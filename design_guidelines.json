@@ -1,0 +1,96 @@
+{
+  "theme": "Soft Utility mixed with Swiss High-Contrast. Light mode priority for high visibility in retail environments.",
+  "typography": {
+    "headings": {
+      "font": "Cabinet Grotesk",
+      "rules": "Tight tracking (tracking-tight). Use text-2xl to text-4xl for dashboard section headers. Never center-align unless explicitly needed for balance."
+    },
+    "body": {
+      "font": "Manrope",
+      "rules": "Crisp and legible. Use text-slate-600 for secondary information."
+    },
+    "mono": {
+      "font": "JetBrains Mono",
+      "rules": "Use exclusively for measurements (e.g., 2000x1000mm), SKU codes, and price values to give a precise, technical feel."
+    }
+  },
+  "colors": {
+    "backgrounds": {
+      "primary": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "glass": "bg-white/70 backdrop-blur-xl border-b border-slate-200"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#64748B"
+    },
+    "categories": {
+      "construcao": { "bg": "#FFEDD5", "text": "#EA580C", "border": "#FDBA74" },
+      "bricolage": { "bg": "#DBEAFE", "text": "#2563EB", "border": "#BFDBFE" },
+      "decoracao": { "bg": "#F3E8FF", "text": "#9333EA", "border": "#E9D5FF" },
+      "jardim": { "bg": "#DCFCE7", "text": "#16A34A", "border": "#BBF7D0" }
+    },
+    "actions": {
+      "primary": "#0F172A",
+      "success": "#10B981",
+      "warning": "#F59E0B"
+    }
+  },
+  "visual enhancers": {
+    "shadows": "Soft, ambient shadows for floating cards (shadow-lg shadow-slate-200/50).",
+    "borders": "1px solid borders (border-slate-200) for structural elements, 2px for active focus states.",
+    "radii": "rounded-2xl for main note cards, rounded-xl for inner elements, rounded-full for category pills and badges."
+  },
+  "component name": {
+    "NoteCard": "Card layout: Client Name (bold) + Phone (subtle text-sm). Top-right category badge. A dedicated 'technical specs' block using monospace for 'medidas' (measurements). Include an 'Anexos' icon and a 'Pedir Preços' CTA.",
+    "BottomNav": "Fixed bottom navigation for mobile with glassmorphism background. 4 tabs: Início, Clientes, Fornecedores, Tarefas.",
+    "FloatingActionButton": "Bottom-right, highly visible dark slate color, triggers a 'Nova Nota' modal. Must be slightly lifted with shadow.",
+    "SupplierQuoteCompare": "Bento-grid module. Displays supplier prices side-by-side. The lowest price should be automatically highlighted with a subtle green border and a 'Melhor Preço' label.",
+    "QuoteRequestModal": "Slide-over or modal UI allowing the manager to select a supplier, preview an auto-generated email template requesting a quote for specific 'medidas', and an 'Enviar Email' button.",
+    "SectionFilter": "Horizontal scrolling list of pill buttons to filter the dashboard by Construção, Bricolagem, Decoração, and Jardim."
+  },
+  "grids": {
+    "dashboard": "Bento grid (grid-cols-1 md:grid-cols-4). High density for data correlation. Wide gaps (gap-6) for breathing room."
+  },
+  "layouts": {
+    "overall": "Mobile-first, optimized for thumb reach on the store floor. 'One cognitive decision per screen'.",
+    "desktop": "Sidebar navigation instead of bottom nav. Split pane: notes list on the left, active note/quote comparison on the right."
+  },
+  "motion": {
+    "interactions": "Translate-y-1 on hover for interactive cards. Scale 0.98 on active (click).",
+    "transitions": "Smooth layout animations when filtering categories (using framer-motion layout prop).",
+    "micro": "Pulse animation for pending actions or newly received quotes."
+  },
+  "accessibility": {
+    "contrast": "Ensure text contrast on category badges is APCA compliant.",
+    "testing": "All interactive and key informational elements MUST include data-testid (e.g., 'data-testid=\"filter-jardim\"')."
+  },
+  "media": "Use lucide-react icons for visual context (e.g., Hammer, Paintbrush, Flower, Sofa).",
+  "3d libraries": "Not required for this utility dashboard.",
+  "image urls": [
+    {
+      "url": "https://images.unsplash.com/photo-1508450859948-4e04fabaa4ea?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNTl8MHwxfHNlYXJjaHwxfHxidWlsZGluZyUyMG1hdGVyaWFscyUyMGNvbnN0cnVjdGlvbnxlbnwwfHx8fDE3ODM4ODQ3NzB8MA&ixlib=rb-4.1.0&q=85",
+      "category": "Construção Empty State",
+      "description": "Concrete building construction image for the Construção section background or empty state."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1653842647973-e90f561ae690?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwzfHxnYXJkZW4lMjBwbGFudHMlMjBudXJzZXJ5fGVufDB8fHx8MTc4Mzg4NDc3MHww&ixlib=rb-4.1.0&q=85",
+      "category": "Jardim Empty State",
+      "description": "Plants nursery image for the Jardim section background or empty state."
+    }
+  ],
+  "instructions_to_main_agent": "Build a responsive React application using Tailwind CSS. Focus on the Bricomarché manager's workflow. Ensure the 'Supplier Quote Compare' and 'Quote Request' interfaces are fully mocked and robust. Use lucide-react for icons. Do not use placeholders for missing functionalities; mock the UI effectively. Ensure language is European Portuguese (pt-PT). IMPORTANT: You have .js files not .tsx files, so write standard React JSX in .js files. Use Framer Motion for list filtering animations. Integrate sonner for toasts.",
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this.",
+    "Do not use dark colors as gradients.",
+    "Do not make generic centered layouts.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters.",
+    "Do not apply universal transitions (`transition: all`).",
+    "Do not center align the app container.",
+    "Always use modern button styles.",
+    "Never use emoji characters like 🤖🧠💭💡🔮🎯 for icons.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Ensure all interactive elements have a `data-testid` attribute in kebab-case."
+  ]
+}
