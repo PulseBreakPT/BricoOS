@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,8 +14,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Trash2, Send, Copy, Mail, Plus, Trophy, Loader2, AlertCircle, CheckCircle2,
-  ArrowRight, Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
-  BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
+  Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
+  BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
+  Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud,
 } from "lucide-react";
 import api, { API } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
@@ -23,14 +24,17 @@ import { STATUS_ORDER, getStatusCfg, getPriorityCfg, PRIORITY_ORDER, PRIORITY_CO
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
-  category: "construcao", measurements: "", priority: "media", labels: [],
-  supplier_id: "", sla_days: 2,
+  category: "construcao", measurements: "", quantity: "", color: "", reference: "",
+  priority: "media", labels: [], supplier_id: "", sla_days: 2, reminder_interval_days: 3,
 };
+
+const DRAFT_KEY = "brico_draft_new_note";
 
 const ACT_ICONS = {
   created: Sparkles, status_change: ArrowRightLeft, priority_change: Flag,
   quote_added: Receipt, quote_removed: Trash2, quote_approved: BadgeCheck,
   email_sent: Send, comment: MessageSquare, updated: Pencil, task_added: Bell,
+  client_contact: MessageSquare, auto_archived: Cloud,
 };
 
 const buildEmail = (n) => {
@@ -40,7 +44,10 @@ const buildEmail = (n) => {
     "Somos o Bricomarché de Faro e gostaríamos de solicitar um orçamento para o seguinte artigo:", "",
     `Artigo: ${n.description || "-"}`,
   ];
+  if (n.reference) lines.push(`Referência: ${n.reference}`);
   if (n.measurements) lines.push(`Medidas: ${n.measurements}`);
+  if (n.quantity) lines.push(`Quantidade: ${n.quantity}`);
+  if (n.color) lines.push(`Cor / acabamento: ${n.color}`);
   if (n.details) lines.push(`Notas: ${n.details}`);
   lines.push("", "Agradecemos o envio do melhor preço e prazo de entrega disponíveis.", "",
     "Com os melhores cumprimentos,", "Bricomarché Faro");
@@ -53,6 +60,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [form, setForm] = useState(emptyForm);
   const [tab, setTab] = useState("detalhes");
   const [saving, setSaving] = useState(false);
+  const [autoState, setAutoState] = useState("idle"); // idle | saving | saved
 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -64,10 +72,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [emailSupplier, setEmailSupplier] = useState("");
   const [emailData, setEmailData] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
+  const [isReminder, setIsReminder] = useState(false);
   const [newQuote, setNewQuote] = useState({ supplier_name: "", product: "", price: "", notes: "" });
 
+  // Assistant data
+  const [assist, setAssist] = useState({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
+  const [dupWarn, setDupWarn] = useState([]);
+
   const isCreate = !id;
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const dirty = useRef(false);
+  const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
     const [q, a, t] = await Promise.all([
@@ -83,6 +97,20 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     setNote(data);
     setForm({ ...emptyForm, ...data });
     setEmailData(buildEmail(data));
+    dirty.current = false;
+  }, []);
+
+  const loadAssistant = useCallback(async (nid) => {
+    try {
+      const [p, h, s, a, d] = await Promise.all([
+        api.get(`/notes/${nid}/preflight`),
+        api.get(`/notes/${nid}/client-history`),
+        api.get(`/notes/${nid}/smart-suggestions`),
+        api.get(`/notes/${nid}/alternatives`),
+        api.get(`/notes/${nid}/duplicates`),
+      ]);
+      setAssist({ preflight: p.data, history: h.data, suggestions: s.data, alternatives: a.data, duplicates: d.data });
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -90,14 +118,75 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
       setId(noteId);
       setTab("detalhes");
       setEmailSupplier("");
+      setIsReminder(false);
+      setDupWarn([]);
+      setAutoState("idle");
+      setAssist({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
       setNewQuote({ supplier_name: "", product: "", price: "", notes: "" });
-      if (noteId) { loadNote(noteId); loadSub(noteId); }
-      else { setNote(null); setForm(emptyForm); setQuotes([]); setActivities([]); setTasks([]); }
+      dirty.current = false;
+      if (noteId) {
+        loadNote(noteId); loadSub(noteId);
+      } else {
+        // recover draft if exists
+        let draft = null;
+        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch { draft = null; }
+        if (draft && (draft.customer_name || draft.description || draft.phone)) {
+          setForm({ ...emptyForm, ...draft });
+          toast.message("Rascunho recuperado", { description: "Continuámos de onde ficou." });
+        } else {
+          setForm(emptyForm);
+        }
+        setNote(null); setQuotes([]); setActivities([]); setTasks([]);
+      }
     }
   }, [open, noteId, loadNote, loadSub]);
 
+  // Load assistant lazily when tab is opened
+  useEffect(() => {
+    if (open && id && tab === "assistente" && !assist.preflight) loadAssistant(id);
+  }, [open, id, tab, assist.preflight, loadAssistant]);
+
+  // Autosave (existing notes) / draft (new notes)
+  useEffect(() => {
+    if (!open) return;
+    if (isCreate) {
+      if (dirty.current) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* noop */ } }
+      return;
+    }
+    if (!id || !dirty.current) return;
+    setAutoState("saving");
+    const t = setTimeout(async () => {
+      try {
+        await api.put(`/notes/${id}`, {
+          customer_name: form.customer_name, phone: form.phone, email: form.email,
+          description: form.description, details: form.details, category: form.category,
+          measurements: form.measurements, quantity: form.quantity, color: form.color,
+          reference: form.reference, sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
+        });
+        setAutoState("saved");
+        dirty.current = false;
+        onChanged && onChanged();
+      } catch { setAutoState("idle"); }
+    }, 900);
+    return () => clearTimeout(t);
+  }, [form, id, isCreate, open]);
+
+  // Duplicate detection while creating
+  useEffect(() => {
+    if (!open || !isCreate) return;
+    const phone = form.phone.trim(); const name = form.customer_name.trim();
+    if (!phone && !name) { setDupWarn([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.post("/notes/check-duplicate", { phone, customer_name: name, description: form.description });
+        setDupWarn(data.matches || []);
+      } catch { setDupWarn([]); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [form.phone, form.customer_name, form.description, isCreate, open]);
+
   const refresh = async () => {
-    if (id) { await loadNote(id); await loadSub(id); }
+    if (id) { await loadNote(id); await loadSub(id); if (tab === "assistente") loadAssistant(id); }
     onChanged && onChanged();
   };
 
@@ -111,9 +200,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
         const { data } = await api.post("/notes", form);
         setId(data.id); setNote(data);
         await loadSub(data.id);
+        localStorage.removeItem(DRAFT_KEY);
+        dirty.current = false;
         toast.success("Pedido criado");
       } else {
         await api.put(`/notes/${id}`, form);
+        dirty.current = false;
         toast.success("Alterações guardadas");
         await refresh();
       }
@@ -148,18 +240,46 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     onChanged && onChanged();
     onOpenChange(false);
   };
+  const resolveNote = async () => {
+    await api.post(`/notes/${id}/resolve`);
+    toast.success("Pedido resolvido e arquivado");
+    await refresh();
+  };
+  const reopenNote = async () => {
+    await api.post(`/notes/${id}/reopen`);
+    toast.success("Pedido reaberto");
+    await refresh();
+  };
+
+  const applySuggestedSupplier = async () => {
+    const sup = assist.suggestions?.suggested_supplier;
+    if (!sup) return;
+    set("supplier_id", sup.id);
+    await api.put(`/notes/${id}`, { supplier_id: sup.id });
+    dirty.current = false;
+    toast.success(`Fornecedor sugerido aplicado: ${sup.name}`);
+    await refresh();
+  };
+  const applySuggestedReminder = async () => {
+    const days = assist.suggestions?.suggested_reminder_days;
+    if (!days) return;
+    set("reminder_interval_days", days);
+    await api.put(`/notes/${id}`, { reminder_interval_days: days });
+    dirty.current = false;
+    toast.success(`Lembrete configurado para ${days} dia(s)`);
+  };
 
   const addLabel = async (val) => {
     const v = (val || labelInput).trim();
     if (!v || form.labels.includes(v)) { setLabelInput(""); return; }
     const labels = [...form.labels, v];
     set("labels", labels); setLabelInput("");
-    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); await refresh(); }
+    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); dirty.current = false; await refresh(); }
   };
   const removeLabel = async (val) => {
     const labels = form.labels.filter((l) => l !== val);
     set("labels", labels);
-    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); await refresh(); }
+    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); dirty.current = false; await refresh(); }
   };
 
   const addComment = async () => {
@@ -195,6 +315,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     await refresh();
   };
 
+  // Load template (autofill by supplier / reminder) when supplier or reminder toggled
+  const loadTemplate = async (supplierId, reminder) => {
+    try {
+      const { data } = await api.get(`/notes/${id}/quote-template`, { params: { supplier_id: supplierId || "", is_reminder: reminder } });
+      setEmailData({ subject: data.subject, body: data.body });
+    } catch { setEmailData(buildEmail({ ...form })); }
+  };
+
   const copyEmail = () => {
     navigator.clipboard.writeText(`${emailData.subject}\n\n${emailData.body}`);
     toast.success("Email copiado");
@@ -204,9 +332,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     setSending(true);
     try {
       await api.post(`/notes/${id}/send-quote-request`, {
-        supplier_id: emailSupplier, subject: emailData.subject, body: emailData.body,
+        supplier_id: emailSupplier, subject: emailData.subject, body: emailData.body, is_reminder: isReminder,
       });
-      toast.success("Email enviado ao fornecedor!");
+      toast.success(isReminder ? "Lembrete enviado!" : "Email enviado ao fornecedor!");
       await refresh();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Erro ao enviar email");
@@ -218,6 +346,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const lowest = quotes.length ? Math.min(...quotes.filter((q) => q.price > 0).map((q) => q.price)) : null;
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
+  const pf = assist.preflight;
+  const sg = assist.suggestions;
+  const hist = assist.history;
+  const alt = assist.alternatives;
+  const dups = assist.duplicates?.matches || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,16 +358,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
         data-testid="note-dialog"
         className="flex max-h-[94vh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:w-full"
       >
-        {/* Header */}
+        {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-5 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
                 {isCreate ? "Novo pedido de orçamento" : (form.customer_name || "Pedido")}
               </DialogTitle>
-              <p className="mt-0.5 truncate text-xs text-slate-500">
+              <p className="mt-0.5 flex items-center gap-2 truncate text-xs text-slate-500">
                 {isCreate ? "Registe o pedido do cliente" : (form.phone || "Sem telefone")}
                 {!isCreate && note ? ` · atualizado ${timeAgo(note.updated_at)}` : ""}
+                {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
+                {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
               </p>
             </div>
             {!isCreate && note ? (
@@ -272,6 +407,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                   <Zap className="mr-1.5 h-3.5 w-3.5" /> {note.next_status_label}
                 </Button>
               ) : null}
+              {note.archived ? (
+                <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 rounded-lg">Reabrir</Button>
+              ) : (
+                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
+                </Button>
+              )}
               <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="ml-auto h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50">
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -289,17 +431,29 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
 
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-slate-100 px-5 pt-3 sm:px-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="text-xs">Detalhes</TabsTrigger>
+              <TabsTrigger value="assistente" data-testid="tab-assistente" className="text-xs" disabled={isCreate}>Assistente</TabsTrigger>
               <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
               <TabsTrigger value="cronologia" data-testid="tab-cronologia" className="text-xs" disabled={isCreate}>Cronologia</TabsTrigger>
-              <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="text-xs" disabled={isCreate}>Tarefas</TabsTrigger>
+              <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="text-xs" disabled={isCreate}>Lembretes</TabsTrigger>
             </TabsList>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
             {/* DETALHES */}
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
+              {isCreate && dupWarn.length > 0 ? (
+                <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {dupWarn.map((d) => (
+                      <li key={d.id} className="text-xs">• {d.customer_name} — {d.description || "sem descrição"} <span className="opacity-70">({getStatusCfg(d.status).label})</span></li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Nome do cliente</Label>
@@ -308,6 +462,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 <div className="space-y-1.5">
                   <Label>Telefone</Label>
                   <Input data-testid="input-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} className="font-mono" placeholder="917100512" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Email do cliente</Label>
+                  <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Referência do artigo</Label>
+                  <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
@@ -329,9 +493,19 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                   <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="2000x1000mm" />
                 </div>
               </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Quantidade</Label>
+                  <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Cor / acabamento</Label>
+                  <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Branco RAL 9016" />
+                </div>
+              </div>
               <div className="mt-4 space-y-1.5">
                 <Label>Notas adicionais</Label>
-                <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, cor, referência, prazo..." />
+                <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
               </div>
 
               {/* Labels */}
@@ -360,20 +534,24 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 </div>
               </div>
 
+              <div className="mt-4 space-y-1.5">
+                <Label>Fornecedor preferido</Label>
+                <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Fornecedor preferido</Label>
-                  <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
-                    <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-1.5">
                   <Label>Prazo alerta (dias)</Label>
                   <Input data-testid="input-sla" type="number" min={1} value={form.sla_days} onChange={(e) => set("sla_days", parseInt(e.target.value) || 2)} className="font-mono" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Lembrete a cada (dias)</Label>
+                  <Input data-testid="input-reminder-interval" type="number" min={1} value={form.reminder_interval_days} onChange={(e) => set("reminder_interval_days", parseInt(e.target.value) || 3)} className="font-mono" />
                 </div>
               </div>
 
@@ -381,6 +559,118 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {isCreate ? "Criar pedido" : "Guardar alterações"}
               </Button>
+            </TabsContent>
+
+            {/* ASSISTENTE */}
+            <TabsContent value="assistente" className="mt-0 focus-visible:outline-none">
+              {!pf ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Smart suggestion */}
+                  <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-violet-900"><Lightbulb className="h-4 w-4" /> Sugestão do assistente</h4>
+                    {sg?.learned && sg?.suggested_supplier ? (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-white p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900">{sg.suggested_supplier.name}</p>
+                            <p className="truncate text-xs text-slate-500">{sg.supplier_reason}</p>
+                          </div>
+                          <Button data-testid="apply-suggested-supplier" size="sm" className="h-8 shrink-0 rounded-lg text-xs" onClick={applySuggestedSupplier}>Aplicar</Button>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-white p-3">
+                          <p className="text-xs text-slate-600">Lembrete sugerido: <b>{sg.suggested_reminder_days} dia(s)</b></p>
+                          <Button data-testid="apply-suggested-reminder" size="sm" variant="outline" className="h-8 shrink-0 rounded-lg text-xs" onClick={applySuggestedReminder}>Aplicar</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-violet-700/80">Ainda a aprender. Quando enviar mais pedidos, o assistente começa a sugerir o fornecedor automaticamente.</p>
+                    )}
+                  </section>
+
+                  {/* Preflight checklist */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900">
+                      <ClipboardCheck className="h-4 w-4" /> Antes de enviar {pf.product_label ? `· ${pf.product_label}` : ""}
+                    </h4>
+                    {pf.missing.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {pf.missing.map((m) => <span key={m} className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Falta: {m}</span>)}
+                      </div>
+                    ) : (
+                      <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Toda a informação essencial está preenchida.</p>
+                    )}
+                    {pf.warnings.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {pf.warnings.map((w, i) => <p key={i} className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {w}</p>)}
+                      </div>
+                    ) : null}
+                    <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Checklist</p>
+                    <ul className="mt-1 space-y-1">
+                      {pf.checklist.map((c) => <li key={c} className="flex items-start gap-1.5 text-xs text-slate-600"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /> {c}</li>)}
+                    </ul>
+                  </section>
+
+                  {/* Duplicates */}
+                  {dups.length > 0 ? (
+                    <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-amber-900"><GitCompare className="h-4 w-4" /> Possíveis duplicados</h4>
+                      <div className="mt-2 space-y-1.5">
+                        {dups.map((d) => (
+                          <div key={d.id} className="rounded-lg bg-white p-2.5 text-xs">
+                            <p className="font-semibold text-slate-900">{d.customer_name} — {d.description}</p>
+                            <p className="text-slate-500">{d.match_reasons.join(" · ")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {/* Client history */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><History className="h-4 w-4" /> Histórico do cliente</h4>
+                    {hist ? (
+                      <div className="mt-2 space-y-2 text-xs">
+                        <p className="text-slate-600">{hist.past_count} pedido(s) anterior(es) deste cliente.</p>
+                        {hist.suppliers_used?.length ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-slate-400">Fornecedores usados:</span>
+                            {hist.suppliers_used.map((s) => <span key={s} className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{s}</span>)}
+                          </div>
+                        ) : null}
+                        {hist.reusable_quotes?.length ? (
+                          <div className="space-y-1">
+                            <p className="font-semibold text-slate-700">Orçamentos reutilizáveis (artigo semelhante):</p>
+                            {hist.reusable_quotes.map((q) => (
+                              <div key={q.id} className="flex items-center justify-between rounded-lg bg-slate-50 p-2">
+                                <span className="text-slate-700">{q.supplier_name} · {q.from_customer}</span>
+                                <span className="font-mono font-bold text-slate-900">{q.price?.toFixed(2)} €</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : <p className="mt-2 text-xs text-slate-400">Sem histórico.</p>}
+                  </section>
+
+                  {/* Alternatives */}
+                  {alt?.suggest_alternatives ? (
+                    <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Sem resposta após {alt.reminder_count} lembretes</h4>
+                      <p className="mt-1 text-xs text-orange-800">Considere fornecedores alternativos:</p>
+                      <div className="mt-2 space-y-1.5">
+                        {alt.alternatives.map((s) => (
+                          <div key={s.id} className="flex items-center justify-between rounded-lg bg-white p-2 text-xs">
+                            <span className="font-semibold text-slate-900">{s.name}{s.email ? "" : " · (sem email)"}</span>
+                            {s.avg_hours != null ? <span className="text-slate-500">~{s.avg_hours}h resposta</span> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              )}
             </TabsContent>
 
             {/* ORCAMENTOS */}
@@ -408,7 +698,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 )}
                 <div className="mt-4 space-y-1.5">
                   <Label>Fornecedor</Label>
-                  <Select value={emailSupplier} onValueChange={setEmailSupplier}>
+                  <Select value={emailSupplier} onValueChange={(v) => { setEmailSupplier(v); loadTemplate(v, isReminder); }}>
                     <SelectTrigger data-testid="select-email-supplier"><SelectValue placeholder="Escolher fornecedor..." /></SelectTrigger>
                     <SelectContent>
                       {suppliers.length === 0 ? (
@@ -422,6 +712,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                     <p className="text-xs text-red-500">Este fornecedor não tem email.</p>
                   ) : null}
                 </div>
+                <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <Checkbox data-testid="reminder-checkbox" checked={isReminder} onCheckedChange={(v) => { setIsReminder(!!v); loadTemplate(emailSupplier, !!v); }} /> Enviar como lembrete
+                </label>
                 <div className="mt-3 space-y-1.5">
                   <Label>Assunto</Label>
                   <Input data-testid="input-email-subject" value={emailData.subject} onChange={(e) => setEmailData((d) => ({ ...d, subject: e.target.value }))} />
@@ -432,7 +725,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button data-testid="send-email-btn" onClick={sendEmail} disabled={sending || !gmailStatus?.connected} className="rounded-xl">
-                    {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Enviar por Gmail
+                    {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} {isReminder ? "Enviar lembrete" : "Enviar por Gmail"}
                   </Button>
                   <Button data-testid="copy-email-btn" variant="outline" onClick={copyEmail} className="rounded-xl">
                     <Copy className="mr-2 h-4 w-4" /> Copiar email
@@ -509,7 +802,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
               </div>
             </TabsContent>
 
-            {/* TAREFAS */}
+            {/* TAREFAS / LEMBRETES */}
             <TabsContent value="tarefas" className="mt-0 focus-visible:outline-none">
               <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row">
                 <Input data-testid="note-task-title" value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} placeholder="Novo lembrete..." className="flex-1" />

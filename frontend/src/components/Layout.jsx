@@ -1,12 +1,13 @@
 import { NavLink, useLocation, Outlet } from "react-router-dom";
-import { LayoutDashboard, Users, Truck, ListChecks, Hammer } from "lucide-react";
+import { Sun, ClipboardList, Truck, ListChecks, BarChart3, Hammer } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 
 const NAV = [
-  { to: "/", label: "Início", icon: LayoutDashboard, testid: "nav-inicio", end: true },
-  { to: "/clientes", label: "Pedidos", icon: Users, testid: "nav-clientes" },
+  { to: "/", label: "Hoje", icon: Sun, testid: "nav-hoje", end: true },
+  { to: "/clientes", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes" },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck, testid: "nav-fornecedores" },
   { to: "/tarefas", label: "Tarefas", icon: ListChecks, testid: "nav-tarefas" },
+  { to: "/estatisticas", label: "Estatísticas", icon: BarChart3, testid: "nav-estatisticas" },
 ];
 
 const Brand = () => (
@@ -55,9 +56,9 @@ export default function Layout() {
           })}
         </nav>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-semibold text-slate-900">Nenhum pedido esquecido</p>
+          <p className="text-xs font-semibold text-slate-900">Nunca esquecer</p>
           <p className="mt-1 text-xs text-slate-500">
-            Alertas automáticos avisam quando um pedido está parado ou sem resposta.
+            Pedidos sem ação regressam ao topo até serem tratados. Atalhos: N novo · / procurar · F foco.
           </p>
         </div>
       </aside>

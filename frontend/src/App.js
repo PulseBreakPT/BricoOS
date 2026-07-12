@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Layout from "@/components/Layout";
+import Today from "@/pages/Today";
 import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import Suppliers from "@/pages/Suppliers";
@@ -13,7 +14,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Today />} />
+            <Route path="/estatisticas" element={<Dashboard />} />
             <Route path="/clientes" element={<Notes />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/tarefas" element={<Tasks />} />

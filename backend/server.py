@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import re
+import difflib
 import logging
 import uuid
 import base64
@@ -49,7 +50,9 @@ STATUSES = [
 CLOSED_STATUSES = {"concluido", "cancelado", "rejeitado"}
 ARCHIVE_STATUSES = {"concluido", "cancelado"}
 WAITING_SUPPLIER = {"enviado_fornecedor", "aguarda_fornecedor"}
+WAITING_CLIENT = {"aguarda_cliente"}
 FORGOTTEN_STATUSES = {"novo", "pendente", "em_preparacao"}
+AUTO_CLOSE_MONTHS = int(os.environ.get("AUTO_CLOSE_MONTHS", "6"))
 PRIORITIES = ["urgente", "alta", "media", "baixa"]
 PRIORITY_RANK = {"urgente": 0, "alta": 1, "media": 2, "baixa": 3}
 STATUS_LABEL = {
@@ -124,8 +127,29 @@ def enrich_note(note, now=None):
     cli = parse_dt(note.get("last_client_contact_at"))
     note["days_since_supplier"] = (now - sup).days if sup else None
     note["days_since_client"] = (now - cli).days if cli else None
+    # ---- Assistant computed fields ----
+    note["waiting_on"] = compute_waiting_on(status)
+    note["reminder_count"] = note.get("reminder_count", 0) or 0
+    ri = note.get("reminder_interval_days") or 3
+    dsup = note["days_since_supplier"]
+    note["reminder_due"] = bool(status in WAITING_SUPPLIER and dsup is not None and dsup >= ri)
+    pt = detect_product_type(note)
+    note["product_type"] = pt
+    note["product_label"] = PRODUCT_TYPES.get(pt, {}).get("label") if pt else None
+    note["measurement_warnings"] = measurement_warnings(note)
+    note["client_waiting_days"] = (note["days_since_client"] if status in ("aguarda_cliente", "orcamento_recebido") else None)
     note.pop("_id", None)
     return note
+
+
+def compute_waiting_on(status):
+    if status in CLOSED_STATUSES:
+        return "none"
+    if status in WAITING_SUPPLIER:
+        return "supplier"
+    if status in WAITING_CLIENT:
+        return "client"
+    return "me"
 
 
 async def compute_response():
@@ -158,6 +182,159 @@ async def compute_response():
     return avg, fastest, per_sup_avg, sent
 
 
+# ---------- Assistant: product intelligence & learning ----------
+PRODUCT_TYPES = {
+    "janela": {"label": "Janela",
+               "keywords": ["janela", "janelas", "sótão", "sotao", "oscilo", "batente"],
+               "checklist": ["Medidas (largura × altura)", "Tipo de abertura (batente/correr/oscilo-batente)",
+                             "Lado de abertura (direita/esquerda)", "Cor / acabamento",
+                             "Tipo de vidro (simples/duplo)", "Com ou sem corte térmico"]},
+    "porta": {"label": "Porta",
+              "keywords": ["porta", "portas", "portão", "portao"],
+              "checklist": ["Medidas (largura × altura)", "Sentido de abertura", "Material",
+                            "Cor / acabamento", "Fechadura / puxador incluído?"]},
+    "madeira": {"label": "Madeira",
+                "keywords": ["madeira", "tábua", "tabua", "bancada", "prateleira", "viga", "mdf", "contraplacado"],
+                "checklist": ["Dimensões (comprimento × largura × espessura)", "Tipo de madeira",
+                              "Tratamento / acabamento", "Quantidade"]},
+    "sanitario": {"label": "Sanitário",
+                  "keywords": ["wc", "sanita", "duche", "cabine", "torneira", "lavatório", "lavatorio",
+                               "tampa", "banheira", "chuveiro", "base de duche", "autoclismo"],
+                  "checklist": ["Medidas", "Cor / acabamento", "Referência / modelo", "Quantidade"]},
+    "tinta": {"label": "Tinta",
+              "keywords": ["tinta", "verniz", "primário", "primario", "esmalte"],
+              "checklist": ["Cor / código", "Acabamento (mate/acetinado/brilhante)",
+                            "Litros / quantidade", "Interior ou exterior"]},
+    "rede": {"label": "Rede mosquiteira",
+             "keywords": ["rede", "mosquiteira", "mosquiteiro", "fole"],
+             "checklist": ["Medidas (largura × altura)", "Tipo (fixa/fole/rolo)", "Cor do perfil"]},
+    "jardim_prod": {"label": "Jardim / Exterior",
+                    "keywords": ["churrasqueira", "planta", "rega", "relva", "vaso", "piscina", "sombra"],
+                    "checklist": ["Dimensões / modelo", "Quantidade", "Material / acabamento"]},
+}
+
+DIM_RX = re.compile(r"(\d{2,7})\s*[xX×]\s*(\d{2,7})(?:\s*[xX×]\s*(\d{2,7}))?")
+
+
+def detect_product_type(note):
+    text = f"{note.get('description', '')} {note.get('details', '')} {note.get('reference', '')}".lower()
+    for key, cfg in PRODUCT_TYPES.items():
+        if any(k in text for k in cfg["keywords"]):
+            return key
+    return None
+
+
+def parse_dims(measurements):
+    dims = []
+    for m in DIM_RX.finditer(measurements or ""):
+        for g in m.groups():
+            if g:
+                dims.append(int(g))
+    return dims
+
+
+def measurement_warnings(note):
+    warns = []
+    dims = parse_dims(note.get("measurements", ""))
+    for d in dims:
+        if d > 6000:
+            warns.append(f"Medida invulgar: {d} mm parece demasiado grande (será {d // 10} mm?).")
+    if len(dims) >= 2:
+        big, small = max(dims), min(dims)
+        if small > 0 and big / small > 20:
+            warns.append("Proporção invulgar entre as medidas — confirme os valores.")
+    return warns
+
+
+def normalize_text(s):
+    s = (s or "").lower()
+    s = re.sub(r"[^a-z0-9áàâãéèêíïóôõöúùüçñ ]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def token_similarity(a, b):
+    a, b = normalize_text(a), normalize_text(b)
+    sa, sb = set(a.split()), set(b.split())
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+def ref_similarity(a, b):
+    a, b = normalize_text(a), normalize_text(b)
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+
+async def learning_profile():
+    """Motor de aprendizagem: observa o histórico e deriva hábitos do chefe de loja."""
+    notes = await db.notes.find({}, {"_id": 0}).to_list(5000)
+    acts = await db.activities.find({"type": "email_sent"}, {"_id": 0}).to_list(20000)
+    quotes = await db.quotes.find({"approved": True}, {"_id": 0}).to_list(20000)
+    reqs = await db.quote_requests.find({}, {"_id": 0}).to_list(20000)
+    note_by_id = {n["id"]: n for n in notes}
+    by_cat, by_pt = {}, {}
+
+    def add(d, key, name, w=1):
+        if not key or not name:
+            return
+        d.setdefault(key, {}).setdefault(name, 0)
+        d[key][name] += w
+
+    for a in acts:
+        n = note_by_id.get(a.get("note_id"))
+        name = (a.get("meta") or {}).get("supplier_name")
+        if n and name:
+            add(by_cat, n.get("category"), name, 1)
+            add(by_pt, detect_product_type(n), name, 1)
+    for qd in quotes:  # approved quotes weigh more (a decision was taken)
+        n = note_by_id.get(qd.get("note_id"))
+        name = qd.get("supplier_name")
+        if n and name:
+            add(by_cat, n.get("category"), name, 2)
+            add(by_pt, detect_product_type(n), name, 2)
+
+    def rank(d):
+        return {k: sorted([{"name": nm, "count": c} for nm, c in v.items()], key=lambda x: -x["count"])
+                for k, v in d.items()}
+
+    firstsend, reminder_gaps = {}, []
+    for r in sorted(reqs, key=lambda x: x.get("sent_at", "")):
+        nid = r.get("note_id")
+        dt = parse_dt(r.get("sent_at"))
+        if not dt:
+            continue
+        if not r.get("is_reminder"):
+            firstsend.setdefault(nid, dt)
+        elif nid in firstsend:
+            reminder_gaps.append((dt - firstsend[nid]).days)
+    avg_reminder = round(sum(reminder_gaps) / len(reminder_gaps)) if reminder_gaps else None
+    slas = [n.get("sla_days") for n in notes if n.get("sla_days")]
+    common_sla = max(set(slas), key=slas.count) if slas else None
+    return {"by_category": rank(by_cat), "by_product_type": rank(by_pt),
+            "avg_reminder_days": avg_reminder, "common_sla": common_sla}
+
+
+async def auto_close_inactive():
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=AUTO_CLOSE_MONTHS * 30)
+    notes = await db.notes.find(
+        {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}}, {"_id": 0}).to_list(5000)
+    count = 0
+    for note in notes:
+        ref = parse_dt(note.get("updated_at") or note.get("status_updated_at") or note.get("created_at"))
+        if ref and ref < cutoff:
+            await db.notes.update_one({"id": note["id"]}, {"$set": {
+                "archived": True, "auto_closed": True, "updated_at": now_iso()}})
+            await log_activity(note["id"], "auto_archived",
+                               f"Arquivado automaticamente por inatividade (> {AUTO_CLOSE_MONTHS} meses)")
+            count += 1
+    return count
+
+
+
 # ---------- Models ----------
 class NoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -168,12 +345,15 @@ class NoteIn(BaseModel):
     details: str = ""
     category: str = "construcao"
     measurements: str = ""
+    quantity: str = ""
+    color: str = ""
     reference: str = ""
     status: str = "novo"
     priority: str = "media"
     labels: List[str] = []
     supplier_id: str = ""
     sla_days: int = DEFAULT_SLA_DAYS
+    reminder_interval_days: int = 3
     favorite: bool = False
 
 
@@ -186,12 +366,15 @@ class NotePatch(BaseModel):
     details: Optional[str] = None
     category: Optional[str] = None
     measurements: Optional[str] = None
+    quantity: Optional[str] = None
+    color: Optional[str] = None
     reference: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     labels: Optional[List[str]] = None
     supplier_id: Optional[str] = None
     sla_days: Optional[int] = None
+    reminder_interval_days: Optional[int] = None
     favorite: Optional[bool] = None
 
 
@@ -258,6 +441,7 @@ async def list_notes(
     search: Optional[str] = None, status: Optional[str] = None, priority: Optional[str] = None,
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
     favorite: Optional[bool] = None, overdue: Optional[bool] = None, archived: Optional[bool] = None,
+    waiting: Optional[str] = None, reminder_due: Optional[bool] = None,
     sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
     q = {}
@@ -283,6 +467,10 @@ async def list_notes(
     docs = [enrich_note(d, now) for d in docs]
     if overdue:
         docs = [d for d in docs if d["is_overdue"]]
+    if waiting:
+        docs = [d for d in docs if d["waiting_on"] == waiting]
+    if reminder_due:
+        docs = [d for d in docs if d.get("reminder_due")]
     if sort == "smart":
         docs.sort(key=lambda d: (0 if d["is_overdue"] else 1, PRIORITY_RANK.get(d.get("priority"), 2),
                                  d.get("status_updated_at") or d.get("created_at")))
@@ -314,6 +502,7 @@ async def create_note(payload: NoteIn):
     doc = payload.model_dump()
     doc.update({"id": str(uuid.uuid4()), "created_by": AUTHOR, "archived": False,
                 "last_supplier_sent_at": "", "last_client_contact_at": "",
+                "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido criado para {doc.get('customer_name') or 'cliente'}")
@@ -419,10 +608,12 @@ async def duplicate_note(note_id: str):
     if not src:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     doc = {k: src.get(k, "") for k in ["customer_name", "phone", "email", "description", "details",
-                                        "category", "measurements", "reference", "supplier_id"]}
+                                        "category", "measurements", "quantity", "color", "reference", "supplier_id"]}
     doc.update({"id": str(uuid.uuid4()), "labels": list(src.get("labels", [])), "priority": src.get("priority", "media"),
-                "status": "novo", "sla_days": src.get("sla_days", DEFAULT_SLA_DAYS), "favorite": False,
+                "status": "novo", "sla_days": src.get("sla_days", DEFAULT_SLA_DAYS),
+                "reminder_interval_days": src.get("reminder_interval_days", 3), "favorite": False,
                 "archived": False, "created_by": AUTHOR, "last_supplier_sent_at": "", "last_client_contact_at": "",
+                "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido duplicado de {src.get('customer_name') or 'pedido anterior'}")
@@ -727,6 +918,9 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
     upd = {"last_supplier_sent_at": now_iso(), "status_updated_at": now_iso(), "updated_at": now_iso(), "status": new_status}
     if not payload.is_reminder:
         upd["supplier_id"] = ids[0]
+    if payload.is_reminder:
+        upd["last_reminder_at"] = now_iso()
+        await db.notes.update_one({"id": note_id}, {"$inc": {"reminder_count": 1}})
     await db.notes.update_one({"id": note_id}, {"$set": upd})
     return {"ok": True, "sent_to": sent_names}
 
@@ -779,9 +973,243 @@ async def today():
     items = await build_notifications()
     inbox = await db.notes.find({"status": "novo", "archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).to_list(50)
     inbox = [enrich_note(d, now) for d in inbox]
+    open_docs = await db.notes.find(
+        {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}}, {"_id": 0}).to_list(5000)
+    open_docs = [enrich_note(d, now) for d in open_docs]
+    waiting_me = [d for d in open_docs if d["waiting_on"] == "me"]
+    waiting_supplier = [d for d in open_docs if d["waiting_on"] == "supplier"]
+    waiting_client = [d for d in open_docs if d["waiting_on"] == "client"]
+    waiting_me.sort(key=lambda d: (0 if d["is_overdue"] else 1, PRIORITY_RANK.get(d.get("priority"), 2),
+                                   d.get("status_updated_at") or d.get("created_at")))
+    long_waiting_clients = sorted(
+        [d for d in waiting_client if (d.get("days_since_client") or 0) >= 2],
+        key=lambda d: -(d.get("days_since_client") or 0))
+    reminder_due = [d for d in waiting_supplier if d.get("reminder_due")]
     st = await stats()
     return {"attention": items[:20], "attention_count": len(items), "inbox": inbox,
+            "waiting_me": waiting_me[:60], "waiting_supplier": waiting_supplier[:60],
+            "waiting_client": waiting_client[:60], "long_waiting_clients": long_waiting_clients,
+            "reminder_due": reminder_due, "counts": {
+                "waiting_me": len(waiting_me), "waiting_supplier": len(waiting_supplier),
+                "waiting_client": len(waiting_client), "reminder_due": len(reminder_due)},
             "summary": st["daily"], "potential_value": st["potential_value"]}
+
+
+# ---------- Assistant endpoints (preflight, history, learning, batches) ----------
+@api_router.get("/notes/{note_id}/preflight")
+async def note_preflight(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    pt = detect_product_type(n)
+    checklist = PRODUCT_TYPES.get(pt, {}).get(
+        "checklist", ["Descrição do artigo", "Quantidade", "Medidas", "Referência"])
+    missing = []
+    if not (n.get("measurements") or "").strip():
+        missing.append("Medidas")
+    if not (n.get("quantity") or "").strip():
+        missing.append("Quantidade")
+    if not (n.get("color") or "").strip():
+        missing.append("Cor / acabamento")
+    if not (n.get("reference") or "").strip():
+        missing.append("Referência")
+    warns = measurement_warnings(n)
+    return {"product_type": pt, "product_label": PRODUCT_TYPES.get(pt, {}).get("label"),
+            "checklist": checklist, "missing": missing, "warnings": warns,
+            "ready": len(warns) == 0}
+
+
+@api_router.get("/notes/{note_id}/client-history")
+async def note_client_history(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    ors = []
+    if (n.get("phone") or "").strip():
+        ors.append({"phone": n["phone"].strip()})
+    if (n.get("customer_name") or "").strip():
+        ors.append({"customer_name": {"$regex": re.escape(n["customer_name"].strip()), "$options": "i"}})
+    past = []
+    if ors:
+        raw = await db.notes.find({"id": {"$ne": note_id}, "$or": ors}, {"_id": 0}).sort("created_at", -1).to_list(50)
+        past = [enrich_note(p) for p in raw]
+    ids = [note_id] + [p["id"] for p in past]
+    acts = await db.activities.find({"note_id": {"$in": ids}, "type": "email_sent"}, {"_id": 0}).to_list(500)
+    suppliers_used = list({(a.get("meta") or {}).get("supplier_name") for a in acts if (a.get("meta") or {}).get("supplier_name")})
+    reusable = []
+    for p in past:
+        sim = max(token_similarity(p.get("description"), n.get("description")),
+                  ref_similarity(p.get("reference"), n.get("reference")))
+        if sim >= 0.4:
+            qs = await db.quotes.find({"note_id": p["id"]}, {"_id": 0}).sort("price", 1).to_list(20)
+            for qd in qs:
+                qd["from_customer"] = p.get("customer_name")
+                qd["from_note_id"] = p["id"]
+                qd["similarity"] = round(sim, 2)
+                reusable.append(qd)
+    reusable.sort(key=lambda x: (-x["similarity"], x.get("price", 0)))
+    return {"past_notes": past, "past_count": len(past),
+            "suppliers_used": suppliers_used, "reusable_quotes": reusable[:10]}
+
+
+@api_router.get("/notes/{note_id}/alternatives")
+async def note_alternatives(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    reqs = await db.quote_requests.find({"note_id": note_id}, {"_id": 0}).to_list(200)
+    contacted = {r.get("supplier_id") for r in reqs}
+    reminder_count = n.get("reminder_count", 0) or 0
+    has_quote = await db.quotes.count_documents({"note_id": note_id})
+    suggest = reminder_count >= 2 and has_quote == 0
+    _, _, per_sup_avg, _ = await compute_response()
+    sups = await db.suppliers.find({}, {"_id": 0}).to_list(2000)
+    alts = [s for s in sups if s["id"] not in contacted]
+    same = [s for s in alts if s.get("category") == n.get("category")] or alts
+    same = sorted(same, key=lambda s: (0 if s.get("email") else 1, per_sup_avg.get(s.get("name"), 9999)))
+    for s in same:
+        s["avg_hours"] = per_sup_avg.get(s.get("name"))
+    return {"suggest_alternatives": suggest, "reminder_count": reminder_count,
+            "has_quote": bool(has_quote), "alternatives": same[:5]}
+
+
+@api_router.get("/notes/{note_id}/smart-suggestions")
+async def note_smart_suggestions(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    profile = await learning_profile()
+    cat = n.get("category")
+    pt = detect_product_type(n)
+    by_pt = profile["by_product_type"].get(pt) if pt else None
+    by_cat = profile["by_category"].get(cat)
+    top = by_pt or by_cat
+    sup_doc = None
+    reason = ""
+    confidence = 0.0
+    if top:
+        best = top[0]
+        confidence = round(min(0.95, 0.5 + 0.1 * best["count"]), 2)
+        label = PRODUCT_TYPES.get(pt, {}).get("label") or (cat or "este tipo de pedido")
+        reason = f"Costuma enviar para {best['name']} em {label} ({best['count']}x)"
+        sup_doc = await db.suppliers.find_one({"name": best["name"]}, {"_id": 0})
+    return {"suggested_supplier": sup_doc, "supplier_reason": reason, "confidence": confidence,
+            "suggested_reminder_days": profile["avg_reminder_days"] or 3,
+            "suggested_sla_days": profile["common_sla"] or DEFAULT_SLA_DAYS,
+            "learned": bool(top)}
+
+
+@api_router.get("/notes/{note_id}/duplicates")
+async def note_duplicates(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    others = await db.notes.find({"id": {"$ne": note_id}, "archived": {"$ne": True}}, {"_id": 0}).to_list(2000)
+    matches = []
+    for o in others:
+        score = 0.0
+        reasons = []
+        if (n.get("phone") or "").strip() and o.get("phone") == n.get("phone"):
+            score += 0.5
+            reasons.append("mesmo telefone")
+        dsim = token_similarity(o.get("description"), n.get("description"))
+        if dsim >= 0.5:
+            score += 0.4
+            reasons.append("descrição semelhante")
+        if (n.get("reference") or "").strip():
+            rsim = ref_similarity(o.get("reference"), n.get("reference"))
+            if rsim >= 0.8:
+                score += 0.3
+                reasons.append("referência semelhante")
+        if score >= 0.5:
+            eo = enrich_note(o)
+            eo["match_score"] = round(min(score, 1.0), 2)
+            eo["match_reasons"] = reasons
+            matches.append(eo)
+    matches.sort(key=lambda x: -x["match_score"])
+    return {"matches": matches[:5]}
+
+
+@api_router.get("/notes/{note_id}/quote-template")
+async def note_quote_template(note_id: str, supplier_id: Optional[str] = None, is_reminder: bool = False):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    sup = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0}) if supplier_id else None
+    desc = n.get("description") or "artigo"
+    ref = (n.get("reference") or "").strip()
+    lines = ["Exmos. Senhores,", ""]
+    if is_reminder:
+        lines.append("Voltamos a contactar relativamente ao pedido de orçamento enviado anteriormente:")
+    else:
+        lines.append("Vimos por este meio solicitar orçamento para o seguinte artigo:")
+    lines.append("")
+    lines.append(f"• Artigo: {desc}")
+    if ref:
+        lines.append(f"• Referência: {ref}")
+    if (n.get("measurements") or "").strip():
+        lines.append(f"• Medidas: {n['measurements']}")
+    if (n.get("quantity") or "").strip():
+        lines.append(f"• Quantidade: {n['quantity']}")
+    if (n.get("color") or "").strip():
+        lines.append(f"• Cor / acabamento: {n['color']}")
+    if (n.get("details") or "").strip():
+        lines.append(f"• Notas: {n['details']}")
+    lines += ["", "Agradecemos indicação de preço, prazo de entrega e disponibilidade.", "",
+              "Com os melhores cumprimentos,", "Bricomarché Faro"]
+    prefix = "Lembrete: pedido de orçamento" if is_reminder else "Pedido de orçamento"
+    subject = f"{prefix} - {desc}" + (f" (Ref. {ref})" if ref else "")
+    return {"subject": subject, "body": "\n".join(lines),
+            "supplier": sup, "to": sup.get("email") if sup else ""}
+
+
+@api_router.get("/batches")
+async def supplier_batches():
+    now = datetime.now(timezone.utc)
+    notes = await db.notes.find(
+        {"archived": {"$ne": True}, "status": {"$in": ["novo", "pendente", "em_preparacao"]}}, {"_id": 0}).to_list(2000)
+    profile = await learning_profile()
+    groups = {}
+    for n in notes:
+        sid = n.get("supplier_id")
+        if not sid:
+            pt = detect_product_type(n)
+            cat = n.get("category")
+            top = (profile["by_product_type"].get(pt) if pt else None) or profile["by_category"].get(cat) or []
+            if top:
+                sd = await db.suppliers.find_one({"name": top[0]["name"]}, {"_id": 0})
+                sid = sd["id"] if sd else None
+        if sid:
+            groups.setdefault(sid, []).append(enrich_note(n, now))
+    out = []
+    for sid, ns in groups.items():
+        if len(ns) >= 2:
+            sd = await db.suppliers.find_one({"id": sid}, {"_id": 0})
+            out.append({"supplier": sd, "notes": ns, "count": len(ns)})
+    out.sort(key=lambda x: -x["count"])
+    return {"batches": out}
+
+
+@api_router.get("/learning/profile")
+async def learning_profile_endpoint():
+    p = await learning_profile()
+    habits = []
+    for pt, ranked in p["by_product_type"].items():
+        if pt and ranked:
+            label = PRODUCT_TYPES.get(pt, {}).get("label", pt)
+            habits.append(f"Para {label}, costuma usar {ranked[0]['name']}.")
+    for cat, ranked in p["by_category"].items():
+        if cat and ranked and not any(cat in h for h in habits):
+            habits.append(f"Na secção {cat}, o fornecedor mais usado é {ranked[0]['name']}.")
+    if p["avg_reminder_days"]:
+        habits.append(f"Costuma enviar lembretes ao fim de ~{p['avg_reminder_days']} dia(s).")
+    return {**p, "habits": habits}
+
+
+@api_router.post("/maintenance/auto-close")
+async def maintenance_auto_close():
+    n = await auto_close_inactive()
+    return {"closed": n, "months": AUTO_CLOSE_MONTHS}
 
 
 # ---------- Stats ----------
@@ -866,7 +1294,9 @@ async def migrate():
         await db.notes.update_many({"status": old}, {"$set": {"status": new}})
     defaults = {"priority": "media", "labels": [], "created_by": AUTHOR, "sla_days": DEFAULT_SLA_DAYS,
                 "supplier_id": "", "email": "", "reference": "", "archived": False,
-                "last_supplier_sent_at": "", "last_client_contact_at": ""}
+                "last_supplier_sent_at": "", "last_client_contact_at": "",
+                "quantity": "", "color": "", "reminder_interval_days": 3,
+                "reminder_count": 0, "last_reminder_at": "", "auto_closed": False}
     for k, v in defaults.items():
         await db.notes.update_many({k: {"$exists": False}}, {"$set": {k: v}})
     await db.notes.update_many({"status": {"$in": list(ARCHIVE_STATUSES)}, "archived": {"$ne": True}}, {"$set": {"archived": True}})
@@ -981,6 +1411,7 @@ async def on_startup():
         await migrate()
         await seed()
         await demo_enrich()
+        await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
 
