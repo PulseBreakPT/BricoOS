@@ -12,7 +12,6 @@ export const STATUS_CONFIG = {
   concluido: { label: "Concluído", bg: "#D1FAE5", text: "#166534", dot: "#16A34A" },
   cancelado: { label: "Cancelado", bg: "#F4F4F5", text: "#52525B", dot: "#71717A" },
 };
-
 export const STATUS_ORDER = Object.keys(STATUS_CONFIG);
 export const getStatusCfg = (k) => STATUS_CONFIG[k] || STATUS_CONFIG.novo;
 
@@ -24,12 +23,6 @@ export const PRIORITY_CONFIG = {
 };
 export const PRIORITY_ORDER = ["urgente", "alta", "media", "baixa"];
 export const getPriorityCfg = (k) => PRIORITY_CONFIG[k] || PRIORITY_CONFIG.media;
-
-export const ACTIVITY_ICON = {
-  created: "sparkles", status_change: "arrow-right-left", priority_change: "flag",
-  quote_added: "receipt", quote_removed: "trash-2", quote_approved: "badge-check",
-  email_sent: "send", comment: "message-square", updated: "pencil", task_added: "bell",
-};
 
 export function timeAgo(iso) {
   if (!iso) return "";
@@ -45,16 +38,53 @@ export function timeAgo(iso) {
   return d.toLocaleDateString("pt-PT");
 }
 
-export function formatDateTime(iso) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleString("pt-PT", {
-    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-  });
-}
-
 export function formatHours(h) {
   if (h == null) return "—";
   if (h < 1) return `${Math.round(h * 60)} min`;
   if (h < 24) return `${h.toFixed(1).replace(".0", "")} h`;
   return `${(h / 24).toFixed(1).replace(".0", "")} dias`;
+}
+
+export function formatEuro(v) {
+  if (v == null) return "—";
+  return `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`;
+}
+
+// ---- Email templates by supplier/section type ----
+const INTRO = {
+  geral: "gostaríamos de solicitar um orçamento para o seguinte artigo:",
+  construcao: "gostaríamos de pedir orçamento para o seguinte material de construção:",
+  bricolage: "gostaríamos de pedir orçamento para o seguinte artigo de bricolage:",
+  decoracao: "gostaríamos de pedir orçamento para o seguinte artigo de decoração:",
+  jardim: "gostaríamos de pedir orçamento para o seguinte artigo de jardim:",
+};
+export const TEMPLATE_OPTIONS = [
+  { key: "geral", label: "Geral" },
+  { key: "construcao", label: "Construção" },
+  { key: "bricolage", label: "Bricolagem" },
+  { key: "decoracao", label: "Decoração" },
+  { key: "jardim", label: "Jardim" },
+];
+
+export function buildEmail(note, key = "geral") {
+  const subject = `Pedido de orçamento - ${note.description || "artigo"}`;
+  const lines = ["Boa tarde,", "", `Somos o Bricomarché de Faro e ${INTRO[key] || INTRO.geral}`, "",
+    `Artigo: ${note.description || "-"}`];
+  if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
+  if (note.reference) lines.push(`Referência: ${note.reference}`);
+  if (note.details) lines.push(`Notas: ${note.details}`);
+  lines.push("", "Agradecemos o envio do melhor preço e prazo de entrega disponíveis.", "",
+    "Com os melhores cumprimentos,", "Bricomarché Faro");
+  return { subject, body: lines.join("\n") };
+}
+
+export function buildReminder(note) {
+  const subject = `Lembrete: pedido de orçamento - ${note.description || "artigo"}`;
+  const lines = ["Boa tarde,", "",
+    "Voltamos a contactar relativamente ao pedido de orçamento enviado anteriormente:", "",
+    `Artigo: ${note.description || "-"}`];
+  if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
+  lines.push("", "Agradecíamos a vossa resposta com o preço e prazo de entrega logo que possível.", "",
+    "Com os melhores cumprimentos,", "Bricomarché Faro");
+  return { subject, body: lines.join("\n") };
 }
