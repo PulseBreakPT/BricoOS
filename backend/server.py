@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import re
 import difflib
+import json as _json
 import logging
 import uuid
 import base64
@@ -32,6 +33,9 @@ PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 REDIRECT_URI = f"{PUBLIC_BASE_URL}/api/oauth/gmail/callback"
+
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+AI_MODEL = os.environ.get('AI_MODEL', 'gpt-5.4')
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send", "openid",
@@ -1280,6 +1284,148 @@ async def stats():
         "daily": {"novo": by_status.get("novo", 0), "pendentes": open_notes, "atrasados": overdue,
                   "novos_hoje": new_today, "concluidos_hoje": concluded_today},
     }
+
+
+# ---------- AI (OpenAI Chat Models via emergentintegrations) ----------
+class ParseEmailIn(BaseModel):
+    text: str = ""
+
+
+class ReplyIn(BaseModel):
+    text: str = ""
+
+
+def ai_available():
+    return bool(OPENAI_API_KEY)
+
+
+async def ai_complete(system, prompt, session="brico"):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    chat = LlmChat(api_key=OPENAI_API_KEY, session_id=session, system_message=system).with_model("openai", AI_MODEL)
+    resp = await chat.send_message(UserMessage(text=prompt))
+    return resp if isinstance(resp, str) else str(resp)
+
+
+def extract_json(text):
+    if not text:
+        return None
+    t = text.strip()
+    t = re.sub(r"^```(?:json)?", "", t).strip()
+    t = re.sub(r"```$", "", t).strip()
+    m = re.search(r"\{.*\}", t, re.DOTALL)
+    if m:
+        t = m.group(0)
+    try:
+        return _json.loads(t)
+    except Exception:
+        return None
+
+
+@api_router.get("/ai/status")
+async def ai_status():
+    return {"available": ai_available(), "model": AI_MODEL}
+
+
+@api_router.post("/ai/parse-client-email")
+async def ai_parse_client_email(payload: ParseEmailIn):
+    if not ai_available():
+        raise HTTPException(status_code=400, detail="Integração OpenAI não configurada.")
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Texto vazio.")
+    system = ("És o assistente de uma loja Bricomarché em Portugal. Extrais dados de mensagens/emails de "
+              "clientes para criar um pedido de orçamento. Respondes SEMPRE apenas com JSON válido, sem texto extra.")
+    prompt = (
+        "Do texto seguinte, extrai um pedido de orçamento. Responde APENAS com JSON com as chaves: "
+        "customer_name, phone, email, description, measurements, quantity, color, reference, category.\n"
+        "- category deve ser um de: construcao, bricolage, decoracao, jardim (a mais adequada; se dúvida, construcao).\n"
+        "- description: resumo curto e claro do artigo pedido.\n"
+        "- Se um campo não existir no texto, usa \"\".\n\n"
+        f"Texto:\n\"\"\"{payload.text}\"\"\""
+    )
+    try:
+        raw = await ai_complete(system, prompt, session="parse-email")
+    except Exception as e:
+        logger.error(f"AI parse-client-email falhou: {e}")
+        raise HTTPException(status_code=502, detail="Falha na chamada à OpenAI. Verifique a chave e o saldo.")
+    data = extract_json(raw) or {}
+    allowed = ["customer_name", "phone", "email", "description", "measurements", "quantity", "color", "reference", "category"]
+    out = {k: (str(data.get(k)) if data.get(k) is not None else "") for k in allowed}
+    if out["category"] not in VALID_CATEGORIES:
+        out["category"] = "construcao"
+    return {"parsed": out}
+
+
+@api_router.post("/notes/{note_id}/ai-summary")
+async def ai_note_summary(note_id: str):
+    if not ai_available():
+        raise HTTPException(status_code=400, detail="Integração OpenAI não configurada.")
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    quotes = await db.quotes.find({"note_id": note_id}, {"_id": 0}).sort("price", 1).to_list(50)
+    q_txt = "; ".join([f"{q.get('supplier_name')}: {q.get('price')}€" for q in quotes]) or "nenhum"
+    en = enrich_note(dict(n))
+    ctx = (
+        f"Cliente: {n.get('customer_name') or '—'}\n"
+        f"Contacto: {n.get('phone') or ''} {n.get('email') or ''}\n"
+        f"Artigo: {n.get('description') or '—'}\n"
+        f"Referência: {n.get('reference') or '—'}\n"
+        f"Medidas: {n.get('measurements') or '—'}; Quantidade: {n.get('quantity') or '—'}; Cor: {n.get('color') or '—'}\n"
+        f"Notas: {n.get('details') or '—'}\n"
+        f"Estado: {en.get('status_label')}; Próxima ação: {en.get('next_action')}\n"
+        f"Orçamentos recebidos: {q_txt}\n"
+    )
+    system = "És o assistente de uma loja Bricomarché. Escreves resumos claros e curtos em português de Portugal, sem markdown."
+    prompt = ("Resume este pedido em 2-3 frases claras: o que é, para que cliente, o estado atual e o próximo passo. "
+              "Sem listas nem markdown.\n\n" + ctx)
+    try:
+        txt = (await ai_complete(system, prompt, session=f"summary-{note_id}")).strip()
+    except Exception as e:
+        logger.error(f"AI summary falhou: {e}")
+        raise HTTPException(status_code=502, detail="Falha na chamada à OpenAI. Verifique a chave e o saldo.")
+    await db.notes.update_one({"id": note_id}, {"$set": {"ai_summary": txt, "ai_summary_at": now_iso()}})
+    return {"summary": txt}
+
+
+@api_router.post("/notes/{note_id}/analyze-reply")
+async def ai_analyze_reply(note_id: str, payload: ReplyIn):
+    if not ai_available():
+        raise HTTPException(status_code=400, detail="Integração OpenAI não configurada.")
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Cole a resposta do fornecedor.")
+    system = ("Analisas respostas de fornecedores a pedidos de orçamento de uma loja Bricomarché. "
+              "Respondes SEMPRE apenas com JSON válido, sem texto extra.")
+    prompt = (
+        f"O pedido pediu orçamento para: {n.get('description') or '—'} "
+        f"(referência: {n.get('reference') or '—'}, medidas: {n.get('measurements') or '—'}, "
+        f"quantidade: {n.get('quantity') or '—'}).\n\n"
+        "Analisa a resposta do fornecedor e responde APENAS com JSON com as chaves:\n"
+        '{"complete": true/false, "missing": ["preço"|"prazo"|"referência"|"disponibilidade"...], '
+        '"price": number|null, "currency": "EUR", "deadline": "texto"|"", "reference": ""|"texto", '
+        '"summary": "resumo curto em português"}\n'
+        "Considera INCOMPLETA se faltar o preço ou o prazo de entrega.\n\n"
+        f"Resposta do fornecedor:\n\"\"\"{payload.text}\"\"\""
+    )
+    try:
+        raw = await ai_complete(system, prompt, session=f"reply-{note_id}")
+    except Exception as e:
+        logger.error(f"AI analyze-reply falhou: {e}")
+        raise HTTPException(status_code=502, detail="Falha na chamada à OpenAI. Verifique a chave e o saldo.")
+    data = extract_json(raw) or {}
+    analysis = {
+        "complete": bool(data.get("complete")),
+        "missing": data.get("missing") or [],
+        "price": data.get("price"),
+        "currency": data.get("currency") or "EUR",
+        "deadline": data.get("deadline") or "",
+        "reference": data.get("reference") or "",
+        "summary": data.get("summary") or "",
+    }
+    return {"analysis": analysis}
+
 
 
 @api_router.get("/")

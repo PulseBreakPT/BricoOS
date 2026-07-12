@@ -54,7 +54,7 @@ const buildEmail = (n) => {
   return { subject, body: lines.join("\n") };
 };
 
-export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gmailStatus, labelsList, onChanged }) {
+export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
   const [id, setId] = useState(noteId);
   const [note, setNote] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -78,6 +78,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   // Assistant data
   const [assist, setAssist] = useState({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
   const [dupWarn, setDupWarn] = useState([]);
+
+  // AI (OpenAI) state
+  const [aiSummary, setAiSummary] = useState("");
+  const [summarizing, setSummarizing] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyAnalyzing, setReplyAnalyzing] = useState(false);
+  const [replyResult, setReplyResult] = useState(null);
 
   const isCreate = !id;
   const dirty = useRef(false);
