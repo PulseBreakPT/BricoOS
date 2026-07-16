@@ -101,8 +101,8 @@ export default function Tasks() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">Coisas por fazer</p>
-        <h1 className="font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Tarefas</h1>
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Coisas por fazer</p>
+        <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Tarefas</h1>
         <p className="text-sm text-slate-500">Por secção: construção, bricolagem, decoração e jardim.</p>
       </div>
 
@@ -137,7 +137,7 @@ export default function Tasks() {
       </div>
 
       {/* Filters */}
-      <div className="no-scrollbar mt-4 flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="no-scrollbar -mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <button
           data-testid="task-filter-todos"
           onClick={() => setFilter("todos")}

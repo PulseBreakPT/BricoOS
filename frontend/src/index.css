@@ -5,11 +5,28 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
 body {
     margin: 0;
     font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove o atraso de duplo-toque e o zoom acidental em botões/links no touch. */
+button, a, [role="button"], [role="tab"] {
+    touch-action: manipulation;
+}
+
+/* iOS faz zoom automático quando um campo focado tem fonte < 16px.
+   Em ecrãs pequenos forçamos 16px nos campos para a página não "saltar". */
+@media (max-width: 640px) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
 }
 
 @layer base {

@@ -225,16 +225,16 @@ export default function Notes() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">Assistente de pedidos</p>
-        <h1 className="font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Pedidos de orçamento</h1>
-        <p className="text-sm text-slate-500">Todo o ciclo de vida — do pedido do cliente à encomenda.</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Assistente de pedidos</p>
+        <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Pedidos de orçamento</h1>
+        <p className="hidden text-sm text-slate-500 sm:block">Todo o ciclo de vida — do pedido do cliente à encomenda.</p>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3 sm:mt-6">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo, referência, notas...  (tecla /)" className="h-11 rounded-xl pl-10" />
+            <Input ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo..." className="h-11 rounded-xl pl-10" />
           </div>
           <Button data-testid="focus-mode-btn" variant={focusMode ? "default" : "outline"} onClick={() => setFocusMode((v) => !v)} className="h-11 shrink-0 rounded-xl" title="Modo de foco (F)">
             <Focus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Foco</span>
@@ -288,7 +288,7 @@ export default function Notes() {
         </div>
 
         {/* Saved filters / presets */}
-        <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
+        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1">
           {PRESETS.map((p) => (
             <button
               key={p.key}
@@ -304,7 +304,7 @@ export default function Notes() {
         </div>
 
         {/* Category pills */}
-        <div className="no-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
+        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1">
           <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${category === "todos" ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-200"}`}>Todas as secções</button>
           {CATEGORY_LIST.map((c) => {
             const Icon = c.icon;
@@ -344,7 +344,7 @@ export default function Notes() {
           ) : null}
         </div>
       ) : (
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           <AnimatePresence mode="popLayout">
             {items.map((note) => (
               <PedidoCard key={note.id} note={note} onOpen={openNote} actions={actions} />
@@ -361,7 +361,7 @@ export default function Notes() {
         </div>
       ) : null}
 
-      <button data-testid="fab-new-note" onClick={openNew} className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
+      <button data-testid="fab-new-note" onClick={openNew} className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
         <Plus className="h-7 w-7" strokeWidth={2.4} />
       </button>
 
@@ -390,7 +390,7 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
         </div>
         <button data-testid="focus-exit" onClick={onExit} className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"><X className="h-4 w-4" /></button>
       </div>
-      <div className="px-6 py-6">
+      <div className="px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />{st.label}
@@ -399,7 +399,7 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: c.bg, color: c.text }}>{c.label}</span>
           {note.is_overdue ? <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">Parado há {note.waiting_days}d</span> : null}
         </div>
-        <h2 className="mt-3 font-heading text-2xl font-extrabold tracking-tight text-slate-900">{note.customer_name || "Sem nome"}</h2>
+        <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
         {note.phone ? <p className="font-mono text-sm text-slate-500">{note.phone}</p> : null}
         <p className="mt-3 text-base text-slate-700">{note.description}</p>
         {note.measurements ? <p className="mt-1 font-mono text-sm text-slate-500">Medidas: {note.measurements}</p> : null}

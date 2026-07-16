@@ -67,8 +67,8 @@ function SummaryChip({ label, value, tone = "slate", icon: Icon }) {
     green: "bg-emerald-50 text-emerald-700",
   };
   return (
-    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${tones[tone]}`}>
-      {Icon ? <Icon className="h-4 w-4" /> : null}
+    <div className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 ${tones[tone]}`}>
+      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
       <span className="text-lg font-extrabold tabular-nums">{value}</span>
       <span className="text-xs font-semibold opacity-80">{label}</span>
     </div>
@@ -135,9 +135,9 @@ export default function Today() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold capitalize text-slate-400">{today}</p>
-        <h1 className="flex items-center gap-2 font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-          <Sun className="h-8 w-8 text-amber-400" /> {greeting()}, chefe
+        <p className="text-xs font-semibold capitalize text-slate-400 sm:text-sm">{today}</p>
+        <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+          <Sun className="h-6 w-6 text-amber-400 sm:h-8 sm:w-8" /> {greeting()}, chefe
         </h1>
         <p className="text-sm text-slate-500">O que precisa da sua atenção primeiro — para nenhum pedido ficar esquecido.</p>
       </div>
@@ -146,8 +146,8 @@ export default function Today() {
         <div className="mt-20 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
       ) : (
         <>
-          {/* Daily summary */}
-          <div className="mt-5 flex flex-wrap gap-2">
+          {/* Daily summary — faixa deslizável no telemóvel, wrap em ecrãs maiores */}
+          <div className="no-scrollbar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
             <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} />
             <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
             <SummaryChip label="atrasados" value={s.atrasados ?? 0} tone="red" icon={AlertTriangle} />
@@ -194,9 +194,15 @@ export default function Today() {
               <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                 <Tabs defaultValue="me">
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="me" data-testid="tab-waiting-me" className="text-xs">A tratar por mim ({counts.waiting_me ?? waitingMe.length})</TabsTrigger>
-                    <TabsTrigger value="others" data-testid="tab-waiting-others" className="text-xs">À espera de terceiros ({waitingOthers.length})</TabsTrigger>
-                    <TabsTrigger value="inbox" data-testid="tab-inbox" className="text-xs">Novos ({inbox.length})</TabsTrigger>
+                    <TabsTrigger value="me" data-testid="tab-waiting-me" className="min-w-0 px-1 text-xs sm:px-3">
+                      <span className="truncate"><span className="sm:hidden">A tratar</span><span className="hidden sm:inline">A tratar por mim</span> ({counts.waiting_me ?? waitingMe.length})</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="others" data-testid="tab-waiting-others" className="min-w-0 px-1 text-xs sm:px-3">
+                      <span className="truncate"><span className="sm:hidden">À espera</span><span className="hidden sm:inline">À espera de terceiros</span> ({waitingOthers.length})</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="inbox" data-testid="tab-inbox" className="min-w-0 px-1 text-xs sm:px-3">
+                      <span className="truncate">Novos ({inbox.length})</span>
+                    </TabsTrigger>
                   </TabsList>
                   <TabsContent value="me" className="mt-3 space-y-2 focus-visible:outline-none">
                     {waitingMe.length === 0 ? <Empty text="Nada à sua espera. Bom trabalho!" /> :

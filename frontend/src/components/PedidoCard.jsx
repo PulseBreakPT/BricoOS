@@ -26,7 +26,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
       transition={{ duration: 0.22 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note.id)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 ${note.is_overdue ? "border-red-200" : "border-slate-200"}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200"}`}
     >
       <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
       <div className="pl-2">
