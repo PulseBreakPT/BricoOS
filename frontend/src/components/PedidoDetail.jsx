@@ -60,7 +60,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [form, setForm] = useState(emptyForm);
   const [tab, setTab] = useState("detalhes");
   const [saving, setSaving] = useState(false);
-  const [autoState, setAutoState] = useState("idle"); // idle | saving | saved
+  const [autoState, setAutoState] = useState("idle"); // idle | saving | saved | error
+  const [autoError, setAutoError] = useState("");
 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -171,9 +172,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           reference: form.reference, sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
         });
         setAutoState("saved");
+        setAutoError("");
         dirty.current = false;
         onChanged && onChanged();
-      } catch { setAutoState("idle"); }
+      } catch (e) {
+        // Guarda o rascunho inválido (ex.: telefone incompleto) mesmo sem
+        // conseguir gravar, para não perder o que o utilizador escreveu.
+        setAutoState("error");
+        setAutoError(getErrorMessage(e, "Não foi possível guardar"));
+      }
     }, 900);
     return () => clearTimeout(t);
   }, [form, id, isCreate, open]);
@@ -201,6 +208,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     if (!form.customer_name && !form.description) {
       toast.error("Preencha o cliente ou a descrição."); return;
     }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("O email do cliente não parece válido."); return;
+    }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
+      toast.error("O telefone do cliente parece incompleto."); return;
+    }
     setSaving(true);
     try {
       if (isCreate) {
@@ -217,8 +230,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
         await refresh();
       }
       onChanged && onChanged();
-    } catch {
-      toast.error("Erro ao guardar");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao guardar"));
     } finally {
       setSaving(false);
     }
@@ -383,6 +396,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 {!isCreate && note ? ` · atualizado ${timeAgo(note.updated_at)}` : ""}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
+                {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
             </div>
             {!isCreate && note ? (

@@ -352,6 +352,41 @@ def _check_positive(value, field_label):
     return value
 
 
+EMAIL_RX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def normalize_phone_loose(v):
+    """Remove tudo menos dígitos (e um '+' inicial). Nunca lança erro — usar em
+    pesquisas/filtros onde o valor pode estar incompleto (ex.: enquanto se digita)."""
+    v = (v or "").strip()
+    if not v:
+        return ""
+    has_plus = v.startswith("+")
+    digits = re.sub(r"\D", "", v)
+    return ("+" if has_plus else "") + digits
+
+
+def normalize_phone(v):
+    """Como normalize_phone_loose, mas valida o resultado — usar ao guardar dados."""
+    v = (v or "").strip()
+    if not v:
+        return v
+    norm = normalize_phone_loose(v)
+    digits = norm.lstrip("+")
+    if len(digits) < 9 or len(digits) > 15:
+        raise ValueError("Telefone inválido")
+    return norm
+
+
+def normalize_email(v):
+    v = (v or "").strip().lower()
+    if not v:
+        return v
+    if not EMAIL_RX.match(v):
+        raise ValueError("Email inválido")
+    return v
+
+
 class NoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     customer_name: str = ""
@@ -396,6 +431,16 @@ class NoteIn(BaseModel):
     @classmethod
     def _v_reminder(cls, v):
         return _check_positive(v, "Intervalo de lembrete")
+
+    @field_validator("phone")
+    @classmethod
+    def _v_phone(cls, v):
+        return normalize_phone(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return normalize_email(v)
 
 
 class NotePatch(BaseModel):
@@ -443,6 +488,16 @@ class NotePatch(BaseModel):
     def _v_reminder(cls, v):
         return _check_positive(v, "Intervalo de lembrete")
 
+    @field_validator("phone")
+    @classmethod
+    def _v_phone(cls, v):
+        return normalize_phone(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return normalize_email(v)
+
 
 class StatusIn(BaseModel):
     status: str
@@ -470,6 +525,24 @@ class SupplierIn(BaseModel):
     phone: str = ""
     category: str = ""
     notes: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O nome do fornecedor é obrigatório")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _v_phone(cls, v):
+        return normalize_phone(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return normalize_email(v)
 
 
 class TaskIn(BaseModel):
@@ -563,8 +636,9 @@ async def list_notes(
 @api_router.post("/notes/check-duplicate")
 async def check_duplicate(payload: DuplicateCheckIn):
     ors = []
-    if payload.phone.strip():
-        ors.append({"phone": payload.phone.strip()})
+    phone_norm = normalize_phone_loose(payload.phone)
+    if phone_norm:
+        ors.append({"phone": phone_norm})
     if payload.customer_name.strip():
         ors.append({"customer_name": {"$regex": re.escape(payload.customer_name.strip()), "$options": "i"}})
     if not ors:
@@ -745,13 +819,50 @@ async def list_labels():
 
 
 # ---------- Suppliers ----------
+async def _supplier_name_taken(name, exclude_id=None):
+    q = {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    return await db.suppliers.find_one(q, {"_id": 0, "id": 1})
+
+
+async def _suppliers_with_stats(sups):
+    if not sups:
+        return sups
+    ids = [s["id"] for s in sups]
+    names = [s["name"] for s in sups]
+    note_counts = {}
+    async for n in db.notes.find({"supplier_id": {"$in": ids}}, {"_id": 0, "supplier_id": 1, "archived": 1}):
+        c = note_counts.setdefault(n["supplier_id"], {"total": 0, "open": 0})
+        c["total"] += 1
+        if not n.get("archived"):
+            c["open"] += 1
+    quote_counts = {}
+    async for q in db.quotes.find({"supplier_name": {"$in": names}}, {"_id": 0, "supplier_name": 1, "approved": 1}):
+        c = quote_counts.setdefault(q["supplier_name"], {"total": 0, "approved": 0})
+        c["total"] += 1
+        if q.get("approved"):
+            c["approved"] += 1
+    for s in sups:
+        nc = note_counts.get(s["id"], {"total": 0, "open": 0})
+        qc = quote_counts.get(s["name"], {"total": 0, "approved": 0})
+        s["open_notes"] = nc["open"]
+        s["total_notes"] = nc["total"]
+        s["quotes_given"] = qc["total"]
+        s["quotes_approved"] = qc["approved"]
+    return sups
+
+
 @api_router.get("/suppliers")
 async def list_suppliers():
-    return await db.suppliers.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+    sups = await db.suppliers.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+    return await _suppliers_with_stats(sups)
 
 
 @api_router.post("/suppliers")
 async def create_supplier(payload: SupplierIn):
+    if await _supplier_name_taken(payload.name):
+        raise HTTPException(status_code=409, detail=f'Já existe um fornecedor chamado "{payload.name}".')
     doc = payload.model_dump()
     doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
     await db.suppliers.insert_one(dict(doc))
@@ -761,6 +872,8 @@ async def create_supplier(payload: SupplierIn):
 
 @api_router.put("/suppliers/{supplier_id}")
 async def update_supplier(supplier_id: str, payload: SupplierIn):
+    if await _supplier_name_taken(payload.name, exclude_id=supplier_id):
+        raise HTTPException(status_code=409, detail=f'Já existe um fornecedor chamado "{payload.name}".')
     res = await db.suppliers.update_one({"id": supplier_id}, {"$set": payload.model_dump()})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
@@ -768,9 +881,21 @@ async def update_supplier(supplier_id: str, payload: SupplierIn):
 
 
 @api_router.delete("/suppliers/{supplier_id}")
-async def delete_supplier(supplier_id: str):
+async def delete_supplier(supplier_id: str, force: bool = False):
+    open_notes = await db.notes.find(
+        {"supplier_id": supplier_id, "archived": {"$ne": True}}, {"_id": 0, "id": 1, "customer_name": 1}
+    ).to_list(500)
+    if open_notes and not force:
+        names = ", ".join(n.get("customer_name") or "cliente" for n in open_notes[:5])
+        more = f" e mais {len(open_notes) - 5}" if len(open_notes) > 5 else ""
+        raise HTTPException(
+            status_code=409,
+            detail=f"Este fornecedor está associado a {len(open_notes)} pedido(s) em aberto ({names}{more}). "
+                   "Confirme novamente para desassociar e eliminar na mesma.")
+    if open_notes:
+        await db.notes.update_many({"supplier_id": supplier_id}, {"$set": {"supplier_id": ""}})
     await db.suppliers.delete_one({"id": supplier_id})
-    return {"ok": True}
+    return {"ok": True, "unlinked_notes": len(open_notes)}
 
 
 # ---------- Tasks ----------
@@ -1544,6 +1669,21 @@ async def migrate():
         await db.notes.update_many({"status_updated_at": {"$exists": False}}, [{"$set": {"status_updated_at": "$updated_at"}}])
     except Exception:
         pass
+    await _normalize_existing_phones()
+
+
+async def _normalize_existing_phones():
+    """Uniformiza telefones já guardados (ex.: '912 345 678' -> '912345678') para
+    que a deteção de duplicados e o histórico de clientes continuem a funcionar
+    com dados antigos, guardados antes da normalização existir."""
+    async for n in db.notes.find({"phone": {"$exists": True, "$ne": ""}}, {"_id": 0, "id": 1, "phone": 1}):
+        norm = normalize_phone_loose(n["phone"])
+        if norm and norm != n["phone"]:
+            await db.notes.update_one({"id": n["id"]}, {"$set": {"phone": norm}})
+    async for s in db.suppliers.find({"phone": {"$exists": True, "$ne": ""}}, {"_id": 0, "id": 1, "phone": 1}):
+        norm = normalize_phone_loose(s["phone"])
+        if norm and norm != s["phone"]:
+            await db.suppliers.update_one({"id": s["id"]}, {"$set": {"phone": norm}})
 
 
 async def ensure_indexes():
