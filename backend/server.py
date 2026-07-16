@@ -17,6 +17,15 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 
+try:
+    from email_templates import (
+        business_greeting, client_quote_template, request_reference, supplier_quote_template,
+    )
+except ImportError:  # Permite também executar como módulo: python -m backend.server
+    from .email_templates import (
+        business_greeting, client_quote_template, request_reference, supplier_quote_template,
+    )
+
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
@@ -87,6 +96,14 @@ NEXT_STATUS = {
     "enviado_fornecedor": "aguarda_fornecedor", "aguarda_fornecedor": "orcamento_recebido",
     "orcamento_recebido": "aguarda_cliente", "aguarda_cliente": "aprovado",
     "aprovado": "encomendado", "encomendado": "concluido",
+}
+NEXT_ACTION_MODE = {
+    # Estes passos exigem uma ação real; nunca devem ser convertidos num mero
+    # clique que avança o estado sem enviar/registar nada.
+    "em_preparacao": "compose_supplier_email",
+    "aguarda_fornecedor": "record_quote",
+    "orcamento_recebido": "reply_to_client",
+    "aguarda_cliente": "record_client_decision",
 }
 PREDEFINED_LABELS = ["À medida", "Cliente VIP", "Stock loja", "Encomenda especial", "Garantia", "Reclamação", "Promoção"]
 
@@ -186,7 +203,9 @@ def enrich_note(note, now=None):
     note["next_action"] = NEXT_ACTION.get(status, "")
     note["next_status"] = NEXT_STATUS.get(status)
     note["next_status_label"] = STATUS_LABEL.get(NEXT_STATUS.get(status), "")
+    note["next_action_mode"] = NEXT_ACTION_MODE.get(status, "status")
     note["status_label"] = STATUS_LABEL.get(status, status)
+    note["request_reference"] = request_reference(note)
     sla = note.get("sla_days") or DEFAULT_SLA_DAYS
     ref = parse_dt(note.get("status_updated_at") or note.get("updated_at") or note.get("created_at"))
     days = max((now - ref).days, 0) if ref else 0
@@ -1241,15 +1260,16 @@ def caixilharia_email(n, spec, is_reminder=False):
     """Gera assunto+corpo do email ao fornecedor no formato da ficha oficial BandAluminios."""
     produto, fam_label, sistema, total = caixilharia_resumo(spec)
     tipo = "Encomenda" if spec.get("tipo_pedido") == "encomenda" else "Orçamento"
-    ref_cliente = (n.get("reference") or "").strip() or n.get("id", "")[:8].upper()
+    ref_cliente = request_reference(n)
+    ref_artigo = (n.get("reference") or "").strip()
     hoje = datetime.now(timezone.utc).strftime("%d/%m/%Y")
 
-    lines = ["Exmos. Senhores,", ""]
+    lines = [f"{business_greeting()} Exmos. Senhores,", ""]
     if is_reminder:
-        lines.append("Voltamos a contactar relativamente ao pedido enviado anteriormente, que reproduzimos abaixo:")
+        lines.append(f"Venho por este meio reforçar o pedido enviado anteriormente com a referência {ref_cliente}:")
     else:
-        lines.append(f"Somos o Bricomarché de Faro e vimos por este meio apresentar o seguinte pedido de {tipo.lower()} "
-                     "de caixilharia à medida, conforme a vossa ficha de pedido:")
+        lines.append(f"Venho por este meio solicitar um pedido de {tipo.lower()} de caixilharia à medida, "
+                     "conforme a vossa ficha de pedido:")
     lines += [
         "",
         f"Tipo de pedido: {tipo}",
@@ -1257,6 +1277,8 @@ def caixilharia_email(n, spec, is_reminder=False):
         f"Ref. de cliente: {ref_cliente}",
         f"Data do pedido: {hoje}",
     ]
+    if ref_artigo:
+        lines.append(f"Referência do artigo: {ref_artigo}")
     if (spec.get("data_entrega") or "").strip():
         try:
             entrega = datetime.strptime(spec["data_entrega"], "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -1291,11 +1313,13 @@ def caixilharia_email(n, spec, is_reminder=False):
         lines.append(f"Estore: {CAIXILHARIA_ESTORES.get(spec['estore'], spec['estore'])}")
     if (spec.get("observacoes") or "").strip():
         lines += ["", f"Observações: {spec['observacoes']}"]
-    lines += ["", "Agradecemos indicação de preço, prazo de entrega e disponibilidade.", "",
-              "Com os melhores cumprimentos,", "Bricomarché Faro"]
+    lines += [
+        "", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.",
+        "", "Com os melhores cumprimentos,", "Bricomarché Faro",
+    ]
 
-    prefix = "Lembrete: " if is_reminder else ""
-    subject = f"{prefix}Pedido de {tipo.lower()} — {produto} à medida · {sistema} ({total} un) — Ref. {ref_cliente}"
+    prefix = "Lembrete · " if is_reminder else ""
+    subject = f"{prefix}Pedido de {tipo.lower()} {ref_cliente} — {produto} à medida · {sistema} ({total} un)"
     return subject, "\n".join(lines)
 
 
@@ -1580,19 +1604,32 @@ async def note_preflight(note_id: str):
     pt = detect_product_type(n)
     checklist = PRODUCT_TYPES.get(pt, {}).get(
         "checklist", ["Descrição do artigo", "Quantidade", "Medidas", "Referência"])
-    missing = []
-    if not (n.get("measurements") or "").strip():
-        missing.append("Medidas")
-    if not (n.get("quantity") or "").strip():
-        missing.append("Quantidade")
-    if not (n.get("color") or "").strip():
-        missing.append("Cor / acabamento")
-    if not (n.get("reference") or "").strip():
-        missing.append("Referência")
+    # Só bloqueia campos realmente relevantes ao tipo de produto. Antes, todos
+    # os pedidos eram marcados como incompletos por não terem, por exemplo, cor
+    # ou medidas — mesmo quando esses campos não se aplicavam.
+    requirements = {
+        "janela": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor / acabamento")],
+        "porta": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor / acabamento")],
+        "rede": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor do perfil")],
+        "madeira": [("measurements", "Dimensões"), ("quantity", "Quantidade")],
+        "sanitario": [("reference", "Referência / modelo"), ("quantity", "Quantidade")],
+        "tinta": [("quantity", "Litros / quantidade"), ("color", "Cor / código")],
+        "jardim_prod": [("quantity", "Quantidade")],
+    }
+    missing = [label for field, label in requirements.get(pt, [("quantity", "Quantidade")])
+               if not str(n.get(field) or "").strip()]
     warns = measurement_warnings(n)
+    if n.get("caixilharia"):
+        spec = n["caixilharia"]
+        items = spec.get("itens") or []
+        missing = [] if items else ["Medidas da caixilharia"]
+        checklist = [
+            "Produto e sistema", "Quantidade, largura e altura", "Sentido de abertura",
+            "Cor / acabamento", CAIXILHARIA_AVISO,
+        ]
     return {"product_type": pt, "product_label": PRODUCT_TYPES.get(pt, {}).get("label"),
             "checklist": checklist, "missing": missing, "warnings": warns,
-            "ready": len(warns) == 0}
+            "ready": len(missing) == 0 and len(warns) == 0}
 
 
 @api_router.get("/notes/{note_id}/client-history")
@@ -1715,32 +1752,19 @@ async def note_quote_template(note_id: str, supplier_id: Optional[str] = None, i
     if n.get("caixilharia"):
         subject, body = caixilharia_email(n, n["caixilharia"], is_reminder)
         return {"subject": subject, "body": body,
-                "supplier": sup, "to": sup.get("email") if sup else ""}
-    desc = n.get("description") or "artigo"
-    ref = (n.get("reference") or "").strip()
-    lines = ["Exmos. Senhores,", ""]
-    if is_reminder:
-        lines.append("Voltamos a contactar relativamente ao pedido de orçamento enviado anteriormente:")
-    else:
-        lines.append("Vimos por este meio solicitar orçamento para o seguinte artigo:")
-    lines.append("")
-    lines.append(f"• Artigo: {desc}")
-    if ref:
-        lines.append(f"• Referência: {ref}")
-    if (n.get("measurements") or "").strip():
-        lines.append(f"• Medidas: {n['measurements']}")
-    if (n.get("quantity") or "").strip():
-        lines.append(f"• Quantidade: {n['quantity']}")
-    if (n.get("color") or "").strip():
-        lines.append(f"• Cor / acabamento: {n['color']}")
-    if (n.get("details") or "").strip():
-        lines.append(f"• Notas: {n['details']}")
-    lines += ["", "Agradecemos indicação de preço, prazo de entrega e disponibilidade.", "",
-              "Com os melhores cumprimentos,", "Bricomarché Faro"]
-    prefix = "Lembrete: pedido de orçamento" if is_reminder else "Pedido de orçamento"
-    subject = f"{prefix} - {desc}" + (f" (Ref. {ref})" if ref else "")
-    return {"subject": subject, "body": "\n".join(lines),
-            "supplier": sup, "to": sup.get("email") if sup else ""}
+                "reference": request_reference(n), "supplier": sup, "to": sup.get("email") if sup else ""}
+    template = supplier_quote_template(n, is_reminder=is_reminder)
+    return {**template, "supplier": sup, "to": sup.get("email") if sup else ""}
+
+
+@api_router.get("/notes/{note_id}/client-template")
+async def note_client_template(note_id: str):
+    """Prepara a resposta habitual ao cliente; não envia nem altera o pedido."""
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    template = client_quote_template(n)
+    return {**template, "to": (n.get("email") or "").strip(), "has_email": bool((n.get("email") or "").strip())}
 
 
 @api_router.get("/batches")

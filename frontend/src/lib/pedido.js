@@ -38,6 +38,31 @@ export function timeAgo(iso) {
   return d.toLocaleDateString("pt-PT");
 }
 
+export function formatDateTime(iso) {
+  if (!iso) return "—";
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return "—";
+  return value.toLocaleString("pt-PT", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+const GUIDED_ACTIONS = {
+  em_preparacao: { mode: "compose_supplier_email", label: "Preparar email" },
+  aguarda_fornecedor: { mode: "record_quote", label: "Registar resposta" },
+  orcamento_recebido: { mode: "reply_to_client", label: "Responder ao cliente" },
+  aguarda_cliente: { mode: "record_client_decision", label: "Registar decisão" },
+};
+
+export function getNextActionMode(note) {
+  return note?.next_action_mode || GUIDED_ACTIONS[note?.status]?.mode || "status";
+}
+
+export function getNextActionCta(note) {
+  return GUIDED_ACTIONS[note?.status]?.label || note?.next_status_label || "Abrir pedido";
+}
+
 export function formatHours(h) {
   if (h == null) return "—";
   if (h < 1) return `${Math.round(h * 60)} min`;
@@ -50,14 +75,7 @@ export function formatEuro(v) {
   return `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`;
 }
 
-// ---- Email templates by supplier/section type ----
-const INTRO = {
-  geral: "gostaríamos de solicitar um orçamento para o seguinte artigo:",
-  construcao: "gostaríamos de pedir orçamento para o seguinte material de construção:",
-  bricolage: "gostaríamos de pedir orçamento para o seguinte artigo de bricolage:",
-  decoracao: "gostaríamos de pedir orçamento para o seguinte artigo de decoração:",
-  jardim: "gostaríamos de pedir orçamento para o seguinte artigo de jardim:",
-};
+// ---- Fallbacks locais para quando o servidor não consegue gerar o modelo ----
 export const TEMPLATE_OPTIONS = [
   { key: "geral", label: "Geral" },
   { key: "construcao", label: "Construção" },
@@ -66,25 +84,45 @@ export const TEMPLATE_OPTIONS = [
   { key: "jardim", label: "Jardim" },
 ];
 
-export function buildEmail(note, key = "geral") {
-  const subject = `Pedido de orçamento - ${note.description || "artigo"}`;
-  const lines = ["Boa tarde,", "", `Somos o Bricomarché de Faro e ${INTRO[key] || INTRO.geral}`, "",
-    `Artigo: ${note.description || "-"}`];
+function greeting() {
+  return new Date().getHours() < 13 ? "Bom dia" : "Boa tarde";
+}
+
+function requestReference(note) {
+  if (note?.request_reference) return note.request_reference;
+  const suffix = String(note?.id || "SEMREF").replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "SEMREF";
+  const year = String(note?.created_at || "").match(/^(\d{4})/)?.[1]?.slice(2);
+  return year ? `BCF-${year}-${suffix}` : `BCF-${suffix}`;
+}
+
+export function buildEmail(note) {
+  const reference = requestReference(note);
+  const description = note.description || "artigo";
+  const count = parseInt(String(note.quantity || "").match(/\d+/)?.[0] || "1", 10);
+  const article = count > 1 ? "os seguintes artigos" : "o seguinte artigo";
+  const subject = `Pedido de cotação ${reference} — ${description}`;
+  const lines = [`${greeting()} Exmos. Senhores,`, "",
+    `Venho por este meio solicitar um pedido de cotação para ${article}:`, "",
+    `Referência do pedido: ${reference}`, `Artigo: ${description}`];
+  if (note.reference) lines.push(`Referência do artigo: ${note.reference}`);
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
-  if (note.reference) lines.push(`Referência: ${note.reference}`);
-  if (note.details) lines.push(`Notas: ${note.details}`);
-  lines.push("", "Agradecemos o envio do melhor preço e prazo de entrega disponíveis.", "",
+  if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
+  if (note.color) lines.push(`Cor / acabamento: ${note.color}`);
+  if (note.details) lines.push(`Observações: ${note.details}`);
+  lines.push("", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.", "",
     "Com os melhores cumprimentos,", "Bricomarché Faro");
   return { subject, body: lines.join("\n") };
 }
 
 export function buildReminder(note) {
-  const subject = `Lembrete: pedido de orçamento - ${note.description || "artigo"}`;
-  const lines = ["Boa tarde,", "",
-    "Voltamos a contactar relativamente ao pedido de orçamento enviado anteriormente:", "",
-    `Artigo: ${note.description || "-"}`];
+  const reference = requestReference(note);
+  const subject = `Lembrete · Pedido de cotação ${reference} — ${note.description || "artigo"}`;
+  const lines = [`${greeting()} Exmos. Senhores,`, "",
+    `Venho por este meio reforçar o pedido de cotação enviado anteriormente com a referência ${reference}:`, "",
+    `Referência do pedido: ${reference}`, `Artigo: ${note.description || "-"}`];
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
-  lines.push("", "Agradecíamos a vossa resposta com o preço e prazo de entrega logo que possível.", "",
+  if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
+  lines.push("", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.", "",
     "Com os melhores cumprimentos,", "Bricomarché Faro");
   return { subject, body: lines.join("\n") };
 }

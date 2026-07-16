@@ -7,7 +7,10 @@ import {
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
-import { PRIORITY_ORDER, PRIORITY_CONFIG, getStatusCfg, getPriorityCfg } from "@/lib/pedido";
+import {
+  PRIORITY_ORDER, PRIORITY_CONFIG, getStatusCfg, getPriorityCfg,
+  getNextActionCta, getNextActionMode,
+} from "@/lib/pedido";
 import PedidoCard from "@/components/PedidoCard";
 import PedidoDetail from "@/components/PedidoDetail";
 import { Input } from "@/components/ui/input";
@@ -49,6 +52,7 @@ export default function Notes() {
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailNoteId, setDetailNoteId] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState("detalhes");
   const [focusMode, setFocusMode] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
 
@@ -118,12 +122,19 @@ export default function Notes() {
     if (g === "connected") { toast.success("Gmail ligado com sucesso!"); loadMeta(); }
     else if (g === "error") { toast.error("Não foi possível ligar o Gmail."); }
     const openId = params.get("open");
-    if (openId) { setDetailNoteId(openId); setDetailOpen(true); }
+    const openTab = params.get("tab");
+    if (openId) {
+      setDetailNoteId(openId);
+      setDetailInitialTab(openTab === "orcamentos" ? "orcamentos" : "detalhes");
+      setDetailOpen(true);
+    }
     if (g || openId) navigate("/clientes", { replace: true });
   }, [location.search, loadMeta, navigate]);
 
-  const openNew = () => { setDetailNoteId(null); setDetailOpen(true); };
-  const openNote = (nid) => { setDetailNoteId(nid); setDetailOpen(true); };
+  const openNew = () => { setDetailNoteId(null); setDetailInitialTab("detalhes"); setDetailOpen(true); };
+  const openNote = (nid, initialTab = "detalhes") => {
+    setDetailNoteId(nid); setDetailInitialTab(initialTab); setDetailOpen(true);
+  };
 
   // ---- Quick actions (available on cards, focus mode, without opening) ----
   const toggleFav = async (note) => {
@@ -138,6 +149,13 @@ export default function Notes() {
   };
   const advance = async (note) => {
     if (!note.next_status) return;
+    if (getNextActionMode(note) !== "status") {
+      openNote(note.id, "orcamentos");
+      toast.message(getNextActionCta(note), {
+        description: "Abra a ação indicada para o estado só mudar depois de a registar.",
+      });
+      return;
+    }
     try {
       await api.patch(`/notes/${note.id}/status`, { status: note.next_status });
       toast.success(`Avançado para "${note.next_status_label}"`);
@@ -369,6 +387,7 @@ export default function Notes() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         noteId={detailNoteId}
+        initialTab={detailInitialTab}
         suppliers={suppliers}
         gmailStatus={gmailStatus}
         labelsList={labels}
@@ -409,7 +428,7 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           <p className="mt-1 text-sm font-semibold text-slate-800">{note.next_action || "Concluído"}</p>
           {note.next_status ? (
             <Button data-testid="focus-advance" onClick={() => actions.advance(note)} className="mt-3 w-full rounded-xl">
-              <Zap className="mr-2 h-4 w-4" /> {note.next_status_label} <span className="ml-1 opacity-70">(Enter)</span>
+              <Zap className="mr-2 h-4 w-4" /> {getNextActionCta(note)} <span className="ml-1 opacity-70">(Enter)</span>
             </Button>
           ) : null}
         </div>
