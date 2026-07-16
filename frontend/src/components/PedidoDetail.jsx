@@ -60,7 +60,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [form, setForm] = useState(emptyForm);
   const [tab, setTab] = useState("detalhes");
   const [saving, setSaving] = useState(false);
-  const [autoState, setAutoState] = useState("idle"); // idle | saving | saved
+  const [autoState, setAutoState] = useState("idle"); // idle | saving | saved | error
+  const [autoError, setAutoError] = useState("");
 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -171,9 +172,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           reference: form.reference, sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
         });
         setAutoState("saved");
+        setAutoError("");
         dirty.current = false;
         onChanged && onChanged();
-      } catch { setAutoState("idle"); }
+      } catch (e) {
+        // Guarda o rascunho inválido (ex.: telefone incompleto) mesmo sem
+        // conseguir gravar, para não perder o que o utilizador escreveu.
+        setAutoState("error");
+        setAutoError(getErrorMessage(e, "Não foi possível guardar"));
+      }
     }, 900);
     return () => clearTimeout(t);
   }, [form, id, isCreate, open]);
@@ -201,6 +208,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     if (!form.customer_name && !form.description) {
       toast.error("Preencha o cliente ou a descrição."); return;
     }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("O email do cliente não parece válido."); return;
+    }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
+      toast.error("O telefone do cliente parece incompleto."); return;
+    }
     setSaving(true);
     try {
       if (isCreate) {
@@ -217,8 +230,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
         await refresh();
       }
       onChanged && onChanged();
-    } catch {
-      toast.error("Erro ao guardar");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao guardar"));
     } finally {
       setSaving(false);
     }
@@ -369,10 +382,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="note-dialog"
-        className="flex max-h-[94vh] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:w-full"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-3xl"
       >
         {/* Header (fixed) */}
-        <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
@@ -383,6 +396,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 {!isCreate && note ? ` · atualizado ${timeAgo(note.updated_at)}` : ""}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
+                {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
             </div>
             {!isCreate && note ? (
@@ -392,11 +406,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
             ) : null}
           </div>
 
-          {/* Quick actions */}
+          {/* Quick actions — deslizáveis no telemóvel para não empilhar linhas no cabeçalho */}
           {!isCreate && note ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="no-scrollbar -mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
               <Select value={note.status} onValueChange={changeStatus}>
-                <SelectTrigger data-testid="quick-status" className="h-9 w-auto gap-1.5 rounded-lg border-0 text-xs font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
+                <SelectTrigger data-testid="quick-status" className="h-9 w-auto shrink-0 gap-1.5 rounded-lg border-0 text-xs font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -406,7 +420,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 </SelectContent>
               </Select>
               <Select value={note.priority} onValueChange={changePriority}>
-                <SelectTrigger data-testid="quick-priority" className="h-9 w-auto gap-1.5 rounded-lg text-xs font-semibold">
+                <SelectTrigger data-testid="quick-priority" className="h-9 w-auto shrink-0 gap-1.5 rounded-lg text-xs font-semibold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -416,18 +430,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 </SelectContent>
               </Select>
               {note.next_status ? (
-                <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 rounded-lg">
+                <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 shrink-0 rounded-lg">
                   <Zap className="mr-1.5 h-3.5 w-3.5" /> {note.next_status_label}
                 </Button>
               ) : null}
               {note.archived ? (
-                <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 rounded-lg">Reabrir</Button>
+                <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 shrink-0 rounded-lg">Reabrir</Button>
               ) : (
-                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 shrink-0 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
-              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="ml-auto h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50">
+              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 shrink-0 rounded-lg border-red-200 text-red-600 hover:bg-red-50 sm:ml-auto">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -436,24 +450,25 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
 
         {/* Next action banner */}
         {!isCreate && note?.next_action ? (
-          <div className={`shrink-0 border-b px-5 py-2.5 text-xs sm:px-6 ${note.is_overdue ? "border-red-100 bg-red-50 text-red-700" : "border-slate-100 bg-slate-50 text-slate-600"}`}>
+          <div className={`shrink-0 border-b px-4 py-2.5 text-xs sm:px-6 ${note.is_overdue ? "border-red-100 bg-red-50 text-red-700" : "border-slate-100 bg-slate-50 text-slate-600"}`}>
             <span className="font-bold">{note.is_overdue ? `Atrasado ${note.waiting_days}d · ` : "Próxima ação: "}</span>
             {note.next_action}
           </div>
         ) : null}
 
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-          <div className="shrink-0 border-b border-slate-100 px-5 pt-3 sm:px-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="text-xs">Detalhes</TabsTrigger>
-              <TabsTrigger value="assistente" data-testid="tab-assistente" className="text-xs" disabled={isCreate}>Assistente</TabsTrigger>
-              <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
-              <TabsTrigger value="cronologia" data-testid="tab-cronologia" className="text-xs" disabled={isCreate}>Cronologia</TabsTrigger>
-              <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="text-xs" disabled={isCreate}>Lembretes</TabsTrigger>
+          <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
+            {/* No telemóvel as 5 tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
+            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-5">
+              <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="shrink-0 text-xs">Detalhes</TabsTrigger>
+              <TabsTrigger value="assistente" data-testid="tab-assistente" className="shrink-0 text-xs" disabled={isCreate}>Assistente</TabsTrigger>
+              <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="shrink-0 text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
+              <TabsTrigger value="cronologia" data-testid="tab-cronologia" className="shrink-0 text-xs" disabled={isCreate}>Cronologia</TabsTrigger>
+              <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="shrink-0 text-xs" disabled={isCreate}>Lembretes</TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
             {/* DETALHES */}
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
               {isCreate && dupWarn.length > 0 ? (

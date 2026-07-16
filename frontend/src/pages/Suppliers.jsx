@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Mail, Phone, Trash2, Pencil, Truck, Loader2 } from "lucide-react";
+import { Plus, Mail, Phone, Trash2, Pencil, Truck, Loader2, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,10 @@ export default function Suppliers() {
       toast.error("O email do fornecedor não parece válido.");
       return;
     }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
+      toast.error("O telefone do fornecedor parece incompleto.");
+      return;
+    }
     setSaving(true);
     try {
       const payload = { ...form, name: form.name.trim(), email: form.email.trim() };
@@ -67,6 +71,22 @@ export default function Suppliers() {
       toast.success("Fornecedor eliminado");
       load();
     } catch (e) {
+      // 409: fornecedor associado a pedidos em aberto — o backend descreve
+      // quantos/quais; se o utilizador confirmar outra vez, força a remoção
+      // e desassocia esses pedidos (ficam sem fornecedor, mas não são apagados).
+      if (e?.response?.status === 409) {
+        const detail = getErrorMessage(e);
+        if (window.confirm(`${detail}\n\nEliminar mesmo assim?`)) {
+          try {
+            await api.delete(`/suppliers/${s.id}`, { params: { force: true } });
+            toast.success("Fornecedor eliminado e pedidos desassociados");
+            load();
+          } catch (e2) {
+            toast.error(getErrorMessage(e2, "Erro ao eliminar"));
+          }
+        }
+        return;
+      }
       toast.error(getErrorMessage(e, "Erro ao eliminar"));
     }
   };
@@ -75,8 +95,8 @@ export default function Suppliers() {
     <div>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">Contactos</p>
-          <h1 className="font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Fornecedores</h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Contactos</p>
+          <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Fornecedores</h1>
           <p className="text-sm text-slate-500">Para onde enviar os pedidos de orçamento.</p>
         </div>
         <Button data-testid="add-supplier-btn" onClick={openNew} className="hidden rounded-xl sm:inline-flex">
@@ -84,14 +104,14 @@ export default function Suppliers() {
         </Button>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2">
         {suppliers.map((s) => {
           const c = getCategory(s.category);
           return (
             <div
               key={s.id}
               data-testid={`supplier-card-${s.id}`}
-              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
             >
               <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
               <div className="flex items-start justify-between gap-3 pl-2">
@@ -120,6 +140,20 @@ export default function Suppliers() {
                 ) : null}
                 {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
               </div>
+              {(s.open_notes > 0 || s.quotes_given > 0) ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 pl-2">
+                  {s.open_notes > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                      <ClipboardList className="h-3 w-3" /> {s.open_notes} pedido{s.open_notes === 1 ? "" : "s"} em aberto
+                    </span>
+                  ) : null}
+                  {s.quotes_given > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                      <Receipt className="h-3 w-3" /> {s.quotes_approved}/{s.quotes_given} orçamento{s.quotes_given === 1 ? "" : "s"} aprovado{s.quotes_approved === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -138,7 +172,7 @@ export default function Suppliers() {
       <button
         data-testid="fab-new-supplier"
         onClick={openNew}
-        className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 sm:hidden"
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 sm:hidden"
       >
         <Plus className="h-7 w-7" strokeWidth={2.4} />
       </button>
@@ -162,7 +196,7 @@ export default function Suppliers() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Telefone</Label>
-                <Input data-testid="supplier-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} className="font-mono" />
+                <Input data-testid="supplier-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="912 345 678" className="font-mono" />
               </div>
               <div className="space-y-1.5">
                 <Label>Secção</Label>

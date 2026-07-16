@@ -9,12 +9,12 @@ import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER
 import { Button } from "@/components/ui/button";
 
 const StatCard = ({ icon: Icon, label, value, accent, testid, danger }) => (
-  <div data-testid={testid} className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm ${danger && value > 0 ? "border-red-200" : "border-slate-200"}`}>
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${accent}1a`, color: accent }}>
-      <Icon className="h-5 w-5" strokeWidth={2.2} />
+  <div data-testid={testid} className={`relative overflow-hidden rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-slate-200"}`}>
+    <div className="flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10" style={{ backgroundColor: `${accent}1a`, color: accent }}>
+      <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
     </div>
-    <p className="mt-4 font-heading text-3xl font-extrabold tracking-tight text-slate-900">{value}</p>
-    <p className="text-sm font-medium text-slate-500">{label}</p>
+    <p className="mt-3 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:mt-4 sm:text-3xl">{value}</p>
+    <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
   </div>
 );
 
@@ -45,12 +45,12 @@ export default function Dashboard() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold capitalize text-slate-400">{today}</p>
-        <h1 className="font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Painel da loja</h1>
+        <p className="text-xs font-semibold capitalize text-slate-400 sm:text-sm">{today}</p>
+        <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Painel da loja</h1>
         <p className="text-sm text-slate-500">Bricomarché de Faro · visão em tempo real dos pedidos.</p>
       </div>
 
-      <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4">
         <StatCard testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#0F172A" />
         <StatCard testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#2563EB" />
         <StatCard testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="#DC2626" danger />
@@ -60,7 +60,7 @@ export default function Dashboard() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Alerts */}
         <div className="lg:col-span-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-lg font-bold tracking-tight text-slate-900">
                 Precisa de atenção {notifs.count > 0 ? <span className="text-red-500">({notifs.count})</span> : null}
@@ -90,7 +90,7 @@ export default function Dashboard() {
           </div>
 
           {/* Pipeline */}
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="font-heading text-lg font-bold tracking-tight text-slate-900">Pipeline por estado</h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {pipeline.length === 0 ? <p className="text-sm text-slate-400">Sem dados.</p> : pipeline.map((s) => {
@@ -110,7 +110,7 @@ export default function Dashboard() {
         {/* Side */}
         <div className="flex flex-col gap-6">
           {/* Fastest suppliers */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-slate-700" />
               <h2 className="font-heading text-base font-bold text-slate-900">Fornecedores mais rápidos</h2>
@@ -128,7 +128,7 @@ export default function Dashboard() {
           </div>
 
           {/* Priorities */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="font-heading text-base font-bold text-slate-900">Por prioridade</h2>
             <div className="mt-4 space-y-3">
               {PRIORITY_ORDER.map((p) => {
@@ -150,7 +150,7 @@ export default function Dashboard() {
           </div>
 
           {/* Gmail */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-slate-700" />
               <h2 className="font-heading text-base font-bold text-slate-900">Envio de emails</h2>
