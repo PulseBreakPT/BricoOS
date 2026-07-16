@@ -18,7 +18,7 @@ import {
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
   Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud,
 } from "lucide-react";
-import api, { API } from "@/lib/api";
+import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg, PRIORITY_ORDER, PRIORITY_CONFIG, timeAgo } from "@/lib/pedido";
 
@@ -242,10 +242,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     await refresh();
   };
   const remove = async () => {
-    await api.delete(`/notes/${id}`);
-    toast.success("Pedido eliminado");
-    onChanged && onChanged();
-    onOpenChange(false);
+    const who = note?.customer_name || "este pedido";
+    if (!window.confirm(`Eliminar o pedido de ${who}? Os orçamentos, histórico e lembretes associados também serão eliminados.`)) return;
+    try {
+      await api.delete(`/notes/${id}`);
+      toast.success("Pedido eliminado");
+      onChanged && onChanged();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao eliminar o pedido"));
+    }
   };
   const resolveNote = async () => {
     await api.post(`/notes/${id}/resolve`);
@@ -344,7 +350,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
       toast.success(isReminder ? "Lembrete enviado!" : "Email enviado ao fornecedor!");
       await refresh();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Erro ao enviar email");
+      toast.error(getErrorMessage(e, "Erro ao enviar email"));
     } finally {
       setSending(false);
     }

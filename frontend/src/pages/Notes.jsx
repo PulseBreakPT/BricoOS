@@ -5,7 +5,7 @@ import {
   Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard,
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { PRIORITY_ORDER, PRIORITY_CONFIG, getStatusCfg, getPriorityCfg } from "@/lib/pedido";
 import PedidoCard from "@/components/PedidoCard";
@@ -56,15 +56,23 @@ export default function Notes() {
   const navigate = useNavigate();
   const searchTimer = useRef(null);
   const searchRef = useRef(null);
+  const loadSeq = useRef(0);
 
   const loadMeta = useCallback(async () => {
-    const [s, g, l] = await Promise.all([
-      api.get("/suppliers"), api.get("/gmail/status"), api.get("/labels"),
-    ]);
-    setSuppliers(s.data); setGmailStatus(g.data); setLabels(l.data);
+    try {
+      const [s, g, l] = await Promise.all([
+        api.get("/suppliers"), api.get("/gmail/status"), api.get("/labels"),
+      ]);
+      setSuppliers(s.data); setGmailStatus(g.data); setLabels(l.data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar fornecedores"));
+    }
   }, []);
 
   const loadNotes = useCallback(async () => {
+    // Número de sequência: garante que uma resposta antiga (lenta) nunca
+    // sobrepõe o resultado de um filtro mais recente.
+    const seq = ++loadSeq.current;
     setLoading(true);
     const p = PRESETS.find((x) => x.key === preset)?.filters || {};
     const params = { sort };
@@ -79,17 +87,23 @@ export default function Notes() {
     if (debounced) params.search = debounced;
     try {
       const { data } = await api.get("/notes", { params });
+      if (seq !== loadSeq.current) return;
       setItems(data.items); setTotal(data.total);
-    } catch {
-      toast.error("Erro ao carregar pedidos");
+    } catch (e) {
+      if (seq !== loadSeq.current) return;
+      toast.error(getErrorMessage(e, "Erro ao carregar pedidos"));
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [preset, category, advSupplier, advPriority, sort, debounced]);
 
   useEffect(() => { loadMeta(); }, [loadMeta]);
   useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => { setFocusIndex(0); }, [preset, category, debounced, advSupplier, advPriority]);
+  // Se a lista encolher (ex.: pedido resolvido), o índice do modo foco não pode ficar fora dela.
+  useEffect(() => {
+    setFocusIndex((i) => Math.min(i, Math.max(items.length - 1, 0)));
+  }, [items.length]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -106,7 +120,7 @@ export default function Notes() {
     const openId = params.get("open");
     if (openId) { setDetailNoteId(openId); setDetailOpen(true); }
     if (g || openId) navigate("/clientes", { replace: true });
-  }, [location.search]);
+  }, [location.search, loadMeta, navigate]);
 
   const openNew = () => { setDetailNoteId(null); setDetailOpen(true); };
   const openNote = (nid) => { setDetailNoteId(nid); setDetailOpen(true); };
@@ -114,7 +128,13 @@ export default function Notes() {
   // ---- Quick actions (available on cards, focus mode, without opening) ----
   const toggleFav = async (note) => {
     setItems((prev) => prev.map((n) => (n.id === note.id ? { ...n, favorite: !n.favorite } : n)));
-    try { await api.put(`/notes/${note.id}`, { favorite: !note.favorite }); } catch { loadNotes(); }
+    try {
+      await api.put(`/notes/${note.id}`, { favorite: !note.favorite });
+    } catch (e) {
+      // Reverte a alteração otimista se o servidor recusar.
+      setItems((prev) => prev.map((n) => (n.id === note.id ? { ...n, favorite: note.favorite } : n)));
+      toast.error(getErrorMessage(e, "Erro ao marcar favorito"));
+    }
   };
   const advance = async (note) => {
     if (!note.next_status) return;
@@ -122,28 +142,28 @@ export default function Notes() {
       await api.patch(`/notes/${note.id}/status`, { status: note.next_status });
       toast.success(`Avançado para "${note.next_status_label}"`);
       loadNotes();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro ao avançar"); }
+    } catch (e) { toast.error(getErrorMessage(e, "Erro ao avançar")); }
   };
   const contactClient = async (note) => {
     try {
       await api.post(`/notes/${note.id}/contact-client`, { method: "telefone" });
       toast.success("Registado: cliente contactado");
       loadNotes();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro"); }
+    } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const resolve = async (note) => {
     try {
       await api.post(`/notes/${note.id}/resolve`);
       toast.success("Pedido resolvido e arquivado");
       loadNotes();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro"); }
+    } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const reopen = async (note) => {
     try {
       await api.post(`/notes/${note.id}/reopen`);
       toast.success("Pedido reaberto");
       loadNotes();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro"); }
+    } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const duplicate = async (note) => {
     try {
@@ -151,7 +171,7 @@ export default function Notes() {
       toast.success("Pedido duplicado — altere apenas o necessário");
       loadNotes();
       openNote(data.id);
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro"); }
+    } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const sendReminder = async (note) => {
     if (!note.supplier_id) {
@@ -169,7 +189,7 @@ export default function Notes() {
       toast.success("Lembrete enviado ao fornecedor");
       loadNotes();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Não foi possível enviar. Verifique o Gmail.");
+      toast.error(getErrorMessage(e, "Não foi possível enviar. Verifique o Gmail."));
       openNote(note.id);
     }
   };

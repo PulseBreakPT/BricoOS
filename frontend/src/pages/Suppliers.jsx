@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Mail, Phone, Trash2, Pencil, Truck, Loader2 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,12 @@ export default function Suppliers() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/suppliers");
-    setSuppliers(data);
+    try {
+      const { data } = await api.get("/suppliers");
+      setSuppliers(data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar fornecedores"));
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -36,25 +40,35 @@ export default function Suppliers() {
   const openEdit = (s) => { setEditing(s); setForm({ ...empty, ...s }); setOpen(true); };
 
   const save = async () => {
-    if (!form.name) { toast.error("Indique o nome do fornecedor."); return; }
+    if (!form.name.trim()) { toast.error("Indique o nome do fornecedor."); return; }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("O email do fornecedor não parece válido.");
+      return;
+    }
     setSaving(true);
     try {
-      if (editing) await api.put(`/suppliers/${editing.id}`, form);
-      else await api.post("/suppliers", form);
+      const payload = { ...form, name: form.name.trim(), email: form.email.trim() };
+      if (editing) await api.put(`/suppliers/${editing.id}`, payload);
+      else await api.post("/suppliers", payload);
       toast.success(editing ? "Fornecedor atualizado" : "Fornecedor adicionado");
       setOpen(false);
       load();
-    } catch {
-      toast.error("Erro ao guardar");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao guardar"));
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (id) => {
-    await api.delete(`/suppliers/${id}`);
-    toast.success("Fornecedor eliminado");
-    load();
+  const remove = async (s) => {
+    if (!window.confirm(`Eliminar o fornecedor "${s.name}"? Esta ação não pode ser anulada.`)) return;
+    try {
+      await api.delete(`/suppliers/${s.id}`);
+      toast.success("Fornecedor eliminado");
+      load();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao eliminar"));
+    }
   };
 
   return (
@@ -89,7 +103,7 @@ export default function Suppliers() {
                   <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

@@ -1,0 +1,160 @@
+# =============================================================================
+# Brico2 — Stack completo auto-contido (Hostinger VPS)
+# =============================================================================
+# Tudo corre em Docker: MongoDB + FastAPI + Caddy (serve o React e faz
+# reverse-proxy de /api, com HTTPS automático). Não precisa de CloudPanel,
+# Nginx do host, nem build manual do frontend.
+#
+# Uso:
+#   docker compose --env-file .env.production up -d --build
+#   docker compose --env-file .env.production logs -f
+#   docker compose --env-file .env.production down
+#
+# Ou simplesmente:  sudo bash hostinger-setup.sh
+# =============================================================================
+
+name: brico2
+
+services:
+
+  mongo:
+    image: mongo:7
+    container_name: brico2-mongo
+    restart: unless-stopped
+    mem_limit: 768m
+    memswap_limit: 1024m
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    # Sem porta exposta ao host — só acessível na rede interna do Docker.
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    networks:
+      - brico2_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend/Dockerfile
+    image: brico2-backend:latest
+    container_name: brico2-backend
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 768m
+    # Autoheal: quando o healthcheck falha de forma persistente, o sidecar
+    # `autoheal` reinicia este container automaticamente.
+    labels:
+      autoheal: "true"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_URL: ${MONGO_URL}
+      DB_NAME: ${DB_NAME}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      # Base pública do site — usada para o redirect do OAuth do Gmail
+      # (https://<dominio>/api/oauth/gmail/callback).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      # Integração Gmail (opcional — sem isto o envio de emails fica desativado).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # IA (opcional — sem chave, os endpoints de IA respondem "não configurado").
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-5.4}
+      # Arquivar automaticamente pedidos inativos há mais de N meses.
+      AUTO_CLOSE_MONTHS: ${AUTO_CLOSE_MONTHS:-6}
+    # Loopback no host para debug local (curl http://127.0.0.1:8001/api/).
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
+    networks:
+      - brico2_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/', timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "7"
+
+  # Vigia os eventos do Docker e reinicia qualquer container com a label
+  # `autoheal=true` que entre em estado unhealthy. Mínimo footprint (~10 MB).
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: brico2-autoheal
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "10"
+      AUTOHEAL_START_PERIOD: "60"
+      AUTOHEAL_DEFAULT_STOP_TIMEOUT: "15"
+      DOCKER_SOCK: /var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - brico2_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/frontend/Dockerfile
+      args:
+        SITE_DOMAIN: ${SITE_DOMAIN}
+    image: brico2-web:latest
+    container_name: brico2-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    volumes:
+      - caddy_data:/data      # certificados Let's Encrypt (persistentes)
+      - caddy_config:/config
+    networks:
+      - brico2_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  mongo_data:
+    name: brico2_mongo_data
+  mongo_config:
+    name: brico2_mongo_config
+  caddy_data:
+    name: brico2_caddy_data
+  caddy_config:
+    name: brico2_caddy_config
+
+networks:
+  brico2_net:
+    name: brico2_net
+    driver: bridge
