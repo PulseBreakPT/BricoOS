@@ -21,10 +21,12 @@ try:
     from email_templates import (
         business_greeting, client_quote_template, request_reference, supplier_quote_template,
     )
+    from caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, request_reference, supplier_quote_template,
     )
+    from .caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -679,6 +681,7 @@ class TaskPatch(BaseModel):
 
 
 class CaixilhariaItem(BaseModel):
+    """Linha do esquema v1, mantida apenas para compatibilidade."""
     model_config = ConfigDict(extra="ignore")
     quantidade: int = 1
     largura_mm: int
@@ -700,10 +703,9 @@ class CaixilhariaItem(BaseModel):
         return v
 
 
-class CaixilhariaIn(BaseModel):
+class CaixilhariaOpcao(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    tipo_pedido: str = "orcamento"
-    produto: str
+    id: str = ""
     familia: str
     sistema: str
     material: str = ""
@@ -713,9 +715,110 @@ class CaixilhariaIn(BaseModel):
     fechadura: str = ""
     muletas: str = ""
     estore: str = ""
-    itens: List[CaixilhariaItem]
+    observacoes: str = ""
+
+    @field_validator("familia")
+    @classmethod
+    def _v_familia(cls, v):
+        return _check_choice(v, list(CAIXILHARIA_FAMILIAS), "Material / família")
+
+    @field_validator("material")
+    @classmethod
+    def _v_material(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_MATERIAIS], "Vidro / painéis")
+
+    @field_validator("fechadura")
+    @classmethod
+    def _v_fechadura(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_FECHADURAS], "Fechadura")
+
+    @field_validator("muletas")
+    @classmethod
+    def _v_muletas(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_MULETAS], "Muletas")
+
+    @field_validator("estore")
+    @classmethod
+    def _v_estore(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_ESTORES], "Estore")
+
+    @model_validator(mode="after")
+    def _v_sistema(self):
+        family = CAIXILHARIA_FAMILIAS[self.familia]
+        if self.sistema not in family["sistemas"]:
+            raise ValueError(f"O sistema escolhido não pertence à família {family['label']}")
+        return self
+
+
+class CaixilhariaLinha(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = ""
+    nome: str = ""
+    produto: str
+    quantidade: int = 1
+    largura_mm: int
+    altura_mm: int
+    sentido_abertura: str = ""
+    opcoes: List[CaixilhariaOpcao]
+    observacoes: str = ""
+
+    @field_validator("produto")
+    @classmethod
+    def _v_produto(cls, v):
+        return _check_choice(v, list(CAIXILHARIA_PRODUTOS), "Produto")
+
+    @field_validator("quantidade")
+    @classmethod
+    def _v_qt(cls, v):
+        if v < 1 or v > 999:
+            raise ValueError("Quantidade tem de estar entre 1 e 999")
+        return v
+
+    @field_validator("largura_mm", "altura_mm")
+    @classmethod
+    def _v_mm(cls, v):
+        if v < 50 or v > 10000:
+            raise ValueError("Medidas em milímetros: entre 50 e 10000 mm")
+        return v
+
+    @model_validator(mode="after")
+    def _v_opcoes(self):
+        if not self.opcoes:
+            raise ValueError("Cada elemento precisa de pelo menos uma opção de fabrico")
+        seen = set()
+        for option in self.opcoes:
+            family = CAIXILHARIA_FAMILIAS[option.familia]
+            if self.produto not in family["produtos"]:
+                product = CAIXILHARIA_PRODUTOS[self.produto].lower()
+                raise ValueError(f"A família {family['label']} não se aplica a {product}")
+            key = (option.familia, option.sistema)
+            if key in seen:
+                raise ValueError("O mesmo material e sistema está repetido no elemento")
+            seen.add(key)
+        return self
+
+
+class CaixilhariaIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    schema_version: int = 2
+    tipo_pedido: str = "orcamento"
+    linhas: List[CaixilhariaLinha] = []
     observacoes: str = ""
     data_entrega: str = ""
+
+    # Campos do esquema v1. Permitem que clientes ainda não atualizados gravem
+    # pedidos; o endpoint converte-os imediatamente para o esquema v2.
+    produto: str = ""
+    familia: str = ""
+    sistema: str = ""
+    material: str = ""
+    material_ref: str = ""
+    cor_aro: str = ""
+    cor_folha: str = ""
+    fechadura: str = ""
+    muletas: str = ""
+    estore: str = ""
+    itens: List[CaixilhariaItem] = []
 
     @field_validator("tipo_pedido")
     @classmethod
@@ -725,12 +828,12 @@ class CaixilhariaIn(BaseModel):
     @field_validator("produto")
     @classmethod
     def _v_produto(cls, v):
-        return _check_choice(v, list(CAIXILHARIA_PRODUTOS), "Produto")
+        return _check_choice(v, list(CAIXILHARIA_PRODUTOS), "Produto") if v else v
 
     @field_validator("familia")
     @classmethod
     def _v_familia(cls, v):
-        return _check_choice(v, list(CAIXILHARIA_FAMILIAS), "Sistema (família)")
+        return _check_choice(v, list(CAIXILHARIA_FAMILIAS), "Sistema (família)") if v else v
 
     @field_validator("material")
     @classmethod
@@ -754,6 +857,12 @@ class CaixilhariaIn(BaseModel):
 
     @model_validator(mode="after")
     def _v_coerencia(self):
+        if self.linhas:
+            if self.tipo_pedido == "encomenda" and any(len(line.opcoes) > 1 for line in self.linhas):
+                raise ValueError("Uma encomenda não pode ter alternativas: escolha uma opção ou mude para Orçamento")
+            return self
+        if not self.produto or not self.familia or not self.sistema:
+            raise ValueError("Adicione pelo menos um elemento com produto, medidas e opção de fabrico")
         fam = CAIXILHARIA_FAMILIAS[self.familia]
         if self.sistema not in fam["sistemas"]:
             raise ValueError(f"O sistema escolhido não pertence à família {fam['label']}")
@@ -1224,11 +1333,7 @@ async def caixilharia_catalog():
 
 
 def caixilharia_resumo(spec):
-    fam = CAIXILHARIA_FAMILIAS.get(spec.get("familia"), {})
-    sistema = (fam.get("sistemas") or {}).get(spec.get("sistema"), spec.get("sistema", ""))
-    produto = CAIXILHARIA_PRODUTOS.get(spec.get("produto"), spec.get("produto", ""))
-    total = sum(i.get("quantidade", 0) for i in spec.get("itens", []))
-    return produto, fam.get("label", ""), sistema, total
+    return caixilharia_summary(spec, CAIXILHARIA_PRODUTOS, CAIXILHARIA_FAMILIAS)
 
 
 @api_router.put("/notes/{note_id}/caixilharia")
@@ -1236,13 +1341,16 @@ async def set_caixilharia(note_id: str, payload: CaixilhariaIn):
     n = await db.notes.find_one({"id": note_id}, {"_id": 0})
     if not n:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    spec = payload.model_dump()
-    produto, fam_label, sistema, total = caixilharia_resumo(spec)
+    spec = normalize_caixilharia_spec(payload.model_dump())
     # Labels calculados no servidor: o frontend mostra o resumo sem duplicar o catálogo.
-    spec["display"] = {"produto": produto, "familia": fam_label, "sistema": sistema, "total_un": total}
+    spec["display"] = caixilharia_resumo(spec)
     await db.notes.update_one({"id": note_id}, {"$set": {"caixilharia": spec, "updated_at": now_iso()}})
-    await log_activity(note_id, "updated",
-                       f"Caixilharia à medida configurada: {produto} · {fam_label} {sistema} ({total} un)")
+    display = spec["display"]
+    comparison = f" · {display['comparison_count']} comparação(ões)" if display["comparison_count"] else ""
+    await log_activity(
+        note_id, "updated",
+        f"Caixilharia configurada: {display['produto']} · {display['total_un']} un{comparison}",
+    )
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -1258,7 +1366,8 @@ async def clear_caixilharia(note_id: str):
 
 def caixilharia_email(n, spec, is_reminder=False):
     """Gera assunto+corpo do email ao fornecedor no formato da ficha oficial BandAluminios."""
-    produto, fam_label, sistema, total = caixilharia_resumo(spec)
+    spec = normalize_caixilharia_spec(spec)
+    display = caixilharia_resumo(spec)
     tipo = "Encomenda" if spec.get("tipo_pedido") == "encomenda" else "Orçamento"
     ref_cliente = request_reference(n)
     ref_artigo = (n.get("reference") or "").strip()
@@ -1285,32 +1394,13 @@ def caixilharia_email(n, spec, is_reminder=False):
         except ValueError:
             entrega = spec["data_entrega"]
         lines.append(f"Data de entrega pretendida: {entrega}")
-    lines += [
-        "",
-        f"Produto: {produto}",
-        f"Sistema: {fam_label} — {sistema}",
-        f"({CAIXILHARIA_AVISO})",
-        "",
-        f"Medidas ({total} un no total):",
-    ]
-    for i, it in enumerate(spec.get("itens", []), 1):
-        row = f"  {i}. {it['quantidade']} un — {it['largura_mm']} x {it['altura_mm']} mm (L x A)"
-        if (it.get("sentido_abertura") or "").strip():
-            row += f" — Abertura: {it['sentido_abertura']}"
-        lines.append(row)
-    lines.append("")
-    if spec.get("material"):
-        mat = CAIXILHARIA_MATERIAIS.get(spec["material"], spec["material"])
-        ref = f" (Ref.: {spec['material_ref']})" if (spec.get("material_ref") or "").strip() else ""
-        lines.append(f"Material: {mat}{ref}")
-    if (spec.get("cor_aro") or "").strip() or (spec.get("cor_folha") or "").strip():
-        lines.append(f"Perfil / cor: Aro: {spec.get('cor_aro') or '—'} · Folha: {spec.get('cor_folha') or '—'}")
-    if spec.get("fechadura"):
-        lines.append(f"Fechadura: {CAIXILHARIA_FECHADURAS.get(spec['fechadura'], spec['fechadura'])}")
-    if spec.get("muletas"):
-        lines.append(f"Muletas: {CAIXILHARIA_MULETAS.get(spec['muletas'], spec['muletas'])}")
-    if spec.get("estore"):
-        lines.append(f"Estore: {CAIXILHARIA_ESTORES.get(spec['estore'], spec['estore'])}")
+    element_lines, display = caixilharia_email_lines(
+        spec, CAIXILHARIA_PRODUTOS, CAIXILHARIA_FAMILIAS,
+        materials=CAIXILHARIA_MATERIAIS, locks=CAIXILHARIA_FECHADURAS,
+        handles=CAIXILHARIA_MULETAS, shutters=CAIXILHARIA_ESTORES,
+        warning=CAIXILHARIA_AVISO,
+    )
+    lines += ["", *element_lines]
     if (spec.get("observacoes") or "").strip():
         lines += ["", f"Observações: {spec['observacoes']}"]
     lines += [
@@ -1319,7 +1409,9 @@ def caixilharia_email(n, spec, is_reminder=False):
     ]
 
     prefix = "Lembrete · " if is_reminder else ""
-    subject = f"{prefix}Pedido de {tipo.lower()} {ref_cliente} — {produto} à medida · {sistema} ({total} un)"
+    element_word = "elemento" if display["element_count"] == 1 else "elementos"
+    subject = (f"{prefix}Pedido de {tipo.lower()} {ref_cliente} — Caixilharia à medida · "
+               f"{display['element_count']} {element_word} · {display['option_count']} opção(ões)")
     return subject, "\n".join(lines)
 
 
@@ -1620,12 +1712,20 @@ async def note_preflight(note_id: str):
                if not str(n.get(field) or "").strip()]
     warns = measurement_warnings(n)
     if n.get("caixilharia"):
-        spec = n["caixilharia"]
-        items = spec.get("itens") or []
-        missing = [] if items else ["Medidas da caixilharia"]
+        spec = normalize_caixilharia_spec(n["caixilharia"])
+        lines = spec.get("linhas") or []
+        missing = [] if lines else ["Elementos de caixilharia"]
+        warns = []
+        for index, line in enumerate(lines, 1):
+            if not line.get("opcoes"):
+                missing.append(f"Opção de fabrico no elemento {index}")
+            for dimension in (line.get("largura_mm", 0), line.get("altura_mm", 0)):
+                if dimension > 6000:
+                    warns.append(f"Elemento {index}: medida invulgar de {dimension} mm — confirme o valor.")
         checklist = [
-            "Produto e sistema", "Quantidade, largura e altura", "Sentido de abertura",
-            "Cor / acabamento", CAIXILHARIA_AVISO,
+            "Produto por elemento", "Quantidade, largura e altura por elemento",
+            "Uma ou mais opções de material / sistema", "Sentido de abertura",
+            "Cor e acessórios por opção", CAIXILHARIA_AVISO,
         ]
     return {"product_type": pt, "product_label": PRODUCT_TYPES.get(pt, {}).get("label"),
             "checklist": checklist, "missing": missing, "warnings": warns,
