@@ -27,7 +27,8 @@ import {
 } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import CaixilhariaForm, {
-  emptyCaixilharia, getCaixilhariaCatalog, validateCaixilhariaSpec, caixilhariaLabels,
+  caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
+  normalizeCaixilhariaSpec, validateCaixilhariaSpec,
 } from "@/components/CaixilhariaForm";
 
 const emptyForm = {
@@ -72,7 +73,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // Assistente de criação por etapas: escolha do tipo → passos
   const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
   const [createStep, setCreateStep] = useState(0);
-  const [caixSpec, setCaixSpec] = useState(emptyCaixilharia);
+  const [caixSpec, setCaixSpec] = useState(() => createEmptyCaixilharia());
   const [caixCatalog, setCaixCatalog] = useState(null);
   const [creating, setCreating] = useState(false);
   const [newQuote, setNewQuote] = useState({ supplier_name: "", product: "", price: "", notes: "" });
@@ -159,7 +160,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setNewQuote({ supplier_name: "", product: "", price: "", notes: "" });
       setCreateMode("choice");
       setCreateStep(0);
-      setCaixSpec(emptyCaixilharia);
+      setCaixSpec(createEmptyCaixilharia());
       setCreating(false);
       dirty.current = false;
       if (noteId) {
@@ -322,17 +323,20 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   const createBandPedido = async () => {
     if (!validClientStep()) return;
-    const v = validateCaixilhariaSpec(caixSpec);
+    const v = validateCaixilhariaSpec(caixSpec, caixCatalog);
     if (!v.ok) { toast.error(v.error); return; }
+    (v.warnings || []).forEach((warning) => toast.warning(warning));
     setCreating(true);
     try {
       const lbl = caixilhariaLabels(caixCatalog, caixSpec);
       const { data } = await api.post("/notes", {
         customer_name: form.customer_name, phone: form.phone, email: form.email,
-        description: `${lbl.produto} à medida — ${lbl.sistema}`,
+        description: `Caixilharia à medida — ${lbl.produto}`,
         category: "construcao", labels: ["À medida"], priority: form.priority || "media",
       });
-      await api.put(`/notes/${data.id}/caixilharia`, { ...caixSpec, itens: v.itens });
+      await api.put(`/notes/${data.id}/caixilharia`, {
+        ...normalizeCaixilhariaSpec(caixSpec), linhas: v.linhas,
+      });
       // Associa (ou cria) o fornecedor BandAluminios automaticamente.
       let supplierId = (suppliers || []).find((s) => /band/i.test(s.name || ""))?.id;
       if (!supplierId && caixCatalog?.supplier) {
@@ -541,7 +545,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="note-dialog"
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-3xl"
+        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-4xl" : "sm:max-w-3xl"}`}
       >
         {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
@@ -897,24 +901,47 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         <div className="min-w-0">
                           <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
                             <Frame className="h-4 w-4 shrink-0 text-slate-500" />
-                            {note.caixilharia.display?.produto} · {note.caixilharia.display?.sistema}
+                            {note.caixilharia.display?.produto || "Caixilharia à medida"}
                           </p>
                           <p className="mt-0.5 text-xs text-slate-500">
-                            {note.caixilharia.display?.familia} — {note.caixilharia.display?.total_un} un
+                            {note.caixilharia.display?.element_count
+                              ? `${note.caixilharia.display.element_count} elemento(s) · ${note.caixilharia.display.option_count} opção(ões) · `
+                              : ""}
+                            {note.caixilharia.display?.total_un} un
                             {note.caixilharia.tipo_pedido === "encomenda" ? " · Encomenda" : " · Orçamento"}
                             {note.caixilharia.data_entrega ? ` · entrega ${note.caixilharia.data_entrega}` : ""}
                           </p>
+                          {note.caixilharia.display?.comparison_count ? (
+                            <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                              {note.caixilharia.display.comparison_count} comparação(ões) de material
+                            </span>
+                          ) : null}
                         </div>
                         <Button data-testid="caixilharia-edit" size="sm" variant="outline" onClick={() => setCaixOpen(true)} className="h-8 shrink-0 rounded-lg text-xs">
                           Editar
                         </Button>
                       </div>
-                      <div className="mt-2 space-y-0.5">
-                        {(note.caixilharia.itens || []).map((it, i) => (
-                          <p key={i} className="font-mono text-xs text-slate-600">
-                            {it.quantidade} un — {it.largura_mm} × {it.altura_mm} mm{it.sentido_abertura ? ` — ${it.sentido_abertura}` : ""}
-                          </p>
+                      <div className="mt-2 space-y-2">
+                        {(note.caixilharia.display?.lines || []).map((line, index) => (
+                          <div key={line.id || index} className="rounded-lg bg-white p-2 text-xs text-slate-600">
+                            <p className="font-mono font-semibold text-slate-700">
+                              {index + 1}. {line.produto} — {line.quantidade} un — {line.largura_mm} × {line.altura_mm} mm
+                              {line.sentido_abertura ? ` — ${line.sentido_abertura}` : ""}
+                            </p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {(line.opcoes || []).map((option, optionIndex) => (
+                                <span key={option.id || optionIndex} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  {String.fromCharCode(65 + optionIndex)} · {option.label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         ))}
+                        {!note.caixilharia.display?.lines?.length ? (note.caixilharia.itens || []).map((item, index) => (
+                          <p key={index} className="font-mono text-xs text-slate-600">
+                            {item.quantidade} un — {item.largura_mm} × {item.altura_mm} mm{item.sentido_abertura ? ` — ${item.sentido_abertura}` : ""}
+                          </p>
+                        )) : null}
                       </div>
                     </div>
                   ) : (

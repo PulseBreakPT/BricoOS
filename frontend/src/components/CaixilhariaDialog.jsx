@@ -7,12 +7,12 @@ import { toast } from "sonner";
 import { Trash2, Loader2, AlertTriangle, Building2 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import CaixilhariaForm, {
-  emptyCaixilharia, getCaixilhariaCatalog, validateCaixilhariaSpec,
+  createEmptyCaixilharia, getCaixilhariaCatalog, normalizeCaixilhariaSpec, validateCaixilhariaSpec,
 } from "@/components/CaixilhariaForm";
 
 export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers, onSaved }) {
   const [catalog, setCatalog] = useState(null);
-  const [spec, setSpec] = useState(emptyCaixilharia);
+  const [spec, setSpec] = useState(() => createEmptyCaixilharia());
   const [saving, setSaving] = useState(false);
   const [addingSupplier, setAddingSupplier] = useState(false);
 
@@ -21,20 +21,19 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
 
   useEffect(() => {
     if (!open) return;
-    setSpec(note?.caixilharia
-      ? { ...emptyCaixilharia, ...note.caixilharia, itens: (note.caixilharia.itens || []).map((i) => ({ ...i })) }
-      : emptyCaixilharia);
+    setSpec(note?.caixilharia ? normalizeCaixilhariaSpec(note.caixilharia) : createEmptyCaixilharia());
     getCaixilhariaCatalog()
       .then(setCatalog)
       .catch((e) => toast.error(getErrorMessage(e, "Erro ao carregar o catálogo de caixilharia")));
   }, [open, note]);
 
   const save = async () => {
-    const v = validateCaixilhariaSpec(spec);
+    const v = validateCaixilhariaSpec(spec, catalog);
     if (!v.ok) { toast.error(v.error); return; }
+    (v.warnings || []).forEach((warning) => toast.warning(warning));
     setSaving(true);
     try {
-      await api.put(`/notes/${note.id}/caixilharia`, { ...spec, itens: v.itens });
+      await api.put(`/notes/${note.id}/caixilharia`, { ...normalizeCaixilhariaSpec(spec), linhas: v.linhas });
       toast.success("Especificação de caixilharia guardada");
       onSaved && onSaved();
       onOpenChange(false);
@@ -78,18 +77,18 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="caixilharia-dialog"
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92vh] sm:w-full sm:max-w-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-4xl"
       >
         <DialogHeader className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
           <DialogTitle className="font-heading text-lg font-bold tracking-tight sm:text-xl">
             Caixilharia à medida — BandAluminios
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-500">
-            Janelas, portas, portadas e redes mosquiteiras, conforme a ficha de pedido do fornecedor.
+            Combine vários elementos e compare PVC com alumínio no mesmo pedido.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           {!catalog ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
           ) : (
