@@ -39,7 +39,7 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/', timeout=3).status==200 else 1)"
 
-# 1 worker único: o startup corre migrate()/seed()/ensure_indexes() uma única
+# 1 worker único: o startup corre migrate()/ensure_indexes() uma única
 # vez — escalar para >1 worker duplicaria esse trabalho.
 CMD ["uvicorn", "server:app", \
      "--host", "0.0.0.0", \
