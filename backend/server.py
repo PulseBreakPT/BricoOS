@@ -12,7 +12,7 @@ import uuid
 import base64
 import warnings
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
@@ -124,7 +124,7 @@ def enrich_note(note, now=None):
     note["status_label"] = STATUS_LABEL.get(status, status)
     sla = note.get("sla_days") or DEFAULT_SLA_DAYS
     ref = parse_dt(note.get("status_updated_at") or note.get("updated_at") or note.get("created_at"))
-    days = (now - ref).days if ref else 0
+    days = max((now - ref).days, 0) if ref else 0
     note["waiting_days"] = days
     note["is_overdue"] = (status in WAITING_SUPPLIER or status in FORGOTTEN_STATUSES) and days >= sla
     sup = parse_dt(note.get("last_supplier_sent_at"))
@@ -340,6 +340,18 @@ async def auto_close_inactive():
 
 
 # ---------- Models ----------
+def _check_choice(value, allowed, field_label):
+    if value is not None and value not in allowed:
+        raise ValueError(f"{field_label} inválido: {value}")
+    return value
+
+
+def _check_positive(value, field_label):
+    if value is not None and value < 1:
+        raise ValueError(f"{field_label} tem de ser pelo menos 1")
+    return value
+
+
 class NoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     customer_name: str = ""
@@ -359,6 +371,31 @@ class NoteIn(BaseModel):
     sla_days: int = DEFAULT_SLA_DAYS
     reminder_interval_days: int = 3
     favorite: bool = False
+
+    @field_validator("status")
+    @classmethod
+    def _v_status(cls, v):
+        return _check_choice(v, STATUSES, "Estado")
+
+    @field_validator("priority")
+    @classmethod
+    def _v_priority(cls, v):
+        return _check_choice(v, PRIORITIES, "Prioridade")
+
+    @field_validator("category")
+    @classmethod
+    def _v_category(cls, v):
+        return _check_choice(v, VALID_CATEGORIES, "Secção")
+
+    @field_validator("sla_days")
+    @classmethod
+    def _v_sla(cls, v):
+        return _check_positive(v, "Prazo (SLA)")
+
+    @field_validator("reminder_interval_days")
+    @classmethod
+    def _v_reminder(cls, v):
+        return _check_positive(v, "Intervalo de lembrete")
 
 
 class NotePatch(BaseModel):
@@ -380,6 +417,31 @@ class NotePatch(BaseModel):
     sla_days: Optional[int] = None
     reminder_interval_days: Optional[int] = None
     favorite: Optional[bool] = None
+
+    @field_validator("status")
+    @classmethod
+    def _v_status(cls, v):
+        return _check_choice(v, STATUSES, "Estado")
+
+    @field_validator("priority")
+    @classmethod
+    def _v_priority(cls, v):
+        return _check_choice(v, PRIORITIES, "Prioridade")
+
+    @field_validator("category")
+    @classmethod
+    def _v_category(cls, v):
+        return _check_choice(v, VALID_CATEGORIES, "Secção")
+
+    @field_validator("sla_days")
+    @classmethod
+    def _v_sla(cls, v):
+        return _check_positive(v, "Prazo (SLA)")
+
+    @field_validator("reminder_interval_days")
+    @classmethod
+    def _v_reminder(cls, v):
+        return _check_positive(v, "Intervalo de lembrete")
 
 
 class StatusIn(BaseModel):
@@ -429,6 +491,13 @@ class QuoteIn(BaseModel):
     currency: str = "EUR"
     notes: str = ""
 
+    @field_validator("price")
+    @classmethod
+    def _v_price(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("O preço não pode ser negativo")
+        return v
+
 
 class QuoteRequestIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -475,15 +544,19 @@ async def list_notes(
         docs = [d for d in docs if d["waiting_on"] == waiting]
     if reminder_due:
         docs = [d for d in docs if d.get("reminder_due")]
-    if sort == "smart":
-        docs.sort(key=lambda d: (0 if d["is_overdue"] else 1, PRIORITY_RANK.get(d.get("priority"), 2),
-                                 d.get("status_updated_at") or d.get("created_at")))
-    elif sort == "priority":
+    if sort == "priority":
         docs.sort(key=lambda d: (PRIORITY_RANK.get(d.get("priority"), 2), d.get("created_at")))
     elif sort == "deadline":
         docs.sort(key=lambda d: -d.get("waiting_days", 0))
     elif sort == "customer":
         docs.sort(key=lambda d: (d.get("customer_name") or "").lower())
+    elif sort == "recent":
+        docs.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    else:  # "smart" e qualquer valor desconhecido
+        docs.sort(key=lambda d: (0 if d["is_overdue"] else 1, PRIORITY_RANK.get(d.get("priority"), 2),
+                                 d.get("status_updated_at") or d.get("created_at")))
+    skip = max(skip, 0)
+    limit = min(max(limit, 1), 500)
     return {"items": docs[skip:skip + limit], "total": len(docs)}
 
 
@@ -648,6 +721,7 @@ async def delete_note(note_id: str):
     await db.quotes.delete_many({"note_id": note_id})
     await db.activities.delete_many({"note_id": note_id})
     await db.tasks.delete_many({"note_id": note_id})
+    await db.quote_requests.delete_many({"note_id": note_id})
     return {"ok": True}
 
 
@@ -833,6 +907,8 @@ async def gmail_connect():
         raise HTTPException(status_code=400, detail="Credenciais Google não configuradas no servidor.")
     flow = Flow.from_client_config(client_config(), scopes=SCOPES, redirect_uri=REDIRECT_URI)
     url, state = flow.authorization_url(access_type="offline", prompt="consent", include_granted_scopes="true")
+    stale_cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    await db.oauth_states.delete_many({"created_at": {"$lt": stale_cutoff}})
     await db.oauth_states.insert_one({"state": state, "created_at": now_iso()})
     return RedirectResponse(url)
 
@@ -846,6 +922,9 @@ async def gmail_callback(code: Optional[str] = None, state: Optional[str] = None
     if not st:
         return RedirectResponse(f"{frontend}/?gmail=error")
     await db.oauth_states.delete_one({"state": state})
+    created = parse_dt(st.get("created_at"))
+    if not created or (datetime.now(timezone.utc) - created) > timedelta(minutes=15):
+        return RedirectResponse(f"{frontend}/?gmail=error")
     try:
         flow = Flow.from_client_config(client_config(), scopes=SCOPES, redirect_uri=REDIRECT_URI)
         with warnings.catch_warnings():
@@ -899,34 +978,49 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
     note = await db.notes.find_one({"id": note_id}, {"_id": 0})
     if not note:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    ids = payload.supplier_ids or ([payload.supplier_id] if payload.supplier_id else [])
+    ids = list(dict.fromkeys(payload.supplier_ids or ([payload.supplier_id] if payload.supplier_id else [])))
     if not ids:
         raise HTTPException(status_code=400, detail="Escolha pelo menos um fornecedor.")
-    sent_names = []
+    if not payload.subject.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
+    creds = await get_gmail_creds()
+    if not creds:
+        raise HTTPException(status_code=400, detail="Gmail não está ligado. Ligue a sua conta Gmail para enviar emails automaticamente.")
+    sent_names, sent_ids, failed = [], [], []
     for sid in ids:
         supplier = await db.suppliers.find_one({"id": sid}, {"_id": 0})
         if not supplier:
+            failed.append({"supplier_id": sid, "reason": "Fornecedor não encontrado"})
             continue
-        await _send_email(supplier.get("email", ""), payload.subject, payload.body)
+        name = supplier.get("name") or "Fornecedor"
+        if not (supplier.get("email") or "").strip():
+            failed.append({"supplier_id": sid, "supplier_name": name, "reason": "Sem email definido"})
+            continue
+        try:
+            await _send_email(supplier["email"], payload.subject, payload.body)
+        except HTTPException as e:
+            failed.append({"supplier_id": sid, "supplier_name": name, "reason": e.detail})
+            continue
         await db.quote_requests.insert_one({"id": str(uuid.uuid4()), "note_id": note_id, "supplier_id": sid,
-                                            "supplier_name": supplier.get("name"), "subject": payload.subject,
+                                            "supplier_name": name, "subject": payload.subject,
                                             "body": payload.body, "sent_at": now_iso(), "is_reminder": payload.is_reminder})
-        act_type = "email_sent"
         verb = "Lembrete enviado" if payload.is_reminder else "Pedido de orçamento enviado"
-        await log_activity(note_id, act_type, f"{verb} a {supplier.get('name')}",
-                           {"supplier_id": sid, "supplier_name": supplier.get("name"), "reminder": payload.is_reminder})
-        sent_names.append(supplier.get("name"))
+        await log_activity(note_id, "email_sent", f"{verb} a {name}",
+                           {"supplier_id": sid, "supplier_name": name, "reminder": payload.is_reminder})
+        sent_names.append(name)
+        sent_ids.append(sid)
     if not sent_names:
-        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+        reasons = "; ".join(f"{f.get('supplier_name', f['supplier_id'])}: {f['reason']}" for f in failed)
+        raise HTTPException(status_code=400, detail=f"Nenhum email enviado. {reasons}")
     new_status = "aguarda_fornecedor" if payload.is_reminder else "enviado_fornecedor"
     upd = {"last_supplier_sent_at": now_iso(), "status_updated_at": now_iso(), "updated_at": now_iso(), "status": new_status}
-    if not payload.is_reminder:
-        upd["supplier_id"] = ids[0]
     if payload.is_reminder:
         upd["last_reminder_at"] = now_iso()
         await db.notes.update_one({"id": note_id}, {"$inc": {"reminder_count": 1}})
+    else:
+        upd["supplier_id"] = sent_ids[0]
     await db.notes.update_one({"id": note_id}, {"$set": upd})
-    return {"ok": True, "sent_to": sent_names}
+    return {"ok": True, "sent_to": sent_names, "failed": failed}
 
 
 # ---------- Notifications / Today ----------

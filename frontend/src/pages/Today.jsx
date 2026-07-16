@@ -4,7 +4,7 @@ import {
   Sun, AlertTriangle, Inbox, Clock, PhoneCall, Bell, Layers, Brain, Zap,
   CheckCircle2, Loader2, TrendingUp, Hourglass, ArrowRight, ChevronRight,
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getErrorMessage } from "@/lib/api";
 import { getCategory } from "@/lib/categories";
 import { getStatusCfg, getPriorityCfg, formatEuro } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -80,6 +80,7 @@ export default function Today() {
   const [learning, setLearning] = useState(null);
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sendingIds, setSendingIds] = useState(new Set());
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -89,8 +90,8 @@ export default function Today() {
         api.get("/today"), api.get("/learning/profile"), api.get("/batches"),
       ]);
       setData(t.data); setLearning(l.data); setBatches(b.data.batches || []);
-    } catch {
-      toast.error("Erro ao carregar o painel de hoje");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar o painel de hoje"));
     } finally {
       setLoading(false);
     }
@@ -103,15 +104,22 @@ export default function Today() {
       await api.patch(`/notes/${n.id}/status`, { status: n.next_status });
       toast.success(`Avançado para "${n.next_status_label}"`);
       load();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erro"); }
+    } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const sendReminder = async (n) => {
     if (!n.supplier_id) { openNote(n.id); return; }
+    if (sendingIds.has(n.id)) return; // evita duplo clique = dois emails
+    setSendingIds((prev) => new Set(prev).add(n.id));
     try {
       const { data: tpl } = await api.get(`/notes/${n.id}/quote-template`, { params: { supplier_id: n.supplier_id, is_reminder: true } });
       await api.post(`/notes/${n.id}/send-quote-request`, { supplier_id: n.supplier_id, subject: tpl.subject, body: tpl.body, is_reminder: true });
       toast.success("Lembrete enviado"); load();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Verifique o Gmail"); openNote(n.id); }
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Verifique o Gmail"));
+      openNote(n.id);
+    } finally {
+      setSendingIds((prev) => { const s = new Set(prev); s.delete(n.id); return s; });
+    }
   };
 
   const today = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
@@ -228,7 +236,9 @@ export default function Today() {
                           <p className="truncate text-sm font-semibold text-slate-900">{n.customer_name}</p>
                           <p className="truncate text-xs text-slate-500">Enviado há {n.days_since_supplier}d</p>
                         </div>
-                        <Button data-testid={`reminder-send-${n.id}`} size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => sendReminder(n)}>Enviar</Button>
+                        <Button data-testid={`reminder-send-${n.id}`} size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={sendingIds.has(n.id)} onClick={() => sendReminder(n)}>
+                          {sendingIds.has(n.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Enviar"}
+                        </Button>
                       </div>
                     ))}
                 </div>

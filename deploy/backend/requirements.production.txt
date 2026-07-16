@@ -1,0 +1,22 @@
+# =============================================================================
+# Brico2 backend — requirements de PRODUÇÃO
+# =============================================================================
+# Apenas o que backend/server.py realmente importa em runtime.
+# Diferenças vs backend/requirements.txt (imagem de dev do Emergent):
+#   - REMOVIDO: boto3, pandas, numpy, stripe, huggingface, jq, typer, black,
+#     isort, flake8, mypy, pytest*  (nunca importados pelo código runtime)
+#   - emergentintegrations (IA) é instalado à parte no Dockerfile porque vem
+#     de um index próprio do Emergent e é opcional (só usado com OPENAI_API_KEY).
+# =============================================================================
+
+fastapi==0.110.1
+uvicorn==0.25.0
+motor==3.3.1
+pymongo==4.6.3
+pydantic>=2.6.4
+python-dotenv>=1.0.1
+
+# Gmail OAuth + envio de emails
+google-auth>=2.55.0
+google-auth-oauthlib>=1.4.0
+google-api-python-client>=2.190.0

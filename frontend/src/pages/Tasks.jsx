@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Trash2, ListChecks } from "lucide-react";
-import api from "@/lib/api";
+import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,27 +21,45 @@ export default function Tasks() {
   const [priority, setPriority] = useState("normal");
 
   const load = useCallback(async () => {
-    const { data } = await api.get("/tasks");
-    setTasks(data);
+    try {
+      const { data } = await api.get("/tasks");
+      setTasks(data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar tarefas"));
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const add = async () => {
     if (!title.trim()) { toast.error("Escreva a tarefa."); return; }
-    await api.post("/tasks", { title: title.trim(), category, priority });
-    setTitle("");
-    toast.success("Tarefa adicionada");
-    load();
+    try {
+      await api.post("/tasks", { title: title.trim(), category, priority });
+      setTitle("");
+      toast.success("Tarefa adicionada");
+      load();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao adicionar a tarefa"));
+    }
   };
 
   const toggle = async (t) => {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
-    await api.patch(`/tasks/${t.id}/toggle`);
+    try {
+      await api.patch(`/tasks/${t.id}/toggle`);
+    } catch (e) {
+      // Reverte a alteração otimista se o servidor recusar.
+      setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: t.done } : x)));
+      toast.error(getErrorMessage(e, "Erro ao atualizar a tarefa"));
+    }
   };
 
   const remove = async (id) => {
-    await api.delete(`/tasks/${id}`);
-    load();
+    try {
+      await api.delete(`/tasks/${id}`);
+      load();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao eliminar a tarefa"));
+    }
   };
 
   const filtered = tasks.filter((t) => filter === "todos" || t.category === filter);
