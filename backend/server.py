@@ -12,7 +12,7 @@ import uuid
 import base64
 import warnings
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
@@ -89,6 +89,68 @@ NEXT_STATUS = {
     "aprovado": "encomendado", "encomendado": "concluido",
 }
 PREDEFINED_LABELS = ["À medida", "Cliente VIP", "Stock loja", "Encomenda especial", "Garantia", "Reclamação", "Promoção"]
+
+# ---------- Caixilharia à medida (fornecedor: BandAluminios) ----------
+# Estrutura fiel à ficha oficial de orçamento/encomenda da BandAluminios
+# (www.bandaluminios.com) + redes mosquiteiras vendidas à medida pela loja.
+CAIXILHARIA_SUPPLIER = {
+    "name": "BandAluminios",
+    "email": "geral@bandaluminios.com",
+    "phone": "+351219265110",
+    "category": "construcao",
+    "notes": "Comércio de PVC e alumínios — caixilharia à medida. "
+             "Estrada da Granja do Marquês, Lote 6, 2725-118 Algueirão, Sintra. "
+             "Seg-Sex 9:00-12:30 / 14:00-17:30 · www.bandaluminios.com",
+}
+
+CAIXILHARIA_PRODUTOS = {
+    "janela": "Janela",
+    "porta": "Porta",
+    "portada": "Portada",
+    "rede_mosquiteira": "Rede mosquiteira",
+}
+
+CAIXILHARIA_FAMILIAS = {
+    "aluminio_sem_corte": {
+        "label": "Alumínio sem corte térmico",
+        "produtos": ["janela", "porta"],
+        "sistemas": {"confort_correr": "Confort Correr", "sb_batente": "SB Batente"},
+    },
+    "aluminio_corte_termico": {
+        "label": "Alumínio com corte térmico",
+        "produtos": ["janela", "porta"],
+        "sistemas": {
+            "thermostop_batente": "Thermostop Batente",
+            "thermostop24_batente": "Thermostop 24 Batente",
+            "thermoline_correr": "Thermoline Correr",
+        },
+    },
+    "portada_hp": {
+        "label": "Portada HP",
+        "produtos": ["portada"],
+        "sistemas": {"lamina_fixa": "Lâmina Fixa", "lamina_regulavel": "Lâmina Regulável"},
+    },
+    "pvc": {
+        "label": "PVC",
+        "produtos": ["janela", "porta"],
+        "sistemas": {"eurodesign70_batente": "Eurodesign 70 Batente", "slinova_correr": "Slinova Correr"},
+    },
+    "redes": {
+        "label": "Redes mosquiteiras",
+        "produtos": ["rede_mosquiteira"],
+        "sistemas": {
+            "rede_fixa": "Fixa", "rede_enrolavel": "Enrolável",
+            "rede_correr": "De correr", "rede_plissada": "Plissada",
+        },
+    },
+}
+
+CAIXILHARIA_SENTIDOS = ["Direita", "Esquerda", "Oscilo-batente", "Fixa", "De correr", "Basculante"]
+CAIXILHARIA_FECHADURAS = {"1_ponto": "1 ponto", "3_pontos": "3 pontos"}
+CAIXILHARIA_MULETAS = {"interior": "Interior", "exterior": "Exterior", "interior_exterior": "Interior + Exterior"}
+CAIXILHARIA_ESTORES = {"com_estore": "Com estore", "sem_estore": "Sem estore"}
+CAIXILHARIA_MATERIAIS = {"vidro": "Vidro", "paineis": "Painéis"}
+CAIXILHARIA_AVISO = "Vãos sempre vistos por dentro"
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -597,6 +659,92 @@ class TaskPatch(BaseModel):
         return _check_choice(v, TASK_REPEATS, "Repetição")
 
 
+class CaixilhariaItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    quantidade: int = 1
+    largura_mm: int
+    altura_mm: int
+    sentido_abertura: str = ""
+
+    @field_validator("quantidade")
+    @classmethod
+    def _v_qt(cls, v):
+        if v < 1 or v > 999:
+            raise ValueError("Quantidade tem de estar entre 1 e 999")
+        return v
+
+    @field_validator("largura_mm", "altura_mm")
+    @classmethod
+    def _v_mm(cls, v):
+        if v < 50 or v > 10000:
+            raise ValueError("Medidas em milímetros: entre 50 e 10000 mm")
+        return v
+
+
+class CaixilhariaIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    tipo_pedido: str = "orcamento"
+    produto: str
+    familia: str
+    sistema: str
+    material: str = ""
+    material_ref: str = ""
+    cor_aro: str = ""
+    cor_folha: str = ""
+    fechadura: str = ""
+    muletas: str = ""
+    estore: str = ""
+    itens: List[CaixilhariaItem]
+    observacoes: str = ""
+    data_entrega: str = ""
+
+    @field_validator("tipo_pedido")
+    @classmethod
+    def _v_tipo(cls, v):
+        return _check_choice(v, ["orcamento", "encomenda"], "Tipo de pedido")
+
+    @field_validator("produto")
+    @classmethod
+    def _v_produto(cls, v):
+        return _check_choice(v, list(CAIXILHARIA_PRODUTOS), "Produto")
+
+    @field_validator("familia")
+    @classmethod
+    def _v_familia(cls, v):
+        return _check_choice(v, list(CAIXILHARIA_FAMILIAS), "Sistema (família)")
+
+    @field_validator("material")
+    @classmethod
+    def _v_material(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_MATERIAIS], "Material")
+
+    @field_validator("fechadura")
+    @classmethod
+    def _v_fechadura(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_FECHADURAS], "Fechadura")
+
+    @field_validator("muletas")
+    @classmethod
+    def _v_muletas(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_MULETAS], "Muletas")
+
+    @field_validator("estore")
+    @classmethod
+    def _v_estore(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_ESTORES], "Estore")
+
+    @model_validator(mode="after")
+    def _v_coerencia(self):
+        fam = CAIXILHARIA_FAMILIAS[self.familia]
+        if self.sistema not in fam["sistemas"]:
+            raise ValueError(f"O sistema escolhido não pertence à família {fam['label']}")
+        if self.produto not in fam["produtos"]:
+            raise ValueError(f"A família {fam['label']} não se aplica a {CAIXILHARIA_PRODUTOS[self.produto].lower()}")
+        if not self.itens:
+            raise ValueError("Adicione pelo menos uma medida (quantidade, largura e altura)")
+        return self
+
+
 class QuoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     supplier_id: str = ""
@@ -1040,6 +1188,117 @@ async def delete_task(task_id: str):
     return {"ok": True}
 
 
+# ---------- Caixilharia à medida ----------
+@api_router.get("/caixilharia/catalog")
+async def caixilharia_catalog():
+    return {
+        "supplier": CAIXILHARIA_SUPPLIER,
+        "produtos": CAIXILHARIA_PRODUTOS,
+        "familias": CAIXILHARIA_FAMILIAS,
+        "sentidos": CAIXILHARIA_SENTIDOS,
+        "fechaduras": CAIXILHARIA_FECHADURAS,
+        "muletas": CAIXILHARIA_MULETAS,
+        "estores": CAIXILHARIA_ESTORES,
+        "materiais": CAIXILHARIA_MATERIAIS,
+        "aviso": CAIXILHARIA_AVISO,
+    }
+
+
+def caixilharia_resumo(spec):
+    fam = CAIXILHARIA_FAMILIAS.get(spec.get("familia"), {})
+    sistema = (fam.get("sistemas") or {}).get(spec.get("sistema"), spec.get("sistema", ""))
+    produto = CAIXILHARIA_PRODUTOS.get(spec.get("produto"), spec.get("produto", ""))
+    total = sum(i.get("quantidade", 0) for i in spec.get("itens", []))
+    return produto, fam.get("label", ""), sistema, total
+
+
+@api_router.put("/notes/{note_id}/caixilharia")
+async def set_caixilharia(note_id: str, payload: CaixilhariaIn):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    spec = payload.model_dump()
+    produto, fam_label, sistema, total = caixilharia_resumo(spec)
+    # Labels calculados no servidor: o frontend mostra o resumo sem duplicar o catálogo.
+    spec["display"] = {"produto": produto, "familia": fam_label, "sistema": sistema, "total_un": total}
+    await db.notes.update_one({"id": note_id}, {"$set": {"caixilharia": spec, "updated_at": now_iso()}})
+    await log_activity(note_id, "updated",
+                       f"Caixilharia à medida configurada: {produto} · {fam_label} {sistema} ({total} un)")
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
+@api_router.delete("/notes/{note_id}/caixilharia")
+async def clear_caixilharia(note_id: str):
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    await db.notes.update_one({"id": note_id}, {"$unset": {"caixilharia": ""}, "$set": {"updated_at": now_iso()}})
+    await log_activity(note_id, "updated", "Especificação de caixilharia removida")
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
+def caixilharia_email(n, spec, is_reminder=False):
+    """Gera assunto+corpo do email ao fornecedor no formato da ficha oficial BandAluminios."""
+    produto, fam_label, sistema, total = caixilharia_resumo(spec)
+    tipo = "Encomenda" if spec.get("tipo_pedido") == "encomenda" else "Orçamento"
+    ref_cliente = (n.get("reference") or "").strip() or n.get("id", "")[:8].upper()
+    hoje = datetime.now(timezone.utc).strftime("%d/%m/%Y")
+
+    lines = ["Exmos. Senhores,", ""]
+    if is_reminder:
+        lines.append("Voltamos a contactar relativamente ao pedido enviado anteriormente, que reproduzimos abaixo:")
+    else:
+        lines.append(f"Somos o Bricomarché de Faro e vimos por este meio apresentar o seguinte pedido de {tipo.lower()} "
+                     "de caixilharia à medida, conforme a vossa ficha de pedido:")
+    lines += [
+        "",
+        f"Tipo de pedido: {tipo}",
+        "Cliente: Bricomarché Faro",
+        f"Ref. de cliente: {ref_cliente}",
+        f"Data do pedido: {hoje}",
+    ]
+    if (spec.get("data_entrega") or "").strip():
+        try:
+            entrega = datetime.strptime(spec["data_entrega"], "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            entrega = spec["data_entrega"]
+        lines.append(f"Data de entrega pretendida: {entrega}")
+    lines += [
+        "",
+        f"Produto: {produto}",
+        f"Sistema: {fam_label} — {sistema}",
+        f"({CAIXILHARIA_AVISO})",
+        "",
+        f"Medidas ({total} un no total):",
+    ]
+    for i, it in enumerate(spec.get("itens", []), 1):
+        row = f"  {i}. {it['quantidade']} un — {it['largura_mm']} x {it['altura_mm']} mm (L x A)"
+        if (it.get("sentido_abertura") or "").strip():
+            row += f" — Abertura: {it['sentido_abertura']}"
+        lines.append(row)
+    lines.append("")
+    if spec.get("material"):
+        mat = CAIXILHARIA_MATERIAIS.get(spec["material"], spec["material"])
+        ref = f" (Ref.: {spec['material_ref']})" if (spec.get("material_ref") or "").strip() else ""
+        lines.append(f"Material: {mat}{ref}")
+    if (spec.get("cor_aro") or "").strip() or (spec.get("cor_folha") or "").strip():
+        lines.append(f"Perfil / cor: Aro: {spec.get('cor_aro') or '—'} · Folha: {spec.get('cor_folha') or '—'}")
+    if spec.get("fechadura"):
+        lines.append(f"Fechadura: {CAIXILHARIA_FECHADURAS.get(spec['fechadura'], spec['fechadura'])}")
+    if spec.get("muletas"):
+        lines.append(f"Muletas: {CAIXILHARIA_MULETAS.get(spec['muletas'], spec['muletas'])}")
+    if spec.get("estore"):
+        lines.append(f"Estore: {CAIXILHARIA_ESTORES.get(spec['estore'], spec['estore'])}")
+    if (spec.get("observacoes") or "").strip():
+        lines += ["", f"Observações: {spec['observacoes']}"]
+    lines += ["", "Agradecemos indicação de preço, prazo de entrega e disponibilidade.", "",
+              "Com os melhores cumprimentos,", "Bricomarché Faro"]
+
+    prefix = "Lembrete: " if is_reminder else ""
+    subject = f"{prefix}Pedido de {tipo.lower()} — {produto} à medida · {sistema} ({total} un) — Ref. {ref_cliente}"
+    return subject, "\n".join(lines)
+
+
 # ---------- Quotes ----------
 @api_router.get("/notes/{note_id}/quotes")
 async def list_quotes(note_id: str):
@@ -1453,6 +1712,10 @@ async def note_quote_template(note_id: str, supplier_id: Optional[str] = None, i
     if not n:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     sup = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0}) if supplier_id else None
+    if n.get("caixilharia"):
+        subject, body = caixilharia_email(n, n["caixilharia"], is_reminder)
+        return {"subject": subject, "body": body,
+                "supplier": sup, "to": sup.get("email") if sup else ""}
     desc = n.get("description") or "artigo"
     ref = (n.get("reference") or "").strip()
     lines = ["Exmos. Senhores,", ""]

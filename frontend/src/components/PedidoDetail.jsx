@@ -16,11 +16,12 @@ import {
   Trash2, Send, Copy, Mail, Plus, Trophy, Loader2, AlertCircle, CheckCircle2,
   Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
-  Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud,
+  Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud, Frame,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg, PRIORITY_ORDER, PRIORITY_CONFIG, timeAgo } from "@/lib/pedido";
+import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
@@ -74,6 +75,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [emailData, setEmailData] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
   const [isReminder, setIsReminder] = useState(false);
+  const [caixOpen, setCaixOpen] = useState(false);
   const [newQuote, setNewQuote] = useState({ supplier_name: "", product: "", price: "", notes: "" });
 
   // Assistant data
@@ -104,7 +106,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     const { data } = await api.get(`/notes/${nid}`);
     setNote(data);
     setForm({ ...emptyForm, ...data });
-    setEmailData(buildEmail(data));
+    // Com caixilharia à medida, o email vem do servidor no formato da ficha do fornecedor.
+    if (data.caixilharia) {
+      try {
+        const { data: tpl } = await api.get(`/notes/${nid}/quote-template`);
+        setEmailData({ subject: tpl.subject, body: tpl.body });
+      } catch {
+        setEmailData(buildEmail(data));
+      }
+    } else {
+      setEmailData(buildEmail(data));
+    }
     dirty.current = false;
   }, []);
 
@@ -536,6 +548,49 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
               </div>
 
+              {/* Caixilharia à medida (BandAluminios) */}
+              {!isCreate ? (
+                <div className="mt-4 space-y-1.5">
+                  <Label>Caixilharia à medida</Label>
+                  {note?.caixilharia ? (
+                    <div data-testid="caixilharia-summary" className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                            <Frame className="h-4 w-4 shrink-0 text-slate-500" />
+                            {note.caixilharia.display?.produto} · {note.caixilharia.display?.sistema}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {note.caixilharia.display?.familia} — {note.caixilharia.display?.total_un} un
+                            {note.caixilharia.tipo_pedido === "encomenda" ? " · Encomenda" : " · Orçamento"}
+                            {note.caixilharia.data_entrega ? ` · entrega ${note.caixilharia.data_entrega}` : ""}
+                          </p>
+                        </div>
+                        <Button data-testid="caixilharia-edit" size="sm" variant="outline" onClick={() => setCaixOpen(true)} className="h-8 shrink-0 rounded-lg text-xs">
+                          Editar
+                        </Button>
+                      </div>
+                      <div className="mt-2 space-y-0.5">
+                        {(note.caixilharia.itens || []).map((it, i) => (
+                          <p key={i} className="font-mono text-xs text-slate-600">
+                            {it.quantidade} un — {it.largura_mm} × {it.altura_mm} mm{it.sentido_abertura ? ` — ${it.sentido_abertura}` : ""}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      data-testid="caixilharia-open"
+                      variant="outline"
+                      onClick={() => setCaixOpen(true)}
+                      className="w-full rounded-xl border-dashed text-slate-600"
+                    >
+                      <Frame className="mr-2 h-4 w-4" /> Pedir janela, porta ou rede mosquiteira à medida
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+
               {/* Labels */}
               <div className="mt-4 space-y-1.5">
                 <Label>Etiquetas</Label>
@@ -862,6 +917,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           </div>
         </Tabs>
       </DialogContent>
+
+      <CaixilhariaDialog open={caixOpen} onOpenChange={setCaixOpen} note={note} suppliers={suppliers} onSaved={refresh} />
     </Dialog>
   );
 }
