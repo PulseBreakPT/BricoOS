@@ -44,7 +44,7 @@ class CaixilhariaLogicTests(unittest.TestCase):
 
         lines, _ = caixilharia_email_lines(raw, PRODUCTS, FAMILIES, warning="Vãos vistos por dentro")
         body = "\n".join(lines)
-        self.assertIn("1. Janela — 1 un — 1000 x 1000 mm (L x A)", body)
+        self.assertIn("1. Janela — 1 un — 1000 x 1000 mm (100 x 100 cm; L x A)", body)
         self.assertIn("Opção A: PVC — Eurodesign 70 Batente", body)
         self.assertIn("Opção B: Alumínio com corte térmico — Thermostop Batente", body)
         self.assertIn("valores separados por opção", body)
