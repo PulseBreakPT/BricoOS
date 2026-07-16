@@ -1559,98 +1559,11 @@ async def ensure_indexes():
             pass
 
 
-async def seed():
-    if await db.notes.count_documents({}) == 0:
-        base = datetime.now(timezone.utc)
-        samples = [
-            ("Teresa Mera", "917100512", "Preço Tijolos Articimentos bancadas", "jardim", "", "novo", "media"),
-            ("Cristóvão", "969770968", "2 pratos iguais para esta referência", "jardim", "", "novo", "baixa"),
-            ("Henrique Pinheiro", "961548608", "Preço de um rolo de ambos", "construcao", "", "novo", "media"),
-            ("Ana Sofia", "966647368", "1 cabine de duche 80x140cm em L", "decoracao", "800x1400mm", "em_preparacao", "alta"),
-            ("Nuno Pinheiro", "916519616", "Preço churrasqueira Patacão", "bricolage", "", "enviado_fornecedor", "media"),
-            ("Eduardo", "911997858", "Janela sótão - abrir para dentro direita", "construcao", "1000x600mm", "aguarda_fornecedor", "urgente"),
-            ("Guerreiro", "917034660", "2 latas Tinta piscinas 20L", "bricolage", "", "novo", "media"),
-            ("António Carvalho", "964862256", "Bancada +50cm e +2 pilares", "jardim", "", "novo", "baixa"),
-            ("Patrícia", "964572010", "Ventoinha industrial com depósito", "bricolage", "", "novo", "media"),
-            ("Rui Catalana", "964136143", "Janela de correr alum sem corte térmico", "construcao", "2000x1000mm", "orcamento_recebido", "alta"),
-            ("João Caliço Martins", "934973199", "Rede mosquiteira de fole", "jardim", "2000x920mm", "novo", "media"),
-            ("Celina Brito", "910331771", "Tampa WC madeira", "decoracao", "", "aprovado", "media"),
-        ]
-        docs = []
-        for i, (name, phone, desc, cat, med, status, prio) in enumerate(samples):
-            ts = (base - timedelta(hours=i * 6)).isoformat()
-            docs.append({"id": str(uuid.uuid4()), "customer_name": name, "phone": phone, "email": "", "description": desc,
-                         "details": "", "category": cat, "measurements": med, "reference": "", "status": status,
-                         "priority": prio, "labels": [], "supplier_id": "", "sla_days": DEFAULT_SLA_DAYS,
-                         "created_by": AUTHOR, "favorite": i in (5, 9), "archived": False,
-                         "last_supplier_sent_at": "", "last_client_contact_at": "",
-                         "created_at": ts, "updated_at": ts, "status_updated_at": ts})
-        await db.notes.insert_many(docs)
-
-    if await db.suppliers.count_documents({}) == 0:
-        sups = [
-            {"name": "Articimentos - Materiais", "email": "", "phone": "289000001", "category": "construcao", "notes": "Tijolo, cimento, bancadas"},
-            {"name": "Alumínios Algarve", "email": "", "phone": "289000002", "category": "construcao", "notes": "Janelas, portas em alumínio"},
-            {"name": "Tintas & Cor Sul", "email": "", "phone": "289000003", "category": "bricolage", "notes": "Tintas e vernizes"},
-            {"name": "Jardins & Cia", "email": "", "phone": "289000004", "category": "jardim", "notes": "Plantas, rega, mobiliário"},
-        ]
-        for s in sups:
-            s.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
-        await db.suppliers.insert_many(sups)
-
-    if await db.tasks.count_documents({}) == 0:
-        tks = [
-            {"title": "Repor stock de cimento e areia", "category": "construcao", "priority": "alta"},
-            {"title": "Montar expositor de tintas novo", "category": "bricolage", "priority": "normal"},
-            {"title": "Atualizar preços da secção decoração", "category": "decoracao", "priority": "normal"},
-            {"title": "Regar plantas e verificar rega automática", "category": "jardim", "priority": "alta"},
-        ]
-        for t in tks:
-            t.update({"id": str(uuid.uuid4()), "done": False, "due_date": "", "note_id": "", "created_at": now_iso()})
-        await db.tasks.insert_many(tks)
-
-
-async def demo_enrich():
-    if await db.meta.find_one({"key": "v2_demo"}):
-        return
-    now = datetime.now(timezone.utc)
-    try:
-        for name, days in [("Eduardo", 4), ("Nuno Pinheiro", 3)]:
-            n = await db.notes.find_one({"customer_name": name})
-            if n:
-                past = (now - timedelta(days=days)).isoformat()
-                await db.notes.update_one({"id": n["id"]}, {"$set": {"status_updated_at": past, "updated_at": past, "last_supplier_sent_at": past}})
-                await log_activity(n["id"], "email_sent", "Pedido de orçamento enviado a Alumínios Algarve", {"supplier_name": "Alumínios Algarve"})
-                await db.activities.update_one({"note_id": n["id"], "type": "email_sent"}, {"$set": {"created_at": past}})
-        rui = await db.notes.find_one({"customer_name": "Rui Catalana"})
-        if rui:
-            sent = (now - timedelta(days=3)).isoformat()
-            recv = (now - timedelta(days=2, hours=6)).isoformat()
-            await log_activity(rui["id"], "email_sent", "Pedido enviado a Alumínios Algarve", {"supplier_name": "Alumínios Algarve"})
-            await db.activities.update_one({"note_id": rui["id"], "type": "email_sent"}, {"$set": {"created_at": sent}})
-            await db.notes.update_one({"id": rui["id"]}, {"$set": {"last_supplier_sent_at": sent}})
-            await db.quotes.insert_one({"id": str(uuid.uuid4()), "note_id": rui["id"], "supplier_id": "", "supplier_name": "Alumínios Algarve",
-                                        "product": "Janela correr alumínio", "price": 289.0, "currency": "EUR", "notes": "Entrega 10 dias", "approved": False, "created_at": recv})
-            await db.quotes.insert_one({"id": str(uuid.uuid4()), "note_id": rui["id"], "supplier_id": "", "supplier_name": "Articimentos - Materiais",
-                                        "product": "Janela correr alumínio", "price": 315.0, "currency": "EUR", "notes": "Entrega 7 dias", "approved": False, "created_at": recv})
-            await log_activity(rui["id"], "quote_added", "Orçamento de Alumínios Algarve: 289.00 €", {"supplier_name": "Alumínios Algarve", "price": 289.0})
-            await db.activities.update_one({"note_id": rui["id"], "type": "quote_added"}, {"$set": {"created_at": recv}})
-        for name, lbls in [("Ana Sofia", ["À medida", "Cliente VIP"]), ("Rui Catalana", ["À medida"])]:
-            await db.notes.update_one({"customer_name": name}, {"$set": {"labels": lbls}})
-        for name, p in [("Eduardo", "urgente"), ("Ana Sofia", "alta"), ("Rui Catalana", "alta"), ("Nuno Pinheiro", "alta"), ("Patrícia", "baixa"), ("Cristóvão", "baixa")]:
-            await db.notes.update_one({"customer_name": name}, {"$set": {"priority": p}})
-    except Exception as e:
-        logger.error(f"demo_enrich falhou: {e}")
-    await db.meta.insert_one({"key": "v2_demo", "done": True, "at": now_iso()})
-
-
 @app.on_event("startup")
 async def on_startup():
     try:
         await ensure_indexes()
         await migrate()
-        await seed()
-        await demo_enrich()
         await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
