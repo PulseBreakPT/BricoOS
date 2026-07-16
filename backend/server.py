@@ -46,6 +46,9 @@ SCOPES = [
 AUTHOR = "Chefe de Loja"
 DEFAULT_SLA_DAYS = 2
 VALID_CATEGORIES = ["construcao", "bricolage", "decoracao", "jardim"]
+TASK_PRIORITIES = ["nenhuma", "baixa", "media", "alta"]
+TASK_PRIORITY_RANK = {"alta": 0, "media": 1, "baixa": 2, "nenhuma": 3}
+TASK_REPEATS = ["none", "daily", "weekly", "monthly"]
 STATUSES = [
     "novo", "pendente", "em_preparacao", "enviado_fornecedor", "aguarda_fornecedor",
     "orcamento_recebido", "aguarda_cliente", "aprovado", "rejeitado", "encomendado",
@@ -545,14 +548,53 @@ class SupplierIn(BaseModel):
         return normalize_email(v)
 
 
+class SubtaskItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = ""
+    title: str
+    done: bool = False
+
+
 class TaskIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     title: str
     category: str = "construcao"
     done: bool = False
-    priority: str = "normal"
+    priority: str = "nenhuma"
     due_date: str = ""
+    repeat: str = "none"
+    subtasks: List[SubtaskItem] = []
     note_id: str = ""
+
+    @field_validator("priority")
+    @classmethod
+    def _v_priority(cls, v):
+        return _check_choice(v, TASK_PRIORITIES, "Prioridade")
+
+    @field_validator("repeat")
+    @classmethod
+    def _v_repeat(cls, v):
+        return _check_choice(v, TASK_REPEATS, "Repetição")
+
+
+class TaskPatch(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+    repeat: Optional[str] = None
+    subtasks: Optional[List[SubtaskItem]] = None
+
+    @field_validator("priority")
+    @classmethod
+    def _v_priority(cls, v):
+        return _check_choice(v, TASK_PRIORITIES, "Prioridade")
+
+    @field_validator("repeat")
+    @classmethod
+    def _v_repeat(cls, v):
+        return _check_choice(v, TASK_REPEATS, "Repetição")
 
 
 class QuoteIn(BaseModel):
@@ -899,6 +941,34 @@ async def delete_supplier(supplier_id: str, force: bool = False):
 
 
 # ---------- Tasks ----------
+def _with_subtask_ids(doc):
+    for st in doc.get("subtasks") or []:
+        if not st.get("id"):
+            st["id"] = str(uuid.uuid4())
+    return doc
+
+
+def _next_due_date(due_date: str, repeat: str) -> Optional[str]:
+    try:
+        d = datetime.strptime(due_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+    if repeat == "daily":
+        d = d + timedelta(days=1)
+    elif repeat == "weekly":
+        d = d + timedelta(days=7)
+    elif repeat == "monthly":
+        month = d.month + 1
+        year = d.year + (month - 1) // 12
+        month = (month - 1) % 12 + 1
+        day = min(d.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                          31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        d = d.replace(year=year, month=month, day=day)
+    else:
+        return None
+    return d.strftime("%Y-%m-%d")
+
+
 @api_router.get("/tasks")
 async def list_tasks(note_id: Optional[str] = None):
     q = {"note_id": note_id} if note_id else {}
@@ -907,7 +977,7 @@ async def list_tasks(note_id: Optional[str] = None):
 
 @api_router.post("/tasks")
 async def create_task(payload: TaskIn):
-    doc = payload.model_dump()
+    doc = _with_subtask_ids(payload.model_dump())
     doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     if doc.get("note_id"):
@@ -923,7 +993,7 @@ async def note_tasks(note_id: str):
 
 @api_router.post("/notes/{note_id}/tasks")
 async def create_note_task(note_id: str, payload: TaskIn):
-    doc = payload.model_dump()
+    doc = _with_subtask_ids(payload.model_dump())
     doc.update({"note_id": note_id, "id": str(uuid.uuid4()), "created_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     await log_activity(note_id, "task_added", f"Lembrete criado: {doc['title']}")
@@ -931,12 +1001,36 @@ async def create_note_task(note_id: str, payload: TaskIn):
     return doc
 
 
+@api_router.put("/tasks/{task_id}")
+async def update_task(task_id: str, payload: TaskPatch):
+    current = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if "subtasks" in update:
+        update["subtasks"] = _with_subtask_ids({"subtasks": update["subtasks"]})["subtasks"]
+    await db.tasks.update_one({"id": task_id}, {"$set": update})
+    return await db.tasks.find_one({"id": task_id}, {"_id": 0})
+
+
 @api_router.patch("/tasks/{task_id}/toggle")
 async def toggle_task(task_id: str):
     task = await db.tasks.find_one({"id": task_id}, {"_id": 0})
     if not task:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
-    await db.tasks.update_one({"id": task_id}, {"$set": {"done": not task.get("done", False)}})
+    new_done = not task.get("done", False)
+    await db.tasks.update_one({"id": task_id}, {"$set": {"done": new_done}})
+    if new_done and task.get("repeat", "none") != "none" and task.get("due_date"):
+        next_date = _next_due_date(task["due_date"], task["repeat"])
+        if next_date:
+            next_doc = {
+                "id": str(uuid.uuid4()), "title": task["title"], "category": task.get("category", "construcao"),
+                "done": False, "priority": task.get("priority", "nenhuma"), "due_date": next_date,
+                "repeat": task["repeat"], "note_id": task.get("note_id", ""), "created_at": now_iso(),
+                "subtasks": [{"id": str(uuid.uuid4()), "title": st["title"], "done": False}
+                             for st in task.get("subtasks", [])],
+            }
+            await db.tasks.insert_one(dict(next_doc))
     return await db.tasks.find_one({"id": task_id}, {"_id": 0})
 
 

@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, ListChecks } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Plus, Trash2, ListChecks, CalendarDays, Repeat, SlidersHorizontal } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,39 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import TaskDialog from "@/components/TaskDialog";
 import { toast } from "sonner";
+import {
+  getTaskPriority, TASK_PRIORITIES, isOverdue, isToday, isNext7Days, formatDue, smartTaskSort, subtaskProgress,
+} from "@/lib/taskMeta";
 
-const PRIORITIES = { alta: { label: "Alta", color: "#DC2626" }, normal: { label: "Normal", color: "#64748B" } };
+const SMART_VIEWS = [
+  { key: "todas", label: "Todas" },
+  { key: "hoje", label: "Hoje" },
+  { key: "semana", label: "Próximos 7 dias" },
+  { key: "atrasadas", label: "Atrasadas" },
+  { key: "sem_data", label: "Sem data" },
+];
+
+function matchesView(t, view) {
+  switch (view) {
+    case "hoje": return isToday(t.due_date);
+    case "semana": return isNext7Days(t.due_date);
+    case "atrasadas": return isOverdue(t.due_date, t.done);
+    case "sem_data": return !t.due_date;
+    default: return true;
+  }
+}
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
-  const [filter, setFilter] = useState("todos");
+  const [view, setView] = useState("todas");
+  const [category, setCategory] = useState("todos");
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("construcao");
-  const [priority, setPriority] = useState("normal");
+  const [addCategory, setAddCategory] = useState("construcao");
+  const [addPriority, setAddPriority] = useState("nenhuma");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -33,7 +56,7 @@ export default function Tasks() {
   const add = async () => {
     if (!title.trim()) { toast.error("Escreva a tarefa."); return; }
     try {
-      await api.post("/tasks", { title: title.trim(), category, priority });
+      await api.post("/tasks", { title: title.trim(), category: addCategory, priority: addPriority });
       setTitle("");
       toast.success("Tarefa adicionada");
       load();
@@ -46,8 +69,8 @@ export default function Tasks() {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
     try {
       await api.patch(`/tasks/${t.id}/toggle`);
+      load(); // recarrega para apanhar a próxima ocorrência de tarefas recorrentes
     } catch (e) {
-      // Reverte a alteração otimista se o servidor recusar.
       setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: t.done } : x)));
       toast.error(getErrorMessage(e, "Erro ao atualizar a tarefa"));
     }
@@ -62,13 +85,22 @@ export default function Tasks() {
     }
   };
 
-  const filtered = tasks.filter((t) => filter === "todos" || t.category === filter);
-  const pending = filtered.filter((t) => !t.done);
+  const openEdit = (t) => { setEditingTask(t); setDialogOpen(true); };
+  const openNew = () => { setEditingTask(null); setDialogOpen(true); };
+
+  const filtered = useMemo(() => tasks
+    .filter((t) => category === "todos" || t.category === category)
+    .filter((t) => matchesView(t, view)),
+  [tasks, category, view]);
+
+  const pending = filtered.filter((t) => !t.done).sort(smartTaskSort);
   const done = filtered.filter((t) => t.done);
 
   const Row = ({ t }) => {
     const c = getCategory(t.category);
-    const p = PRIORITIES[t.priority] || PRIORITIES.normal;
+    const p = getTaskPriority(t.priority);
+    const overdue = isOverdue(t.due_date, t.done);
+    const progress = subtaskProgress(t);
     return (
       <div
         data-testid={`task-row-${t.id}`}
@@ -80,17 +112,32 @@ export default function Tasks() {
           onCheckedChange={() => toggle(t)}
           className="h-5 w-5 rounded-md"
         />
-        <div className="min-w-0 flex-1">
+        <button className="min-w-0 flex-1 text-left" onClick={() => openEdit(t)}>
           <p className={`text-sm font-semibold text-slate-900 ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
-          <div className="mt-1.5 flex items-center gap-2">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <CategoryBadge category={t.category} />
-            {t.priority === "alta" && !t.done ? (
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: `${p.color}1a`, color: p.color }}>
+            {t.priority && t.priority !== "nenhuma" ? (
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: p.bg, color: p.color }}>
                 {p.label}
               </span>
             ) : null}
+            {t.due_date ? (
+              <span
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  overdue ? "bg-red-100 text-red-700" : isToday(t.due_date) ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}
+                {t.repeat && t.repeat !== "none" ? <Repeat className="h-3 w-3" /> : null}
+              </span>
+            ) : null}
+            {progress ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                {progress.done}/{progress.total}
+              </span>
+            ) : null}
           </div>
-        </div>
+        </button>
         <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-slate-300 hover:bg-red-50 hover:text-red-500">
           <Trash2 className="h-4 w-4" />
         </button>
@@ -117,41 +164,63 @@ export default function Tasks() {
             placeholder="Nova tarefa..."
             className="h-11 flex-1 rounded-xl"
           />
-          <Select value={category} onValueChange={setCategory}>
+          <Select value={addCategory} onValueChange={setAddCategory}>
             <SelectTrigger data-testid="task-category-select" className="h-11 rounded-xl sm:w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={priority} onValueChange={setPriority}>
+          <Select value={addPriority} onValueChange={setAddPriority}>
             <SelectTrigger data-testid="task-priority-select" className="h-11 rounded-xl sm:w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="alta">Alta</SelectItem>
+              {Object.entries(TASK_PRIORITIES).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button data-testid="add-task-btn" onClick={add} className="h-11 rounded-xl">
             <Plus className="mr-1 h-4 w-4" /> Adicionar
           </Button>
+          <Button
+            data-testid="add-task-advanced-btn"
+            variant="outline"
+            onClick={openNew}
+            className="h-11 shrink-0 rounded-xl px-3"
+            title="Nova tarefa com data, repetição e subtarefas"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Smart views */}
       <div className="no-scrollbar -mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        {SMART_VIEWS.map((v) => (
+          <button
+            key={v.key}
+            data-testid={`task-view-${v.key}`}
+            onClick={() => setView(v.key)}
+            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold ${view === v.key ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Category filters */}
+      <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <button
           data-testid="task-filter-todos"
-          onClick={() => setFilter("todos")}
-          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold ${filter === "todos" ? "bg-primary text-primary-foreground" : "border border-slate-200 bg-white text-slate-600"}`}
+          onClick={() => setCategory("todos")}
+          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold ${category === "todos" ? "bg-primary text-primary-foreground" : "border border-slate-200 bg-white text-slate-600"}`}
         >
-          Todas
+          Todas as secções
         </button>
         {CATEGORY_LIST.map((c) => {
-          const active = filter === c.key;
+          const active = category === c.key;
           return (
             <button
               key={c.key}
               data-testid={`task-filter-${c.key}`}
-              onClick={() => setFilter(c.key)}
+              onClick={() => setCategory(c.key)}
               className="shrink-0 rounded-full px-3.5 py-2 text-xs font-bold"
               style={{ backgroundColor: active ? c.accent : c.bg, color: active ? "#fff" : c.text }}
             >
@@ -183,6 +252,8 @@ export default function Tasks() {
           <p className="text-sm text-slate-500">Adicione a primeira tarefa acima.</p>
         </div>
       ) : null}
+
+      <TaskDialog open={dialogOpen} onOpenChange={setDialogOpen} task={editingTask} onSaved={load} />
     </div>
   );
 }
