@@ -17,11 +17,15 @@ import {
   Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
   Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud, Frame,
+  Store, ArrowLeft, ChevronRight,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg, PRIORITY_ORDER, PRIORITY_CONFIG, timeAgo } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
+import CaixilhariaForm, {
+  emptyCaixilharia, getCaixilhariaCatalog, validateCaixilhariaSpec, caixilhariaLabels,
+} from "@/components/CaixilhariaForm";
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
@@ -76,6 +80,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [sending, setSending] = useState(false);
   const [isReminder, setIsReminder] = useState(false);
   const [caixOpen, setCaixOpen] = useState(false);
+
+  // Assistente de criação por etapas: escolha do tipo → passos
+  const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
+  const [createStep, setCreateStep] = useState(0);
+  const [caixSpec, setCaixSpec] = useState(emptyCaixilharia);
+  const [caixCatalog, setCaixCatalog] = useState(null);
+  const [creating, setCreating] = useState(false);
   const [newQuote, setNewQuote] = useState({ supplier_name: "", product: "", price: "", notes: "" });
 
   // Assistant data
@@ -143,6 +154,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
       setAutoState("idle");
       setAssist({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
       setNewQuote({ supplier_name: "", product: "", price: "", notes: "" });
+      setCreateMode("choice");
+      setCreateStep(0);
+      setCaixSpec(emptyCaixilharia);
+      setCreating(false);
       dirty.current = false;
       if (noteId) {
         loadNote(noteId); loadSub(noteId);
@@ -165,6 +180,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   useEffect(() => {
     if (open && id && tab === "assistente" && !assist.preflight) loadAssistant(id);
   }, [open, id, tab, assist.preflight, loadAssistant]);
+
+  // Catálogo de caixilharia — carregado quando o utilizador escolhe o fluxo BandAluminios
+  useEffect(() => {
+    if (open && createMode === "band" && !caixCatalog) {
+      getCaixilhariaCatalog()
+        .then(setCaixCatalog)
+        .catch((e) => toast.error(getErrorMessage(e, "Erro ao carregar o catálogo de caixilharia")));
+    }
+  }, [open, createMode, caixCatalog]);
 
   // Autosave (existing notes) / draft (new notes)
   useEffect(() => {
@@ -246,6 +270,76 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
       toast.error(getErrorMessage(e, "Erro ao guardar"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ---- Assistente de criação por etapas ----
+  const createSteps = createMode === "band" ? ["Cliente", "Caixilharia"] : ["Cliente", "Artigo", "Confirmar"];
+  const isLastStep = createStep === createSteps.length - 1;
+
+  const validClientStep = () => {
+    if (!form.customer_name.trim() && !form.phone.trim()) {
+      toast.error("Indique pelo menos o nome ou o telefone do cliente."); return false;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("O email do cliente não parece válido."); return false;
+    }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
+      toast.error("O telefone do cliente parece incompleto."); return false;
+    }
+    return true;
+  };
+
+  const wizardBack = () => {
+    if (createStep === 0) setCreateMode("choice");
+    else setCreateStep((s) => s - 1);
+  };
+
+  const wizardNext = () => {
+    if (createStep === 0 && !validClientStep()) return;
+    if (createMode === "normal" && createStep === 1 && !form.description.trim()) {
+      toast.error("Descreva o artigo pedido."); return;
+    }
+    setCreateStep((s) => s + 1);
+  };
+
+  const createBandPedido = async () => {
+    if (!validClientStep()) return;
+    const v = validateCaixilhariaSpec(caixSpec);
+    if (!v.ok) { toast.error(v.error); return; }
+    setCreating(true);
+    try {
+      const lbl = caixilhariaLabels(caixCatalog, caixSpec);
+      const { data } = await api.post("/notes", {
+        customer_name: form.customer_name, phone: form.phone, email: form.email,
+        description: `${lbl.produto} à medida — ${lbl.sistema}`,
+        category: "construcao", labels: ["À medida"], priority: form.priority || "media",
+      });
+      await api.put(`/notes/${data.id}/caixilharia`, { ...caixSpec, itens: v.itens });
+      // Associa (ou cria) o fornecedor BandAluminios automaticamente.
+      let supplierId = (suppliers || []).find((s) => /band/i.test(s.name || ""))?.id;
+      if (!supplierId && caixCatalog?.supplier) {
+        try {
+          const { data: sup } = await api.post("/suppliers", caixCatalog.supplier);
+          supplierId = sup.id;
+        } catch { /* segue sem fornecedor associado */ }
+      }
+      if (supplierId) {
+        await api.put(`/notes/${data.id}`, { supplier_id: supplierId });
+        setEmailSupplier(supplierId);
+      }
+      localStorage.removeItem(DRAFT_KEY);
+      dirty.current = false;
+      setId(data.id);
+      await loadNote(data.id);
+      await loadSub(data.id);
+      setTab("orcamentos");
+      onChanged && onChanged();
+      toast.success("Pedido à medida criado — email pronto na aba Orçamentos");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao criar o pedido à medida"));
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -401,10 +495,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
-                {isCreate ? "Novo pedido de orçamento" : (form.customer_name || "Pedido")}
+                {isCreate
+                  ? (createMode === "band" ? "Pedido à medida — BandAluminios" : "Novo pedido de orçamento")
+                  : (form.customer_name || "Pedido")}
               </DialogTitle>
               <p className="mt-0.5 flex items-center gap-2 truncate text-xs text-slate-500">
-                {isCreate ? "Registe o pedido do cliente" : (form.phone || "Sem telefone")}
+                {isCreate
+                  ? (createMode === "choice"
+                    ? "Escolha o tipo de pedido"
+                    : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
+                  : (form.phone || "Sem telefone")}
                 {!isCreate && note ? ` · atualizado ${timeAgo(note.updated_at)}` : ""}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
@@ -468,6 +568,188 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           </div>
         ) : null}
 
+        {isCreate ? (
+          /* ---------- Assistente de criação por etapas ---------- */
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+            {createMode === "choice" ? (
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-slate-900">O que precisa de pedir?</p>
+                <button
+                  data-testid="create-mode-band"
+                  onClick={() => { setCreateMode("band"); setCreateStep(0); }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                    <Frame className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-slate-900">Caixilharia à medida — BandAluminios</span>
+                    <span className="block text-xs text-slate-500">Janelas, portas, portadas e redes mosquiteiras com medidas, para pedir cotação ao fornecedor</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                </button>
+                <button
+                  data-testid="create-mode-normal"
+                  onClick={() => { setCreateMode("normal"); setCreateStep(0); }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                    <Store className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-slate-900">Pedido normal de loja</span>
+                    <span className="block text-xs text-slate-500">Qualquer outro artigo: preço, encomenda ou disponibilidade junto de um fornecedor</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Progresso */}
+                <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {createSteps.map((label, i) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-emerald-500 text-white" : i === createStep ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"}`}>
+                        {i < createStep ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                      </span>
+                      <span className={`text-xs font-semibold ${i === createStep ? "text-slate-900" : "text-slate-400"}`}>{label}</span>
+                      {i < createSteps.length - 1 ? <span className="h-px w-4 bg-slate-200" /> : null}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Passo 1 — Cliente (comum aos dois fluxos) */}
+                {createStep === 0 ? (
+                  <>
+                    {dupWarn.length > 0 ? (
+                      <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                        <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
+                        <ul className="mt-1.5 space-y-1">
+                          {dupWarn.map((d) => (
+                            <li key={d.id} className="text-xs">• {d.customer_name} — {d.description || "sem descrição"} <span className="opacity-70">({getStatusCfg(d.status).label})</span></li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Nome do cliente</Label>
+                        <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Telefone</Label>
+                        <Input data-testid="input-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} className="font-mono" placeholder="917100512" />
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-1.5">
+                      <Label>Email do cliente (opcional)</Label>
+                      <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+                    </div>
+                  </>
+                ) : null}
+
+                {/* Passo 2 (normal) — Artigo, sem medidas nem acabamento */}
+                {createMode === "normal" && createStep === 1 ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label>Descrição / pedido</Label>
+                      <Input data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Ex.: Motosserra a bateria 40V" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Secção</Label>
+                        <Select value={form.category} onValueChange={(v) => set("category", v)}>
+                          <SelectTrigger data-testid="select-category"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key} data-testid={`category-option-${c.key}`}>{c.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Quantidade</Label>
+                        <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-1.5">
+                      <Label>Referência do artigo (opcional)</Label>
+                      <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
+                    </div>
+                  </>
+                ) : null}
+
+                {/* Passo 3 (normal) — Confirmar */}
+                {createMode === "normal" && createStep === 2 ? (
+                  <>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
+                      <p><span className="font-bold text-slate-900">{form.customer_name || "Sem nome"}</span>{form.phone ? ` · ${form.phone}` : ""}</p>
+                      <p className="mt-0.5">{form.description}{form.quantity ? ` — ${form.quantity}` : ""}</p>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Prioridade</Label>
+                        <Select value={form.priority} onValueChange={(v) => set("priority", v)}>
+                          <SelectTrigger data-testid="select-priority"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {PRIORITY_ORDER.map((p) => <SelectItem key={p} value={p}>{PRIORITY_CONFIG[p].label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Fornecedor preferido (opcional)</Label>
+                        <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
+                          <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhum</SelectItem>
+                            {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-1.5">
+                      <Label>Notas adicionais (opcional)</Label>
+                      <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
+                    </div>
+                  </>
+                ) : null}
+
+                {/* Passo 2 (BandAluminios) — Caixilharia */}
+                {createMode === "band" && createStep === 1 ? (
+                  !caixCatalog ? (
+                    <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
+                  ) : (
+                    <>
+                      <CaixilhariaForm catalog={caixCatalog} spec={caixSpec} onChange={setCaixSpec} />
+                      <p className="mt-3 flex items-start gap-1.5 text-[11px] text-slate-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                        Ao criar, o fornecedor BandAluminios é associado automaticamente e o email fica pronto na aba «Orçamentos».
+                      </p>
+                    </>
+                  )
+                ) : null}
+
+                {/* Navegação */}
+                <div className="mt-6 flex gap-2">
+                  <Button data-testid="wizard-back" variant="outline" onClick={wizardBack} className="rounded-xl">
+                    <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
+                  </Button>
+                  {!isLastStep ? (
+                    <Button data-testid="wizard-next" onClick={wizardNext} className="flex-1 rounded-xl">
+                      Continuar <ChevronRight className="ml-1.5 h-4 w-4" />
+                    </Button>
+                  ) : createMode === "band" ? (
+                    <Button data-testid="wizard-create-band" onClick={createBandPedido} disabled={creating || !caixCatalog} className="flex-1 rounded-xl">
+                      {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Criar pedido à medida
+                    </Button>
+                  ) : (
+                    <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl">
+                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Criar pedido
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
             {/* No telemóvel as 5 tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
@@ -483,17 +765,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
             {/* DETALHES */}
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
-              {isCreate && dupWarn.length > 0 ? (
-                <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
-                  <ul className="mt-1.5 space-y-1">
-                    {dupWarn.map((d) => (
-                      <li key={d.id} className="text-xs">• {d.customer_name} — {d.description || "sem descrição"} <span className="opacity-70">({getStatusCfg(d.status).label})</span></li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Nome do cliente</Label>
@@ -529,18 +800,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Medidas / à medida</Label>
-                  <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="2000x1000mm" />
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
                   <Label>Quantidade</Label>
                   <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Cor / acabamento</Label>
-                  <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Branco RAL 9016" />
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
@@ -640,7 +901,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
 
               <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="mt-6 w-full rounded-xl">
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isCreate ? "Criar pedido" : "Guardar alterações"}
+                Guardar alterações
               </Button>
             </TabsContent>
 
@@ -916,6 +1177,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
             </TabsContent>
           </div>
         </Tabs>
+        )}
       </DialogContent>
 
       <CaixilhariaDialog open={caixOpen} onOpenChange={setCaixOpen} note={note} suppliers={suppliers} onSaved={refresh} />
