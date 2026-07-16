@@ -3,8 +3,17 @@ const identifier = (prefix) => `${prefix}_${Date.now().toString(36)}_${++sequenc
 
 export const OPTION_FIELDS = [
   "familia", "sistema", "material", "material_ref", "cor_aro", "cor_folha",
-  "fechadura", "muletas", "estore", "observacoes",
+  "fechadura", "muletas", "estore", "quadricula", "quadricula_cor", "observacoes",
 ];
+
+const LEGACY_OPENING_TYPES = {
+  "De correr": "correr", "Oscilo-batente": "oscilo_batente",
+  Basculante: "basculante", Fixa: "fixa",
+};
+
+const productOpeningDefault = (product) => (
+  product === "portada" ? "portada" : product === "rede_mosquiteira" ? "rede" : ""
+);
 
 export function createCaixOption(seed = {}) {
   return {
@@ -13,19 +22,58 @@ export function createCaixOption(seed = {}) {
     material: seed.material || "", material_ref: seed.material_ref || "",
     cor_aro: seed.cor_aro || "", cor_folha: seed.cor_folha || "",
     fechadura: seed.fechadura || "", muletas: seed.muletas || "",
-    estore: seed.estore || "", observacoes: seed.observacoes || "",
+    estore: seed.estore || "", quadricula: seed.quadricula || "",
+    quadricula_cor: seed.quadricula_cor || "", observacoes: seed.observacoes || "",
   };
 }
 
 export function createCaixLine(produto = "janela", seed = {}) {
+  const legacyDirection = seed.sentido_abertura || "";
+  const migratedType = seed.tipo_abertura || LEGACY_OPENING_TYPES[legacyDirection] || productOpeningDefault(produto);
   return {
     id: seed.id || identifier("elem"), nome: seed.nome || "", produto,
     quantidade: seed.quantidade ?? 1,
     largura_mm: seed.largura_mm ?? "", altura_mm: seed.altura_mm ?? "",
-    sentido_abertura: seed.sentido_abertura || "",
+    unidade_entrada: ["mm", "cm"].includes(seed.unidade_entrada) ? seed.unidade_entrada : "mm",
+    tipo_abertura: migratedType,
+    numero_folhas: seed.numero_folhas ?? "",
+    sentido_abertura: LEGACY_OPENING_TYPES[legacyDirection] ? "" : legacyDirection,
     opcoes: (seed.opcoes?.length ? seed.opcoes : [{}]).map(createCaixOption),
     observacoes: seed.observacoes || "",
   };
+}
+
+export function measurementDisplayValue(millimetres, unit = "mm") {
+  if (millimetres === "" || millimetres === null || millimetres === undefined) return "";
+  const value = Number(millimetres);
+  if (!Number.isFinite(value)) return "";
+  return unit === "cm" ? value / 10 : value;
+}
+
+export function measurementToMillimetres(value, unit = "mm") {
+  if (value === "" || value === null || value === undefined) return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  return Math.round(numeric * (unit === "cm" ? 10 : 1));
+}
+
+export function isModelCompatible(model, line) {
+  if (!model) return true;
+  if (model.products?.length && !model.products.includes(line.produto)) return false;
+  const type = line.tipo_abertura;
+  if (!type) return true;
+  if (type === "correr") return model.category === "correr";
+  if (["abrir_batente", "oscilo_batente", "basculante", "fixa"].includes(type)) {
+    return model.category === "abrir_batente";
+  }
+  if (type === "portada") return model.category === "portada";
+  return true;
+}
+
+export function glazingThicknessMm(reference) {
+  const match = String(reference || "").match(/\b\d{1,2}(?:\s*\+\s*\d{1,2})+\b/);
+  if (!match) return null;
+  return match[0].split("+").reduce((sum, part) => sum + Number(part.trim()), 0);
 }
 
 export function createEmptyCaixilharia() {
@@ -73,6 +121,8 @@ export function validateCaixilhariaSpec(spec, catalog) {
     const quantity = parseInt(line.quantidade, 10);
     const width = parseInt(line.largura_mm, 10);
     const height = parseInt(line.altura_mm, 10);
+    const leaves = line.numero_folhas === "" || line.numero_folhas === null
+      ? null : parseInt(line.numero_folhas, 10);
     if (!quantity || quantity < 1 || quantity > 999) {
       return { ok: false, error: `Elemento ${number}: indique uma quantidade entre 1 e 999.` };
     }
@@ -80,6 +130,9 @@ export function validateCaixilhariaSpec(spec, catalog) {
       return { ok: false, error: `Elemento ${number}: largura e altura devem estar entre 50 e 10000 mm.` };
     }
     if (!line.opcoes.length) return { ok: false, error: `Elemento ${number}: adicione uma opção de fabrico.` };
+    if (leaves !== null && (!leaves || leaves < 1 || leaves > 6)) {
+      return { ok: false, error: `Elemento ${number}: indique entre 1 e 6 folhas.` };
+    }
 
     const seen = new Set();
     const options = [];
@@ -95,6 +148,27 @@ export function validateCaixilhariaSpec(spec, catalog) {
       if (family && !family.sistemas?.[option.sistema]) {
         return { ok: false, error: `Elemento ${number}, opção ${optionNumber}: o sistema não pertence ao material escolhido.` };
       }
+      const model = catalog?.modelos?.[option.sistema];
+      if (model && !isModelCompatible(model, line)) {
+        return { ok: false, error: `Elemento ${number}, opção ${optionNumber}: ${model.name} não corresponde ao produto ou tipo de abertura.` };
+      }
+      if (leaves && model?.leaves?.length && !model.leaves.includes(leaves)) {
+        return { ok: false, error: `Elemento ${number}: ${model.name} admite ${model.leaves.join(", ")} folha(s).` };
+      }
+      const glazing = glazingThicknessMm(option.material_ref);
+      if (glazing && model?.glass_limit_mm && glazing > model.glass_limit_mm) {
+        warnings.push(
+          `Elemento ${number}, opção ${optionNumber}: a composição indicada soma ${glazing} mm e ultrapassa `
+          + `os ${model.glass_limit_mm} mm publicados para ${model.name}. Confirme com a BandAlumínios.`,
+        );
+      }
+      const maxWhite = model?.max_dimensions?.white;
+      if (maxWhite && (width > maxWhite.width_mm || height > maxWhite.height_mm)) {
+        warnings.push(
+          `Elemento ${number}: as medidas ultrapassam o máximo publicado para ${model.name} em branco `
+          + `(${maxWhite.width_mm} × ${maxWhite.height_mm} mm).`,
+        );
+      }
       const key = `${option.familia}:${option.sistema}`;
       if (seen.has(key)) return { ok: false, error: `Elemento ${number}: existe uma opção repetida.` };
       seen.add(key);
@@ -106,6 +180,7 @@ export function validateCaixilhariaSpec(spec, catalog) {
     }
     lines.push({
       ...line, quantidade: quantity, largura_mm: width, altura_mm: height,
+      numero_folhas: leaves,
       opcoes: options,
     });
   }
