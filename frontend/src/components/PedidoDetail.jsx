@@ -21,7 +21,10 @@ import {
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
-import { STATUS_ORDER, getStatusCfg, getPriorityCfg, PRIORITY_ORDER, PRIORITY_CONFIG, timeAgo } from "@/lib/pedido";
+import {
+  STATUS_ORDER, getStatusCfg, PRIORITY_ORDER, PRIORITY_CONFIG,
+  buildEmail, formatDateTime, getNextActionCta, getNextActionMode, timeAgo,
+} from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import CaixilhariaForm, {
   emptyCaixilharia, getCaixilhariaCatalog, validateCaixilhariaSpec, caixilhariaLabels,
@@ -42,24 +45,7 @@ const ACT_ICONS = {
   client_contact: MessageSquare, auto_archived: Cloud,
 };
 
-const buildEmail = (n) => {
-  const subject = `Pedido de orçamento - ${n.description || "artigo"}`;
-  const lines = [
-    "Boa tarde,", "",
-    "Somos o Bricomarché de Faro e gostaríamos de solicitar um orçamento para o seguinte artigo:", "",
-    `Artigo: ${n.description || "-"}`,
-  ];
-  if (n.reference) lines.push(`Referência: ${n.reference}`);
-  if (n.measurements) lines.push(`Medidas: ${n.measurements}`);
-  if (n.quantity) lines.push(`Quantidade: ${n.quantity}`);
-  if (n.color) lines.push(`Cor / acabamento: ${n.color}`);
-  if (n.details) lines.push(`Notas: ${n.details}`);
-  lines.push("", "Agradecemos o envio do melhor preço e prazo de entrega disponíveis.", "",
-    "Com os melhores cumprimentos,", "Bricomarché Faro");
-  return { subject, body: lines.join("\n") };
-};
-
-export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
+export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
   const [id, setId] = useState(noteId);
   const [note, setNote] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -79,6 +65,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   const [emailData, setEmailData] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
   const [isReminder, setIsReminder] = useState(false);
+  const [clientEmailData, setClientEmailData] = useState({ subject: "", body: "", reference: "", to: "" });
+  const [clientTemplateLoading, setClientTemplateLoading] = useState(false);
   const [caixOpen, setCaixOpen] = useState(false);
 
   // Assistente de criação por etapas: escolha do tipo → passos
@@ -102,6 +90,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
 
   const isCreate = !id;
   const dirty = useRef(false);
+  const contentScrollRef = useRef(null);
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
@@ -117,18 +106,31 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     const { data } = await api.get(`/notes/${nid}`);
     setNote(data);
     setForm({ ...emptyForm, ...data });
-    // Com caixilharia à medida, o email vem do servidor no formato da ficha do fornecedor.
-    if (data.caixilharia) {
-      try {
-        const { data: tpl } = await api.get(`/notes/${nid}/quote-template`);
-        setEmailData({ subject: tpl.subject, body: tpl.body });
-      } catch {
-        setEmailData(buildEmail(data));
-      }
-    } else {
+    // O servidor mantém o tom, a referência interna e o formato de caixilharia
+    // consistentes. O modelo local existe apenas como fallback offline.
+    try {
+      const { data: tpl } = await api.get(`/notes/${nid}/quote-template`);
+      setEmailData({ subject: tpl.subject, body: tpl.body });
+    } catch {
       setEmailData(buildEmail(data));
     }
     dirty.current = false;
+  }, []);
+
+  const loadClientTemplate = useCallback(async (nid) => {
+    if (!nid) return;
+    setClientTemplateLoading(true);
+    try {
+      const { data } = await api.get(`/notes/${nid}/client-template`);
+      setClientEmailData({
+        subject: data.subject || "", body: data.body || "",
+        reference: data.reference || "", to: data.to || "",
+      });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível preparar a resposta ao cliente"));
+    } finally {
+      setClientTemplateLoading(false);
+    }
   }, []);
 
   const loadAssistant = useCallback(async (nid) => {
@@ -147,9 +149,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
   useEffect(() => {
     if (open) {
       setId(noteId);
-      setTab("detalhes");
+      setTab(initialTab);
       setEmailSupplier("");
       setIsReminder(false);
+      setClientEmailData({ subject: "", body: "", reference: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
       setAssist({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
@@ -174,7 +177,21 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
         setNote(null); setQuotes([]); setActivities([]); setTasks([]);
       }
     }
-  }, [open, noteId, loadNote, loadSub]);
+  }, [open, noteId, initialTab, loadNote, loadSub]);
+
+  // Cada separador começa no topo. Evita abrir uma aba curta na posição de
+  // scroll deixada por outra aba longa, sobretudo em Android/iOS.
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, tab, id]);
+
+  useEffect(() => {
+    if (open && id && tab === "orcamentos") loadClientTemplate(id);
+  }, [open, id, tab, loadClientTemplate]);
 
   // Load assistant lazily when tab is opened
   useEffect(() => {
@@ -354,7 +371,20 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     await refresh();
   };
   const advance = async () => {
-    if (note?.next_status) { await changeStatus(note.next_status); }
+    if (!note?.next_status) return;
+    const mode = getNextActionMode(note);
+    if (mode !== "status") {
+      setTab("orcamentos");
+      const guidance = {
+        compose_supplier_email: "Revise e envie o email ao fornecedor. O estado muda automaticamente depois do envio.",
+        record_quote: "Registe o orçamento recebido. O estado muda automaticamente quando o guardar.",
+        reply_to_client: "Prepare a resposta ao cliente e anexe o orçamento antes de registar o envio.",
+        record_client_decision: "Registe a decisão aprovando um orçamento ou escolhendo o estado adequado.",
+      };
+      toast.message(getNextActionCta(note), { description: guidance[mode] });
+      return;
+    }
+    await changeStatus(note.next_status);
   };
   const toggleFav = async () => {
     await api.put(`/notes/${id}`, { favorite: !note.favorite });
@@ -475,6 +505,29 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
     }
   };
 
+  const copyClientEmail = async () => {
+    await navigator.clipboard.writeText(`${clientEmailData.subject}\n\n${clientEmailData.body}`);
+    toast.success("Resposta ao cliente copiada");
+  };
+  const openClientEmail = () => {
+    const to = (form.email || clientEmailData.to || "").trim();
+    if (!to) { toast.error("Adicione primeiro o email do cliente nos Detalhes."); return; }
+    const url = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(clientEmailData.subject)}&body=${encodeURIComponent(clientEmailData.body)}`;
+    window.location.href = url;
+  };
+  const registerClientEmail = async () => {
+    try {
+      await api.post(`/notes/${id}/contact-client`, {
+        method: "email",
+        message: `Orçamento ${clientEmailData.reference || note?.request_reference || ""} enviado ao cliente`.trim(),
+      });
+      toast.success("Envio ao cliente registado");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível registar o envio"));
+    }
+  };
+
   const lowest = quotes.length ? Math.min(...quotes.filter((q) => q.price > 0).map((q) => q.price)) : null;
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
@@ -499,17 +552,22 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                   ? (createMode === "band" ? "Pedido à medida — BandAluminios" : "Novo pedido de orçamento")
                   : (form.customer_name || "Pedido")}
               </DialogTitle>
-              <p className="mt-0.5 flex items-center gap-2 truncate text-xs text-slate-500">
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
                 {isCreate
                   ? (createMode === "choice"
                     ? "Escolha o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
                   : (form.phone || "Sem telefone")}
-                {!isCreate && note ? ` · atualizado ${timeAgo(note.updated_at)}` : ""}
+                {!isCreate && note ? <span className="font-mono text-[11px] font-semibold text-slate-600">{note.request_reference}</span> : null}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
                 {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
+              {!isCreate && note ? (
+                <p className="mt-0.5 text-[10px] text-slate-400" title={`Atualizado ${timeAgo(note.updated_at)}`}>
+                  Criado {formatDateTime(note.created_at)} · atualizado {formatDateTime(note.updated_at)}
+                </p>
+              ) : null}
             </div>
             {!isCreate && note ? (
               <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-amber-400">
@@ -543,7 +601,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
               </Select>
               {note.next_status ? (
                 <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 shrink-0 rounded-lg">
-                  <Zap className="mr-1.5 h-3.5 w-3.5" /> {note.next_status_label}
+                  <Zap className="mr-1.5 h-3.5 w-3.5" /> {getNextActionCta(note)}
                 </Button>
               ) : null}
               {note.archived ? (
@@ -570,7 +628,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
 
         {isCreate ? (
           /* ---------- Assistente de criação por etapas ---------- */
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+          <div ref={contentScrollRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
             {createMode === "choice" ? (
               <div className="space-y-3">
                 <p className="text-sm font-bold text-slate-900">O que precisa de pedir?</p>
@@ -648,7 +706,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                   </>
                 ) : null}
 
-                {/* Passo 2 (normal) — Artigo, sem medidas nem acabamento */}
+                {/* Passo 2 (normal) — artigo e especificação essencial */}
                 {createMode === "normal" && createStep === 1 ? (
                   <>
                     <div className="space-y-1.5">
@@ -673,6 +731,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                     <div className="mt-4 space-y-1.5">
                       <Label>Referência do artigo (opcional)</Label>
                       <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Medidas / dimensões (opcional)</Label>
+                        <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="Ex.: 2000 × 600 × 30 mm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Cor / acabamento (opcional)</Label>
+                        <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Carvalho natural" />
+                      </div>
                     </div>
                   </>
                 ) : null}
@@ -762,7 +830,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
             </TabsList>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+          <div ref={contentScrollRef} data-testid="note-scroll-area" className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
             {/* DETALHES */}
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -783,6 +851,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 <div className="space-y-1.5">
                   <Label>Referência do artigo</Label>
                   <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Medidas / dimensões</Label>
+                  <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="Ex.: 2000 × 600 × 30 mm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Cor / acabamento</Label>
+                  <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Carvalho natural" />
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
@@ -1077,6 +1155,49 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                 </div>
               </section>
 
+              {quotes.length > 0 ? (
+                <section data-testid="client-email-panel" className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Send className="h-4 w-4 text-blue-700" />
+                        <h4 className="font-heading text-sm font-bold text-slate-900">Responder ao cliente</h4>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
+                    </div>
+                    {clientTemplateLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" /> : null}
+                  </div>
+
+                  {!form.email ? (
+                    <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800">
+                      <span className="font-bold">Falta o email do cliente.</span> Toque aqui para o adicionar nos Detalhes.
+                    </button>
+                  ) : (
+                    <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 font-mono text-xs text-slate-600">Para: {form.email}</p>
+                  )}
+
+                  <div className="mt-3 space-y-1.5">
+                    <Label>Assunto</Label>
+                    <Input data-testid="client-email-subject" value={clientEmailData.subject} onChange={(e) => setClientEmailData((d) => ({ ...d, subject: e.target.value }))} />
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    <Label>Mensagem</Label>
+                    <Textarea data-testid="client-email-body" value={clientEmailData.body} onChange={(e) => setClientEmailData((d) => ({ ...d, body: e.target.value }))} rows={7} className="bg-white font-mono text-xs" />
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button data-testid="open-client-email" onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className="rounded-xl bg-blue-700 hover:bg-blue-800">
+                      <Mail className="mr-2 h-4 w-4" /> Abrir no email
+                    </Button>
+                    <Button data-testid="copy-client-email" variant="outline" onClick={copyClientEmail} disabled={!clientEmailData.body} className="rounded-xl bg-white">
+                      <Copy className="mr-2 h-4 w-4" /> Copiar resposta
+                    </Button>
+                    <Button data-testid="register-client-email" variant="ghost" onClick={registerClientEmail} disabled={!clientEmailData.body} className="rounded-xl text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800">
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> Registar envio
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
+
               <section className="mt-6">
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-slate-700" />
@@ -1138,7 +1259,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, suppliers, gm
                       </div>
                       <div className="min-w-0 flex-1 pt-0.5">
                         <p className="text-sm text-slate-800">{a.message}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">{a.author} · {timeAgo(a.created_at)}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {a.author} · {formatDateTime(a.created_at)} <span className="text-slate-300">({timeAgo(a.created_at)})</span>
+                        </p>
                       </div>
                     </div>
                   );

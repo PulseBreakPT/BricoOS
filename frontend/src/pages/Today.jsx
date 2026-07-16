@@ -6,7 +6,9 @@ import {
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { getCategory } from "@/lib/categories";
-import { getStatusCfg, getPriorityCfg, formatEuro } from "@/lib/pedido";
+import {
+  getStatusCfg, getPriorityCfg, formatEuro, getNextActionCta, getNextActionMode,
+} from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -47,9 +49,9 @@ function PedidoRow({ n, onOpen, onAdvance }) {
           size="sm" variant="outline"
           onClick={(e) => { e.stopPropagation(); onAdvance(n); }}
           className="h-8 shrink-0 rounded-lg text-xs"
-          title={`Avançar: ${n.next_status_label}`}
+          title={getNextActionCta(n)}
         >
-          <Zap className="h-3.5 w-3.5 sm:mr-1" /> <span className="hidden sm:inline">{n.next_status_label}</span>
+          <Zap className="h-3.5 w-3.5 sm:mr-1" /> <span className="hidden sm:inline">{getNextActionCta(n)}</span>
         </Button>
       ) : (
         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
@@ -98,8 +100,15 @@ export default function Today() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const openNote = (id) => navigate(`/clientes?open=${id}`);
+  const openNote = (id, tab = "") => navigate(`/clientes?open=${id}${tab ? `&tab=${tab}` : ""}`);
   const advance = async (n) => {
+    if (getNextActionMode(n) !== "status") {
+      openNote(n.id, "orcamentos");
+      toast.message(getNextActionCta(n), {
+        description: "Registe a ação no pedido para manter o estado correto.",
+      });
+      return;
+    }
     try {
       await api.patch(`/notes/${n.id}/status`, { status: n.next_status });
       toast.success(`Avançado para "${n.next_status_label}"`);

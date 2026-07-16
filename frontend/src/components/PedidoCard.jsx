@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import {
   Star, Ruler, Phone, AlertTriangle, ArrowRight, Tag, MoreVertical, Send,
-  PhoneCall, CheckCircle2, Copy, Archive, ArchiveRestore, Clock,
+  PhoneCall, CheckCircle2, Copy, ArchiveRestore, Clock, CalendarClock,
 } from "lucide-react";
 import { getCategory } from "@/lib/categories";
-import { getStatusCfg, getPriorityCfg } from "@/lib/pedido";
+import {
+  formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg,
+} from "@/lib/pedido";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -39,6 +41,10 @@ export default function PedidoCard({ note, onOpen, actions }) {
               </span>
             </div>
             {note.phone ? <p className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-slate-500"><Phone className="h-3 w-3" /> {note.phone}</p> : null}
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium text-slate-400">
+              <span className="font-mono text-slate-500">{note.request_reference || `BCF-${note.id?.slice(0, 8).toUpperCase()}`}</span>
+              <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" /> {formatDateTime(note.created_at)}</span>
+            </p>
           </div>
           <div className="flex shrink-0 items-center">
             <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 hover:text-amber-400">
@@ -53,7 +59,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 {note.next_status ? (
                   <DropdownMenuItem data-testid={`menu-advance-${note.id}`} onClick={() => actions.advance(note)}>
-                    <ArrowRight className="mr-2 h-4 w-4" /> Avançar: {note.next_status_label}
+                    <ArrowRight className="mr-2 h-4 w-4" /> {getNextActionCta(note)}
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem data-testid={`menu-reminder-${note.id}`} onClick={() => actions.sendReminder(note)}>
@@ -101,7 +107,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
             <p className="min-w-0 flex-1 truncate text-xs text-slate-500"><span className="font-semibold text-slate-700">Próximo:</span> {note.next_action}</p>
             <button data-testid={`advance-${note.id}`} onClick={stop(actions.advance)} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 active:scale-95">
-              {note.next_status_label} <ArrowRight className="h-3.5 w-3.5" />
+              {getNextActionCta(note)} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : null}
