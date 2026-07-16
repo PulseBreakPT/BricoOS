@@ -22,11 +22,33 @@ try:
         business_greeting, client_quote_template, request_reference, supplier_quote_template,
     )
     from caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
+    from bandaluminios_analysis import build_catalog_analysis
+    from bandaluminios_catalog import (
+        CATALOG_META as CAIXILHARIA_CATALOG_META,
+        FAMILIES as CAIXILHARIA_FAMILIAS,
+        GLASS_TYPES as CAIXILHARIA_VIDROS,
+        MODELS as CAIXILHARIA_MODELOS,
+        OPENING_TYPES as CAIXILHARIA_TIPOS_ABERTURA,
+        QUADRILLE_INFO as CAIXILHARIA_QUADRICULA_INFO,
+        QUADRILLE_OPTIONS as CAIXILHARIA_QUADRICULAS,
+        material_labels as caixilharia_material_labels,
+    )
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, request_reference, supplier_quote_template,
     )
     from .caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
+    from .bandaluminios_analysis import build_catalog_analysis
+    from .bandaluminios_catalog import (
+        CATALOG_META as CAIXILHARIA_CATALOG_META,
+        FAMILIES as CAIXILHARIA_FAMILIAS,
+        GLASS_TYPES as CAIXILHARIA_VIDROS,
+        MODELS as CAIXILHARIA_MODELOS,
+        OPENING_TYPES as CAIXILHARIA_TIPOS_ABERTURA,
+        QUADRILLE_INFO as CAIXILHARIA_QUADRICULA_INFO,
+        QUADRILLE_OPTIONS as CAIXILHARIA_QUADRICULAS,
+        material_labels as caixilharia_material_labels,
+    )
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -129,46 +151,11 @@ CAIXILHARIA_PRODUTOS = {
     "rede_mosquiteira": "Rede mosquiteira",
 }
 
-CAIXILHARIA_FAMILIAS = {
-    "aluminio_sem_corte": {
-        "label": "Alumínio sem corte térmico",
-        "produtos": ["janela", "porta"],
-        "sistemas": {"confort_correr": "Confort Correr", "sb_batente": "SB Batente"},
-    },
-    "aluminio_corte_termico": {
-        "label": "Alumínio com corte térmico",
-        "produtos": ["janela", "porta"],
-        "sistemas": {
-            "thermostop_batente": "Thermostop Batente",
-            "thermostop24_batente": "Thermostop 24 Batente",
-            "thermoline_correr": "Thermoline Correr",
-        },
-    },
-    "portada_hp": {
-        "label": "Portada HP",
-        "produtos": ["portada"],
-        "sistemas": {"lamina_fixa": "Lâmina Fixa", "lamina_regulavel": "Lâmina Regulável"},
-    },
-    "pvc": {
-        "label": "PVC",
-        "produtos": ["janela", "porta"],
-        "sistemas": {"eurodesign70_batente": "Eurodesign 70 Batente", "slinova_correr": "Slinova Correr"},
-    },
-    "redes": {
-        "label": "Redes mosquiteiras",
-        "produtos": ["rede_mosquiteira"],
-        "sistemas": {
-            "rede_fixa": "Fixa", "rede_enrolavel": "Enrolável",
-            "rede_correr": "De correr", "rede_plissada": "Plissada",
-        },
-    },
-}
-
-CAIXILHARIA_SENTIDOS = ["Direita", "Esquerda", "Oscilo-batente", "Fixa", "De correr", "Basculante"]
+CAIXILHARIA_SENTIDOS = ["Direita", "Esquerda", "Sem preferência"]
 CAIXILHARIA_FECHADURAS = {"1_ponto": "1 ponto", "3_pontos": "3 pontos"}
 CAIXILHARIA_MULETAS = {"interior": "Interior", "exterior": "Exterior", "interior_exterior": "Interior + Exterior"}
 CAIXILHARIA_ESTORES = {"com_estore": "Com estore", "sem_estore": "Sem estore"}
-CAIXILHARIA_MATERIAIS = {"vidro": "Vidro", "paineis": "Painéis"}
+CAIXILHARIA_MATERIAIS = caixilharia_material_labels()
 CAIXILHARIA_AVISO = "Vãos sempre vistos por dentro"
 
 app = FastAPI()
@@ -715,6 +702,8 @@ class CaixilhariaOpcao(BaseModel):
     fechadura: str = ""
     muletas: str = ""
     estore: str = ""
+    quadricula: str = ""
+    quadricula_cor: str = ""
     observacoes: str = ""
 
     @field_validator("familia")
@@ -742,6 +731,11 @@ class CaixilhariaOpcao(BaseModel):
     def _v_estore(cls, v):
         return _check_choice(v, ["", *CAIXILHARIA_ESTORES], "Estore")
 
+    @field_validator("quadricula")
+    @classmethod
+    def _v_quadricula(cls, v):
+        return _check_choice(v, ["", *CAIXILHARIA_QUADRICULAS], "Quadrícula")
+
     @model_validator(mode="after")
     def _v_sistema(self):
         family = CAIXILHARIA_FAMILIAS[self.familia]
@@ -758,6 +752,9 @@ class CaixilhariaLinha(BaseModel):
     quantidade: int = 1
     largura_mm: int
     altura_mm: int
+    unidade_entrada: str = "mm"
+    tipo_abertura: str = ""
+    numero_folhas: Optional[int] = None
     sentido_abertura: str = ""
     opcoes: List[CaixilhariaOpcao]
     observacoes: str = ""
@@ -781,6 +778,23 @@ class CaixilhariaLinha(BaseModel):
             raise ValueError("Medidas em milímetros: entre 50 e 10000 mm")
         return v
 
+    @field_validator("unidade_entrada")
+    @classmethod
+    def _v_unidade(cls, v):
+        return _check_choice(v, ["mm", "cm"], "Unidade de introdução")
+
+    @field_validator("tipo_abertura")
+    @classmethod
+    def _v_tipo_abertura(cls, v):
+        return _check_choice(v, list(CAIXILHARIA_TIPOS_ABERTURA), "Tipo de abertura")
+
+    @field_validator("numero_folhas")
+    @classmethod
+    def _v_numero_folhas(cls, v):
+        if v is not None and (v < 1 or v > 6):
+            raise ValueError("O número de folhas tem de estar entre 1 e 6")
+        return v
+
     @model_validator(mode="after")
     def _v_opcoes(self):
         if not self.opcoes:
@@ -795,6 +809,22 @@ class CaixilhariaLinha(BaseModel):
             if key in seen:
                 raise ValueError("O mesmo material e sistema está repetido no elemento")
             seen.add(key)
+            model = CAIXILHARIA_MODELOS.get(option.sistema)
+            if not model:
+                continue
+            if self.produto not in model.get("products", []):
+                raise ValueError(f"O modelo {model['name']} não se aplica ao produto escolhido")
+            category = model.get("category")
+            if self.tipo_abertura == "correr" and category != "correr":
+                raise ValueError(f"O modelo {model['name']} não é uma série de correr")
+            if self.tipo_abertura in {"abrir_batente", "oscilo_batente", "basculante"} and category == "correr":
+                raise ValueError(f"O modelo {model['name']} é de correr e não corresponde à abertura escolhida")
+            if self.tipo_abertura == "portada" and category != "portada":
+                raise ValueError(f"O modelo {model['name']} não é uma portada")
+            leaves = model.get("leaves") or []
+            if self.numero_folhas and leaves and self.numero_folhas not in leaves:
+                allowed = ", ".join(str(value) for value in leaves)
+                raise ValueError(f"O modelo {model['name']} admite {allowed} folha(s)")
         return self
 
 
@@ -1319,17 +1349,31 @@ async def delete_task(task_id: str):
 # ---------- Caixilharia à medida ----------
 @api_router.get("/caixilharia/catalog")
 async def caixilharia_catalog():
+    technical_analysis = build_catalog_analysis(CAIXILHARIA_MODELOS)
     return {
         "supplier": CAIXILHARIA_SUPPLIER,
+        "catalog_meta": CAIXILHARIA_CATALOG_META,
         "produtos": CAIXILHARIA_PRODUTOS,
         "familias": CAIXILHARIA_FAMILIAS,
+        "modelos": CAIXILHARIA_MODELOS,
+        "tipos_abertura": CAIXILHARIA_TIPOS_ABERTURA,
         "sentidos": CAIXILHARIA_SENTIDOS,
         "fechaduras": CAIXILHARIA_FECHADURAS,
         "muletas": CAIXILHARIA_MULETAS,
         "estores": CAIXILHARIA_ESTORES,
         "materiais": CAIXILHARIA_MATERIAIS,
+        "vidros": CAIXILHARIA_VIDROS,
+        "quadriculas": CAIXILHARIA_QUADRICULAS,
+        "quadricula_info": CAIXILHARIA_QUADRICULA_INFO,
+        "analise_tecnica": technical_analysis,
         "aviso": CAIXILHARIA_AVISO,
     }
+
+
+@api_router.get("/caixilharia/catalog/analysis")
+async def caixilharia_catalog_analysis():
+    """Recalcula rankings/comparações a partir da evidência atual do catálogo."""
+    return build_catalog_analysis(CAIXILHARIA_MODELOS)
 
 
 def caixilharia_resumo(spec):
@@ -1398,6 +1442,8 @@ def caixilharia_email(n, spec, is_reminder=False):
         spec, CAIXILHARIA_PRODUTOS, CAIXILHARIA_FAMILIAS,
         materials=CAIXILHARIA_MATERIAIS, locks=CAIXILHARIA_FECHADURAS,
         handles=CAIXILHARIA_MULETAS, shutters=CAIXILHARIA_ESTORES,
+        models=CAIXILHARIA_MODELOS, opening_types=CAIXILHARIA_TIPOS_ABERTURA,
+        quadrilles=CAIXILHARIA_QUADRICULAS,
         warning=CAIXILHARIA_AVISO,
     )
     lines += ["", *element_lines]
@@ -1719,13 +1765,19 @@ async def note_preflight(note_id: str):
         for index, line in enumerate(lines, 1):
             if not line.get("opcoes"):
                 missing.append(f"Opção de fabrico no elemento {index}")
+            if line.get("produto") in {"janela", "porta", "portada"}:
+                if not line.get("tipo_abertura"):
+                    missing.append(f"Tipo de abertura no elemento {index}")
+                if not line.get("numero_folhas"):
+                    missing.append(f"Número de folhas no elemento {index}")
             for dimension in (line.get("largura_mm", 0), line.get("altura_mm", 0)):
                 if dimension > 6000:
                     warns.append(f"Elemento {index}: medida invulgar de {dimension} mm — confirme o valor.")
         checklist = [
             "Produto por elemento", "Quantidade, largura e altura por elemento",
-            "Uma ou mais opções de material / sistema", "Sentido de abertura",
-            "Cor e acessórios por opção", CAIXILHARIA_AVISO,
+            "Tipo de abertura e número de folhas", "Uma ou mais opções de material / modelo",
+            "Tipo e composição do vidro", "Cor, quadrícula e acessórios por opção",
+            "Confirmar que a classificação técnica se aplica à configuração", CAIXILHARIA_AVISO,
         ]
     return {"product_type": pt, "product_label": PRODUCT_TYPES.get(pt, {}).get("label"),
             "checklist": checklist, "missing": missing, "warnings": warns,
