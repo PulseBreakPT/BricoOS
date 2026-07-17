@@ -17,7 +17,7 @@ import {
   Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
   Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud, Frame,
-  Store, ArrowLeft, ChevronRight,
+  Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
@@ -33,7 +33,7 @@ import CaixilhariaForm, {
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
-  category: "construcao", measurements: "", quantity: "", color: "", reference: "",
+  category: "construcao", quantity: "", reference: "",
   priority: "media", labels: [], supplier_id: "", sla_days: 2, reminder_interval_days: 3,
 };
 
@@ -43,7 +43,27 @@ const ACT_ICONS = {
   created: Sparkles, status_change: ArrowRightLeft, priority_change: Flag,
   quote_added: Receipt, quote_removed: Trash2, quote_approved: BadgeCheck,
   email_sent: Send, comment: MessageSquare, updated: Pencil, task_added: Bell,
-  client_contact: MessageSquare, auto_archived: Cloud,
+  client_contact: PhoneCall, supplier_contact: PhoneCall,
+  contact_attempt: PhoneMissed, auto_archived: Cloud,
+};
+
+// Registos de um toque: gravam o resultado do contacto na cronologia e
+// atualizam etiquetas/contadores no servidor (ver QUICK_LOG_EVENTS no backend).
+const QUICK_LOG_OPTIONS = [
+  { event: "cliente_nao_atendeu", label: "Cliente não atendeu", icon: PhoneMissed, tone: "red" },
+  { event: "cliente_deixou_mensagem", label: "Deixei mensagem ao cliente", icon: MessageSquare, tone: "amber" },
+  { event: "cliente_atendeu", label: "Falei com o cliente", icon: PhoneCall, tone: "green" },
+  { event: "fornecedor_nao_atendeu", label: "Fornecedor não atendeu", icon: PhoneMissed, tone: "red" },
+  { event: "fornecedor_atendeu", label: "Falei com o fornecedor", icon: PhoneCall, tone: "green" },
+  { event: "aguarda_stock", label: "Aguarda stock", icon: Package, tone: "amber" },
+  { event: "pronto_levantamento", label: "Pronto p/ levantamento", icon: PackageCheck, tone: "green" },
+  { event: "cliente_avisado", label: "Cliente avisado", icon: BellRing, tone: "green" },
+];
+
+const QUICK_LOG_TONES = {
+  red: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+  amber: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
+  green: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
 };
 
 export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
@@ -222,8 +242,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         await api.put(`/notes/${id}`, {
           customer_name: form.customer_name, phone: form.phone, email: form.email,
           description: form.description, details: form.details, category: form.category,
-          measurements: form.measurements, quantity: form.quantity, color: form.color,
-          reference: form.reference, sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
+          quantity: form.quantity, reference: form.reference,
+          sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
         });
         setAutoState("saved");
         setAutoError("");
@@ -455,6 +475,20 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     await refresh();
   };
 
+  const [loggingEvent, setLoggingEvent] = useState("");
+  const quickLog = async (event) => {
+    setLoggingEvent(event);
+    try {
+      await api.post(`/notes/${id}/quick-log`, { event });
+      toast.success("Registado na cronologia");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível registar"));
+    } finally {
+      setLoggingEvent("");
+    }
+  };
+
   const addTask = async () => {
     if (!newTask.title.trim()) { toast.error("Escreva o lembrete."); return; }
     await api.post(`/notes/${id}/tasks`, { title: newTask.title.trim(), due_date: newTask.due_date });
@@ -561,7 +595,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   ? (createMode === "choice"
                     ? "Escolha o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
-                  : (form.phone || "Sem telefone")}
+                  : (form.phone
+                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
+                    : "Sem telefone")}
                 {!isCreate && note ? <span className="font-mono text-[11px] font-semibold text-slate-600">{note.request_reference}</span> : null}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
@@ -736,16 +772,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <Label>Referência do artigo (opcional)</Label>
                       <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
                     </div>
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <Label>Medidas / dimensões (opcional)</Label>
-                        <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="Ex.: 2000 × 600 × 30 mm" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Cor / acabamento (opcional)</Label>
-                        <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Carvalho natural" />
-                      </div>
-                    </div>
                   </>
                 ) : null}
 
@@ -855,16 +881,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="space-y-1.5">
                   <Label>Referência do artigo</Label>
                   <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Medidas / dimensões</Label>
-                  <Input data-testid="input-measurements" value={form.measurements} onChange={(e) => set("measurements", e.target.value)} className="font-mono" placeholder="Ex.: 2000 × 600 × 30 mm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Cor / acabamento</Label>
-                  <Input data-testid="input-color" value={form.color} onChange={(e) => set("color", e.target.value)} placeholder="Ex.: Carvalho natural" />
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
@@ -1106,8 +1122,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   {/* Alternatives */}
                   {alt?.suggest_alternatives ? (
                     <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Sem resposta após {alt.reminder_count} lembretes</h4>
-                      <p className="mt-1 text-xs text-orange-800">Considere fornecedores alternativos:</p>
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Fornecedor sem resposta</h4>
+                      <p className="mt-1 text-xs text-orange-800">
+                        {[
+                          alt.reminder_count ? `${alt.reminder_count} lembrete(s) por email` : "",
+                          alt.no_answer_count ? `${alt.no_answer_count} chamada(s) sem resposta` : "",
+                        ].filter(Boolean).join(" e ") || "Sem retorno até agora"}. Considere fornecedores alternativos:
+                      </p>
                       <div className="mt-2 space-y-1.5">
                         {alt.alternatives.map((s) => (
                           <div key={s.id} className="flex items-center justify-between rounded-lg bg-white p-2 text-xs">
@@ -1269,7 +1290,38 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
             {/* CRONOLOGIA */}
             <TabsContent value="cronologia" className="mt-0 focus-visible:outline-none">
-              <div className="flex gap-2">
+              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Registo rápido</p>
+                {(note?.client_no_answer_count > 0 || note?.supplier_no_answer_count > 0) ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {note?.client_no_answer_count > 0 ? (
+                      <span data-testid="client-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                        <PhoneMissed className="h-3 w-3" /> Cliente sem resposta ({note.client_no_answer_count}×)
+                      </span>
+                    ) : null}
+                    {note?.supplier_no_answer_count > 0 ? (
+                      <span data-testid="supplier-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                        <PhoneMissed className="h-3 w-3" /> Fornecedor sem resposta ({note.supplier_no_answer_count}×)
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {QUICK_LOG_OPTIONS.map(({ event, label, icon: Icon, tone }) => (
+                    <button
+                      key={event}
+                      data-testid={`quick-log-${event}`}
+                      onClick={() => quickLog(event)}
+                      disabled={!!loggingEvent}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${QUICK_LOG_TONES[tone]}`}
+                    >
+                      {loggingEvent === event ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <div className="mt-4 flex gap-2">
                 <Input data-testid="comment-input" value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addComment()} placeholder="Adicionar nota / comentário..." />
                 <Button data-testid="add-comment-btn" onClick={addComment} className="rounded-xl"><MessageSquare className="h-4 w-4" /></Button>
               </div>

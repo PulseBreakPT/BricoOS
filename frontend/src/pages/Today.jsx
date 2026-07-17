@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Sun, AlertTriangle, Inbox, Clock, PhoneCall, Bell, Layers, Brain, Zap,
+  Sun, AlertTriangle, Inbox, Clock, PhoneCall, PhoneMissed, Bell, Layers, Brain, Zap,
   CheckCircle2, Loader2, TrendingUp, Hourglass, ArrowRight, ChevronRight,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
@@ -140,6 +140,7 @@ export default function Today() {
   const waitingOthers = [...(data?.waiting_supplier || []), ...(data?.waiting_client || [])];
   const reminders = data?.reminder_due || [];
   const longClients = data?.long_waiting_clients || [];
+  const followUps = data?.follow_up_calls || [];
 
   return (
     <div>
@@ -160,6 +161,7 @@ export default function Today() {
             <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} />
             <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
             <SummaryChip label="atrasados" value={s.atrasados ?? 0} tone="red" icon={AlertTriangle} />
+            {counts.follow_up ? <SummaryChip label="a religar" value={counts.follow_up} tone="amber" icon={PhoneMissed} /> : null}
             <SummaryChip label="novos hoje" value={s.novos_hoje ?? 0} tone="amber" icon={TrendingUp} />
             <SummaryChip label="concluídos hoje" value={s.concluidos_hoje ?? 0} tone="green" icon={CheckCircle2} />
           </div>
@@ -239,6 +241,36 @@ export default function Today() {
                 <p className="mt-2 font-heading text-3xl font-extrabold">{formatEuro(data?.potential_value)}</p>
                 <p className="mt-1 text-xs text-slate-400">Soma dos melhores orçamentos em aberto.</p>
               </section>
+
+              {/* Voltar a ligar — chamadas falhadas registadas no pedido */}
+              {followUps.length > 0 ? (
+                <section className="rounded-2xl border border-red-200 bg-red-50/50 p-4 sm:p-5">
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-red-800"><PhoneMissed className="h-4 w-4" /> Voltar a ligar</h3>
+                  <div className="mt-3 space-y-2">
+                    {followUps.map((n) => (
+                      <div key={n.id} data-testid={`follow-up-${n.id}`} className="flex items-center gap-2 rounded-xl bg-white p-2.5">
+                        <button onClick={() => openNote(n.id, "cronologia")} className="min-w-0 flex-1 text-left">
+                          <p className="truncate text-sm font-semibold text-slate-900">{n.customer_name || "Sem nome"}</p>
+                          <p className="truncate text-xs text-slate-500">
+                            {n.client_callback_due
+                              ? `Cliente não atendeu ${n.client_no_answer_count}×`
+                              : `Fornecedor não atendeu ${n.supplier_no_answer_count}×`}
+                          </p>
+                        </button>
+                        {n.client_callback_due && n.phone ? (
+                          <a
+                            href={`tel:${n.phone}`}
+                            data-testid={`follow-up-call-${n.id}`}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-red-700"
+                          >
+                            <PhoneCall className="h-3.5 w-3.5" /> Ligar
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {/* Lembretes a enviar */}
               <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
