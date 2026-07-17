@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 from email_templates import (
     business_greeting,
     client_quote_template,
-    request_reference,
     supplier_quote_template,
 )
 
@@ -29,9 +28,6 @@ class EmailTemplateTests(unittest.TestCase):
         self.assertEqual(business_greeting(datetime(2026, 7, 16, 10, tzinfo=LISBON)), "Bom dia")
         self.assertEqual(business_greeting(datetime(2026, 7, 16, 15, tzinfo=LISBON)), "Boa tarde")
 
-    def test_reference_is_stable_and_separate_from_product_reference(self):
-        self.assertEqual(request_reference(self.note), "BCF-26-A1B2C3D4")
-
     def test_supplier_template_matches_working_style_and_plural(self):
         template = supplier_quote_template(
             self.note,
@@ -46,11 +42,9 @@ class EmailTemplateTests(unittest.TestCase):
     def test_reminder_omits_internal_reference(self):
         template = supplier_quote_template(self.note, is_reminder=True)
         self.assertTrue(template["subject"].startswith("Lembrete · Pedido de cotação"))
-        self.assertNotIn("BCF-26-A1B2C3D4", template["subject"])
+        self.assertNotIn("BCF-", template["subject"])
         self.assertIn("reforçar o pedido de cotação", template["body"])
-        self.assertNotIn("BCF-26-A1B2C3D4", template["body"])
-        # A referência interna continua disponível à parte, para uso do utilizador.
-        self.assertEqual(template["reference"], "BCF-26-A1B2C3D4")
+        self.assertNotIn("BCF-", template["body"])
 
     def test_client_template_is_ready_for_an_attachment(self):
         template = client_quote_template(self.note)

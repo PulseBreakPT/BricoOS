@@ -19,7 +19,7 @@ from email.mime.text import MIMEText
 
 try:
     from email_templates import (
-        business_greeting, client_quote_template, request_reference, supplier_quote_template,
+        business_greeting, client_quote_template, supplier_quote_template,
     )
     from caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
     from bandaluminios_analysis import build_catalog_analysis
@@ -35,7 +35,7 @@ try:
     )
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
-        business_greeting, client_quote_template, request_reference, supplier_quote_template,
+        business_greeting, client_quote_template, supplier_quote_template,
     )
     from .caixilharia_logic import caixilharia_email_lines, caixilharia_summary, normalize_caixilharia_spec
     from .bandaluminios_analysis import build_catalog_analysis
@@ -253,7 +253,6 @@ def enrich_note(note, now=None):
     note["next_status_label"] = STATUS_LABEL.get(NEXT_STATUS.get(status), "")
     note["next_action_mode"] = NEXT_ACTION_MODE.get(status, "status")
     note["status_label"] = STATUS_LABEL.get(status, status)
-    note["request_reference"] = request_reference(note)
     sla = note.get("sla_days") or DEFAULT_SLA_DAYS
     ref = parse_dt(note.get("status_updated_at") or note.get("updated_at") or note.get("created_at"))
     days = max((now - ref).days, 0) if ref else 0
@@ -2054,7 +2053,7 @@ async def note_quote_template(note_id: str, supplier_id: Optional[str] = None, i
     if n.get("caixilharia"):
         subject, body = caixilharia_email(n, n["caixilharia"], is_reminder)
         return {"subject": subject, "body": body,
-                "reference": request_reference(n), "supplier": sup, "to": sup.get("email") if sup else ""}
+                "supplier": sup, "to": sup.get("email") if sup else ""}
     template = supplier_quote_template(n, is_reminder=is_reminder)
     return {**template, "supplier": sup, "to": sup.get("email") if sup else ""}
 

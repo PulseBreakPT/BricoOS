@@ -87,7 +87,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [emailData, setEmailData] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
   const [isReminder, setIsReminder] = useState(false);
-  const [clientEmailData, setClientEmailData] = useState({ subject: "", body: "", reference: "", to: "" });
+  const [clientEmailData, setClientEmailData] = useState({ subject: "", body: "", to: "" });
   const [clientTemplateLoading, setClientTemplateLoading] = useState(false);
   const [caixOpen, setCaixOpen] = useState(false);
 
@@ -145,8 +145,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     try {
       const { data } = await api.get(`/notes/${nid}/client-template`);
       setClientEmailData({
-        subject: data.subject || "", body: data.body || "",
-        reference: data.reference || "", to: data.to || "",
+        subject: data.subject || "", body: data.body || "", to: data.to || "",
       });
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível preparar a resposta ao cliente"));
@@ -174,7 +173,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setTab(initialTab);
       setEmailSupplier("");
       setIsReminder(false);
-      setClientEmailData({ subject: "", body: "", reference: "", to: "" });
+      setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
       setAssist({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
@@ -558,7 +557,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     try {
       await api.post(`/notes/${id}/contact-client`, {
         method: "email",
-        message: `Orçamento ${clientEmailData.reference || note?.request_reference || ""} enviado ao cliente`.trim(),
+        message: "Orçamento enviado ao cliente",
       });
       toast.success("Envio ao cliente registado");
       await refresh();
@@ -599,7 +598,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   : (form.phone
                     ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
                     : "Sem telefone")}
-                {!isCreate && note ? <span className="font-mono text-[11px] font-semibold text-slate-600">{note.request_reference}</span> : null}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
                 {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
@@ -908,8 +906,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
               </div>
 
-              {/* Caixilharia à medida (BandAluminios) */}
-              {!isCreate ? (
+              {/* Caixilharia à medida (BandAluminios) — só em pedidos criados no
+                  fluxo à medida; um pedido normal de loja nunca ganha caixilharia */}
+              {!isCreate && note?.caixilharia ? (
                 <div className="mt-4 space-y-1.5">
                   <Label>Caixilharia à medida</Label>
                   {note?.caixilharia ? (
@@ -925,7 +924,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                               ? `${note.caixilharia.display.element_count} elemento(s) · ${note.caixilharia.display.option_count} opção(ões) · `
                               : ""}
                             {note.caixilharia.display?.total_un} un
-                            {note.caixilharia.tipo_pedido === "encomenda" ? " · Encomenda" : " · Orçamento"}
                             {note.caixilharia.data_entrega ? ` · entrega ${note.caixilharia.data_entrega}` : ""}
                           </p>
                           {note.caixilharia.display?.comparison_count ? (
@@ -961,16 +959,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         )) : null}
                       </div>
                     </div>
-                  ) : (
-                    <Button
-                      data-testid="caixilharia-open"
-                      variant="outline"
-                      onClick={() => setCaixOpen(true)}
-                      className="w-full rounded-xl border-dashed text-slate-600"
-                    >
-                      <Frame className="mr-2 h-4 w-4" /> Pedir janela, porta ou rede mosquiteira à medida
-                    </Button>
-                  )}
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1035,7 +1024,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="space-y-5">
                   {/* Smart suggestion */}
                   <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-violet-900"><Lightbulb className="h-4 w-4" /> Sugestão do assistente</h4>
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-violet-900"><Lightbulb className="h-4 w-4" /> Sugestão do assistente</h4>
                     {sg?.learned && sg?.suggested_supplier ? (
                       <div className="mt-3 space-y-2">
                         <div className="flex items-center justify-between gap-2 rounded-xl bg-white p-3">
@@ -1057,7 +1046,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
                   {/* Preflight checklist */}
                   <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900">
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
                       <ClipboardCheck className="h-4 w-4" /> Antes de enviar {pf.product_label ? `· ${pf.product_label}` : ""}
                     </h4>
                     {pf.missing.length > 0 ? (
@@ -1081,7 +1070,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   {/* Duplicates */}
                   {dups.length > 0 ? (
                     <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-amber-900"><GitCompare className="h-4 w-4" /> Possíveis duplicados</h4>
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-amber-900"><GitCompare className="h-4 w-4" /> Possíveis duplicados</h4>
                       <div className="mt-2 space-y-1.5">
                         {dups.map((d) => (
                           <div key={d.id} className="rounded-lg bg-white p-2.5 text-xs">
@@ -1095,7 +1084,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
                   {/* Client history */}
                   <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><History className="h-4 w-4" /> Histórico do cliente</h4>
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900"><History className="h-4 w-4" /> Histórico do cliente</h4>
                     {hist ? (
                       <div className="mt-2 space-y-2 text-xs">
                         <p className="text-slate-600">{hist.past_count} pedido(s) anterior(es) deste cliente.</p>
@@ -1123,7 +1112,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   {/* Alternatives */}
                   {alt?.suggest_alternatives ? (
                     <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Fornecedor sem resposta</h4>
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-orange-900"><RefreshCw className="h-4 w-4" /> Fornecedor sem resposta</h4>
                       <p className="mt-1 text-xs text-orange-800">
                         {[
                           alt.reminder_count ? `${alt.reminder_count} lembrete(s) por email` : "",
@@ -1149,7 +1138,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-slate-700" />
-                  <h4 className="font-heading text-sm font-bold text-slate-900">Pedir preço a fornecedor</h4>
+                  <h4 className="font-heading text-sm font-extrabold text-slate-900">Pedir preço a fornecedor</h4>
                 </div>
                 {!gmailStatus?.connected ? (
                   <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -1210,7 +1199,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <div>
                       <div className="flex items-center gap-2">
                         <Send className="h-4 w-4 text-blue-700" />
-                        <h4 className="font-heading text-sm font-bold text-slate-900">Responder ao cliente</h4>
+                        <h4 className="font-heading text-sm font-extrabold text-slate-900">Responder ao cliente</h4>
                       </div>
                       <p className="mt-1 text-xs text-slate-600">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
                     </div>
@@ -1250,7 +1239,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <section className="mt-6">
                 <div className="flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-slate-700" />
-                  <h4 className="font-heading text-sm font-bold text-slate-900">Comparar orçamentos recebidos</h4>
+                  <h4 className="font-heading text-sm font-extrabold text-slate-900">Comparar orçamentos recebidos</h4>
                 </div>
                 <div className="mt-3 space-y-2">
                   {quotes.length === 0 ? (

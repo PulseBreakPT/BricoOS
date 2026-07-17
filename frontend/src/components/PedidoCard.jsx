@@ -35,7 +35,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="truncate font-heading text-base font-bold tracking-tight text-slate-900">{note.customer_name || "Sem nome"}</h3>
+              <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-slate-900">{note.customer_name || "Sem nome"}</h3>
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: pr.bg, color: pr.text }}>
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pr.dot }} />{pr.label}
               </span>
@@ -46,7 +46,6 @@ export default function PedidoCard({ note, onOpen, actions }) {
               </a>
             ) : null}
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium text-slate-400">
-              <span className="font-mono text-slate-500">{note.request_reference || `BCF-${note.id?.slice(0, 8).toUpperCase()}`}</span>
               <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" /> {formatDateTime(note.created_at)}</span>
             </p>
           </div>

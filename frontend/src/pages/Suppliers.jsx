@@ -173,7 +173,7 @@ export default function Suppliers() {
               <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
               <div className="flex items-start justify-between gap-3 pl-2">
                 <div className="min-w-0">
-                  <h3 className="font-heading text-base font-bold tracking-tight text-slate-900">{s.name}</h3>
+                  <h3 className="font-heading text-base font-extrabold tracking-tight text-slate-900">{s.name}</h3>
                   {s.category ? <div className="mt-2"><CategoryBadge category={s.category} /></div> : null}
                 </div>
                 <div className="flex gap-1">
