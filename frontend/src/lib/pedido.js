@@ -88,19 +88,11 @@ function greeting() {
   return new Date().getHours() < 13 ? "Bom dia" : "Boa tarde";
 }
 
-function requestReference(note) {
-  if (note?.request_reference) return note.request_reference;
-  const suffix = String(note?.id || "SEMREF").replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "SEMREF";
-  const year = String(note?.created_at || "").match(/^(\d{4})/)?.[1]?.slice(2);
-  return year ? `BCF-${year}-${suffix}` : `BCF-${suffix}`;
-}
-
 export function buildEmail(note) {
-  const reference = requestReference(note);
   const description = note.description || "artigo";
   const count = parseInt(String(note.quantity || "").match(/\d+/)?.[0] || "1", 10);
   const article = count > 1 ? "os seguintes artigos" : "o seguinte artigo";
-  const subject = `Pedido de cotação ${reference} — ${description}`;
+  const subject = `Pedido de cotação — ${description}`;
   const lines = [`${greeting()} Exmos. Senhores,`, "",
     `Venho por este meio solicitar um pedido de cotação para ${article}:`, "",
     `Artigo: ${description}`];
@@ -115,10 +107,9 @@ export function buildEmail(note) {
 }
 
 export function buildReminder(note) {
-  const reference = requestReference(note);
-  const subject = `Lembrete · Pedido de cotação ${reference} — ${note.description || "artigo"}`;
+  const subject = `Lembrete · Pedido de cotação — ${note.description || "artigo"}`;
   const lines = [`${greeting()} Exmos. Senhores,`, "",
-    `Venho por este meio reforçar o pedido de cotação enviado anteriormente com a referência ${reference}:`, "",
+    "Venho por este meio reforçar o pedido de cotação enviado anteriormente:", "",
     `Artigo: ${note.description || "-"}`];
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);

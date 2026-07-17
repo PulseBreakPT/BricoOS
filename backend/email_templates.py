@@ -47,10 +47,7 @@ def supplier_quote_template(note, is_reminder=False, now=None):
 
     lines = [f"{greeting} Exmos. Senhores,", ""]
     if is_reminder:
-        lines.append(
-            "Venho por este meio reforçar o pedido de cotação enviado anteriormente "
-            f"com a referência {reference}:"
-        )
+        lines.append("Venho por este meio reforçar o pedido de cotação enviado anteriormente:")
     else:
         lines.append(f"Venho por este meio solicitar um pedido de cotação para {article}:")
     lines += ["", f"Artigo: {description}"]
@@ -79,7 +76,7 @@ def supplier_quote_template(note, is_reminder=False, now=None):
         "Bricomarché Faro",
     ]
     prefix = "Lembrete · " if is_reminder else ""
-    subject = f"{prefix}Pedido de cotação {reference} — {description}"
+    subject = f"{prefix}Pedido de cotação — {description}"
     return {"subject": subject, "body": "\n".join(lines), "reference": reference}
 
 
@@ -88,7 +85,7 @@ def client_quote_template(note, now=None):
     greeting = business_greeting(now)
     reference = request_reference(note)
     description = (note.get("description") or "artigo solicitado").strip()
-    subject = f"Orçamento solicitado {reference} — {description}"
+    subject = f"Orçamento solicitado — {description}"
     body = "\n".join([
         f"{greeting} caro cliente,",
         "",

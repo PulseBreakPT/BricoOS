@@ -1549,21 +1549,18 @@ def caixilharia_email(n, spec, is_reminder=False):
     spec = normalize_caixilharia_spec(spec)
     display = caixilharia_resumo(spec)
     tipo = "Encomenda" if spec.get("tipo_pedido") == "encomenda" else "Orçamento"
-    ref_cliente = request_reference(n)
     ref_artigo = (n.get("reference") or "").strip()
     hoje = datetime.now(timezone.utc).strftime("%d/%m/%Y")
 
     lines = [f"{business_greeting()} Exmos. Senhores,", ""]
     if is_reminder:
-        lines.append(f"Venho por este meio reforçar o pedido enviado anteriormente com a referência {ref_cliente}:")
+        lines.append("Venho por este meio reforçar o pedido de caixilharia à medida enviado anteriormente:")
     else:
         lines.append(f"Venho por este meio solicitar um pedido de {tipo.lower()} de caixilharia à medida, "
                      "conforme a vossa ficha de pedido:")
     lines += [
         "",
-        f"Tipo de pedido: {tipo}",
         "Cliente: Bricomarché Faro",
-        f"Ref. de cliente: {ref_cliente}",
         f"Data do pedido: {hoje}",
     ]
     if ref_artigo:
@@ -1592,7 +1589,7 @@ def caixilharia_email(n, spec, is_reminder=False):
 
     prefix = "Lembrete · " if is_reminder else ""
     element_word = "elemento" if display["element_count"] == 1 else "elementos"
-    subject = (f"{prefix}Pedido de {tipo.lower()} {ref_cliente} — Caixilharia à medida · "
+    subject = (f"{prefix}Pedido de {tipo.lower()} — Caixilharia à medida · "
                f"{display['element_count']} {element_word} · {display['option_count']} opção(ões)")
     return subject, "\n".join(lines)
 

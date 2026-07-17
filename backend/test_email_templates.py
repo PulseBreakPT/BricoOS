@@ -43,16 +43,20 @@ class EmailTemplateTests(unittest.TestCase):
         self.assertIn("Referência do artigo: ART-44", template["body"])
         self.assertIn("Preço;", template["body"])
 
-    def test_reminder_keeps_same_reference(self):
+    def test_reminder_omits_internal_reference(self):
         template = supplier_quote_template(self.note, is_reminder=True)
-        self.assertTrue(template["subject"].startswith("Lembrete · Pedido de cotação BCF-26-A1B2C3D4"))
+        self.assertTrue(template["subject"].startswith("Lembrete · Pedido de cotação"))
+        self.assertNotIn("BCF-26-A1B2C3D4", template["subject"])
         self.assertIn("reforçar o pedido de cotação", template["body"])
+        self.assertNotIn("BCF-26-A1B2C3D4", template["body"])
+        # A referência interna continua disponível à parte, para uso do utilizador.
+        self.assertEqual(template["reference"], "BCF-26-A1B2C3D4")
 
     def test_client_template_is_ready_for_an_attachment(self):
         template = client_quote_template(self.note)
         self.assertIn("Segue em anexo o orçamento solicitado", template["body"])
         self.assertIn("já inclui IVA", template["body"])
-        self.assertIn("BCF-26-A1B2C3D4", template["subject"])
+        self.assertNotIn("BCF-26-A1B2C3D4", template["subject"])
 
 
 if __name__ == "__main__":

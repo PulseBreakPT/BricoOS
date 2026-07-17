@@ -66,7 +66,14 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
     updateLines([...normalized.linhas.slice(0, lineIndex + 1), copy, ...normalized.linhas.slice(lineIndex + 1)]);
   };
   // Sugestão: depois de medir uma janela/porta, oferece adicionar a rede
-  // mosquiteira ou portada correspondente já com as mesmas medidas.
+  // mosquiteira ou portada correspondente já com as mesmas medidas. "Já
+  // adicionada" é derivado dos elementos existentes (não é estado à parte),
+  // por isso fica sempre correto mesmo que o elemento seja removido depois.
+  const hasCompanion = (line, product) => normalized.linhas.some((other) => (
+    other.id !== line.id && other.produto === product
+    && String(other.largura_mm) === String(line.largura_mm)
+    && String(other.altura_mm) === String(line.altura_mm)
+  ));
   const addCompanionLine = (lineIndex, product) => {
     const source = normalized.linhas[lineIndex];
     const companion = createCaixLine(product, {
@@ -328,12 +335,24 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                 <div className="mt-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3">
                   <p className="text-xs font-semibold text-blue-800">Quer incluir rede mosquiteira ou portada com as mesmas medidas?</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <Button type="button" data-testid={`caix-line-${lineIndex}-add-rede`} variant="outline" size="sm" onClick={() => addCompanionLine(lineIndex, "rede_mosquiteira")} className="h-8 rounded-lg text-xs">
-                      <Plus className="mr-1 h-3.5 w-3.5" /> Rede mosquiteira
-                    </Button>
-                    <Button type="button" data-testid={`caix-line-${lineIndex}-add-portada`} variant="outline" size="sm" onClick={() => addCompanionLine(lineIndex, "portada")} className="h-8 rounded-lg text-xs">
-                      <Plus className="mr-1 h-3.5 w-3.5" /> Portada
-                    </Button>
+                    {[["rede_mosquiteira", "Rede mosquiteira", "rede"], ["portada", "Portada", "portada"]].map(([product, label, slug]) => {
+                      const added = hasCompanion(line, product);
+                      return (
+                        <Button
+                          key={product}
+                          type="button"
+                          data-testid={`caix-line-${lineIndex}-add-${slug}`}
+                          variant="outline"
+                          size="sm"
+                          disabled={added}
+                          onClick={() => addCompanionLine(lineIndex, product)}
+                          className={`h-8 rounded-lg text-xs ${added ? "border-emerald-300 bg-emerald-50 text-emerald-700 disabled:opacity-100" : ""}`}
+                        >
+                          {added ? <Check className="mr-1 h-3.5 w-3.5" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
+                          {label}{added ? " adicionada" : ""}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
