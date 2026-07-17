@@ -7,7 +7,7 @@ import {
 import api, { getErrorMessage } from "@/lib/api";
 import { getCategory } from "@/lib/categories";
 import {
-  getStatusCfg, getPriorityCfg, formatEuro, getNextActionCta, getNextActionMode,
+  getStatusCfg, getPriorityCfg, getNextActionCta, getNextActionMode,
 } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -131,7 +131,6 @@ export default function Today() {
     }
   };
 
-  const today = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   const s = data?.summary || {};
   const counts = data?.counts || {};
   const attention = data?.attention || [];
@@ -145,11 +144,16 @@ export default function Today() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold capitalize text-slate-400 sm:text-sm">{today}</p>
         <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
           <Sun className="h-6 w-6 text-amber-400 sm:h-8 sm:w-8" /> {greeting()}, chefe
         </h1>
-        <p className="text-sm text-slate-500">O que precisa da sua atenção primeiro — para nenhum pedido ficar esquecido.</p>
+        <p className="text-sm text-slate-500">
+          {!data
+            ? "O que precisa da sua atenção primeiro — para nenhum pedido ficar esquecido."
+            : counts.waiting_me
+              ? `Ficaram ${counts.waiting_me} pedido(s) por tratar. Amanhã voltam ao topo automaticamente.`
+              : "Tudo tratado. Nada ficou por fazer hoje."}
+        </p>
       </div>
 
       {loading && !data ? (
@@ -169,40 +173,35 @@ export default function Today() {
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* MAIN column */}
             <div className="space-y-6 lg:col-span-2">
-              {/* Precisa de atenção */}
+              {/* Precisa de atenção + listas — um só cartão para reduzir scroll */}
               <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                <div className="flex items-center justify-between">
-                  <h2 className="flex items-center gap-2 font-heading text-base font-bold text-slate-900">
-                    <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
-                    {attention.length ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{data.attention_count}</span> : null}
-                  </h2>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {attention.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
-                      <CheckCircle2 className="h-5 w-5" /> Tudo em dia. Nenhum pedido esquecido!
+                {attention.length > 0 ? (
+                  <>
+                    <h2 className="flex items-center gap-2 font-heading text-base font-bold text-slate-900">
+                      <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{data.attention_count}</span>
+                    </h2>
+                    <div className="mt-3 space-y-2">
+                      {attention.map((a) => (
+                        <button
+                          key={a.id} data-testid={`attention-${a.id}`}
+                          onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40"}`}
+                        >
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                            <AlertTriangle className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-slate-900">{a.title}</p>
+                            <p className="truncate text-xs text-slate-500">{a.message}</p>
+                          </div>
+                          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+                        </button>
+                      ))}
                     </div>
-                  ) : attention.map((a) => (
-                    <button
-                      key={a.id} data-testid={`attention-${a.id}`}
-                      onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
-                      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40"}`}
-                    >
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
-                        <AlertTriangle className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{a.title}</p>
-                        <p className="truncate text-xs text-slate-500">{a.message}</p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              {/* Listas: à espera de mim / de terceiros / novos */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="my-5 border-t border-slate-100" />
+                  </>
+                ) : null}
                 <Tabs defaultValue="me">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="me" data-testid="tab-waiting-me" className="min-w-0 px-1 text-xs sm:px-3">
@@ -233,15 +232,6 @@ export default function Today() {
 
             {/* SIDE column */}
             <div className="space-y-6">
-              {/* Valor potencial */}
-              <section className="rounded-2xl border border-slate-900 bg-slate-900 p-5 text-white">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                  <TrendingUp className="h-4 w-4" /> Vendas pendentes (potencial)
-                </p>
-                <p className="mt-2 font-heading text-3xl font-extrabold">{formatEuro(data?.potential_value)}</p>
-                <p className="mt-1 text-xs text-slate-400">Soma dos melhores orçamentos em aberto.</p>
-              </section>
-
               {/* Voltar a ligar — chamadas falhadas registadas no pedido */}
               {followUps.length > 0 ? (
                 <section className="rounded-2xl border border-red-200 bg-red-50/50 p-4 sm:p-5">
@@ -273,11 +263,11 @@ export default function Today() {
               ) : null}
 
               {/* Lembretes a enviar */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><Bell className="h-4 w-4 text-blue-500" /> Lembretes a enviar</h3>
-                <div className="mt-3 space-y-2">
-                  {reminders.length === 0 ? <Empty text="Sem lembretes pendentes." /> :
-                    reminders.map((n) => (
+              {reminders.length > 0 ? (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><Bell className="h-4 w-4 text-blue-500" /> Lembretes a enviar</h3>
+                  <div className="mt-3 space-y-2">
+                    {reminders.map((n) => (
                       <div key={n.id} className="flex items-center gap-2 rounded-xl border border-slate-200 p-2.5">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-900">{n.customer_name}</p>
@@ -288,8 +278,9 @@ export default function Today() {
                         </Button>
                       </div>
                     ))}
-                </div>
-              </section>
+                  </div>
+                </section>
+              ) : null}
 
               {/* Clientes à espera há demasiado tempo */}
               {longClients.length > 0 ? (
@@ -338,16 +329,6 @@ export default function Today() {
               </section>
             </div>
           </div>
-
-          {/* Fim do dia */}
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 sm:p-5">
-            <p className="font-bold text-slate-900">Fim do dia</p>
-            <p className="mt-1">
-              {counts.waiting_me
-                ? `Ficaram ${counts.waiting_me} pedido(s) por tratar. Amanhã voltam ao topo automaticamente.`
-                : "Tudo tratado. Nada ficou por fazer hoje."}
-            </p>
-          </section>
         </>
       )}
     </div>
