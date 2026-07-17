@@ -586,6 +586,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const sqTotal = (sq?.items || [])
     .filter((i) => i.include !== false)
     .reduce((acc, i) => acc + (parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1), 0);
+  // Margem final efetiva sobre o custo c/IVA — é o número a reportar ao chefe.
+  // Recalcula em tempo real, mesmo quando o preço é escrito à mão.
+  const itemEffMargin = (i) => {
+    const cost = (i.supplier_unit_price || 0) * 1.23;
+    if (cost <= 0) return null;
+    return (((parseFloat(i.client_price) || 0) / cost) - 1) * 100;
+  };
+  const sqCostTotal = (sq?.items || [])
+    .filter((i) => i.include !== false)
+    .reduce((acc, i) => acc + (i.supplier_unit_price || 0) * 1.23 * (parseInt(i.qty, 10) || 1), 0);
+  const sqEffMargin = sqCostTotal > 0 ? ((sqTotal / sqCostTotal) - 1) * 100 : null;
 
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
@@ -1166,6 +1177,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   Custo: <span className="font-mono">{i.supplier_unit_price != null ? Number(i.supplier_unit_price).toFixed(2) : "—"} €</span> s/ IVA
                                   <span className="mx-1.5">·</span>
                                   Total: <span className="font-mono font-bold text-slate-700">{(((parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1))).toFixed(2)} €</span>
+                                  {itemEffMargin(i) != null ? (
+                                    <>
+                                      <span className="mx-1.5">·</span>
+                                      Margem final: <span data-testid={`sq-eff-margin-${i.n}`} className={`font-mono font-bold ${itemEffMargin(i) + 0.05 < (parseFloat(i.margin_pct) || 0) ? "text-red-600" : "text-emerald-600"}`}>{itemEffMargin(i).toFixed(1)}%</span>
+                                    </>
+                                  ) : null}
                                 </p>
                               </div>
                             </div>
@@ -1175,7 +1192,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 p-3 text-white">
-                      <p className="text-sm font-bold">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal opacity-70">c/ IVA</span></p>
+                      <div>
+                        <p className="text-sm font-bold">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal opacity-70">c/ IVA</span></p>
+                        {sqEffMargin != null ? (
+                          <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] opacity-80">
+                            Margem final sobre o custo c/ IVA: <span className="font-mono font-bold">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
+                          </p>
+                        ) : null}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {sq.client_pdf_file_id ? (
                           <a
