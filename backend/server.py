@@ -2385,6 +2385,58 @@ async def _normalize_existing_phones():
             await db.suppliers.update_one({"id": s["id"]}, {"$set": {"phone": norm}})
 
 
+async def seed_notas_telemovel():
+    """Importa uma vez os pedidos anotados na app de notas do telemóvel
+    (jul/2026). O marcador em db.migrations garante que nunca duplica,
+    mesmo com vários restarts."""
+    marker_id = "seed_notas_telemovel_2026_07"
+    if await db.migrations.find_one({"id": marker_id}):
+        return
+
+    pedidos = [
+        {"customer_name": "Teresa Mera", "phone": "+351917100512",
+         "description": "Preço tijolos, articimentos, bancadas", "category": "jardim"},
+        {"customer_name": "Patrícia", "phone": "+351964572010",
+         "description": "Ventoinha industrial com depósito, tipo mercado municipal", "category": "bricolage"},
+        {"customer_name": "Eduardo", "phone": "+351911997858",
+         "description": "Janela sótão — abrir para dentro, direita", "category": "construcao",
+         "measurements": "Trapezoidal: base 95 cm · topo inclinado 99 cm · lados 66 cm e 38 cm"},
+        {"customer_name": "Rui Catalana", "phone": "+351964136143",
+         "description": "Janela de correr alumínio sem corte térmico — 2000x1000, 2000x2000 c/trinco "
+                        "e 2000x1000 abrir esquerda; persiana 2000x2000 tipo loja, de cima para baixo",
+         "category": "construcao"},
+        {"customer_name": "João Caliço Martins", "phone": "+351934973199",
+         "description": "Rede mosquiteira de fole", "category": "jardim",
+         "measurements": "2000 x 920 mm"},
+        {"customer_name": "Joana", "phone": "+351969152218",
+         "description": "Pinho: 190x60x2.8 — mdf branco 190x39x1.8+", "category": "construcao"},
+        {"customer_name": "Vítor Queiroz", "phone": "+351966149645",
+         "description": "Toldo modelo Braga 3x5 com motor", "category": "jardim"},
+    ]
+    base = {"email": "", "details": "", "measurements": "", "quantity": "", "color": "",
+            "reference": "", "status": "novo", "priority": "media", "labels": [],
+            "supplier_id": "", "sla_days": DEFAULT_SLA_DAYS, "reminder_interval_days": 3,
+            "favorite": False, "created_by": AUTHOR, "archived": False,
+            "last_supplier_sent_at": "", "last_client_contact_at": "",
+            "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
+            "client_no_answer_count": 0, "supplier_no_answer_count": 0,
+            "last_client_attempt_at": "", "last_supplier_attempt_at": ""}
+    for p in pedidos:
+        doc = {**base, **p, "id": str(uuid.uuid4()),
+               "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()}
+        await db.notes.insert_one(dict(doc))
+        await log_activity(doc["id"], "created", f"Pedido criado para {doc['customer_name']}")
+
+    # Sem nome nem telefone de cliente → tarefa de loja, não pedido.
+    await db.tasks.insert_one({
+        "id": str(uuid.uuid4()), "title": "Trocar preços ripados deli home inativos",
+        "category": "construcao", "done": False, "priority": "media", "due_date": "",
+        "repeat": "none", "subtasks": [], "note_id": "", "created_at": now_iso()})
+
+    await db.migrations.insert_one({"id": marker_id, "applied_at": now_iso()})
+    logger.info("Seed de notas do telemóvel aplicado: 7 pedidos + 1 tarefa.")
+
+
 async def ensure_indexes():
     for f in ["status", "priority", "category", "created_at", "supplier_id", "favorite", "archived"]:
         try:
@@ -2403,6 +2455,7 @@ async def on_startup():
     try:
         await ensure_indexes()
         await migrate()
+        await seed_notas_telemovel()
         await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
