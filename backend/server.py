@@ -1563,7 +1563,7 @@ def caixilharia_email(n, spec, is_reminder=False):
         f"Data do pedido: {hoje}",
     ]
     if ref_artigo:
-        lines.append(f"Referência do artigo: {ref_artigo}")
+        lines.append(f"Código EAN13: {ref_artigo}")
     if (spec.get("data_entrega") or "").strip():
         try:
             entrega = datetime.strptime(spec["data_entrega"], "%Y-%m-%d").strftime("%d/%m/%Y")
@@ -1582,8 +1582,7 @@ def caixilharia_email(n, spec, is_reminder=False):
     if (spec.get("observacoes") or "").strip():
         lines += ["", f"Observações: {spec['observacoes']}"]
     lines += [
-        "", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.",
-        "", "Com os melhores cumprimentos,", "Bricomarché Faro",
+        "", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro",
     ]
 
     prefix = "Lembrete · " if is_reminder else ""

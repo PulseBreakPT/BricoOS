@@ -96,13 +96,12 @@ export function buildEmail(note) {
   const lines = [`${greeting()} Exmos. Senhores,`, "",
     `Venho por este meio solicitar um pedido de cotação para ${article}:`, "",
     `Artigo: ${description}`];
-  if (note.reference) lines.push(`Referência do artigo: ${note.reference}`);
+  if (note.reference) lines.push(`Código EAN13: ${note.reference}`);
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
   if (note.color) lines.push(`Cor / acabamento: ${note.color}`);
   if (note.details) lines.push(`Observações: ${note.details}`);
-  lines.push("", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.", "",
-    "Com os melhores cumprimentos,", "Bricomarché Faro");
+  lines.push("", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro");
   return { subject, body: lines.join("\n") };
 }
 
@@ -113,7 +112,6 @@ export function buildReminder(note) {
     `Artigo: ${note.description || "-"}`];
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
-  lines.push("", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.", "",
-    "Com os melhores cumprimentos,", "Bricomarché Faro");
+  lines.push("", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro");
   return { subject, body: lines.join("\n") };
 }

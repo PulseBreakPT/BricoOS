@@ -43,7 +43,7 @@ def supplier_quote_template(note, is_reminder=False, now=None):
 
     product_reference = (note.get("reference") or "").strip()
     if product_reference:
-        lines.append(f"Referência do artigo: {product_reference}")
+        lines.append(f"Código EAN13: {product_reference}")
     for field, label in (
         ("measurements", "Medidas"),
         ("quantity", "Quantidade"),
@@ -56,12 +56,8 @@ def supplier_quote_template(note, is_reminder=False, now=None):
 
     lines += [
         "",
-        "Agradeço, por favor, indicação de:",
-        "• Preço;",
-        "• Prazo de entrega;",
-        "• Disponibilidade.",
-        "",
         "Com os melhores cumprimentos,",
+        "Tiago Jesus",
         "Bricomarché Faro",
     ]
     prefix = "Lembrete · " if is_reminder else ""
@@ -85,6 +81,7 @@ def client_quote_template(note, now=None):
         "O prazo de entrega encontra-se indicado no orçamento em anexo.",
         "",
         "Com os melhores cumprimentos,",
+        "Tiago Jesus",
         "Bricomarché Faro",
     ])
     return {"subject": subject, "body": body}
