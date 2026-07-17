@@ -1,11 +1,12 @@
-import { NavLink, useLocation, Outlet } from "react-router-dom";
-import { Sun, ClipboardList, Truck, ListChecks, BarChart3, Hammer } from "lucide-react";
+import { Link, NavLink, useLocation, Outlet } from "react-router-dom";
+import { Sun, ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 
 const NAV = [
   { to: "/", label: "Hoje", icon: Sun, testid: "nav-hoje", end: true },
   { to: "/clientes", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes" },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck, testid: "nav-fornecedores" },
+  { to: "/catalogo-tecnico", label: "Catálogo técnico", icon: BookOpenCheck, testid: "nav-catalogo", mobile: false },
   { to: "/tarefas", label: "Tarefas", icon: ListChecks, testid: "nav-tarefas" },
   { to: "/estatisticas", label: "Estatísticas", icon: BarChart3, testid: "nav-estatisticas" },
 ];
@@ -63,9 +64,19 @@ export default function Layout() {
         </div>
       </aside>
 
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/70 px-4 py-3 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/80 px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3 lg:hidden">
         <Brand />
-        <NotificationsBell variant="mobile" />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            to="/catalogo-tecnico"
+            aria-label="Abrir catálogo técnico"
+            title="Catálogo técnico"
+            className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${location.pathname.startsWith("/catalogo-tecnico") ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600"}`}
+          >
+            <BookOpenCheck className="h-[18px] w-[18px]" />
+          </Link>
+          <NotificationsBell variant="mobile" />
+        </div>
       </header>
 
       <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">
@@ -76,7 +87,7 @@ export default function Layout() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-around px-1 py-1.5">
-          {NAV.map((item) => {
+          {NAV.filter((item) => item.mobile !== false).map((item) => {
             const Icon = item.icon;
             const isActive = item.end
               ? location.pathname === item.to

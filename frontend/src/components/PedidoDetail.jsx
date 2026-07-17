@@ -545,7 +545,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="note-dialog"
-        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-4xl" : "sm:max-w-3xl"}`}
+        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl" : "sm:max-w-3xl"}`}
       >
         {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
@@ -632,7 +632,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
         {isCreate ? (
           /* ---------- Assistente de criação por etapas ---------- */
-          <div ref={contentScrollRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+          <div ref={contentScrollRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-3 pb-0 sm:px-6 sm:pt-5">
             {createMode === "choice" ? (
               <div className="space-y-3">
                 <p className="text-sm font-bold text-slate-900">O que precisa de pedir?</p>
@@ -800,7 +800,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 ) : null}
 
                 {/* Navegação */}
-                <div className="mt-6 flex gap-2">
+                <div className="sticky bottom-0 z-20 -mx-3 mt-6 flex gap-2 border-t border-slate-200 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:px-6 sm:pb-4">
                   <Button data-testid="wizard-back" variant="outline" onClick={wizardBack} className="rounded-xl">
                     <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
                   </Button>

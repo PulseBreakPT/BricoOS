@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -6,11 +7,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  BookOpen, Copy, ExternalLink, Eye, GitCompare, Info, Layers3, Plus, Ruler,
-  ShieldCheck, Sparkles, Trash2,
+  BookOpenCheck, Check, ChevronDown, Copy, ExternalLink, GitCompare, Info,
+  Layers3, Plus, Ruler, Sparkles, Trash2,
 } from "lucide-react";
 import api from "@/lib/api";
-import CatalogIntelligence from "@/components/CatalogIntelligence";
 import {
   caixilhariaLabels, createCaixLine, createCaixOption, createEmptyCaixilharia,
   emptyCaixilharia, isModelCompatible, measurementDisplayValue, measurementToMillimetres,
@@ -37,24 +37,41 @@ const optionLetter = (index) => String.fromCharCode(65 + index);
 
 export default function CaixilhariaForm({ catalog, spec, onChange }) {
   const normalized = normalizeCaixilhariaSpec(spec);
+  const [expandedLineId, setExpandedLineId] = useState(normalized.linhas[0]?.id || "");
+  const lineIds = normalized.linhas.map((line) => line.id).join("|");
+  const firstLineId = normalized.linhas[0]?.id || "";
+  useEffect(() => {
+    if (expandedLineId && !lineIds.split("|").includes(expandedLineId)) {
+      setExpandedLineId(firstLineId);
+    }
+  }, [expandedLineId, firstLineId, lineIds]);
   const setTop = (key, value) => onChange({ ...normalized, [key]: value });
   const updateLines = (lines) => onChange({ ...normalized, linhas: lines });
   const updateLine = (lineIndex, update) => updateLines(
     normalized.linhas.map((line, index) => (index === lineIndex ? { ...line, ...update } : line)),
   );
 
-  const addLine = (product = "janela") => updateLines([...normalized.linhas, createCaixLine(product)]);
+  const addLine = (product = "janela") => {
+    const nextLine = createCaixLine(product);
+    setExpandedLineId(nextLine.id);
+    updateLines([...normalized.linhas, nextLine]);
+  };
   const duplicateLine = (lineIndex) => {
     const source = normalized.linhas[lineIndex];
     const copy = createCaixLine(source.produto, {
       ...source, id: "", nome: source.nome ? `${source.nome} (cópia)` : "",
       opcoes: source.opcoes.map((option) => ({ ...option, id: "" })),
     });
+    setExpandedLineId(copy.id);
     updateLines([...normalized.linhas.slice(0, lineIndex + 1), copy, ...normalized.linhas.slice(lineIndex + 1)]);
   };
   const removeLine = (lineIndex) => {
     if (normalized.linhas.length === 1) return;
-    updateLines(normalized.linhas.filter((_, index) => index !== lineIndex));
+    const remaining = normalized.linhas.filter((_, index) => index !== lineIndex);
+    if (normalized.linhas[lineIndex].id === expandedLineId) {
+      setExpandedLineId(remaining[Math.max(0, lineIndex - 1)]?.id || remaining[0]?.id || "");
+    }
+    updateLines(remaining);
   };
 
   const pickProduct = (lineIndex, product) => {
@@ -139,32 +156,39 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
   return (
     <div>
       {catalog.catalog_meta ? (
-        <div className="rounded-2xl bg-slate-950 p-4 text-white shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
-              <BookOpen className="h-4 w-4" />
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-blue-300">
+              <BookOpenCheck className="h-4 w-4" />
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-extrabold">Catálogo técnico BandAlumínios</p>
-                <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[10px] text-slate-300">
-                  revisto {catalog.catalog_meta.checked_at}
+                <p className="text-sm font-extrabold text-slate-900">Pedido de caixilharia</p>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                  {catalog.aviso}
                 </span>
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-300">{catalog.catalog_meta.notice}</p>
-              <a href={catalog.catalog_meta.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-300 hover:text-blue-200">
-                Abrir catálogo oficial <ExternalLink className="h-3 w-3" />
-              </a>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                O ranking, as classificações e as fichas completas estão numa página própria.
+              </p>
             </div>
           </div>
+          <a
+            href="/catalogo-tecnico"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+          >
+            Comparar modelos <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
       ) : null}
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold uppercase tracking-wide text-amber-800">
-        <Eye className="h-4 w-4 shrink-0" /> {catalog.aviso}
-      </div>
-      <CatalogIntelligence analysis={catalog.analise_tecnica} />
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-5 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">1</span>
+        <h3 className="font-heading text-sm font-bold text-slate-900">Tipo de pedido</h3>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
         {[['orcamento', 'Orçamento'], ['encomenda', 'Encomenda']].map(([key, label]) => {
           const disabled = key === "encomenda" && hasComparisons;
           return (
@@ -189,12 +213,13 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
         </p>
       ) : null}
 
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <div>
+      <div className="mt-6 flex items-end justify-between gap-3">
+        <div className="min-w-0">
           <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">2</span>
             <Layers3 className="h-4 w-4" /> Elementos do pedido
           </h3>
-          <p className="text-xs text-slate-500">Um elemento por porta, janela, portada ou rede com medidas próprias.</p>
+          <p className="mt-1 text-xs text-slate-500">Abra apenas o elemento que está a editar.</p>
         </div>
         <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
           {normalized.linhas.length} elem. · {totalUnits} un
@@ -203,27 +228,42 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
 
       <div className="mt-3 space-y-4">
         {normalized.linhas.map((line, lineIndex) => (
-          <section key={line.id} data-testid={`caix-line-${lineIndex}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-2.5 sm:px-4">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-extrabold text-white">{lineIndex + 1}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-slate-900">{line.nome || catalog.produtos[line.produto] || "Elemento"}</p>
-                <p className="truncate text-[11px] text-slate-500">
-                  {line.largura_mm && line.altura_mm
-                    ? `${line.largura_mm} × ${line.altura_mm} mm · ${line.largura_mm / 10} × ${line.altura_mm / 10} cm · `
-                    : ""}
-                  {line.opcoes.length} opção{line.opcoes.length === 1 ? "" : "ões"}
-                </p>
-              </div>
-              <button type="button" onClick={() => duplicateLine(lineIndex)} title="Duplicar elemento" className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-700">
+          <section
+            key={line.id}
+            data-testid={`caix-line-${lineIndex}`}
+            className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors ${expandedLineId === line.id ? "border-blue-300 ring-1 ring-blue-100" : "border-slate-200"}`}
+          >
+            <div className={`flex items-center gap-1.5 bg-slate-50/80 px-2 py-2 sm:gap-2 sm:px-3 ${expandedLineId === line.id ? "border-b border-slate-100" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setExpandedLineId(expandedLineId === line.id ? "" : line.id)}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-expanded={expandedLineId === line.id}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-extrabold text-white">{lineIndex + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-slate-900">{line.nome || catalog.produtos[line.produto] || "Elemento"}</span>
+                  <span className="block truncate text-[11px] text-slate-500">
+                    {line.largura_mm && line.altura_mm ? `${line.largura_mm} × ${line.altura_mm} mm` : "Medidas por preencher"}
+                    {line.opcoes.some((option) => option.sistema)
+                      ? ` · ${line.opcoes.map((option) => catalog.modelos?.[option.sistema]?.name).filter(Boolean).join(" + ")}`
+                      : ` · ${line.opcoes.length} opção${line.opcoes.length === 1 ? "" : "ões"}`}
+                  </span>
+                </span>
+                <span className="hidden text-[10px] font-bold uppercase tracking-wide text-slate-400 sm:inline">
+                  {expandedLineId === line.id ? "Fechar" : "Editar"}
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${expandedLineId === line.id ? "rotate-180" : ""}`} />
+              </button>
+              <button type="button" onClick={() => duplicateLine(lineIndex)} title="Duplicar elemento" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-slate-700">
                 <Copy className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-25">
+              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-25">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="p-3 sm:p-4">
+            {expandedLineId === line.id ? <div className="p-3 sm:p-4">
               <div className="space-y-1.5">
                 <Label>Identificação (opcional)</Label>
                 <Input value={line.nome} onChange={(event) => updateLine(lineIndex, { nome: event.target.value })} placeholder="Ex.: Porta da entrada, janela da cozinha" />
@@ -364,7 +404,10 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                 <Label>Observações deste elemento</Label>
                 <Textarea value={line.observacoes} onChange={(event) => updateLine(lineIndex, { observacoes: event.target.value })} rows={2} placeholder="Ex.: manter o desenho atual, soleira baixa..." />
               </div>
-            </div>
+              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
+                <Check className="mr-1.5 h-4 w-4" /> Concluir este elemento
+              </Button>
+            </div> : null}
           </section>
         ))}
       </div>
@@ -380,7 +423,11 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_11rem]">
+      <div className="mt-6 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">3</span>
+        <h3 className="font-heading text-sm font-bold text-slate-900">Finalizar</h3>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_11rem]">
         <div className="space-y-1.5">
           <Label>Observações gerais</Label>
           <Textarea data-testid="caix-observacoes" value={normalized.observacoes} onChange={(event) => setTop("observacoes", event.target.value)} rows={2} placeholder="Informação comum a todo o pedido..." />
@@ -399,7 +446,6 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
   const selectedFamily = catalog.familias[option.familia];
   const selectedModel = catalog.modelos?.[option.sistema];
   const analysisId = catalog.analise_tecnica?.aliases?.[option.sistema] || option.sistema;
-  const selectedAnalysis = catalog.analise_tecnica?.model_index?.[analysisId];
   const compatibleSystems = selectedFamily ? Object.entries(selectedFamily.sistemas).filter(
     ([key]) => isModelCompatible(catalog.modelos?.[key], line),
   ) : [];
@@ -416,7 +462,16 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
 
       <div className="mt-2 space-y-1.5">
         <Label>Material / família</Label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="sm:hidden">
+          <Select value={option.familia || "none"} onValueChange={(value) => onPickFamily(value === "none" ? "" : value)}>
+            <SelectTrigger><SelectValue placeholder="Escolher material" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Escolher material</SelectItem>
+              {families.map(([key, family]) => <SelectItem key={key} value={key}>{family.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="hidden flex-wrap gap-1.5 sm:flex">
           {families.map(([key, family]) => (
             <button
               key={key}
@@ -433,7 +488,16 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
       {selectedFamily ? (
         <div className="mt-3 space-y-1.5">
           <Label>Modelo / série</Label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="sm:hidden">
+            <Select value={option.sistema || "none"} onValueChange={(value) => onSet("sistema", value === "none" ? "" : value)}>
+              <SelectTrigger><SelectValue placeholder="Escolher modelo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Escolher modelo</SelectItem>
+                {compatibleSystems.map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="hidden flex-wrap gap-1.5 sm:flex">
             {compatibleSystems.map(([key, label]) => (
               <button
                 key={key}
@@ -456,9 +520,9 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
       )}
 
       {selectedModel ? (
-        <ModelPassport
+        <SelectedModelSummary
           model={selectedModel}
-          analysis={selectedAnalysis}
+          analysisId={analysisId}
           onApplyGlass={() => onSetPair({
             material: option.material || "vidro",
             material_ref: selectedModel.reference_glass,
@@ -545,113 +609,27 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
   );
 }
 
-function ModelPassport({ model, analysis, onApplyGlass }) {
-  const characteristics = Object.entries(model.characteristics || {});
-  const classifications = Object.entries(model.classification || {});
+function SelectedModelSummary({ model, analysisId, onApplyGlass }) {
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-gradient-to-r from-slate-900 to-slate-800 px-3 py-3 text-white">
-        <div className="flex items-start gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-blue-300">
-            <ShieldCheck className="h-4 w-4" />
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white">
+            <Check className="h-3.5 w-3.5" />
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-extrabold">{model.name}</p>
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-200">{model.category_label}</span>
-              {analysis ? (
-                <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-black ${analysis.overall.score === null ? "bg-slate-700 text-slate-300" : "bg-amber-300 text-slate-950"}`}>
-                  Overall {analysis.overall.score ?? "N/D"}{analysis.overall.category ? ` · ${analysis.overall.category}` : ""}
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-300">{model.description}</p>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-extrabold text-slate-900">{model.name}</p>
+            <p className="truncate text-[10px] text-slate-500">{model.category_label}</p>
           </div>
         </div>
-      </div>
-
-      <div className="p-3">
-        {analysis ? (
-          <div className="mb-2 grid grid-cols-3 gap-1.5 sm:grid-cols-5">
-            {["air", "water", "wind", "thermal", "acoustic"].map((key) => {
-              const feature = analysis.features?.[key];
-              return (
-                <div key={key} className="rounded-lg border border-slate-200 bg-white p-1.5 text-center">
-                  <p className="truncate text-[8px] font-bold uppercase tracking-wide text-slate-400">{feature?.label}</p>
-                  <p className={`mt-0.5 font-mono text-[11px] font-black ${feature?.score === null ? "text-slate-400" : "text-slate-900"}`}>{feature?.score ?? "N/D"}</p>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {characteristics.slice(0, 4).map(([label, value]) => (
-            <div key={label} className="rounded-lg bg-slate-50 p-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-              <p className="mt-0.5 text-[11px] font-bold leading-snug text-slate-800">{value}</p>
-            </div>
-          ))}
-        </div>
-
-        {model.reference_glass ? (
-          <button type="button" onClick={onApplyGlass} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100">
+        <div className="flex flex-wrap gap-1.5 sm:justify-end">
+          {model.reference_glass ? <button type="button" onClick={onApplyGlass} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100">
             <Sparkles className="h-3 w-3" /> Usar vidro de referência {model.reference_glass}
-          </button>
-        ) : null}
-
-        <details className="mt-2 rounded-lg border border-slate-200">
-          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold text-slate-700">
-            Classificação, ensaios e perfis
-          </summary>
-          <div className="space-y-3 border-t border-slate-100 p-3">
-            {classifications.length ? (
-              <div className="flex flex-wrap gap-1.5">
-                {classifications.map(([label, value]) => (
-                  <span key={label} className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] text-emerald-800">
-                    <strong>{label}</strong> · {value}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-500">A ficha pública não apresenta classes de desempenho para este modelo.</p>
-            )}
-
-            {(model.tests || []).length ? (
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Configurações ensaiadas</p>
-                <div className="mt-1 space-y-1">
-                  {model.tests.map((test) => (
-                    <p key={`${test.sample}-${test.glass}`} className="rounded-md bg-slate-50 px-2 py-1.5 font-mono text-[10px] text-slate-600">
-                      {test.sample} · vidro {test.glass}
-                      {test.uw ? ` · Uw ${test.uw}` : ""}
-                      {test.wind ? ` · vento ${test.wind}` : ""}
-                      {test.rw ? ` · Rw ${test.rw}` : ""}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {(model.profiles || []).length ? (
-              <p className="text-[10px] leading-relaxed text-slate-500">
-                <strong className="text-slate-700">Perfis publicados:</strong> {model.profiles.join(", ")}
-              </p>
-            ) : null}
-
-            {(model.data_notes || []).map((note) => (
-              <p key={note} className="flex items-start gap-1.5 rounded-md bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
-                <Info className="mt-0.5 h-3 w-3 shrink-0" /> {note}
-              </p>
-            ))}
-
-            <div className="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
-              <p className="text-[10px] leading-relaxed text-slate-400">Valores publicados para configurações de referência. Confirmar no orçamento.</p>
-              <a href={model.source_url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-blue-700 hover:text-blue-900">
-                Ficha oficial <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        </details>
+          </button> : null}
+          <a href={`/catalogo-tecnico?modelo=${encodeURIComponent(analysisId)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-50">
+            Ver classificação <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
       </div>
     </div>
   );

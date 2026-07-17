@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, ArrowRight, Award, BarChart3, BookOpenCheck, Calculator,
   CheckCircle2, Database, ExternalLink, FileSearch, GitCompare, Medal,
@@ -52,7 +52,7 @@ function RankingCard({ model, selected, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-[13rem] flex-1 rounded-2xl border p-3 text-left transition ${selected ? "border-amber-300 bg-white/10 ring-1 ring-amber-300" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}
+      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition sm:min-w-[13rem] ${selected ? "border-amber-300 bg-white/10 ring-1 ring-amber-300" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}
     >
       <div className="flex items-start gap-3">
         <OverallBadge overall={overall} compact />
@@ -116,9 +116,9 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
         <GitCompare className="h-4 w-4 text-blue-700" />
         <h4 className="text-sm font-extrabold text-slate-900">Comparação direta</h4>
       </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
         <ModelSelect value={leftId} models={models} onChange={onLeft} />
-        <span className="font-mono text-[10px] font-bold text-slate-400">VS</span>
+        <span className="text-center font-mono text-[10px] font-bold text-slate-400">VS</span>
         <ModelSelect value={rightId} models={models} onChange={onRight} />
       </div>
 
@@ -146,7 +146,7 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
               </div>
             );
           })}
-          <div className="grid grid-cols-2 gap-2 pt-1 text-[10px]">
+          <div className="grid grid-cols-1 gap-2 pt-1 text-[10px] sm:grid-cols-2">
             <div className="rounded-lg bg-emerald-50 p-2 text-emerald-900">
               <strong>{left.name} superior em</strong><br />{comparison.superior_left.length ? comparison.superior_left.join(", ") : "Nenhum eixo comparável."}
             </div>
@@ -170,7 +170,7 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
 
 function ModelSelect({ value, models, onChange }) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
       {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
     </select>
   );
@@ -223,7 +223,7 @@ function ModelAnalysis({ model }) {
   const unresolvedUses = model.recommendations.filter((item) => item.status === "not_determined");
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <OverallBadge overall={model.overall} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -316,22 +316,27 @@ function InsightList({ title, icon: Icon, items, tone }) {
   );
 }
 
-export default function CatalogIntelligence({ analysis }) {
+export default function CatalogIntelligence({ analysis, initialModelId = "", standalone = false }) {
   const models = analysis?.models || [];
   const ranked = (analysis?.ranking || []).map((id) => analysis.model_index[id]).filter(Boolean);
-  const initialSelected = ranked[0]?.id || models[0]?.id || "";
+  const requestedId = analysis?.aliases?.[initialModelId] || initialModelId;
+  const initialSelected = analysis?.model_index?.[requestedId]?.id || ranked[0]?.id || models[0]?.id || "";
   const [selectedId, setSelectedId] = useState(initialSelected);
   const [leftId, setLeftId] = useState(ranked[0]?.id || models[0]?.id || "");
   const [rightId, setRightId] = useState(ranked[1]?.id || models[1]?.id || "");
+  const [analysisOpen, setAnalysisOpen] = useState(standalone);
+  useEffect(() => {
+    if (requestedId && analysis?.model_index?.[requestedId]) setSelectedId(requestedId);
+  }, [analysis, requestedId]);
   if (!analysis || !models.length) return null;
   const selected = analysis.model_index?.[selectedId] || models[0];
   const spotlight = ranked.length ? ranked.slice(0, 3) : models.slice(0, 3);
 
   return (
-    <section className="mt-4 overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 shadow-xl">
-      <div className="relative p-4 sm:p-5">
+    <section className={`${standalone ? "" : "mt-4"} overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-xl sm:rounded-3xl`}>
+      <div className="relative p-3 sm:p-5">
         <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-600/20 blur-3xl" />
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
+        <div className="relative flex flex-col items-start justify-between gap-3 sm:flex-row">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-300"><Trophy className="h-5 w-5" /></span>
             <div>
@@ -342,7 +347,7 @@ export default function CatalogIntelligence({ analysis }) {
               <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">Comparação rápida com fórmula, norma e fonte em cada nota. É um índice Brico2 auditável — não uma certificação.</p>
             </div>
           </div>
-          <div className="flex gap-2 text-center">
+          <div className="grid w-full grid-cols-3 gap-2 text-center sm:w-auto">
             <Stat value={analysis.stats.catalog_models} label="modelos" />
             <Stat value={analysis.stats.ranked_models} label="no ranking" />
             <Stat value={analysis.stats.models_with_conflicts} label="conflitos" />
@@ -355,16 +360,16 @@ export default function CatalogIntelligence({ analysis }) {
         <WinnerStrip winners={analysis.winners} />
       </div>
 
-      <details className="group border-t border-white/10 bg-slate-900/60">
+      <details open={analysisOpen} onToggle={(event) => setAnalysisOpen(event.currentTarget.open)} className="group border-t border-white/10 bg-slate-900/60">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-extrabold text-white hover:bg-white/[0.03] sm:px-5">
-          <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-300" /> Abrir análise, comparação e auditoria completa</span>
+          <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-300" /> {analysisOpen ? "Ocultar análise detalhada" : "Abrir análise, comparação e auditoria completa"}</span>
           <ArrowRight className="h-4 w-4 text-slate-500 transition group-open:rotate-90" />
         </summary>
-        <div className="space-y-4 border-t border-white/10 bg-slate-100 p-3 sm:p-4">
+        <div className="space-y-4 border-t border-white/10 bg-slate-100 p-2 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-[22rem_1fr]">
-            <div className="space-y-3">
+            <div className="order-2 space-y-3 xl:order-1">
               <ComparisonPanel analysis={analysis} leftId={leftId} rightId={rightId} onLeft={setLeftId} onRight={setRightId} />
-              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 xl:block">
                 <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900"><Database className="h-4 w-4 text-blue-700" /> Todos os modelos</p>
                 <div className="mt-2 space-y-1">
                   {models.map((model) => (
@@ -382,7 +387,15 @@ export default function CatalogIntelligence({ analysis }) {
               </div>
               <MethodologyPanel methodology={analysis.methodology} models={models} />
             </div>
-            <ModelAnalysis model={selected} />
+            <div className="order-1 space-y-3 xl:order-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 xl:hidden">
+                <label htmlFor="catalog-model-mobile" className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Modelo em análise</label>
+                <select id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500">
+                  {models.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.overall.score ?? "N/D"}</option>)}
+                </select>
+              </div>
+              <ModelAnalysis model={selected} />
+            </div>
           </div>
         </div>
       </details>
