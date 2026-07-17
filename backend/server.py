@@ -129,7 +129,49 @@ NEXT_ACTION_MODE = {
     "orcamento_recebido": "reply_to_client",
     "aguarda_cliente": "record_client_decision",
 }
-PREDEFINED_LABELS = ["À medida", "Cliente VIP", "Stock loja", "Encomenda especial", "Garantia", "Reclamação", "Promoção"]
+PREDEFINED_LABELS = [
+    "À medida", "Cliente VIP", "Stock loja", "Encomenda especial", "Garantia", "Reclamação", "Promoção",
+    "Cliente não atendeu", "Fornecedor não atendeu", "Aguarda stock", "Pronto p/ levantamento", "Cliente avisado",
+]
+
+# Registos rápidos: um toque regista o que aconteceu (chamada falhada, aviso ao
+# cliente, stock…) na cronologia, atualiza etiquetas e contadores de tentativas.
+QUICK_LOG_EVENTS = {
+    "cliente_nao_atendeu": {
+        "message": "Cliente não atendeu a chamada", "type": "contact_attempt",
+        "label": "Cliente não atendeu", "counter": "client_no_answer_count",
+    },
+    "cliente_deixou_mensagem": {
+        "message": "Deixada mensagem / SMS ao cliente", "type": "contact_attempt",
+        "counter": "client_no_answer_count",
+    },
+    "cliente_atendeu": {
+        "message": "Falei com o cliente por telefone", "type": "client_contact",
+        "touch_client": True, "clear_labels": ["Cliente não atendeu"],
+        "reset_counter": "client_no_answer_count",
+    },
+    "fornecedor_nao_atendeu": {
+        "message": "Fornecedor não atendeu a chamada", "type": "contact_attempt",
+        "label": "Fornecedor não atendeu", "counter": "supplier_no_answer_count",
+    },
+    "fornecedor_atendeu": {
+        "message": "Falei com o fornecedor por telefone", "type": "supplier_contact",
+        "clear_labels": ["Fornecedor não atendeu"], "reset_counter": "supplier_no_answer_count",
+    },
+    "aguarda_stock": {
+        "message": "Artigo a aguardar reposição de stock", "type": "comment",
+        "label": "Aguarda stock",
+    },
+    "pronto_levantamento": {
+        "message": "Encomenda pronta para levantamento em loja", "type": "comment",
+        "label": "Pronto p/ levantamento", "clear_labels": ["Aguarda stock"],
+    },
+    "cliente_avisado": {
+        "message": "Cliente avisado de que pode levantar a encomenda", "type": "client_contact",
+        "touch_client": True, "label": "Cliente avisado",
+        "clear_labels": ["Cliente não atendeu"], "reset_counter": "client_no_answer_count",
+    },
+}
 
 # ---------- Caixilharia à medida (fornecedor: BandAluminios) ----------
 # Estrutura fiel à ficha oficial de orçamento/encomenda da BandAluminios
@@ -591,6 +633,16 @@ class ContactClientIn(BaseModel):
     message: str = ""
 
 
+class QuickLogIn(BaseModel):
+    event: str
+    message: str = ""
+
+    @field_validator("event")
+    @classmethod
+    def _v_event(cls, v):
+        return _check_choice(v, set(QUICK_LOG_EVENTS), "Registo rápido")
+
+
 class SupplierIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str
@@ -1002,6 +1054,7 @@ async def create_note(payload: NoteIn):
     doc.update({"id": str(uuid.uuid4()), "created_by": AUTHOR, "archived": False,
                 "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
+                "client_no_answer_count": 0, "supplier_no_answer_count": 0,
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido criado para {doc.get('customer_name') or 'cliente'}")
@@ -1101,6 +1154,31 @@ async def contact_client(note_id: str, payload: ContactClientIn):
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
+@api_router.post("/notes/{note_id}/quick-log")
+async def quick_log(note_id: str, payload: QuickLogIn):
+    cfg = QUICK_LOG_EVENTS[payload.event]
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    update = {"$set": {"updated_at": now_iso()}}
+    if cfg.get("touch_client"):
+        update["$set"]["last_client_contact_at"] = now_iso()
+    if cfg.get("reset_counter"):
+        update["$set"][cfg["reset_counter"]] = 0
+    if cfg.get("counter"):
+        update["$inc"] = {cfg["counter"]: 1}
+    if cfg.get("label"):
+        update["$addToSet"] = {"labels": cfg["label"]}
+    await db.notes.update_one({"id": note_id}, update)
+    clear = [lbl for lbl in cfg.get("clear_labels", []) if lbl != cfg.get("label")]
+    if clear:
+        await db.notes.update_one({"id": note_id}, {"$pull": {"labels": {"$in": clear}}})
+    extra = payload.message.strip()
+    msg = cfg["message"] + (f" — {extra}" if extra else "")
+    await log_activity(note_id, cfg["type"], msg, {"event": payload.event})
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
 @api_router.post("/notes/{note_id}/duplicate")
 async def duplicate_note(note_id: str):
     src = await db.notes.find_one({"id": note_id}, {"_id": 0})
@@ -1113,6 +1191,7 @@ async def duplicate_note(note_id: str):
                 "reminder_interval_days": src.get("reminder_interval_days", 3), "favorite": False,
                 "archived": False, "created_by": AUTHOR, "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
+                "client_no_answer_count": 0, "supplier_no_answer_count": 0,
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido duplicado de {src.get('customer_name') or 'pedido anterior'}")
@@ -1742,16 +1821,17 @@ async def note_preflight(note_id: str):
     pt = detect_product_type(n)
     checklist = PRODUCT_TYPES.get(pt, {}).get(
         "checklist", ["Descrição do artigo", "Quantidade", "Medidas", "Referência"])
-    # Só bloqueia campos realmente relevantes ao tipo de produto. Antes, todos
-    # os pedidos eram marcados como incompletos por não terem, por exemplo, cor
-    # ou medidas — mesmo quando esses campos não se aplicavam.
+    # Só bloqueia campos realmente relevantes ao tipo de produto. Medidas e cor
+    # deixaram de ser campos do pedido de loja (produtos com medidas seguem o
+    # fluxo de caixilharia à medida), pelo que nunca são exigidos aqui —
+    # detalhes desse género vão na descrição ou nas notas.
     requirements = {
-        "janela": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor / acabamento")],
-        "porta": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor / acabamento")],
-        "rede": [("measurements", "Medidas"), ("quantity", "Quantidade"), ("color", "Cor do perfil")],
-        "madeira": [("measurements", "Dimensões"), ("quantity", "Quantidade")],
+        "janela": [("quantity", "Quantidade")],
+        "porta": [("quantity", "Quantidade")],
+        "rede": [("quantity", "Quantidade")],
+        "madeira": [("quantity", "Quantidade")],
         "sanitario": [("reference", "Referência / modelo"), ("quantity", "Quantidade")],
-        "tinta": [("quantity", "Litros / quantidade"), ("color", "Cor / código")],
+        "tinta": [("quantity", "Litros / quantidade")],
         "jardim_prod": [("quantity", "Quantidade")],
     }
     missing = [label for field, label in requirements.get(pt, [("quantity", "Quantidade")])
@@ -2194,7 +2274,8 @@ async def migrate():
                 "supplier_id": "", "email": "", "reference": "", "archived": False,
                 "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "quantity": "", "color": "", "reminder_interval_days": 3,
-                "reminder_count": 0, "last_reminder_at": "", "auto_closed": False}
+                "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
+                "client_no_answer_count": 0, "supplier_no_answer_count": 0}
     for k, v in defaults.items():
         await db.notes.update_many({k: {"$exists": False}}, {"$set": {k: v}})
     await db.notes.update_many({"status": {"$in": list(ARCHIVE_STATUSES)}, "archived": {"$ne": True}}, {"$set": {"archived": True}})
