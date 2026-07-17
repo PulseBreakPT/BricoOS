@@ -103,7 +103,7 @@ export function buildEmail(note) {
   const subject = `Pedido de cotação ${reference} — ${description}`;
   const lines = [`${greeting()} Exmos. Senhores,`, "",
     `Venho por este meio solicitar um pedido de cotação para ${article}:`, "",
-    `Referência do pedido: ${reference}`, `Artigo: ${description}`];
+    `Artigo: ${description}`];
   if (note.reference) lines.push(`Referência do artigo: ${note.reference}`);
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
@@ -119,7 +119,7 @@ export function buildReminder(note) {
   const subject = `Lembrete · Pedido de cotação ${reference} — ${note.description || "artigo"}`;
   const lines = [`${greeting()} Exmos. Senhores,`, "",
     `Venho por este meio reforçar o pedido de cotação enviado anteriormente com a referência ${reference}:`, "",
-    `Referência do pedido: ${reference}`, `Artigo: ${note.description || "-"}`];
+    `Artigo: ${note.description || "-"}`];
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
   lines.push("", "Agradeço, por favor, indicação de:", "• Preço;", "• Prazo de entrega;", "• Disponibilidade.", "",

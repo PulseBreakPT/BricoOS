@@ -53,7 +53,7 @@ def supplier_quote_template(note, is_reminder=False, now=None):
         )
     else:
         lines.append(f"Venho por este meio solicitar um pedido de cotação para {article}:")
-    lines += ["", f"Referência do pedido: {reference}", f"Artigo: {description}"]
+    lines += ["", f"Artigo: {description}"]
 
     product_reference = (note.get("reference") or "").strip()
     if product_reference:

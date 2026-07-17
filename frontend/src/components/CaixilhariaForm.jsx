@@ -65,6 +65,20 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
     setExpandedLineId(copy.id);
     updateLines([...normalized.linhas.slice(0, lineIndex + 1), copy, ...normalized.linhas.slice(lineIndex + 1)]);
   };
+  // Sugestão: depois de medir uma janela/porta, oferece adicionar a rede
+  // mosquiteira ou portada correspondente já com as mesmas medidas.
+  const addCompanionLine = (lineIndex, product) => {
+    const source = normalized.linhas[lineIndex];
+    const companion = createCaixLine(product, {
+      largura_mm: source.largura_mm,
+      altura_mm: source.altura_mm,
+      unidade_entrada: source.unidade_entrada,
+      quantidade: source.quantidade,
+      nome: source.nome ? `${source.nome} — ${catalog.produtos[product] || ""}`.trim() : "",
+    });
+    setExpandedLineId(companion.id);
+    updateLines([...normalized.linhas.slice(0, lineIndex + 1), companion, ...normalized.linhas.slice(lineIndex + 1)]);
+  };
   const removeLine = (lineIndex) => {
     if (normalized.linhas.length === 1) return;
     const remaining = normalized.linhas.filter((_, index) => index !== lineIndex);
@@ -184,39 +198,17 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
         </div>
       ) : null}
 
-      <div className="mt-5 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">1</span>
-        <h3 className="font-heading text-sm font-bold text-slate-900">Tipo de pedido</h3>
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {[['orcamento', 'Orçamento'], ['encomenda', 'Encomenda']].map(([key, label]) => {
-          const disabled = key === "encomenda" && hasComparisons;
-          return (
-            <button
-              key={key}
-              type="button"
-              data-testid={`caix-tipo-${key}`}
-              onClick={() => !disabled && setTop("tipo_pedido", key)}
-              disabled={disabled}
-              title={disabled ? "Remova as alternativas antes de transformar em encomenda" : ""}
-              className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 ${normalized.tipo_pedido === key ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600"}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
       {hasComparisons ? (
-        <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2.5 text-xs text-blue-700">
+        <p className="mt-5 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2.5 text-xs text-blue-700">
           <GitCompare className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           Este é um pedido comparativo. O email pedirá um preço separado para cada opção.
         </p>
       ) : null}
 
-      <div className="mt-6 flex items-end justify-between gap-3">
+      <div className={`flex items-end justify-between gap-3 ${hasComparisons ? "mt-4" : "mt-5"}`}>
         <div className="min-w-0">
           <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">2</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">1</span>
             <Layers3 className="h-4 w-4" /> Elementos do pedido
           </h3>
           <p className="mt-1 text-xs text-slate-500">Abra apenas o elemento que está a editar.</p>
@@ -332,7 +324,21 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                 </p>
               ) : null}
 
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {["janela", "porta"].includes(line.produto) && line.largura_mm && line.altura_mm ? (
+                <div className="mt-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3">
+                  <p className="text-xs font-semibold text-blue-800">Quer incluir rede mosquiteira ou portada com as mesmas medidas?</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button type="button" data-testid={`caix-line-${lineIndex}-add-rede`} variant="outline" size="sm" onClick={() => addCompanionLine(lineIndex, "rede_mosquiteira")} className="h-8 rounded-lg text-xs">
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Rede mosquiteira
+                    </Button>
+                    <Button type="button" data-testid={`caix-line-${lineIndex}-add-portada`} variant="outline" size="sm" onClick={() => addCompanionLine(lineIndex, "portada")} className="h-8 rounded-lg text-xs">
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Portada
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Tipo de abertura</Label>
                   <Select value={line.tipo_abertura || "none"} onValueChange={(value) => pickOpeningType(lineIndex, value === "none" ? "" : value)}>
@@ -424,7 +430,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
       </div>
 
       <div className="mt-6 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">3</span>
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">2</span>
         <h3 className="font-heading text-sm font-bold text-slate-900">Finalizar</h3>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_11rem]">
@@ -540,7 +546,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Vidro / painéis</Label>
                   <Select value={option.material || "none"} onValueChange={(value) => onSet("material", value === "none" ? "" : value)}>
@@ -562,7 +568,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   <span><strong>{catalog.vidros[option.material].benefit}</strong> {catalog.vidros[option.material].typical_use}</span>
                 </p>
               ) : null}
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Cor do aro</Label>
                   <Input value={option.cor_aro} onChange={(event) => onSet("cor_aro", event.target.value)} placeholder="Ex.: Branco RAL 9016" />
@@ -572,7 +578,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   <Input value={option.cor_folha} onChange={(event) => onSet("cor_folha", event.target.value)} placeholder="Ex.: Branco RAL 9016" />
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <OptionSelect
                   label="Quadrícula decorativa"
                   value={option.quadricula}
@@ -592,7 +598,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   />
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <OptionSelect label="Fechadura" value={option.fechadura} options={catalog.fechaduras} onChange={(value) => onSet("fechadura", value)} />
                 <OptionSelect label="Muletas" value={option.muletas} options={catalog.muletas} onChange={(value) => onSet("muletas", value)} />
                 <OptionSelect label="Estore" value={option.estore} options={catalog.estores} onChange={(value) => onSet("estore", value)} />
