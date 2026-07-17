@@ -43,13 +43,16 @@ segredos seguros, faz build de tudo e instala o comando global `brico2`.
 Depois de fazeres merge de um PR no GitHub, no terminal do VPS:
 
 ```bash
-sudo brico2            # tudo (backend + frontend)
-sudo brico2 backend    # só a API (mais rápido)
-sudo brico2 web        # só o frontend
+sudo brico2            # atualiza e reconstrói só o que mudou (backend e/ou frontend)
+sudo brico2 backend    # força só a API
+sudo brico2 web        # força só o frontend
+sudo brico2 all        # força os dois, mesmo sem alterações relevantes
 ```
 
 O comando faz `git fetch origin main` + `git reset --hard origin/main`
-(fica exatamente com o último merge em `main`) e reconstrói os containers.
+(fica exatamente com o último merge em `main`) e, por omissão, só reconstrói
+o(s) serviço(s) cujos ficheiros mudaram desde a última vez — muito mais
+rápido quando um PR só mexe no backend ou só no frontend.
 
 Alternativa sem o comando global:
 
