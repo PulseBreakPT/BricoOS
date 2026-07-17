@@ -20,3 +20,10 @@ python-dotenv>=1.0.1
 google-auth>=2.55.0
 google-auth-oauthlib>=1.4.0
 google-api-python-client>=2.190.0
+
+# Conversor de orçamentos PDF (quote_pdf.py): leitura do PDF do fornecedor,
+# geração do PDF de venda, e upload multipart (FastAPI exige python-multipart
+# no arranque para as rotas com UploadFile).
+pymupdf>=1.26
+reportlab>=4.1
+python-multipart>=0.0.9
