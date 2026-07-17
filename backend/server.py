@@ -666,6 +666,22 @@ class QuickLogIn(BaseModel):
         return _check_choice(v, set(QUICK_LOG_EVENTS), "Registo rápido")
 
 
+class SupplierContact(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = ""
+    phone: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v):
+        return (v or "").strip()
+
+    @field_validator("phone")
+    @classmethod
+    def _v_phone(cls, v):
+        return normalize_phone(v)
+
+
 class SupplierIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str
@@ -673,6 +689,7 @@ class SupplierIn(BaseModel):
     phone: str = ""
     category: str = ""
     notes: str = ""
+    contacts: List[SupplierContact] = []
 
     @field_validator("name")
     @classmethod
