@@ -17,6 +17,7 @@ import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
 
 const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", contacts: [] };
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Formato internacional (com indicativo) do PhoneInput → link de WhatsApp.
 // Números antigos sem indicativo assumem Portugal, tal como o "tel:".
@@ -41,6 +42,15 @@ function PhoneActions({ phone }) {
   );
 }
 
+function EmailAction({ email }) {
+  if (!email) return null;
+  return (
+    <a href={`mailto:${email}`} title="Enviar email" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+      <Mail className="h-3.5 w-3.5" />
+    </a>
+  );
+}
+
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState([]);
   const [open, setOpen] = useState(false);
@@ -61,9 +71,13 @@ export default function Suppliers() {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
-  const openEdit = (s) => { setEditing(s); setForm({ ...empty, ...s, contacts: s.contacts || [] }); setOpen(true); };
+  const openEdit = (s) => {
+    setEditing(s);
+    setForm({ ...empty, ...s, contacts: (s.contacts || []).map((c) => ({ name: "", phone: "", email: "", ...c })) });
+    setOpen(true);
+  };
 
-  const addContact = () => setForm((f) => ({ ...f, contacts: [...(f.contacts || []), { name: "", phone: "" }] }));
+  const addContact = () => setForm((f) => ({ ...f, contacts: [...(f.contacts || []), { name: "", phone: "", email: "" }] }));
   const updateContact = (i, k, v) => setForm((f) => ({
     ...f, contacts: f.contacts.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)),
   }));
@@ -71,7 +85,7 @@ export default function Suppliers() {
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("Indique o nome do fornecedor."); return; }
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    if (form.email && !EMAIL_RX.test(form.email.trim())) {
       toast.error("O email do fornecedor não parece válido.");
       return;
     }
@@ -80,11 +94,15 @@ export default function Suppliers() {
       return;
     }
     const contacts = (form.contacts || [])
-      .map((c) => ({ name: (c.name || "").trim(), phone: (c.phone || "").trim() }))
-      .filter((c) => c.name || c.phone);
+      .map((c) => ({ name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim() }))
+      .filter((c) => c.name || c.phone || c.email);
     for (const c of contacts) {
       if (c.phone && c.phone.replace(/\D/g, "").length < 9) {
         toast.error(`O telefone de ${c.name || "contacto"} parece incompleto.`);
+        return;
+      }
+      if (c.email && !EMAIL_RX.test(c.email)) {
+        toast.error(`O email de ${c.name || "contacto"} não parece válido.`);
         return;
       }
     }
@@ -168,9 +186,12 @@ export default function Suppliers() {
                 </div>
               </div>
               <div className="mt-3 space-y-1.5 pl-2 text-sm">
-                <p className="flex items-center gap-2 text-slate-600">
-                  <Mail className="h-3.5 w-3.5 text-slate-400" />
-                  {s.email ? <span className="font-mono text-xs">{s.email}</span> : <span className="text-xs text-red-400">Sem email definido</span>}
+                <p className="flex items-center justify-between gap-2 text-slate-600">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    {s.email ? <span className="truncate font-mono text-xs">{s.email}</span> : <span className="text-xs text-red-400">Sem email definido</span>}
+                  </span>
+                  <EmailAction email={s.email} />
                 </p>
                 {s.phone ? (
                   <p className="flex items-center justify-between gap-2 text-slate-600">
@@ -180,16 +201,21 @@ export default function Suppliers() {
                     <PhoneActions phone={s.phone} />
                   </p>
                 ) : null}
-                {(s.contacts || []).filter((c) => c.phone).map((c, i) => (
+                {(s.contacts || []).filter((c) => c.phone || c.email).map((c, i) => (
                   <p key={i} className="flex items-center justify-between gap-2 text-slate-600">
                     <span className="flex min-w-0 items-center gap-2">
                       <Phone className="h-3.5 w-3.5 shrink-0 text-slate-300" />
                       <span className="truncate text-xs">
-                        {c.name ? <span className="font-semibold">{c.name}</span> : null}{c.name ? " · " : ""}
-                        <span className="font-mono">{c.phone}</span>
+                        {c.name ? <span className="font-semibold">{c.name}</span> : null}{c.name && (c.phone || c.email) ? " · " : ""}
+                        {c.phone ? <span className="font-mono">{c.phone}</span> : null}
+                        {c.phone && c.email ? " · " : ""}
+                        {c.email ? <span className="font-mono">{c.email}</span> : null}
                       </span>
                     </span>
-                    <PhoneActions phone={c.phone} />
+                    <span className="flex shrink-0 items-center gap-1">
+                      <PhoneActions phone={c.phone} />
+                      <EmailAction email={c.email} />
+                    </span>
                   </p>
                 ))}
                 {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
@@ -269,7 +295,7 @@ export default function Suppliers() {
                 </Button>
               </div>
               {(form.contacts || []).length === 0 ? (
-                <p className="text-xs text-slate-400">Ex.: número pessoal da Camila, do Jorge, etc.</p>
+                <p className="text-xs text-slate-400">Ex.: número/email pessoal da Camila, do Jorge, etc.</p>
               ) : (
                 <div className="space-y-2">
                   {form.contacts.map((c, i) => (
@@ -287,6 +313,13 @@ export default function Suppliers() {
                           value={c.phone}
                           onChange={(v) => updateContact(i, "phone", v)}
                           placeholder="912345678"
+                        />
+                        <Input
+                          data-testid={`supplier-contact-email-${i}`}
+                          value={c.email}
+                          onChange={(e) => updateContact(i, "email", e.target.value)}
+                          placeholder="email@fornecedor.pt"
+                          className="h-8 font-mono text-sm"
                         />
                       </div>
                       <button
