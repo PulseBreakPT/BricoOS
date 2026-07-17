@@ -61,11 +61,11 @@ function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 transition-shadow ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
+      className={`flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 transition-shadow sm:shrink-0 ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
     >
       {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
-      <span className="text-lg font-extrabold tabular-nums">{value}</span>
-      <span className="text-xs font-semibold opacity-80">{label}</span>
+      <span className="shrink-0 text-lg font-extrabold tabular-nums">{value}</span>
+      <span className="truncate text-xs font-semibold opacity-80">{label}</span>
     </Tag>
   );
 }
@@ -307,9 +307,9 @@ export default function Notes() {
         </p>
       </div>
 
-      {/* Resumo do dia — cada chip com filtro aplica-o diretamente na lista */}
+      {/* Resumo do dia — grelha compacta no telemóvel, sem scroll horizontal */}
       {today ? (
-        <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} active={preset === "novos"} onClick={() => setPreset(preset === "novos" ? "todos" : "novos")} />
           <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
           <SummaryChip label="a tratar por mim" value={counts.waiting_me ?? 0} tone="blue" icon={Zap} active={preset === "waiting_me"} onClick={() => setPreset(preset === "waiting_me" ? "todos" : "waiting_me")} />
