@@ -68,7 +68,7 @@ export default function Catalog() {
           </div>
         </div>
 
-        <div className="flex h-3 items-end gap-2 overflow-hidden border-t border-white/10 px-4 sm:px-6">
+        <div className="flex h-3 items-end justify-between overflow-hidden border-t border-white/10 px-4 sm:px-6">
           {Array.from({ length: 32 }).map((_, index) => (
             <span key={index} className={`block w-px shrink-0 bg-amber-300/50 ${index % 5 === 0 ? "h-3" : "h-1.5"}`} />
           ))}
