@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { Trash2, Loader2, AlertTriangle, Building2 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import CaixilhariaForm, {
-  createEmptyCaixilharia, getCaixilhariaCatalog, normalizeCaixilhariaSpec, validateCaixilhariaSpec,
+  caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog, normalizeCaixilhariaSpec,
+  validateCaixilhariaSpec,
 } from "@/components/CaixilhariaForm";
 
 export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers, onSaved }) {
@@ -18,6 +19,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
 
   const hasSpec = Boolean(note?.caixilharia);
   const bandSupplier = (suppliers || []).find((s) => /band/i.test(s.name || ""));
+  const requestSummary = catalog ? caixilhariaLabels(catalog, spec) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -77,18 +79,18 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="caixilharia-dialog"
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-4xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-5xl"
       >
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
-          <DialogTitle className="font-heading text-lg font-bold tracking-tight sm:text-xl">
+        <DialogHeader className="shrink-0 border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
+          <DialogTitle className="pr-8 font-heading text-base font-bold tracking-tight sm:text-xl">
             Caixilharia à medida — BandAluminios
           </DialogTitle>
-          <DialogDescription className="text-sm text-slate-500">
+          <DialogDescription className="pr-8 text-xs text-slate-500 sm:text-sm">
             Combine vários elementos e compare PVC com alumínio no mesmo pedido.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-3 sm:px-6 sm:py-5">
           {!catalog ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
           ) : (
@@ -122,11 +124,16 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
           )}
         </div>
 
-        <div className="shrink-0 border-t border-slate-100 px-4 py-3 sm:px-6">
+        <div className="shrink-0 border-t border-slate-100 bg-white px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2.5 sm:px-6 sm:py-3">
+          <div className="mb-2 flex items-center justify-between gap-3 text-[10px] text-slate-500 sm:hidden">
+            <span className="truncate font-bold text-slate-700">{requestSummary?.produto || "Pedido por preencher"}</span>
+            <span className="shrink-0">{requestSummary?.option_count || 0} opção{requestSummary?.option_count === 1 ? "" : "ões"}</span>
+          </div>
           <div className="flex items-center gap-2">
             <Button data-testid="caix-save" onClick={save} disabled={saving || !catalog} className="flex-1 rounded-xl">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {hasSpec ? "Guardar alterações" : "Guardar especificação"}
+              <span className="sm:hidden">Guardar</span>
+              <span className="hidden sm:inline">{hasSpec ? "Guardar alterações" : "Guardar especificação"}</span>
             </Button>
             {hasSpec ? (
               <Button data-testid="caix-remove" variant="outline" onClick={remove} className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
