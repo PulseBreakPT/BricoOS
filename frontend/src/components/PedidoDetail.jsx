@@ -541,20 +541,26 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const setSqItem = (n, patch) => {
     setSq((q) => ({ ...q, items: q.items.map((i) => (i.n === n ? { ...i, ...patch } : i)) }));
   };
-  const applySqMargin = (margin) => {
+  // Margem por linha (PVC 15% · alumínio/redes/portadas 18%, editável).
+  // Arredonda para cima ao euro — igual ao servidor — para não comer a margem.
+  const applyItemMargin = (n, pct) => {
     setSq((q) => ({
-      ...q, margin,
-      items: q.items.map((i) => (i.supplier_unit_price
-        ? { ...i, client_price: Math.round(i.supplier_unit_price * 1.23 * margin) }
-        : i)),
+      ...q,
+      items: q.items.map((i) => {
+        if (i.n !== n) return i;
+        const price = i.supplier_unit_price
+          ? Math.ceil(i.supplier_unit_price * 1.23 * (1 + (parseFloat(pct) || 0) / 100))
+          : i.client_price;
+        return { ...i, margin_pct: pct, client_price: price };
+      }),
     }));
   };
   const saveSupplierQuote = async () => {
     await api.put(`/notes/${id}/supplier-quote`, {
-      margin: parseFloat(sq.margin) || 2,
-      items: sq.items.map(({ n, description, qty, client_price, include }) => ({
+      items: sq.items.map(({ n, description, qty, client_price, margin_pct, include }) => ({
         n, description, qty: parseInt(qty, 10) || 1,
-        client_price: parseFloat(client_price) || 0, include: include !== false,
+        client_price: parseFloat(client_price) || 0,
+        margin_pct: parseFloat(margin_pct) || 18, include: include !== false,
       })),
     });
   };
@@ -1110,22 +1116,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
                 {sq ? (
                   <div className="mt-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                       <p>
                         <span className="font-bold text-slate-900">{sq.quote_number}</span>
                         {sq.date ? ` · ${sq.date}` : ""}{sq.obra ? ` · Obra ${sq.obra}` : ""} · {sq.items.length} linha(s)
                         {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
                       </p>
-                      <label className="flex items-center gap-1.5 font-semibold">
-                        Margem ×
-                        <Input
-                          data-testid="sq-margin"
-                          type="number" min="0.5" step="0.1"
-                          value={sq.margin}
-                          onChange={(e) => applySqMargin(parseFloat(e.target.value) || 2)}
-                          className="h-8 w-20 rounded-lg font-mono text-xs"
-                        />
-                      </label>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — ajustáveis linha a linha.
+                      </p>
                     </div>
 
                     <div className="mt-3 space-y-3">
@@ -1155,10 +1154,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   <Input data-testid={`sq-qty-${i.n}`} type="number" min="1" value={i.qty} onChange={(e) => setSqItem(i.n, { qty: e.target.value })} className="mt-0.5 h-8 w-16 rounded-lg font-mono text-xs" />
                                 </label>
                                 <label className="text-[11px] font-semibold text-slate-500">
+                                  Margem %
+                                  <Input data-testid={`sq-margin-${i.n}`} type="number" min="0" max="95" step="0.5" value={i.margin_pct ?? 18} onChange={(e) => applyItemMargin(i.n, e.target.value)} className="mt-0.5 h-8 w-20 rounded-lg font-mono text-xs" />
+                                </label>
+                                <label className="text-[11px] font-semibold text-slate-500">
                                   PVP/ud. (€, c/ IVA)
                                   <Input data-testid={`sq-price-${i.n}`} type="number" min="0" step="0.01" value={i.client_price} onChange={(e) => setSqItem(i.n, { client_price: e.target.value })} className="mt-0.5 h-8 w-24 rounded-lg font-mono text-xs" />
                                 </label>
                                 <p className="ml-auto text-[11px] text-slate-400">
+                                  <span data-testid={`sq-material-${i.n}`} className="mr-1.5 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{i.material_label || "Alumínio"}</span>
                                   Custo: <span className="font-mono">{i.supplier_unit_price != null ? Number(i.supplier_unit_price).toFixed(2) : "—"} €</span> s/ IVA
                                   <span className="mx-1.5">·</span>
                                   Total: <span className="font-mono font-bold text-slate-700">{(((parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1))).toFixed(2)} €</span>
