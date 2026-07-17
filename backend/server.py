@@ -34,8 +34,8 @@ try:
         material_labels as caixilharia_material_labels,
     )
     from quote_pdf import (
-        DEFAULT_MARGIN as QUOTE_DEFAULT_MARGIN,
-        build_client_pdf, parse_supplier_pdf, suggest_client_price,
+        build_client_pdf, detect_material, margin_for_material, material_label,
+        parse_supplier_pdf, suggest_client_price,
     )
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
@@ -54,8 +54,8 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         material_labels as caixilharia_material_labels,
     )
     from .quote_pdf import (
-        DEFAULT_MARGIN as QUOTE_DEFAULT_MARGIN,
-        build_client_pdf, parse_supplier_pdf, suggest_client_price,
+        build_client_pdf, detect_material, margin_for_material, material_label,
+        parse_supplier_pdf, suggest_client_price,
     )
 
 from google_auth_oauthlib.flow import Flow
@@ -1649,12 +1649,12 @@ class SupplierQuoteItemIn(BaseModel):
     description: str = ""
     qty: int = 1
     client_price: float = 0.0
+    margin_pct: float = 18.0
     include: bool = True
 
 
 class SupplierQuoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    margin: float = QUOTE_DEFAULT_MARGIN
     items: List[SupplierQuoteItemIn] = []
 
 
@@ -1681,9 +1681,15 @@ async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
         "filename": file.filename or "orcamento_fornecedor.pdf",
         "content_b64": base64.b64encode(data).decode(), "created_at": now_iso()})
     for item in parsed["items"]:
-        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"))
+        material = detect_material(item.get("description"))
+        item["material"] = material
+        item["material_label"] = material_label(material)
+        item["margin_pct"] = margin_for_material(material)
+        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
         item["include"] = True
-    supplier_quote = {**parsed, "margin": QUOTE_DEFAULT_MARGIN,
+    supplier_quote = {**parsed,
+                      "margin_rules": {"pvc": margin_for_material("pvc"),
+                                       "aluminio": margin_for_material("aluminio")},
                       "source_file_id": file_id, "imported_at": now_iso()}
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote": supplier_quote, "updated_at": now_iso()}})
@@ -1717,8 +1723,8 @@ async def update_supplier_quote(note_id: str, payload: SupplierQuoteIn):
         item["description"] = edit.description.strip() or item["description"]
         item["qty"] = max(1, edit.qty)
         item["client_price"] = max(0.0, round(edit.client_price, 2))
+        item["margin_pct"] = min(max(edit.margin_pct, 0.0), 95.0)
         item["include"] = edit.include
-    supplier_quote["margin"] = max(0.1, payload.margin)
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote": supplier_quote, "updated_at": now_iso()}})
     return {"ok": True, "supplier_quote": supplier_quote}

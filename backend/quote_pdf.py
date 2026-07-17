@@ -9,7 +9,9 @@ total único com IVA incluído — réplica do documento que a loja já fazia à
 
 import base64
 import io
+import math
 import re
+import unicodedata
 
 import fitz  # PyMuPDF
 from reportlab.lib import colors
@@ -22,7 +24,19 @@ from reportlab.platypus import (
 )
 
 IVA_RATE = 0.23
-DEFAULT_MARGIN = 2.0
+
+# Margens da loja sobre o custo do fornecedor: PVC 15%; alumínio, redes
+# mosquiteiras e portadas 18%. O material é detetado pela descrição da linha
+# (as séries vêm do catálogo BandAluminios: Euro-Design/Slinova são PVC;
+# SB/Thermostop/Thermoline/Confort e as Portadas HP são alumínio).
+MARGIN_PVC_PCT = 15.0
+MARGIN_ALU_PCT = 18.0
+
+MATERIAL_MARGINS = {"pvc": MARGIN_PVC_PCT, "aluminio": MARGIN_ALU_PCT,
+                    "portada": MARGIN_ALU_PCT, "rede": MARGIN_ALU_PCT}
+MATERIAL_LABELS = {"pvc": "PVC", "aluminio": "Alumínio",
+                   "portada": "Portada", "rede": "Rede mosquiteira"}
+_PVC_HINTS = ("pvc", "euro-design", "eurodesign", "slinova")
 
 # Fronteiras horizontais (pontos PDF) das colunas da tabela BandAluminios,
 # medidas em orçamentos reais. O Nº fica à esquerda de X_DESC; o gráfico
@@ -58,11 +72,43 @@ def format_pt_price(value):
     return f"{value:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
 
 
-def suggest_client_price(supplier_unit_price, margin=DEFAULT_MARGIN):
-    """Preço de venda sugerido: custo × (1+IVA) × margem, arredondado ao euro."""
+def _fold(text):
+    normalized = unicodedata.normalize("NFKD", text or "")
+    return "".join(c for c in normalized if not unicodedata.combining(c)).lower()
+
+
+def detect_material(description):
+    """Classifica a linha para escolher a margem: pvc | aluminio | portada | rede."""
+    d = _fold(description)
+    if "mosquit" in d or re.search(r"\brede\b", d):
+        return "rede"
+    if "portada" in d:
+        return "portada"
+    if any(hint in d for hint in _PVC_HINTS):
+        return "pvc"
+    # As restantes séries BandAluminios (SB, Thermostop, Thermoline, Confort…)
+    # são alumínio — e na dúvida aplica-se também a margem de alumínio.
+    return "aluminio"
+
+
+def margin_for_material(material):
+    return MATERIAL_MARGINS.get(material, MARGIN_ALU_PCT)
+
+
+def material_label(material):
+    return MATERIAL_LABELS.get(material, "Alumínio")
+
+
+def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_ALU_PCT):
+    """Preço de venda sugerido: custo × (1+IVA) × (1+margem).
+
+    Arredonda sempre PARA CIMA ao euro — nunca para baixo, para o
+    arredondamento não comer a margem.
+    """
     if not supplier_unit_price or supplier_unit_price <= 0:
         return 0.0
-    return float(round(supplier_unit_price * (1 + IVA_RATE) * margin))
+    exact = supplier_unit_price * (1 + IVA_RATE) * (1 + margin_pct / 100)
+    return float(math.ceil(round(exact, 2)))
 
 
 def _header_field(text, pattern):
