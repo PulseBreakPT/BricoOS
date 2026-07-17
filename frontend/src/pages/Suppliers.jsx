@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Mail, Phone, Trash2, Pencil, Truck, Loader2, Receipt, ClipboardList } from "lucide-react";
+import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Loader2, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,33 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
 
-const empty = { name: "", email: "", phone: "", category: "construcao", notes: "" };
+const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", contacts: [] };
+
+// Formato internacional (com indicativo) do PhoneInput → link de WhatsApp.
+// Números antigos sem indicativo assumem Portugal, tal como o "tel:".
+function waLink(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  return `https://wa.me/${phone.trim().startsWith("+") ? digits : `351${digits}`}`;
+}
+
+function PhoneActions({ phone }) {
+  const wa = waLink(phone);
+  if (!wa) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <a href={`tel:${phone}`} title="Ligar" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+        <Phone className="h-3.5 w-3.5" />
+      </a>
+      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">
+        <MessageCircle className="h-3.5 w-3.5" />
+      </a>
+    </span>
+  );
+}
 
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState([]);
@@ -37,7 +61,13 @@ export default function Suppliers() {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
-  const openEdit = (s) => { setEditing(s); setForm({ ...empty, ...s }); setOpen(true); };
+  const openEdit = (s) => { setEditing(s); setForm({ ...empty, ...s, contacts: s.contacts || [] }); setOpen(true); };
+
+  const addContact = () => setForm((f) => ({ ...f, contacts: [...(f.contacts || []), { name: "", phone: "" }] }));
+  const updateContact = (i, k, v) => setForm((f) => ({
+    ...f, contacts: f.contacts.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)),
+  }));
+  const removeContact = (i) => setForm((f) => ({ ...f, contacts: f.contacts.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("Indique o nome do fornecedor."); return; }
@@ -49,9 +79,18 @@ export default function Suppliers() {
       toast.error("O telefone do fornecedor parece incompleto.");
       return;
     }
+    const contacts = (form.contacts || [])
+      .map((c) => ({ name: (c.name || "").trim(), phone: (c.phone || "").trim() }))
+      .filter((c) => c.name || c.phone);
+    for (const c of contacts) {
+      if (c.phone && c.phone.replace(/\D/g, "").length < 9) {
+        toast.error(`O telefone de ${c.name || "contacto"} parece incompleto.`);
+        return;
+      }
+    }
     setSaving(true);
     try {
-      const payload = { ...form, name: form.name.trim(), email: form.email.trim() };
+      const payload = { ...form, name: form.name.trim(), email: form.email.trim(), contacts };
       if (editing) await api.put(`/suppliers/${editing.id}`, payload);
       else await api.post("/suppliers", payload);
       toast.success(editing ? "Fornecedor atualizado" : "Fornecedor adicionado");
@@ -134,10 +173,25 @@ export default function Suppliers() {
                   {s.email ? <span className="font-mono text-xs">{s.email}</span> : <span className="text-xs text-red-400">Sem email definido</span>}
                 </p>
                 {s.phone ? (
-                  <p className="flex items-center gap-2 text-slate-600">
-                    <Phone className="h-3.5 w-3.5 text-slate-400" /> <span className="font-mono text-xs">{s.phone}</span>
+                  <p className="flex items-center justify-between gap-2 text-slate-600">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" /> <span className="truncate font-mono text-xs">{s.phone}</span>
+                    </span>
+                    <PhoneActions phone={s.phone} />
                   </p>
                 ) : null}
+                {(s.contacts || []).filter((c) => c.phone).map((c, i) => (
+                  <p key={i} className="flex items-center justify-between gap-2 text-slate-600">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                      <span className="truncate text-xs">
+                        {c.name ? <span className="font-semibold">{c.name}</span> : null}{c.name ? " · " : ""}
+                        <span className="font-mono">{c.phone}</span>
+                      </span>
+                    </span>
+                    <PhoneActions phone={c.phone} />
+                  </p>
+                ))}
                 {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
               </div>
               {(s.open_notes > 0 || s.quotes_given > 0) ? (
@@ -193,21 +247,62 @@ export default function Suppliers() {
               <Label>Email</Label>
               <Input data-testid="supplier-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="geral@fornecedor.pt" className="font-mono" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Telefone</Label>
-                <Input data-testid="supplier-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="912 345 678" className="font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Secção</Label>
-                <Select value={form.category} onValueChange={(v) => set("category", v)}>
-                  <SelectTrigger data-testid="supplier-category"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label>Telefone principal</Label>
+              <PhoneInput testId="supplier-phone" value={form.phone} onChange={(v) => set("phone", v)} placeholder="912345678" />
             </div>
+            <div className="space-y-1.5">
+              <Label>Secção</Label>
+              <Select value={form.category} onValueChange={(v) => set("category", v)}>
+                <SelectTrigger data-testid="supplier-category"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Outros contactos (opcional)</Label>
+                <Button type="button" data-testid="add-supplier-contact" size="sm" variant="outline" onClick={addContact} className="h-7 rounded-lg px-2 text-xs">
+                  <Plus className="mr-1 h-3 w-3" /> Adicionar
+                </Button>
+              </div>
+              {(form.contacts || []).length === 0 ? (
+                <p className="text-xs text-slate-400">Ex.: número pessoal da Camila, do Jorge, etc.</p>
+              ) : (
+                <div className="space-y-2">
+                  {form.contacts.map((c, i) => (
+                    <div key={i} className="flex items-start gap-2 rounded-xl border border-slate-200 p-2">
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Input
+                          data-testid={`supplier-contact-name-${i}`}
+                          value={c.name}
+                          onChange={(e) => updateContact(i, "name", e.target.value)}
+                          placeholder="Nome (ex.: Camila)"
+                          className="h-8 text-sm"
+                        />
+                        <PhoneInput
+                          testId={`supplier-contact-phone-${i}`}
+                          value={c.phone}
+                          onChange={(v) => updateContact(i, "phone", v)}
+                          placeholder="912345678"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        data-testid={`remove-supplier-contact-${i}`}
+                        onClick={() => removeContact(i)}
+                        className="mt-1 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-red-500"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1.5">
               <Label>Notas</Label>
               <Textarea data-testid="supplier-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2} placeholder="O que fornece..." />
