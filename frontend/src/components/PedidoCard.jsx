@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { getCategory } from "@/lib/categories";
 import {
-  formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg,
+  formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg, timeAgo,
 } from "@/lib/pedido";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -111,6 +111,21 @@ export default function PedidoCard({ note, onOpen, actions }) {
             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600"><PhoneMissed className="h-3 w-3" /> Fornecedor s/ resposta {note.supplier_no_answer_count}×</span>
           ) : null}
         </div>
+
+        {(note.recent_activities || []).length > 0 ? (
+          <div className="mt-3 border-t border-slate-100 pt-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Últimas alterações</p>
+            <ul className="mt-1.5 space-y-1">
+              {note.recent_activities.slice(0, 3).map((a, i) => (
+                <li key={i} className="flex items-baseline gap-1.5 text-[11px] text-slate-500">
+                  <span className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-slate-300" />
+                  <span className="min-w-0 flex-1 truncate">{a.message}</span>
+                  <span className="shrink-0 text-slate-400">{timeAgo(a.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {note.next_status && !archived ? (
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
