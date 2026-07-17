@@ -40,7 +40,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
 
   const go = (n) => {
     setOpen(false);
-    if (n.note_id) navigate(`/clientes?open=${n.note_id}`);
+    if (n.note_id) navigate(`/?open=${n.note_id}`);
     else navigate("/tarefas");
   };
 

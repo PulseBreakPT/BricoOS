@@ -35,7 +35,7 @@ export default function Catalog() {
       <header className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-xl sm:rounded-3xl">
         <div className="relative p-4 sm:p-6 lg:p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-          <Link to="/clientes" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white">
+          <Link to="/" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" /> Voltar aos pedidos
           </Link>
 

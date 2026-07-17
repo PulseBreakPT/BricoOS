@@ -1,10 +1,9 @@
 import { Link, NavLink, useLocation, Outlet } from "react-router-dom";
-import { Sun, ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 
 const NAV = [
-  { to: "/", label: "Hoje", icon: Sun, testid: "nav-hoje", end: true },
-  { to: "/clientes", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes" },
+  { to: "/", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes", end: true },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck, testid: "nav-fornecedores" },
   { to: "/catalogo-tecnico", label: "Catálogo técnico", icon: BookOpenCheck, testid: "nav-catalogo", mobile: false },
   { to: "/tarefas", label: "Tarefas", icon: ListChecks, testid: "nav-tarefas" },
