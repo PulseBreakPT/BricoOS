@@ -18,6 +18,7 @@ import {
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
+  FileUp, FileText, Download,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
@@ -90,6 +91,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [clientEmailData, setClientEmailData] = useState({ subject: "", body: "", to: "" });
   const [clientTemplateLoading, setClientTemplateLoading] = useState(false);
   const [caixOpen, setCaixOpen] = useState(false);
+
+  // Orçamento do fornecedor importado de PDF (BandAluminios) → PDF de venda
+  const [sq, setSq] = useState(null);
+  const [importingPdf, setImportingPdf] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const supplierPdfInputRef = useRef(null);
 
   // Assistente de criação por etapas: escolha do tipo → passos
   const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
@@ -196,6 +203,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   useEffect(() => {
     if (open && id && tab === "orcamentos") loadClientTemplate(id);
   }, [open, id, tab, loadClientTemplate]);
+
+  // O rascunho editável do orçamento importado acompanha a última versão do servidor.
+  useEffect(() => {
+    setSq(note?.supplier_quote ? JSON.parse(JSON.stringify(note.supplier_quote)) : null);
+  }, [note]);
 
   // Catálogo de caixilharia — carregado quando o utilizador escolhe o fluxo BandAluminios
   useEffect(() => {
@@ -508,6 +520,66 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       toast.error(getErrorMessage(e, "Não foi possível registar o envio"));
     }
   };
+
+  // ---- Orçamento do fornecedor (PDF) → PDF de venda ao cliente ----
+  const uploadSupplierPdf = async (file) => {
+    if (!file) return;
+    setImportingPdf(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await api.post(`/notes/${id}/supplier-pdf`, fd);
+      toast.success("Orçamento do fornecedor importado — reveja os preços de venda");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível ler o PDF do fornecedor"));
+    } finally {
+      setImportingPdf(false);
+      if (supplierPdfInputRef.current) supplierPdfInputRef.current.value = "";
+    }
+  };
+  const setSqItem = (n, patch) => {
+    setSq((q) => ({ ...q, items: q.items.map((i) => (i.n === n ? { ...i, ...patch } : i)) }));
+  };
+  const applySqMargin = (margin) => {
+    setSq((q) => ({
+      ...q, margin,
+      items: q.items.map((i) => (i.supplier_unit_price
+        ? { ...i, client_price: Math.round(i.supplier_unit_price * 1.23 * margin) }
+        : i)),
+    }));
+  };
+  const saveSupplierQuote = async () => {
+    await api.put(`/notes/${id}/supplier-quote`, {
+      margin: parseFloat(sq.margin) || 2,
+      items: sq.items.map(({ n, description, qty, client_price, include }) => ({
+        n, description, qty: parseInt(qty, 10) || 1,
+        client_price: parseFloat(client_price) || 0, include: include !== false,
+      })),
+    });
+  };
+  const generateClientPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      await saveSupplierQuote();
+      const res = await api.post(`/notes/${id}/client-pdf`, null, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Orcamento_${(sq.quote_number || "cliente").replace(/[^A-Za-z0-9]+/g, "_")}_cliente.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF para o cliente gerado e descarregado");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível gerar o PDF"));
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+  const sqTotal = (sq?.items || [])
+    .filter((i) => i.include !== false)
+    .reduce((acc, i) => acc + (parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1), 0);
 
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
@@ -1002,6 +1074,128 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <Copy className="mr-2 h-4 w-4" /> Copiar email
                   </Button>
                 </div>
+              </section>
+
+              {/* Orçamento do fornecedor (PDF) → PDF de venda ao cliente */}
+              <section data-testid="supplier-pdf-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-slate-700" />
+                      <h4 className="font-heading text-sm font-extrabold text-slate-900">Orçamento do fornecedor (PDF)</h4>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Envie o PDF da BandAluminios: a app lê as linhas, sugere preços de venda e gera o PDF com a marca da loja para entregar ao cliente.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  ref={supplierPdfInputRef}
+                  data-testid="supplier-pdf-input"
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => uploadSupplierPdf(e.target.files?.[0])}
+                />
+                <Button
+                  data-testid="supplier-pdf-upload"
+                  variant={sq ? "outline" : "default"}
+                  disabled={importingPdf}
+                  onClick={() => supplierPdfInputRef.current?.click()}
+                  className="mt-3 rounded-xl"
+                >
+                  {importingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                  {sq ? "Substituir PDF do fornecedor" : "Importar PDF do fornecedor"}
+                </Button>
+
+                {sq ? (
+                  <div className="mt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                      <p>
+                        <span className="font-bold text-slate-900">{sq.quote_number}</span>
+                        {sq.date ? ` · ${sq.date}` : ""}{sq.obra ? ` · Obra ${sq.obra}` : ""} · {sq.items.length} linha(s)
+                        {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
+                      </p>
+                      <label className="flex items-center gap-1.5 font-semibold">
+                        Margem ×
+                        <Input
+                          data-testid="sq-margin"
+                          type="number" min="0.5" step="0.1"
+                          value={sq.margin}
+                          onChange={(e) => applySqMargin(parseFloat(e.target.value) || 2)}
+                          className="h-8 w-20 rounded-lg font-mono text-xs"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      {sq.items.map((i) => (
+                        <div key={i.n} data-testid={`sq-item-${i.n}`} className={`rounded-xl border p-3 ${i.include === false ? "border-slate-200 opacity-50" : "border-slate-200"}`}>
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              data-testid={`sq-include-${i.n}`}
+                              checked={i.include !== false}
+                              onCheckedChange={(v) => setSqItem(i.n, { include: !!v })}
+                              className="mt-1 h-5 w-5 rounded-md"
+                            />
+                            {i.image_b64 ? (
+                              <img src={`data:image/png;base64,${i.image_b64}`} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-100 object-contain" />
+                            ) : null}
+                            <div className="min-w-0 flex-1">
+                              <Textarea
+                                data-testid={`sq-desc-${i.n}`}
+                                value={i.description}
+                                onChange={(e) => setSqItem(i.n, { description: e.target.value })}
+                                rows={3}
+                                className="text-xs"
+                              />
+                              <div className="mt-2 flex flex-wrap items-end gap-3">
+                                <label className="text-[11px] font-semibold text-slate-500">
+                                  Qtd.
+                                  <Input data-testid={`sq-qty-${i.n}`} type="number" min="1" value={i.qty} onChange={(e) => setSqItem(i.n, { qty: e.target.value })} className="mt-0.5 h-8 w-16 rounded-lg font-mono text-xs" />
+                                </label>
+                                <label className="text-[11px] font-semibold text-slate-500">
+                                  PVP/ud. (€, c/ IVA)
+                                  <Input data-testid={`sq-price-${i.n}`} type="number" min="0" step="0.01" value={i.client_price} onChange={(e) => setSqItem(i.n, { client_price: e.target.value })} className="mt-0.5 h-8 w-24 rounded-lg font-mono text-xs" />
+                                </label>
+                                <p className="ml-auto text-[11px] text-slate-400">
+                                  Custo: <span className="font-mono">{i.supplier_unit_price != null ? Number(i.supplier_unit_price).toFixed(2) : "—"} €</span> s/ IVA
+                                  <span className="mx-1.5">·</span>
+                                  Total: <span className="font-mono font-bold text-slate-700">{(((parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1))).toFixed(2)} €</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 p-3 text-white">
+                      <p className="text-sm font-bold">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal opacity-70">c/ IVA</span></p>
+                      <div className="flex flex-wrap gap-2">
+                        {sq.client_pdf_file_id ? (
+                          <a
+                            data-testid="sq-download-last"
+                            href={`${API}/notes/${id}/files/${sq.client_pdf_file_id}`}
+                            className="inline-flex items-center rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                          >
+                            <Download className="mr-1.5 h-3.5 w-3.5" /> Último PDF
+                          </a>
+                        ) : null}
+                        <Button
+                          data-testid="sq-generate-pdf"
+                          size="sm"
+                          disabled={generatingPdf}
+                          onClick={generateClientPdf}
+                          className="rounded-lg bg-white text-slate-900 hover:bg-slate-100"
+                        >
+                          {generatingPdf ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+                          Gerar PDF para o cliente
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </section>
 
               {quotes.length > 0 ? (
