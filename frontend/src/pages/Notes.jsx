@@ -61,11 +61,11 @@ function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 transition-shadow sm:shrink-0 ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
+      className={`flex min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 transition-shadow sm:gap-2 sm:shrink-0 sm:px-3 sm:py-2 ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
     >
-      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
-      <span className="shrink-0 text-lg font-extrabold tabular-nums">{value}</span>
-      <span className="truncate text-xs font-semibold opacity-80">{label}</span>
+      {Icon ? <Icon className="h-4 w-4 shrink-0 min-[420px]:hidden sm:block" /> : null}
+      <span className="shrink-0 text-base font-extrabold tabular-nums sm:text-lg">{value}</span>
+      <span className="truncate text-[11px] font-semibold opacity-80 sm:text-xs">{label}</span>
     </Tag>
   );
 }
@@ -309,7 +309,7 @@ export default function Notes() {
 
       {/* Resumo do dia — grelha compacta no telemóvel, sem scroll horizontal */}
       {today ? (
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <div className="mt-4 grid grid-cols-2 gap-1.5 min-[420px]:grid-cols-3 sm:flex sm:flex-wrap sm:gap-2">
           <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} active={preset === "novos"} onClick={() => setPreset(preset === "novos" ? "todos" : "novos")} />
           <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
           <SummaryChip label="a tratar por mim" value={counts.waiting_me ?? 0} tone="blue" icon={Zap} active={preset === "waiting_me"} onClick={() => setPreset(preset === "waiting_me" ? "todos" : "waiting_me")} />

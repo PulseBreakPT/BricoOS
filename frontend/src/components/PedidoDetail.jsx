@@ -576,7 +576,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </SelectContent>
               </Select>
               {note.next_status ? (
-                <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
+                <Button data-testid="detail-advance" size="sm" onClick={advance} className="col-span-2 h-9 w-full rounded-lg sm:col-span-1 sm:w-auto sm:shrink-0">
                   <Zap className="mr-1.5 h-3.5 w-3.5" /> {getNextActionCta(note)}
                 </Button>
               ) : null}
@@ -815,8 +815,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <Label>Pedido do cliente</Label>
                 <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5">
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="col-span-2 space-y-1.5 sm:col-span-1">
                   <Label>Código EAN13</Label>
                   <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
                 </div>
@@ -1151,7 +1151,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 // Título de categoria centrado, com traços dos dois lados: - - - Cliente - - -
 function SectionTitle({ title, first = false }) {
   return (
-    <div className={`flex items-center gap-3 ${first ? "" : "mt-6"}`}>
+    <div className={`flex items-center gap-3 ${first ? "" : "mt-5 sm:mt-6"}`}>
       <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
       <h3 className="shrink-0 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{title}</h3>
       <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
