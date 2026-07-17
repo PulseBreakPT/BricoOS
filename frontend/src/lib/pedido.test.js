@@ -11,18 +11,18 @@ const note = {
   quantity: "2 unidades",
 };
 
-test("o pedido de cotação usa referência estável e o tom habitual", () => {
+test("o pedido de cotação usa o tom habitual sem referência interna", () => {
   const template = buildEmail(note);
-  expect(template.subject).toContain("BCF-26-A1B2C3D4");
+  expect(template.subject).not.toContain("BCF-");
   expect(template.body).toMatch(/^(Bom dia|Boa tarde) Exmos\. Senhores,/);
   expect(template.body).toContain("para os seguintes artigos:");
   expect(template.body).toContain("Referência do artigo: ART-44");
   expect(template.body).toContain("• Prazo de entrega;");
 });
 
-test("o lembrete conserva a referência do pedido", () => {
+test("o lembrete não expõe a referência interna ao fornecedor", () => {
   const template = buildReminder(note);
-  expect(template.subject).toContain("BCF-26-A1B2C3D4");
+  expect(template.subject).not.toContain("BCF-");
   expect(template.body).toContain("reforçar o pedido de cotação");
 });
 
