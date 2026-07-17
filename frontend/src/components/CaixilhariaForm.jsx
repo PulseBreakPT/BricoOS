@@ -214,7 +214,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
 
       <div className={`flex items-end justify-between gap-3 ${hasComparisons ? "mt-4" : "mt-5"}`}>
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900">
+          <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">1</span>
             <Layers3 className="h-4 w-4" /> Elementos do pedido
           </h3>
@@ -450,7 +450,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
 
       <div className="mt-6 flex items-center gap-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 font-mono text-[10px] font-black text-white">2</span>
-        <h3 className="font-heading text-sm font-bold text-slate-900">Finalizar</h3>
+        <h3 className="font-heading text-sm font-extrabold text-slate-900">Finalizar</h3>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_11rem]">
         <div className="space-y-1.5">

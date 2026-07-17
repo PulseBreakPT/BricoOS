@@ -293,7 +293,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
             <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-slate-700" />
-                <h4 className="font-heading text-sm font-bold text-slate-900">Pedir preço a fornecedor</h4>
+                <h4 className="font-heading text-sm font-extrabold text-slate-900">Pedir preço a fornecedor</h4>
               </div>
 
               {!gmailStatus?.connected ? (
@@ -386,7 +386,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
             <section className="mt-6">
               <div className="flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-slate-700" />
-                <h4 className="font-heading text-sm font-bold text-slate-900">Comparar orçamentos recebidos</h4>
+                <h4 className="font-heading text-sm font-extrabold text-slate-900">Comparar orçamentos recebidos</h4>
               </div>
 
               <div className="mt-3 space-y-2">

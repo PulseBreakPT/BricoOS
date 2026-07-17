@@ -177,7 +177,7 @@ export default function Today() {
               <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                 {attention.length > 0 ? (
                   <>
-                    <h2 className="flex items-center gap-2 font-heading text-base font-bold text-slate-900">
+                    <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-slate-900">
                       <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
                       <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{data.attention_count}</span>
                     </h2>
@@ -235,7 +235,7 @@ export default function Today() {
               {/* Voltar a ligar — chamadas falhadas registadas no pedido */}
               {followUps.length > 0 ? (
                 <section className="rounded-2xl border border-red-200 bg-red-50/50 p-4 sm:p-5">
-                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-red-800"><PhoneMissed className="h-4 w-4" /> Voltar a ligar</h3>
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-red-800"><PhoneMissed className="h-4 w-4" /> Voltar a ligar</h3>
                   <div className="mt-3 space-y-2">
                     {followUps.map((n) => (
                       <div key={n.id} data-testid={`follow-up-${n.id}`} className="flex items-center gap-2 rounded-xl bg-white p-2.5">
@@ -265,7 +265,7 @@ export default function Today() {
               {/* Lembretes a enviar */}
               {reminders.length > 0 ? (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><Bell className="h-4 w-4 text-blue-500" /> Lembretes a enviar</h3>
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900"><Bell className="h-4 w-4 text-blue-500" /> Lembretes a enviar</h3>
                   <div className="mt-3 space-y-2">
                     {reminders.map((n) => (
                       <div key={n.id} className="flex items-center gap-2 rounded-xl border border-slate-200 p-2.5">
@@ -285,7 +285,7 @@ export default function Today() {
               {/* Clientes à espera há demasiado tempo */}
               {longClients.length > 0 ? (
                 <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4 sm:p-5">
-                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-800"><Hourglass className="h-4 w-4" /> Clientes à espera</h3>
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-orange-800"><Hourglass className="h-4 w-4" /> Clientes à espera</h3>
                   <div className="mt-3 space-y-2">
                     {longClients.map((n) => (
                       <button key={n.id} onClick={() => openNote(n.id)} className="flex w-full items-center gap-2 rounded-xl bg-white p-2.5 text-left hover:bg-orange-50">
@@ -303,7 +303,7 @@ export default function Today() {
               {/* Agrupar para o mesmo fornecedor */}
               {batches.length > 0 ? (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                  <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-slate-900"><Layers className="h-4 w-4 text-indigo-500" /> Agrupar pedidos</h3>
+                  <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900"><Layers className="h-4 w-4 text-indigo-500" /> Agrupar pedidos</h3>
                   <p className="mt-1 text-xs text-slate-500">Envie num só email por fornecedor.</p>
                   <div className="mt-3 space-y-2">
                     {batches.map((b, i) => (
@@ -318,7 +318,7 @@ export default function Today() {
 
               {/* Motor de aprendizagem */}
               <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 sm:p-5">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-bold text-violet-800"><Brain className="h-4 w-4" /> O assistente aprendeu</h3>
+                <h3 className="flex items-center gap-2 font-heading text-sm font-extrabold text-violet-800"><Brain className="h-4 w-4" /> O assistente aprendeu</h3>
                 <div className="mt-3 space-y-1.5">
                   {(learning?.habits || []).length === 0 ? (
                     <p className="text-xs text-violet-700/80">Ainda a aprender os seus hábitos. Com o uso, começa a sugerir automaticamente.</p>

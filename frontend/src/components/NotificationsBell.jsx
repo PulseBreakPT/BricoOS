@@ -77,7 +77,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500">
                 <Bell className="h-7 w-7" />
               </div>
-              <p className="mt-4 font-heading text-base font-bold text-slate-700">Tudo em dia</p>
+              <p className="mt-4 font-heading text-base font-extrabold text-slate-700">Tudo em dia</p>
               <p className="text-sm">Nenhum pedido esquecido ou atrasado.</p>
             </div>
           ) : data.items.map((n) => {

@@ -113,7 +113,7 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-slate-700" />
-              <h2 className="font-heading text-base font-bold text-slate-900">Fornecedores mais rápidos</h2>
+              <h2 className="font-heading text-base font-extrabold text-slate-900">Fornecedores mais rápidos</h2>
             </div>
             <div className="mt-3 space-y-2">
               {(stats?.fastest_suppliers || []).length === 0 ? (
@@ -129,7 +129,7 @@ export default function Dashboard() {
 
           {/* Priorities */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 className="font-heading text-base font-bold text-slate-900">Por prioridade</h2>
+            <h2 className="font-heading text-base font-extrabold text-slate-900">Por prioridade</h2>
             <div className="mt-4 space-y-3">
               {PRIORITY_ORDER.map((p) => {
                 const cfg = getPriorityCfg(p);
@@ -153,7 +153,7 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-slate-700" />
-              <h2 className="font-heading text-base font-bold text-slate-900">Envio de emails</h2>
+              <h2 className="font-heading text-base font-extrabold text-slate-900">Envio de emails</h2>
             </div>
             {gmail.connected ? (
               <div className="mt-3">

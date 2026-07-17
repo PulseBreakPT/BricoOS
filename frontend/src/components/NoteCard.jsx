@@ -31,7 +31,7 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <h3
-              className={`truncate font-heading text-base font-bold tracking-tight text-slate-900 ${
+              className={`truncate font-heading text-base font-extrabold tracking-tight text-slate-900 ${
                 note.done ? "line-through opacity-50" : ""
               }`}
             >
