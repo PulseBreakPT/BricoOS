@@ -39,7 +39,7 @@ class EmailTemplateTests(unittest.TestCase):
         )
         self.assertIn("Bom dia Exmos. Senhores,", template["body"])
         self.assertIn("para os seguintes artigos:", template["body"])
-        self.assertIn("Referência do pedido: BCF-26-A1B2C3D4", template["body"])
+        self.assertNotIn("Referência do pedido", template["body"])
         self.assertIn("Referência do artigo: ART-44", template["body"])
         self.assertIn("Preço;", template["body"])
 
