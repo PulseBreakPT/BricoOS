@@ -26,6 +26,7 @@ import {
   buildEmail, formatDateTime, getNextActionCta, getNextActionMode, timeAgo,
 } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
+import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
@@ -736,7 +737,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       </div>
                       <div className="space-y-1.5">
                         <Label>Telefone</Label>
-                        <Input data-testid="input-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} className="font-mono" placeholder="917100512" />
+                        <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                       </div>
                     </div>
                     <div className="mt-4 space-y-1.5">
@@ -870,7 +871,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
                 <div className="space-y-1.5">
                   <Label>Telefone</Label>
-                  <Input data-testid="input-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} className="font-mono" placeholder="917100512" />
+                  <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
