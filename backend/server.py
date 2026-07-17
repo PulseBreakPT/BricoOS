@@ -670,6 +670,7 @@ class SupplierContact(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = ""
     phone: str = ""
+    email: str = ""
 
     @field_validator("name")
     @classmethod
@@ -680,6 +681,11 @@ class SupplierContact(BaseModel):
     @classmethod
     def _v_phone(cls, v):
         return normalize_phone(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return normalize_email(v)
 
 
 class SupplierIn(BaseModel):
