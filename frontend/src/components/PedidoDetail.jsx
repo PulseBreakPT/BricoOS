@@ -552,11 +552,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
             ) : null}
           </div>
 
-          {/* Quick actions — deslizáveis no telemóvel para não empilhar linhas no cabeçalho */}
+          {/* Quick actions — grelha compacta no telemóvel, linha em ecrãs maiores */}
           {!isCreate && note ? (
-            <div className="no-scrollbar -mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
               <Select value={note.status} onValueChange={changeStatus}>
-                <SelectTrigger data-testid="quick-status" className="h-9 w-auto shrink-0 gap-1.5 rounded-lg border-0 text-xs font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
+                <SelectTrigger data-testid="quick-status" className="h-9 w-full gap-1.5 rounded-lg border-0 text-xs font-bold sm:w-auto sm:shrink-0" style={{ backgroundColor: st.bg, color: st.text }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -566,7 +566,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </SelectContent>
               </Select>
               <Select value={note.priority} onValueChange={changePriority}>
-                <SelectTrigger data-testid="quick-priority" className="h-9 w-auto shrink-0 gap-1.5 rounded-lg text-xs font-semibold">
+                <SelectTrigger data-testid="quick-priority" className="h-9 w-full gap-1.5 rounded-lg text-xs font-semibold sm:w-auto sm:shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -576,18 +576,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </SelectContent>
               </Select>
               {note.next_status ? (
-                <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 shrink-0 rounded-lg">
+                <Button data-testid="detail-advance" size="sm" onClick={advance} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
                   <Zap className="mr-1.5 h-3.5 w-3.5" /> {getNextActionCta(note)}
                 </Button>
               ) : null}
               {note.archived ? (
-                <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 shrink-0 rounded-lg">Reabrir</Button>
+                <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">Reabrir</Button>
               ) : (
-                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 shrink-0 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 w-full rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 sm:w-auto sm:shrink-0">
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
-              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 shrink-0 rounded-lg border-red-200 text-red-600 hover:bg-red-50 sm:ml-auto">
+              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-red-200 text-red-600 hover:bg-red-50 sm:ml-auto sm:w-auto sm:shrink-0">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -1148,10 +1148,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   );
 }
 
+// Título de categoria centrado, com traços dos dois lados: - - - Cliente - - -
 function SectionTitle({ title, first = false }) {
   return (
-    <h3 className={`flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 ${first ? "" : "mt-6 border-t border-slate-200 pt-5"}`}>
-      {title}
-    </h3>
+    <div className={`flex items-center gap-3 ${first ? "" : "mt-6"}`}>
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
+      <h3 className="shrink-0 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{title}</h3>
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
+    </div>
   );
 }
