@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import RedirectResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -33,6 +33,10 @@ try:
         QUADRILLE_OPTIONS as CAIXILHARIA_QUADRICULAS,
         material_labels as caixilharia_material_labels,
     )
+    from quote_pdf import (
+        DEFAULT_MARGIN as QUOTE_DEFAULT_MARGIN,
+        build_client_pdf, parse_supplier_pdf, suggest_client_price,
+    )
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -48,6 +52,10 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         QUADRILLE_INFO as CAIXILHARIA_QUADRICULA_INFO,
         QUADRILLE_OPTIONS as CAIXILHARIA_QUADRICULAS,
         material_labels as caixilharia_material_labels,
+    )
+    from .quote_pdf import (
+        DEFAULT_MARGIN as QUOTE_DEFAULT_MARGIN,
+        build_client_pdf, parse_supplier_pdf, suggest_client_price,
     )
 
 from google_auth_oauthlib.flow import Flow
@@ -1628,6 +1636,130 @@ async def add_quote(note_id: str, payload: QuoteIn):
         await log_activity(note_id, "status_change", "Estado alterado para Orçamento recebido", {"to": "orcamento_recebido"})
     doc.pop("_id", None)
     return doc
+
+
+# ---------- Orçamento do fornecedor (PDF) → PDF de venda ao cliente ----------
+BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
+MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
+
+
+class SupplierQuoteItemIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    n: int
+    description: str = ""
+    qty: int = 1
+    client_price: float = 0.0
+    include: bool = True
+
+
+class SupplierQuoteIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    margin: float = QUOTE_DEFAULT_MARGIN
+    items: List[SupplierQuoteItemIn] = []
+
+
+def _client_pdf_filename(quote_number):
+    ref = re.sub(r"[^A-Za-z0-9]+", "_", quote_number or "orcamento").strip("_")
+    return f"Orcamento_{ref}_cliente.pdf"
+
+
+@api_router.post("/notes/{note_id}/supplier-pdf")
+async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    data = await file.read()
+    if len(data) > MAX_SUPPLIER_PDF_BYTES:
+        raise HTTPException(status_code=400, detail="O PDF é demasiado grande (máx. 15 MB).")
+    try:
+        parsed = parse_supplier_pdf(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    file_id = str(uuid.uuid4())
+    await db.note_files.insert_one({
+        "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
+        "filename": file.filename or "orcamento_fornecedor.pdf",
+        "content_b64": base64.b64encode(data).decode(), "created_at": now_iso()})
+    for item in parsed["items"]:
+        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"))
+        item["include"] = True
+    supplier_quote = {**parsed, "margin": QUOTE_DEFAULT_MARGIN,
+                      "source_file_id": file_id, "imported_at": now_iso()}
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "supplier_quote": supplier_quote, "updated_at": now_iso()}})
+    await log_activity(note_id, "updated",
+                       f"Orçamento do fornecedor importado ({supplier_quote['quote_number']}, "
+                       f"{len(parsed['items'])} linha(s))", {"file_id": file_id})
+    # O total do fornecedor entra no fluxo normal de orçamentos recebidos
+    # (muda o estado e alimenta as estatísticas de resposta).
+    if parsed.get("total"):
+        await add_quote(note_id, QuoteIn(
+            supplier_name="BandAluminios",
+            product=(parsed["items"][0].get("description") or "").split("\n")[0],
+            price=parsed["total"],
+            notes=f"Importado do PDF {supplier_quote['quote_number']} (total c/ IVA)"))
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
+@api_router.put("/notes/{note_id}/supplier-quote")
+async def update_supplier_quote(note_id: str, payload: SupplierQuoteIn):
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    supplier_quote = note.get("supplier_quote")
+    if not supplier_quote:
+        raise HTTPException(status_code=400, detail="Importe primeiro o PDF do fornecedor.")
+    edits = {item.n: item for item in payload.items}
+    for item in supplier_quote.get("items", []):
+        edit = edits.get(item.get("n"))
+        if not edit:
+            continue
+        item["description"] = edit.description.strip() or item["description"]
+        item["qty"] = max(1, edit.qty)
+        item["client_price"] = max(0.0, round(edit.client_price, 2))
+        item["include"] = edit.include
+    supplier_quote["margin"] = max(0.1, payload.margin)
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "supplier_quote": supplier_quote, "updated_at": now_iso()}})
+    return {"ok": True, "supplier_quote": supplier_quote}
+
+
+@api_router.post("/notes/{note_id}/client-pdf")
+async def generate_client_pdf(note_id: str):
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    supplier_quote = note.get("supplier_quote")
+    if not supplier_quote:
+        raise HTTPException(status_code=400, detail="Importe primeiro o PDF do fornecedor.")
+    try:
+        pdf_bytes = build_client_pdf(supplier_quote, BRICO_LOGO_PATH.read_bytes())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    filename = _client_pdf_filename(supplier_quote.get("quote_number"))
+    file_id = str(uuid.uuid4())
+    await db.note_files.insert_one({
+        "id": file_id, "note_id": note_id, "kind": "client_pdf", "filename": filename,
+        "content_b64": base64.b64encode(pdf_bytes).decode(), "created_at": now_iso()})
+    total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1)
+                for i in supplier_quote.get("items", []) if i.get("include", True))
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "supplier_quote.client_pdf_file_id": file_id,
+        "supplier_quote.client_pdf_generated_at": now_iso(), "updated_at": now_iso()}})
+    await log_activity(note_id, "updated",
+                       f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA)",
+                       {"file_id": file_id})
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@api_router.get("/notes/{note_id}/files/{file_id}")
+async def download_note_file(note_id: str, file_id: str):
+    f = await db.note_files.find_one({"id": file_id, "note_id": note_id}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    return Response(content=base64.b64decode(f["content_b64"]), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "documento.pdf")}"'})
 
 
 @api_router.post("/notes/{note_id}/quotes/{quote_id}/approve")
