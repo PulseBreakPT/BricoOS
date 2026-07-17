@@ -25,6 +25,7 @@ import { toast } from "sonner";
 const PRESETS = [
   { key: "todos", label: "Todos", filters: {} },
   { key: "waiting_me", label: "À espera da minha ação", filters: { waiting: "me" } },
+  { key: "callback", label: "Voltar a ligar", filters: { callback: true } },
   { key: "supplier", label: "Sem resposta", filters: { waiting: "supplier" } },
   { key: "client", label: "Clientes à espera", filters: { waiting: "client" } },
   { key: "overdue", label: "Atrasados", filters: { overdue: true } },
@@ -33,6 +34,8 @@ const PRESETS = [
   { key: "aprovados", label: "Aprovados", filters: { status: "aprovado,encomendado" } },
   { key: "arquivados", label: "Arquivados", filters: { archived: true } },
 ];
+
+const DETAIL_TABS = ["detalhes", "assistente", "orcamentos", "cronologia", "tarefas"];
 
 export default function Notes() {
   const [items, setItems] = useState([]);
@@ -84,6 +87,7 @@ export default function Notes() {
     if (p.priority) params.priority = p.priority;
     if (p.overdue) params.overdue = true;
     if (p.waiting) params.waiting = p.waiting;
+    if (p.callback) params.callback = true;
     if (p.archived) params.archived = true;
     if (advPriority) params.priority = advPriority;
     if (category !== "todos") params.category = category;
@@ -125,7 +129,7 @@ export default function Notes() {
     const openTab = params.get("tab");
     if (openId) {
       setDetailNoteId(openId);
-      setDetailInitialTab(openTab === "orcamentos" ? "orcamentos" : "detalhes");
+      setDetailInitialTab(DETAIL_TABS.includes(openTab) ? openTab : "detalhes");
       setDetailOpen(true);
     }
     if (g || openId) navigate("/clientes", { replace: true });
@@ -419,7 +423,7 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           {note.is_overdue ? <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">Parado há {note.waiting_days}d</span> : null}
         </div>
         <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
-        {note.phone ? <p className="font-mono text-sm text-slate-500">{note.phone}</p> : null}
+        {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-slate-500 hover:text-slate-900 hover:underline">{note.phone}</a> : null}
         <p className="mt-3 text-base text-slate-700">{note.description}</p>
         {note.measurements ? <p className="mt-1 font-mono text-sm text-slate-500">Medidas: {note.measurements}</p> : null}
 

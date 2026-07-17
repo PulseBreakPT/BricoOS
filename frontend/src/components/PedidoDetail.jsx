@@ -595,7 +595,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   ? (createMode === "choice"
                     ? "Escolha o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
-                  : (form.phone || "Sem telefone")}
+                  : (form.phone
+                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
+                    : "Sem telefone")}
                 {!isCreate && note ? <span className="font-mono text-[11px] font-semibold text-slate-600">{note.request_reference}</span> : null}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
@@ -1120,8 +1122,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   {/* Alternatives */}
                   {alt?.suggest_alternatives ? (
                     <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Sem resposta após {alt.reminder_count} lembretes</h4>
-                      <p className="mt-1 text-xs text-orange-800">Considere fornecedores alternativos:</p>
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-bold text-orange-900"><RefreshCw className="h-4 w-4" /> Fornecedor sem resposta</h4>
+                      <p className="mt-1 text-xs text-orange-800">
+                        {[
+                          alt.reminder_count ? `${alt.reminder_count} lembrete(s) por email` : "",
+                          alt.no_answer_count ? `${alt.no_answer_count} chamada(s) sem resposta` : "",
+                        ].filter(Boolean).join(" e ") || "Sem retorno até agora"}. Considere fornecedores alternativos:
+                      </p>
                       <div className="mt-2 space-y-1.5">
                         {alt.alternatives.map((s) => (
                           <div key={s.id} className="flex items-center justify-between rounded-lg bg-white p-2 text-xs">

@@ -140,10 +140,11 @@ QUICK_LOG_EVENTS = {
     "cliente_nao_atendeu": {
         "message": "Cliente não atendeu a chamada", "type": "contact_attempt",
         "label": "Cliente não atendeu", "counter": "client_no_answer_count",
+        "attempt_field": "last_client_attempt_at",
     },
     "cliente_deixou_mensagem": {
         "message": "Deixada mensagem / SMS ao cliente", "type": "contact_attempt",
-        "counter": "client_no_answer_count",
+        "counter": "client_no_answer_count", "attempt_field": "last_client_attempt_at",
     },
     "cliente_atendeu": {
         "message": "Falei com o cliente por telefone", "type": "client_contact",
@@ -153,6 +154,7 @@ QUICK_LOG_EVENTS = {
     "fornecedor_nao_atendeu": {
         "message": "Fornecedor não atendeu a chamada", "type": "contact_attempt",
         "label": "Fornecedor não atendeu", "counter": "supplier_no_answer_count",
+        "attempt_field": "last_supplier_attempt_at",
     },
     "fornecedor_atendeu": {
         "message": "Falei com o fornecedor por telefone", "type": "supplier_contact",
@@ -228,6 +230,21 @@ async def log_activity(note_id, type_, message, meta=None):
         "author": AUTHOR, "created_at": now_iso(), "meta": meta or {}})
 
 
+# Depois de uma chamada falhada, só volta a pedir nova tentativa passado este
+# intervalo — evita alertar quem acabou de desligar o telefone.
+CALLBACK_RETRY_HOURS = 2
+
+
+def callback_due(note, now, side):
+    """side: "client" ou "supplier". True quando há tentativas falhadas
+    pendentes e a última já foi há tempo suficiente para voltar a tentar."""
+    count = note.get(f"{side}_no_answer_count", 0) or 0
+    if count <= 0 or note.get("archived") or note.get("status") in CLOSED_STATUSES:
+        return False
+    last = parse_dt(note.get(f"last_{side}_attempt_at"))
+    return last is None or (now - last) >= timedelta(hours=CALLBACK_RETRY_HOURS)
+
+
 def enrich_note(note, now=None):
     now = now or datetime.now(timezone.utc)
     status = note.get("status", "novo")
@@ -257,6 +274,12 @@ def enrich_note(note, now=None):
     note["product_label"] = PRODUCT_TYPES.get(pt, {}).get("label") if pt else None
     note["measurement_warnings"] = measurement_warnings(note)
     note["client_waiting_days"] = (note["days_since_client"] if status in ("aguarda_cliente", "orcamento_recebido") else None)
+    # ---- Recontactos (registo rápido) ----
+    note["client_no_answer_count"] = note.get("client_no_answer_count", 0) or 0
+    note["supplier_no_answer_count"] = note.get("supplier_no_answer_count", 0) or 0
+    note["client_callback_due"] = callback_due(note, now, "client")
+    note["supplier_callback_due"] = callback_due(note, now, "supplier")
+    note["needs_callback"] = note["client_callback_due"] or note["supplier_callback_due"]
     note.pop("_id", None)
     return note
 
@@ -987,7 +1010,7 @@ async def list_notes(
     search: Optional[str] = None, status: Optional[str] = None, priority: Optional[str] = None,
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
     favorite: Optional[bool] = None, overdue: Optional[bool] = None, archived: Optional[bool] = None,
-    waiting: Optional[str] = None, reminder_due: Optional[bool] = None,
+    waiting: Optional[str] = None, reminder_due: Optional[bool] = None, callback: Optional[bool] = None,
     sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
     q = {}
@@ -1008,6 +1031,11 @@ async def list_notes(
         rx = {"$regex": re.escape(search), "$options": "i"}
         q["$or"] = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"email": rx},
                     {"details": rx}, {"measurements": rx}, {"reference": rx}, {"labels": rx}]
+        # Telefones: quem procura "917 100 512" ou "917-100" tem de encontrar
+        # o número guardado como "917100512" — compara só os dígitos.
+        digits = re.sub(r"\D", "", search)
+        if len(digits) >= 3:
+            q["$or"].append({"phone": {"$regex": r"\D*".join(digits)}})
     docs = await db.notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
     now = datetime.now(timezone.utc)
     docs = [enrich_note(d, now) for d in docs]
@@ -1017,6 +1045,8 @@ async def list_notes(
         docs = [d for d in docs if d["waiting_on"] == waiting]
     if reminder_due:
         docs = [d for d in docs if d.get("reminder_due")]
+    if callback:
+        docs = [d for d in docs if d.get("needs_callback")]
     if sort == "priority":
         docs.sort(key=lambda d: (PRIORITY_RANK.get(d.get("priority"), 2), d.get("created_at")))
     elif sort == "deadline":
@@ -1055,6 +1085,7 @@ async def create_note(payload: NoteIn):
                 "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
+                "last_client_attempt_at": "", "last_supplier_attempt_at": "",
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido criado para {doc.get('customer_name') or 'cliente'}")
@@ -1165,6 +1196,8 @@ async def quick_log(note_id: str, payload: QuickLogIn):
         update["$set"]["last_client_contact_at"] = now_iso()
     if cfg.get("reset_counter"):
         update["$set"][cfg["reset_counter"]] = 0
+    if cfg.get("attempt_field"):
+        update["$set"][cfg["attempt_field"]] = now_iso()
     if cfg.get("counter"):
         update["$inc"] = {cfg["counter"]: 1}
     if cfg.get("label"):
@@ -1192,6 +1225,7 @@ async def duplicate_note(note_id: str):
                 "archived": False, "created_by": AUTHOR, "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
+                "last_client_attempt_at": "", "last_supplier_attempt_at": "",
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido duplicado de {src.get('customer_name') or 'pedido anterior'}")
@@ -1766,6 +1800,14 @@ async def build_notifications():
         if n.get("priority") == "urgente":
             out.append({"id": f"{n['id']}-urg", "note_id": n["id"], "kind": "urgent", "severity": "high",
                         "title": f"{cust} · URGENTE", "message": f"Pedido urgente. {NEXT_ACTION.get(status)}", "days": days})
+        for side, who in (("client", "cliente"), ("supplier", "fornecedor")):
+            attempts = n.get(f"{side}_no_answer_count", 0) or 0
+            if attempts and callback_due(n, now, side):
+                out.append({"id": f"{n['id']}-cb-{side}", "note_id": n["id"], "kind": f"callback_{side}",
+                            "severity": "high" if attempts >= 3 else "medium",
+                            "title": f"{cust} · voltar a ligar ao {who}",
+                            "message": f"{attempts} tentativa(s) sem resposta. Volte a tentar ou use outro contacto.",
+                            "days": days})
     tasks = await db.tasks.find({"done": {"$ne": True}}, {"_id": 0}).to_list(5000)
     for t in tasks:
         dd = parse_dt(t.get("due_date"))
@@ -1802,13 +1844,17 @@ async def today():
         [d for d in waiting_client if (d.get("days_since_client") or 0) >= 2],
         key=lambda d: -(d.get("days_since_client") or 0))
     reminder_due = [d for d in waiting_supplier if d.get("reminder_due")]
+    follow_up_calls = sorted(
+        [d for d in open_docs if d.get("needs_callback")],
+        key=lambda d: -max(d.get("client_no_answer_count", 0), d.get("supplier_no_answer_count", 0)))
     st = await stats()
     return {"attention": items[:20], "attention_count": len(items), "inbox": inbox,
             "waiting_me": waiting_me[:60], "waiting_supplier": waiting_supplier[:60],
             "waiting_client": waiting_client[:60], "long_waiting_clients": long_waiting_clients,
-            "reminder_due": reminder_due, "counts": {
+            "reminder_due": reminder_due, "follow_up_calls": follow_up_calls[:20], "counts": {
                 "waiting_me": len(waiting_me), "waiting_supplier": len(waiting_supplier),
-                "waiting_client": len(waiting_client), "reminder_due": len(reminder_due)},
+                "waiting_client": len(waiting_client), "reminder_due": len(reminder_due),
+                "follow_up": len(follow_up_calls)},
             "summary": st["daily"], "potential_value": st["potential_value"]}
 
 
@@ -1905,8 +1951,11 @@ async def note_alternatives(note_id: str):
     reqs = await db.quote_requests.find({"note_id": note_id}, {"_id": 0}).to_list(200)
     contacted = {r.get("supplier_id") for r in reqs}
     reminder_count = n.get("reminder_count", 0) or 0
+    no_answer_count = n.get("supplier_no_answer_count", 0) or 0
     has_quote = await db.quotes.count_documents({"note_id": note_id})
-    suggest = reminder_count >= 2 and has_quote == 0
+    # Sugere alternativas quando o fornecedor não responde nem por email
+    # (2+ lembretes) nem por telefone (2+ chamadas falhadas).
+    suggest = (reminder_count >= 2 or no_answer_count >= 2) and has_quote == 0
     _, _, per_sup_avg, _ = await compute_response()
     sups = await db.suppliers.find({}, {"_id": 0}).to_list(2000)
     alts = [s for s in sups if s["id"] not in contacted]
@@ -1915,6 +1964,7 @@ async def note_alternatives(note_id: str):
     for s in same:
         s["avg_hours"] = per_sup_avg.get(s.get("name"))
     return {"suggest_alternatives": suggest, "reminder_count": reminder_count,
+            "no_answer_count": no_answer_count,
             "has_quote": bool(has_quote), "alternatives": same[:5]}
 
 
@@ -2275,7 +2325,8 @@ async def migrate():
                 "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "quantity": "", "color": "", "reminder_interval_days": 3,
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
-                "client_no_answer_count": 0, "supplier_no_answer_count": 0}
+                "client_no_answer_count": 0, "supplier_no_answer_count": 0,
+                "last_client_attempt_at": "", "last_supplier_attempt_at": ""}
     for k, v in defaults.items():
         await db.notes.update_many({k: {"$exists": False}}, {"$set": {k: v}})
     await db.notes.update_many({"status": {"$in": list(ARCHIVE_STATUSES)}, "archived": {"$ne": True}}, {"$set": {"archived": True}})

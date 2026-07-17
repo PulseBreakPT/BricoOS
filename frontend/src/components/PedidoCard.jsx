@@ -40,7 +40,11 @@ export default function PedidoCard({ note, onOpen, actions }) {
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pr.dot }} />{pr.label}
               </span>
             </div>
-            {note.phone ? <p className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-slate-500"><Phone className="h-3 w-3" /> {note.phone}</p> : null}
+            {note.phone ? (
+              <a href={`tel:${note.phone}`} onClick={(e) => e.stopPropagation()} title="Ligar ao cliente" className="mt-0.5 flex w-fit items-center gap-1.5 font-mono text-xs text-slate-500 hover:text-slate-900 hover:underline">
+                <Phone className="h-3 w-3" /> {note.phone}
+              </a>
+            ) : null}
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium text-slate-400">
               <span className="font-mono text-slate-500">{note.request_reference || `BCF-${note.id?.slice(0, 8).toUpperCase()}`}</span>
               <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" /> {formatDateTime(note.created_at)}</span>
