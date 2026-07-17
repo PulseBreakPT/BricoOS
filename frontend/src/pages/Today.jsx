@@ -7,7 +7,7 @@ import {
 import api, { getErrorMessage } from "@/lib/api";
 import { getCategory } from "@/lib/categories";
 import {
-  getStatusCfg, getPriorityCfg, formatEuro, getNextActionCta, getNextActionMode,
+  getStatusCfg, getPriorityCfg, getNextActionCta, getNextActionMode,
 } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -131,7 +131,6 @@ export default function Today() {
     }
   };
 
-  const today = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   const s = data?.summary || {};
   const counts = data?.counts || {};
   const attention = data?.attention || [];
@@ -145,7 +144,6 @@ export default function Today() {
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold capitalize text-slate-400 sm:text-sm">{today}</p>
         <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
           <Sun className="h-6 w-6 text-amber-400 sm:h-8 sm:w-8" /> {greeting()}, chefe
         </h1>
@@ -233,15 +231,6 @@ export default function Today() {
 
             {/* SIDE column */}
             <div className="space-y-6">
-              {/* Valor potencial */}
-              <section className="rounded-2xl border border-slate-900 bg-slate-900 p-5 text-white">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                  <TrendingUp className="h-4 w-4" /> Vendas pendentes (potencial)
-                </p>
-                <p className="mt-2 font-heading text-3xl font-extrabold">{formatEuro(data?.potential_value)}</p>
-                <p className="mt-1 text-xs text-slate-400">Soma dos melhores orçamentos em aberto.</p>
-              </section>
-
               {/* Voltar a ligar — chamadas falhadas registadas no pedido */}
               {followUps.length > 0 ? (
                 <section className="rounded-2xl border border-red-200 bg-red-50/50 p-4 sm:p-5">
