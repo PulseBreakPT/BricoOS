@@ -7,6 +7,7 @@ import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
+import Catalog from "@/pages/Catalog";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
             <Route path="/clientes" element={<Notes />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/tarefas" element={<Tasks />} />
+            <Route path="/catalogo-tecnico" element={<Catalog />} />
           </Route>
         </Routes>
       </BrowserRouter>
