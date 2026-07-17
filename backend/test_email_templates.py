@@ -36,8 +36,9 @@ class EmailTemplateTests(unittest.TestCase):
         self.assertIn("Bom dia Exmos. Senhores,", template["body"])
         self.assertIn("para os seguintes artigos:", template["body"])
         self.assertNotIn("Referência do pedido", template["body"])
-        self.assertIn("Referência do artigo: ART-44", template["body"])
-        self.assertIn("Preço;", template["body"])
+        self.assertIn("Código EAN13: ART-44", template["body"])
+        self.assertNotIn("Agradeço, por favor", template["body"])
+        self.assertIn("Tiago Jesus", template["body"])
 
     def test_reminder_omits_internal_reference(self):
         template = supplier_quote_template(self.note, is_reminder=True)

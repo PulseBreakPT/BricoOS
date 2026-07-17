@@ -13,10 +13,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
-  Trash2, Send, Copy, Mail, Plus, Trophy, Loader2, AlertCircle, CheckCircle2,
+  Trash2, Send, Copy, Mail, Plus, Loader2, AlertCircle, CheckCircle2,
   Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
-  BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap, ClipboardCheck, History,
-  Lightbulb, GitCompare, RefreshCw, Check, AlertTriangle, Cloud, Frame,
+  BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
+  Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
@@ -97,10 +97,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [caixSpec, setCaixSpec] = useState(() => createEmptyCaixilharia());
   const [caixCatalog, setCaixCatalog] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [newQuote, setNewQuote] = useState({ supplier_name: "", product: "", price: "", notes: "" });
 
   // Assistant data
-  const [assist, setAssist] = useState({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
   const [dupWarn, setDupWarn] = useState([]);
 
   // AI (OpenAI) state
@@ -154,19 +152,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     }
   }, []);
 
-  const loadAssistant = useCallback(async (nid) => {
-    try {
-      const [p, h, s, a, d] = await Promise.all([
-        api.get(`/notes/${nid}/preflight`),
-        api.get(`/notes/${nid}/client-history`),
-        api.get(`/notes/${nid}/smart-suggestions`),
-        api.get(`/notes/${nid}/alternatives`),
-        api.get(`/notes/${nid}/duplicates`),
-      ]);
-      setAssist({ preflight: p.data, history: h.data, suggestions: s.data, alternatives: a.data, duplicates: d.data });
-    } catch { /* ignore */ }
-  }, []);
-
   useEffect(() => {
     if (open) {
       setId(noteId);
@@ -176,8 +161,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
-      setAssist({ preflight: null, history: null, suggestions: null, alternatives: null, duplicates: null });
-      setNewQuote({ supplier_name: "", product: "", price: "", notes: "" });
       setCreateMode("choice");
       setCreateStep(0);
       setCaixSpec(createEmptyCaixilharia());
@@ -213,11 +196,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   useEffect(() => {
     if (open && id && tab === "orcamentos") loadClientTemplate(id);
   }, [open, id, tab, loadClientTemplate]);
-
-  // Load assistant lazily when tab is opened
-  useEffect(() => {
-    if (open && id && tab === "assistente" && !assist.preflight) loadAssistant(id);
-  }, [open, id, tab, assist.preflight, loadAssistant]);
 
   // Catálogo de caixilharia — carregado quando o utilizador escolhe o fluxo BandAluminios
   useEffect(() => {
@@ -274,7 +252,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   }, [form.phone, form.customer_name, form.description, isCreate, open]);
 
   const refresh = async () => {
-    if (id) { await loadNote(id); await loadSub(id); if (tab === "assistente") loadAssistant(id); }
+    if (id) { await loadNote(id); await loadSub(id); }
     onChanged && onChanged();
   };
 
@@ -312,7 +290,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
 
   // ---- Assistente de criação por etapas ----
-  const createSteps = createMode === "band" ? ["Cliente", "Caixilharia"] : ["Cliente", "Artigo", "Confirmar"];
+  const createSteps = createMode === "band" ? ["Cliente", "Caixilharia"] : ["Cliente", "Pedido", "Confirmar"];
   const isLastStep = createStep === createSteps.length - 1;
 
   const validClientStep = () => {
@@ -336,7 +314,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const wizardNext = () => {
     if (createStep === 0 && !validClientStep()) return;
     if (createMode === "normal" && createStep === 1 && !form.description.trim()) {
-      toast.error("Descreva o artigo pedido."); return;
+      toast.error("Descreva o pedido do cliente."); return;
     }
     setCreateStep((s) => s + 1);
   };
@@ -437,24 +415,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     await refresh();
   };
 
-  const applySuggestedSupplier = async () => {
-    const sup = assist.suggestions?.suggested_supplier;
-    if (!sup) return;
-    set("supplier_id", sup.id);
-    await api.put(`/notes/${id}`, { supplier_id: sup.id });
-    dirty.current = false;
-    toast.success(`Fornecedor sugerido aplicado: ${sup.name}`);
-    await refresh();
-  };
-  const applySuggestedReminder = async () => {
-    const days = assist.suggestions?.suggested_reminder_days;
-    if (!days) return;
-    set("reminder_interval_days", days);
-    await api.put(`/notes/${id}`, { reminder_interval_days: days });
-    dirty.current = false;
-    toast.success(`Lembrete configurado para ${days} dia(s)`);
-  };
-
   const addLabel = async (val) => {
     const v = (val || labelInput).trim();
     if (!v || form.labels.includes(v)) { setLabelInput(""); return; }
@@ -497,23 +457,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
   const toggleTask = async (t) => { await api.patch(`/tasks/${t.id}/toggle`); await loadSub(id); };
   const deleteTask = async (tid) => { await api.delete(`/tasks/${tid}`); await loadSub(id); };
-
-  const addQuote = async () => {
-    if (!newQuote.supplier_name || !newQuote.price) { toast.error("Indique fornecedor e preço."); return; }
-    await api.post(`/notes/${id}/quotes`, {
-      supplier_name: newQuote.supplier_name, product: newQuote.product || form.description,
-      price: parseFloat(newQuote.price), notes: newQuote.notes,
-    });
-    setNewQuote({ supplier_name: "", product: "", price: "", notes: "" });
-    toast.success("Orçamento adicionado");
-    await refresh();
-  };
-  const deleteQuote = async (qid) => { await api.delete(`/notes/${id}/quotes/${qid}`); await refresh(); };
-  const approveQuote = async (qid) => {
-    await api.post(`/notes/${id}/quotes/${qid}/approve`);
-    toast.success("Orçamento aprovado");
-    await refresh();
-  };
 
   // Load template (autofill by supplier / reminder) when supplier or reminder toggled
   const loadTemplate = async (supplierId, reminder) => {
@@ -566,14 +509,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     }
   };
 
-  const lowest = quotes.length ? Math.min(...quotes.filter((q) => q.price > 0).map((q) => q.price)) : null;
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
-  const pf = assist.preflight;
-  const sg = assist.suggestions;
-  const hist = assist.history;
-  const alt = assist.alternatives;
-  const dups = assist.duplicates?.matches || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -749,8 +686,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {createMode === "normal" && createStep === 1 ? (
                   <>
                     <div className="space-y-1.5">
-                      <Label>Descrição / pedido</Label>
-                      <Input data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Ex.: Motosserra a bateria 40V" />
+                      <Label>Pedido do cliente</Label>
+                      <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Motosserra a bateria 40V, cor, prazo, condições..." />
                     </div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
@@ -768,8 +705,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       </div>
                     </div>
                     <div className="mt-4 space-y-1.5">
-                      <Label>Referência do artigo (opcional)</Label>
-                      <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
+                      <Label>Código EAN13 (opcional)</Label>
+                      <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
                     </div>
                   </>
                 ) : null}
@@ -801,10 +738,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    <div className="mt-4 space-y-1.5">
-                      <Label>Notas adicionais (opcional)</Label>
-                      <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
                     </div>
                   </>
                 ) : null}
@@ -849,10 +782,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         ) : (
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
-            {/* No telemóvel as 5 tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
-            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-5">
+            {/* No telemóvel as tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
+            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-4">
               <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="shrink-0 text-xs">Detalhes</TabsTrigger>
-              <TabsTrigger value="assistente" data-testid="tab-assistente" className="shrink-0 text-xs" disabled={isCreate}>Assistente</TabsTrigger>
               <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="shrink-0 text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
               <TabsTrigger value="cronologia" data-testid="tab-cronologia" className="shrink-0 text-xs" disabled={isCreate}>Cronologia</TabsTrigger>
               <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="shrink-0 text-xs" disabled={isCreate}>Lembretes</TabsTrigger>
@@ -878,13 +810,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Referência do artigo</Label>
-                  <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ref. do produto" />
+                  <Label>Código EAN13</Label>
+                  <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
                 </div>
               </div>
               <div className="mt-4 space-y-1.5">
-                <Label>Descrição / pedido</Label>
-                <Input data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Ex.: Janela de correr alumínio" />
+                <Label>Pedido do cliente</Label>
+                <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -901,11 +833,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
                 </div>
               </div>
-              <div className="mt-4 space-y-1.5">
-                <Label>Notas adicionais</Label>
-                <Textarea data-testid="input-details" value={form.details} onChange={(e) => set("details", e.target.value)} rows={3} placeholder="Detalhes, prazo, condições..." />
-              </div>
-
               {/* Caixilharia à medida (BandAluminios) — só em pedidos criados no
                   fluxo à medida; um pedido normal de loja nunca ganha caixilharia */}
               {!isCreate && note?.caixilharia ? (
@@ -1016,123 +943,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               </Button>
             </TabsContent>
 
-            {/* ASSISTENTE */}
-            <TabsContent value="assistente" className="mt-0 focus-visible:outline-none">
-              {!pf ? (
-                <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-              ) : (
-                <div className="space-y-5">
-                  {/* Smart suggestion */}
-                  <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-violet-900"><Lightbulb className="h-4 w-4" /> Sugestão do assistente</h4>
-                    {sg?.learned && sg?.suggested_supplier ? (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-white p-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900">{sg.suggested_supplier.name}</p>
-                            <p className="truncate text-xs text-slate-500">{sg.supplier_reason}</p>
-                          </div>
-                          <Button data-testid="apply-suggested-supplier" size="sm" className="h-8 shrink-0 rounded-lg text-xs" onClick={applySuggestedSupplier}>Aplicar</Button>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-white p-3">
-                          <p className="text-xs text-slate-600">Lembrete sugerido: <b>{sg.suggested_reminder_days} dia(s)</b></p>
-                          <Button data-testid="apply-suggested-reminder" size="sm" variant="outline" className="h-8 shrink-0 rounded-lg text-xs" onClick={applySuggestedReminder}>Aplicar</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-xs text-violet-700/80">Ainda a aprender. Quando enviar mais pedidos, o assistente começa a sugerir o fornecedor automaticamente.</p>
-                    )}
-                  </section>
-
-                  {/* Preflight checklist */}
-                  <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
-                      <ClipboardCheck className="h-4 w-4" /> Antes de enviar {pf.product_label ? `· ${pf.product_label}` : ""}
-                    </h4>
-                    {pf.missing.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {pf.missing.map((m) => <span key={m} className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">Falta: {m}</span>)}
-                      </div>
-                    ) : (
-                      <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Toda a informação essencial está preenchida.</p>
-                    )}
-                    {pf.warnings.length > 0 ? (
-                      <div className="mt-2 space-y-1">
-                        {pf.warnings.map((w, i) => <p key={i} className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {w}</p>)}
-                      </div>
-                    ) : null}
-                    <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Checklist</p>
-                    <ul className="mt-1 space-y-1">
-                      {pf.checklist.map((c) => <li key={c} className="flex items-start gap-1.5 text-xs text-slate-600"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" /> {c}</li>)}
-                    </ul>
-                  </section>
-
-                  {/* Duplicates */}
-                  {dups.length > 0 ? (
-                    <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-amber-900"><GitCompare className="h-4 w-4" /> Possíveis duplicados</h4>
-                      <div className="mt-2 space-y-1.5">
-                        {dups.map((d) => (
-                          <div key={d.id} className="rounded-lg bg-white p-2.5 text-xs">
-                            <p className="font-semibold text-slate-900">{d.customer_name} — {d.description}</p>
-                            <p className="text-slate-500">{d.match_reasons.join(" · ")}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  ) : null}
-
-                  {/* Client history */}
-                  <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900"><History className="h-4 w-4" /> Histórico do cliente</h4>
-                    {hist ? (
-                      <div className="mt-2 space-y-2 text-xs">
-                        <p className="text-slate-600">{hist.past_count} pedido(s) anterior(es) deste cliente.</p>
-                        {hist.suppliers_used?.length ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="text-slate-400">Fornecedores usados:</span>
-                            {hist.suppliers_used.map((s) => <span key={s} className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{s}</span>)}
-                          </div>
-                        ) : null}
-                        {hist.reusable_quotes?.length ? (
-                          <div className="space-y-1">
-                            <p className="font-semibold text-slate-700">Orçamentos reutilizáveis (artigo semelhante):</p>
-                            {hist.reusable_quotes.map((q) => (
-                              <div key={q.id} className="flex items-center justify-between rounded-lg bg-slate-50 p-2">
-                                <span className="text-slate-700">{q.supplier_name} · {q.from_customer}</span>
-                                <span className="font-mono font-bold text-slate-900">{q.price?.toFixed(2)} €</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : <p className="mt-2 text-xs text-slate-400">Sem histórico.</p>}
-                  </section>
-
-                  {/* Alternatives */}
-                  {alt?.suggest_alternatives ? (
-                    <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-orange-900"><RefreshCw className="h-4 w-4" /> Fornecedor sem resposta</h4>
-                      <p className="mt-1 text-xs text-orange-800">
-                        {[
-                          alt.reminder_count ? `${alt.reminder_count} lembrete(s) por email` : "",
-                          alt.no_answer_count ? `${alt.no_answer_count} chamada(s) sem resposta` : "",
-                        ].filter(Boolean).join(" e ") || "Sem retorno até agora"}. Considere fornecedores alternativos:
-                      </p>
-                      <div className="mt-2 space-y-1.5">
-                        {alt.alternatives.map((s) => (
-                          <div key={s.id} className="flex items-center justify-between rounded-lg bg-white p-2 text-xs">
-                            <span className="font-semibold text-slate-900">{s.name}{s.email ? "" : " · (sem email)"}</span>
-                            {s.avg_hours != null ? <span className="text-slate-500">~{s.avg_hours}h resposta</span> : null}
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  ) : null}
-                </div>
-              )}
-            </TabsContent>
-
             {/* ORCAMENTOS */}
             <TabsContent value="orcamentos" className="mt-0 focus-visible:outline-none">
               <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
@@ -1236,46 +1046,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </section>
               ) : null}
 
-              <section className="mt-6">
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-slate-700" />
-                  <h4 className="font-heading text-sm font-extrabold text-slate-900">Comparar orçamentos recebidos</h4>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {quotes.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">Ainda sem orçamentos.</p>
-                  ) : quotes.map((q) => {
-                    const isBest = q.price === lowest && q.price > 0;
-                    return (
-                      <div key={q.id} data-testid={`quote-row-${q.id}`} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${isBest ? "border-emerald-300 bg-emerald-50" : q.approved ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white"}`}>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-slate-900">{q.supplier_name}</p>
-                            {isBest ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">Melhor preço</span> : null}
-                            {q.approved ? <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold uppercase text-white">Aprovado</span> : null}
-                          </div>
-                          {q.product ? <p className="truncate text-xs text-slate-500">{q.product}</p> : null}
-                          {q.notes ? <p className="truncate text-xs text-slate-400">{q.notes}</p> : null}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className={`font-mono text-base font-bold ${isBest ? "text-emerald-700" : "text-slate-900"}`}>{q.price.toFixed(2)} €</span>
-                          {!q.approved ? (
-                            <button data-testid={`approve-quote-${q.id}`} onClick={() => approveQuote(q.id)} title="Aprovar" className="rounded-lg p-1 text-slate-400 hover:text-emerald-600"><BadgeCheck className="h-4 w-4" /></button>
-                          ) : null}
-                          <button data-testid={`delete-quote-${q.id}`} onClick={() => deleteQuote(q.id)} className="rounded-lg p-1 text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2">
-                  <Input data-testid="quote-supplier-input" placeholder="Fornecedor" value={newQuote.supplier_name} onChange={(e) => setNewQuote((q) => ({ ...q, supplier_name: e.target.value }))} />
-                  <Input data-testid="quote-price-input" type="number" placeholder="Preço (€)" value={newQuote.price} onChange={(e) => setNewQuote((q) => ({ ...q, price: e.target.value }))} className="font-mono" />
-                  <Input data-testid="quote-product-input" placeholder="Artigo (opcional)" value={newQuote.product} onChange={(e) => setNewQuote((q) => ({ ...q, product: e.target.value }))} />
-                  <Input data-testid="quote-notes-input" placeholder="Nota (prazo, ref...)" value={newQuote.notes} onChange={(e) => setNewQuote((q) => ({ ...q, notes: e.target.value }))} />
-                  <Button data-testid="add-quote-btn" onClick={addQuote} className="rounded-xl sm:col-span-2"><Plus className="mr-2 h-4 w-4" /> Adicionar orçamento</Button>
-                </div>
-              </section>
             </TabsContent>
 
             {/* CRONOLOGIA */}
