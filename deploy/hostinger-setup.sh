@@ -169,11 +169,15 @@ fi
 APP_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 cat > /usr/local/bin/brico2 <<BRICO2
 #!/usr/bin/env bash
-# Atualiza o Brico2: git pull (PR merge mais recente em main) + rebuild
+# Atualiza o Brico2: git pull (PR merge mais recente em main) + rebuild.
+# Por omissão só reconstrói o(s) serviço(s) cujos ficheiros mudaram desde
+# a última vez (backend/ → API, frontend/ → site) — muito mais rápido
+# quando um PR só mexe num dos dois lados.
 # Uso:
-#   sudo brico2          — atualiza tudo (backend + frontend)
-#   sudo brico2 backend  — só API (mais rápido)
-#   sudo brico2 web      — só frontend
+#   sudo brico2          — atualiza e reconstrói só o que mudou
+#   sudo brico2 backend  — força só a API
+#   sudo brico2 web      — força só o frontend
+#   sudo brico2 all      — força os dois, mesmo sem alterações relevantes
 set -euo pipefail
 APP_DIR="$APP_ROOT"
 COMPOSE_FILE="\$APP_DIR/deploy/docker-compose.yml"
@@ -183,37 +187,63 @@ log() { printf '\n\033[1;34m▶ %s\033[0m\n' "\$*"; }
 ok()  { printf '\033[1;32m✅ %s\033[0m\n' "\$*"; }
 err() { printf '\n\033[1;31m❌ %s\033[0m\n' "\$*" >&2; exit 1; }
 
-SERVICES="\${@:-}"  # args livres: "backend", "web", ou vazio = tudo
+FORCE="\${*:-}"  # "backend", "web", "all", ou vazio = auto-deteta pelo git diff
 
 cd "\$APP_DIR"
 
+OLD_REV="\$(git rev-parse HEAD)"
 log "A puxar código mais recente do GitHub..."
 git fetch origin main
 git reset --hard origin/main
+NEW_REV="\$(git rev-parse HEAD)"
 ok "Código: \$(git log -1 --pretty='%h — %s')"
 
-if [[ -z "\$SERVICES" ]]; then
-  log "A reconstruir backend + frontend..."
-  docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" up -d --build --remove-orphans backend web
+if [[ "\$FORCE" == "all" ]]; then
+  SERVICES="backend web"
+elif [[ -n "\$FORCE" ]]; then
+  SERVICES="\$FORCE"
+elif [[ "\$OLD_REV" == "\$NEW_REV" ]]; then
+  SERVICES=""
+  ok "Já estava atualizado (\$(git log -1 --pretty='%h')) — nada para reconstruir."
 else
-  log "A reconstruir \$SERVICES..."
-  docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" up -d --build --remove-orphans \$SERVICES
+  CHANGED="\$(git diff --name-only "\$OLD_REV" "\$NEW_REV")"
+  NEED_BACKEND=0; NEED_WEB=0
+  if echo "\$CHANGED" | grep -qE '^(backend/|deploy/backend/)'; then NEED_BACKEND=1; fi
+  if echo "\$CHANGED" | grep -qE '^(frontend/|deploy/frontend/)'; then NEED_WEB=1; fi
+  if echo "\$CHANGED" | grep -qE '^deploy/Caddyfile\$'; then NEED_WEB=1; fi
+  # Ficheiros partilhados (compose, este script) — mais seguro reconstruir os dois.
+  if echo "\$CHANGED" | grep -qE '^deploy/(docker-compose\.yml|hostinger-setup\.sh)\$'; then NEED_BACKEND=1; NEED_WEB=1; fi
+  SERVICES=""
+  [[ "\$NEED_BACKEND" == 1 ]] && SERVICES="\$SERVICES backend"
+  [[ "\$NEED_WEB" == 1 ]] && SERVICES="\$SERVICES web"
+  SERVICES="\$(echo \$SERVICES)"  # limpa espaços a mais
+  if [[ -z "\$SERVICES" ]]; then
+    ok "Só mudaram ficheiros fora de backend/ ou frontend/ — nada para reconstruir."
+  fi
 fi
 
-log "A aguardar backend ficar saudável (máx 3 min)..."
-for i in \$(seq 1 36); do
-  if curl -fsS "http://127.0.0.1:8001/api/" >/dev/null 2>&1; then
-    ok "Backend saudável (tentativa \$i)"
-    break
-  fi
-  if [ "\$i" -eq 36 ]; then
-    err "Backend não respondeu em 3 min. Últimos logs:\$(docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" logs --tail=50 backend)"
-  fi
-  sleep 5
-done
+if [[ -n "\$SERVICES" ]]; then
+  log "A reconstruir: \$SERVICES..."
+  docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" up -d --build --remove-orphans \$SERVICES
 
-echo ""
-docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" ps
+  if [[ "\$SERVICES" == *backend* ]]; then
+    log "A aguardar backend ficar saudável (máx 3 min)..."
+    for i in \$(seq 1 36); do
+      if curl -fsS "http://127.0.0.1:8001/api/" >/dev/null 2>&1; then
+        ok "Backend saudável (tentativa \$i)"
+        break
+      fi
+      if [ "\$i" -eq 36 ]; then
+        err "Backend não respondeu em 3 min. Últimos logs:\$(docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" logs --tail=50 backend)"
+      fi
+      sleep 5
+    done
+  fi
+
+  echo ""
+  docker compose -f "\$COMPOSE_FILE" --env-file "\$ENV_FILE" ps
+fi
+
 echo ""
 ok "Deploy concluído em \$(date '+%H:%M:%S')."
 BRICO2
