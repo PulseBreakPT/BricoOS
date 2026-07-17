@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
-  Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard,
+  Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, Sun, AlertTriangle, Clock,
+  PhoneMissed, TrendingUp,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 
 const PRESETS = [
   { key: "todos", label: "Todos", filters: {} },
+  { key: "novos", label: "Novos", filters: { status: "novo" } },
   { key: "waiting_me", label: "À espera da minha ação", filters: { waiting: "me" } },
   { key: "callback", label: "Voltar a ligar", filters: { callback: true } },
   { key: "supplier", label: "Sem resposta", filters: { waiting: "supplier" } },
@@ -35,7 +37,38 @@ const PRESETS = [
   { key: "arquivados", label: "Arquivados", filters: { archived: true } },
 ];
 
-const DETAIL_TABS = ["detalhes", "assistente", "orcamentos", "cronologia", "tarefas"];
+const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 20) return "Boa tarde";
+  return "Boa noite";
+}
+
+// Chips de resumo do dia. Os que têm "preset" aplicam o filtro correspondente
+// na lista ao clicar — o resumo e a lista são o mesmo painel, não duas páginas.
+function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
+  const tones = {
+    slate: "bg-slate-100 text-slate-700",
+    blue: "bg-blue-50 text-blue-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+    green: "bg-emerald-50 text-emerald-700",
+  };
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 transition-shadow ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
+    >
+      {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+      <span className="text-lg font-extrabold tabular-nums">{value}</span>
+      <span className="text-xs font-semibold opacity-80">{label}</span>
+    </Tag>
+  );
+}
 
 export default function Notes() {
   const [items, setItems] = useState([]);
@@ -44,6 +77,7 @@ export default function Notes() {
   const [suppliers, setSuppliers] = useState([]);
   const [gmailStatus, setGmailStatus] = useState({ connected: false, configured: false });
   const [labels, setLabels] = useState([]);
+  const [today, setToday] = useState(null);
 
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -76,6 +110,14 @@ export default function Notes() {
     }
   }, []);
 
+  // Resumo do dia + alertas (antiga página "Hoje", agora no topo deste painel)
+  const loadToday = useCallback(async () => {
+    try {
+      const { data } = await api.get("/today");
+      setToday(data);
+    } catch { /* o painel funciona na mesma sem o resumo */ }
+  }, []);
+
   const loadNotes = useCallback(async () => {
     // Número de sequência: garante que uma resposta antiga (lenta) nunca
     // sobrepõe o resultado de um filtro mais recente.
@@ -105,8 +147,11 @@ export default function Notes() {
     }
   }, [preset, category, advSupplier, advPriority, sort, debounced]);
 
-  useEffect(() => { loadMeta(); }, [loadMeta]);
+  useEffect(() => { loadMeta(); loadToday(); }, [loadMeta, loadToday]);
   useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  // Depois de qualquer ação que mude pedidos, atualiza lista E resumo do dia.
+  const reloadAll = useCallback(() => { loadNotes(); loadToday(); }, [loadNotes, loadToday]);
   useEffect(() => { setFocusIndex(0); }, [preset, category, debounced, advSupplier, advPriority]);
   // Se a lista encolher (ex.: pedido resolvido), o índice do modo foco não pode ficar fora dela.
   useEffect(() => {
@@ -132,7 +177,7 @@ export default function Notes() {
       setDetailInitialTab(DETAIL_TABS.includes(openTab) ? openTab : "detalhes");
       setDetailOpen(true);
     }
-    if (g || openId) navigate("/clientes", { replace: true });
+    if (g || openId) navigate("/", { replace: true });
   }, [location.search, loadMeta, navigate]);
 
   const openNew = () => { setDetailNoteId(null); setDetailInitialTab("detalhes"); setDetailOpen(true); };
@@ -163,35 +208,35 @@ export default function Notes() {
     try {
       await api.patch(`/notes/${note.id}/status`, { status: note.next_status });
       toast.success(`Avançado para "${note.next_status_label}"`);
-      loadNotes();
+      reloadAll();
     } catch (e) { toast.error(getErrorMessage(e, "Erro ao avançar")); }
   };
   const contactClient = async (note) => {
     try {
       await api.post(`/notes/${note.id}/contact-client`, { method: "telefone" });
       toast.success("Registado: cliente contactado");
-      loadNotes();
+      reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const resolve = async (note) => {
     try {
       await api.post(`/notes/${note.id}/resolve`);
       toast.success("Pedido resolvido e arquivado");
-      loadNotes();
+      reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const reopen = async (note) => {
     try {
       await api.post(`/notes/${note.id}/reopen`);
       toast.success("Pedido reaberto");
-      loadNotes();
+      reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
   const duplicate = async (note) => {
     try {
       const { data } = await api.post(`/notes/${note.id}/duplicate`);
       toast.success("Pedido duplicado — altere apenas o necessário");
-      loadNotes();
+      reloadAll();
       openNote(data.id);
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
@@ -209,7 +254,7 @@ export default function Notes() {
         supplier_id: note.supplier_id, subject: tpl.subject, body: tpl.body, is_reminder: true,
       });
       toast.success("Lembrete enviado ao fornecedor");
-      loadNotes();
+      reloadAll();
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível enviar. Verifique o Gmail."));
       openNote(note.id);
@@ -243,14 +288,70 @@ export default function Notes() {
   };
 
   const focusNote = items[focusIndex];
+  const s = today?.summary || {};
+  const counts = today?.counts || {};
+  const attention = today?.attention || [];
 
   return (
     <div>
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Assistente de pedidos</p>
-        <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Pedidos de orçamento</h1>
-        <p className="hidden text-sm text-slate-500 sm:block">Todo o ciclo de vida — do pedido do cliente à encomenda.</p>
+        <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+          <Sun className="h-6 w-6 text-amber-400 sm:h-8 sm:w-8" /> {greeting()}, chefe
+        </h1>
+        <p className="text-sm text-slate-500">
+          {!today
+            ? "Todo o ciclo de vida — do pedido do cliente à encomenda."
+            : counts.waiting_me
+              ? `${counts.waiting_me} pedido(s) à espera da sua ação.`
+              : "Tudo tratado. Nada está à espera de si."}
+        </p>
       </div>
+
+      {/* Resumo do dia — cada chip com filtro aplica-o diretamente na lista */}
+      {today ? (
+        <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+          <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} active={preset === "novos"} onClick={() => setPreset(preset === "novos" ? "todos" : "novos")} />
+          <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
+          <SummaryChip label="a tratar por mim" value={counts.waiting_me ?? 0} tone="blue" icon={Zap} active={preset === "waiting_me"} onClick={() => setPreset(preset === "waiting_me" ? "todos" : "waiting_me")} />
+          <SummaryChip label="atrasados" value={s.atrasados ?? 0} tone="red" icon={AlertTriangle} active={preset === "overdue"} onClick={() => setPreset(preset === "overdue" ? "todos" : "overdue")} />
+          {counts.follow_up ? <SummaryChip label="a religar" value={counts.follow_up} tone="amber" icon={PhoneMissed} active={preset === "callback"} onClick={() => setPreset(preset === "callback" ? "todos" : "callback")} /> : null}
+          <SummaryChip label="novos hoje" value={s.novos_hoje ?? 0} tone="amber" icon={TrendingUp} />
+          <SummaryChip label="concluídos hoje" value={s.concluidos_hoje ?? 0} tone="green" icon={CheckCircle2} />
+        </div>
+      ) : null}
+
+      {/* Precisa de atenção — triagem no topo, o resto é a própria lista */}
+      {attention.length > 0 ? (
+        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-slate-900">
+            <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{today.attention_count}</span>
+          </h2>
+          <div className="mt-3 space-y-2">
+            {attention.slice(0, 4).map((a) => (
+              <button
+                key={a.id} data-testid={`attention-${a.id}`}
+                onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
+                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40"}`}
+              >
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-extrabold text-slate-900">{a.title}</p>
+                  <p className="truncate text-xs text-slate-500">{a.message}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+              </button>
+            ))}
+            {today.attention_count > 4 ? (
+              <button onClick={() => setPreset("overdue")} className="w-full rounded-xl border border-dashed border-slate-200 p-2 text-center text-xs font-semibold text-slate-500 hover:text-slate-900">
+                Ver os restantes na lista (filtro "Atrasados") →
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-3 sm:mt-6">
         <div className="flex gap-2">
@@ -395,7 +496,7 @@ export default function Notes() {
         suppliers={suppliers}
         gmailStatus={gmailStatus}
         labelsList={labels}
-        onChanged={loadNotes}
+        onChanged={reloadAll}
       />
     </div>
   );

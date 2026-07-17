@@ -65,7 +65,7 @@ export default function Dashboard() {
               <h2 className="font-heading text-lg font-bold tracking-tight text-slate-900">
                 Precisa de atenção {notifs.count > 0 ? <span className="text-red-500">({notifs.count})</span> : null}
               </h2>
-              <Link to="/clientes" data-testid="link-ver-pedidos" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-900">Ver pedidos <ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/" data-testid="link-ver-pedidos" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-900">Ver pedidos <ArrowRight className="h-4 w-4" /></Link>
             </div>
             <div className="mt-4 space-y-2">
               {notifs.items.length === 0 ? (
@@ -73,7 +73,7 @@ export default function Dashboard() {
               ) : notifs.items.slice(0, 6).map((n) => {
                 const sev = SEV_ICON[n.severity] || SEV_ICON.low;
                 return (
-                  <button key={n.id} data-testid={`dash-alert-${n.id}`} onClick={() => n.note_id ? navigate(`/clientes?open=${n.note_id}`) : navigate("/tarefas")}
+                  <button key={n.id} data-testid={`dash-alert-${n.id}`} onClick={() => n.note_id ? navigate(`/?open=${n.note_id}`) : navigate("/tarefas")}
                     className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:brightness-[0.98] ${sev.ring}`}>
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sev.bg}`}>
                       {n.kind === "urgent" ? <Zap className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
