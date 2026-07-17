@@ -1747,14 +1747,20 @@ async def generate_client_pdf(note_id: str):
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "client_pdf", "filename": filename,
         "content_b64": base64.b64encode(pdf_bytes).decode(), "created_at": now_iso()})
-    total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1)
-                for i in supplier_quote.get("items", []) if i.get("include", True))
+    included = [i for i in supplier_quote.get("items", []) if i.get("include", True)]
+    total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1) for i in included)
+    # Margem final efetiva sobre o custo c/IVA — fica na cronologia para ser
+    # fácil reportar a que margem o orçamento foi enviado ao cliente.
+    cost_total = sum((i.get("supplier_unit_price") or 0) * 1.23 * int(i.get("qty") or 1) for i in included)
+    eff_margin = round((total / cost_total - 1) * 100, 1) if cost_total > 0 else None
+    margin_txt = f" · margem final {eff_margin:.1f}%" if eff_margin is not None else ""
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote.client_pdf_file_id": file_id,
-        "supplier_quote.client_pdf_generated_at": now_iso(), "updated_at": now_iso()}})
+        "supplier_quote.client_pdf_generated_at": now_iso(),
+        "supplier_quote.client_pdf_margin_pct": eff_margin, "updated_at": now_iso()}})
     await log_activity(note_id, "updated",
-                       f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA)",
-                       {"file_id": file_id})
+                       f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA{margin_txt})",
+                       {"file_id": file_id, "eff_margin_pct": eff_margin})
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
