@@ -792,9 +792,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           </div>
 
           <div ref={contentScrollRef} data-testid="note-scroll-area" className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
-            {/* DETALHES */}
+            {/* DETALHES — informação agrupada por categorias com separadores */}
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <SectionTitle first title="Cliente" />
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Nome do cliente</Label>
                   <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
@@ -804,21 +805,21 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                 </div>
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Email do cliente</Label>
-                  <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
-                </div>
+              <div className="mt-4 space-y-1.5">
+                <Label>Email do cliente</Label>
+                <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+              </div>
+
+              <SectionTitle title="Artigo" />
+              <div className="mt-3 space-y-1.5">
+                <Label>Pedido do cliente</Label>
+                <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Código EAN13</Label>
                   <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
                 </div>
-              </div>
-              <div className="mt-4 space-y-1.5">
-                <Label>Pedido do cliente</Label>
-                <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Secção</Label>
                   <Select value={form.category} onValueChange={(v) => set("category", v)}>
@@ -890,9 +891,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
               ) : null}
 
-              {/* Labels */}
-              <div className="mt-4 space-y-1.5">
-                <Label>Etiquetas</Label>
+              <SectionTitle title="Etiquetas" />
+              <div className="mt-3 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {form.labels.map((l) => (
                     <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -916,7 +916,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
               </div>
 
-              <div className="mt-4 space-y-1.5">
+              <SectionTitle title="Fornecedor e alertas" />
+              <div className="mt-3 space-y-1.5">
                 <Label>Fornecedor preferido</Label>
                 <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
                   <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
@@ -1144,5 +1145,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
       <CaixilhariaDialog open={caixOpen} onOpenChange={setCaixOpen} note={note} suppliers={suppliers} onSaved={refresh} />
     </Dialog>
+  );
+}
+
+function SectionTitle({ title, first = false }) {
+  return (
+    <h3 className={`flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-400 ${first ? "" : "mt-6 border-t border-slate-200 pt-5"}`}>
+      {title}
+    </h3>
   );
 }

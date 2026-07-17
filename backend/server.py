@@ -1082,7 +1082,23 @@ async def list_notes(
                                  d.get("status_updated_at") or d.get("created_at")))
     skip = max(skip, 0)
     limit = min(max(limit, 1), 500)
-    return {"items": docs[skip:skip + limit], "total": len(docs)}
+    page = docs[skip:skip + limit]
+    # Últimas alterações de cada pedido da página, numa única consulta —
+    # aparecem no cartão da lista sem ser preciso abrir o pedido.
+    ids = [d["id"] for d in page]
+    if ids:
+        acts = await db.activities.find(
+            {"note_id": {"$in": ids}},
+            {"_id": 0, "note_id": 1, "type": 1, "message": 1, "created_at": 1},
+        ).sort("created_at", -1).to_list(20000)
+        recent = {}
+        for a in acts:
+            bucket = recent.setdefault(a["note_id"], [])
+            if len(bucket) < 3:
+                bucket.append(a)
+        for d in page:
+            d["recent_activities"] = recent.get(d["id"], [])
+    return {"items": page, "total": len(docs)}
 
 
 @api_router.post("/notes/check-duplicate")
