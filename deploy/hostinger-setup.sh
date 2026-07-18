@@ -116,7 +116,12 @@ BACKEND_PORT=8001
 CORS_ORIGINS=https://${SITE_DOMAIN}
 PUBLIC_BASE_URL=https://${SITE_DOMAIN}
 
-# --- Gmail (opcional): credenciais OAuth do Google Cloud Console -----------
+# --- Gmail por SMTP (recomendado): palavra-passe de aplicação ---------------
+# Gera em https://myaccount.google.com/apppasswords (requer 2FA ativa).
+GMAIL_SMTP_USER=
+GMAIL_SMTP_APP_PASSWORD=
+
+# --- Gmail por OAuth (alternativa): credenciais do Google Cloud Console -----
 # Redirect URI a registar: https://${SITE_DOMAIN}/api/oauth/gmail/callback
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
