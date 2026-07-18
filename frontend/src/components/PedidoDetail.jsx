@@ -21,6 +21,7 @@ import {
   FileUp, FileText, Download, Inbox, RefreshCw,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
+import { withDeviceToken } from "@/lib/deviceAuth";
 import { CATEGORY_LIST } from "@/lib/categories";
 import {
   STATUS_ORDER, getStatusCfg, PRIORITY_ORDER, PRIORITY_CONFIG,
@@ -1164,7 +1165,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                               {m.attachments.map((a) => (
                                 <a
                                   key={a.id}
-                                  href={`${API}/emails/${m.id}/attachments/${a.id}`}
+                                  href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
@@ -1292,7 +1293,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         {sq.client_pdf_file_id ? (
                           <a
                             data-testid="sq-download-last"
-                            href={`${API}/notes/${id}/files/${sq.client_pdf_file_id}`}
+                            href={withDeviceToken(`${API}/notes/${id}/files/${sq.client_pdf_file_id}`)}
                             className="inline-flex items-center rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
                           >
                             <Download className="mr-1.5 h-3.5 w-3.5" /> Último PDF

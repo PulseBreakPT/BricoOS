@@ -1,6 +1,7 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import PinGate from "@/components/PinGate";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
@@ -18,18 +19,23 @@ function LegacyClientesRedirect() {
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Notes />} />
-            <Route path="/clientes" element={<LegacyClientesRedirect />} />
-            <Route path="/estatisticas" element={<Dashboard />} />
-            <Route path="/fornecedores" element={<Suppliers />} />
-            <Route path="/tarefas" element={<Tasks />} />
-            <Route path="/catalogo-tecnico" element={<Catalog />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      {/* O PinGate envolve o Router inteiro: todas as rotas — atuais e futuras —
+          só montam depois de o dispositivo estar verificado, e o utilizador fica
+          no URL que tentou abrir. */}
+      <PinGate>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Notes />} />
+              <Route path="/clientes" element={<LegacyClientesRedirect />} />
+              <Route path="/estatisticas" element={<Dashboard />} />
+              <Route path="/fornecedores" element={<Suppliers />} />
+              <Route path="/tarefas" element={<Tasks />} />
+              <Route path="/catalogo-tecnico" element={<Catalog />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </PinGate>
       <Toaster position="top-center" richColors closeButton />
     </div>
   );
