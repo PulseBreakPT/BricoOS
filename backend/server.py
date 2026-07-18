@@ -19,8 +19,10 @@ import warnings
 import email as email_lib
 from email.header import decode_header
 from email.mime.application import MIMEApplication
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr
+from html import escape as html_escape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing import List, Optional
@@ -2019,12 +2021,51 @@ async def gmail_disconnect():
     return {"ok": True}
 
 
+# Assinatura de email (imagem embutida no corpo, visível sem abrir anexos).
+SIGNATURE_PATH = ROOT_DIR / "assets" / "assinatura_email.png"
+_signature_cache = {"loaded": False, "data": None}
+
+
+def _signature_bytes():
+    if not _signature_cache["loaded"]:
+        _signature_cache["loaded"] = True
+        try:
+            _signature_cache["data"] = SIGNATURE_PATH.read_bytes()
+        except OSError:
+            _signature_cache["data"] = None
+    return _signature_cache["data"]
+
+
 def _build_email_body(body, attachments=None):
-    """Mensagem simples ou multipart com PDFs anexados."""
+    """Corpo do email com a assinatura embutida no fim (HTML + imagem inline
+    via cid, com fallback em texto simples) e PDFs anexados quando existem."""
+    signature = _signature_bytes()
+    if signature:
+        related = MIMEMultipart("related")
+        alternative = MIMEMultipart("alternative")
+        alternative.attach(MIMEText(body))
+        # width=420 num asset de 840px: tamanho confortável em qualquer
+        # cliente de email, nítido em ecrãs retina, nunca maior que o ecrã.
+        html = (
+            '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;'
+            'color:#111111;white-space:pre-wrap;">' + html_escape(body) + "</div>"
+            '<br/><img src="cid:assinatura" width="420" '
+            'style="max-width:100%;height:auto;border:0;display:block;" '
+            'alt="Bricomarché Faro"/>'
+        )
+        alternative.attach(MIMEText(html, "html"))
+        related.attach(alternative)
+        image = MIMEImage(signature, _subtype="png")
+        image.add_header("Content-ID", "<assinatura>")
+        image.add_header("Content-Disposition", "inline", filename="assinatura.png")
+        related.attach(image)
+        core = related
+    else:
+        core = MIMEText(body)
     if not attachments:
-        return MIMEText(body)
-    message = MIMEMultipart()
-    message.attach(MIMEText(body))
+        return core
+    message = MIMEMultipart("mixed")
+    message.attach(core)
     for att in attachments:
         part = MIMEApplication(att["data"], _subtype="pdf")
         part.add_header("Content-Disposition", "attachment",
