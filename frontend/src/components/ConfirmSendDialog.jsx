@@ -104,7 +104,16 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
           </div>
           <div className="mt-3 space-y-1.5">
             <Label>Assunto</Label>
-            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-amber-400 bg-amber-50" : ""} />
+            {pending.subject_needs_review ? (
+              <p data-testid="subject-review-warning" className="text-xs text-amber-700">
+                {(pending.obra_candidates || []).length > 1
+                  ? `O PDF tem vários números de obra possíveis (${pending.obra_candidates.join(", ")}) — confirme o assunto antes de enviar.`
+                  : "Não foi possível ler o número da obra no PDF — confirme o assunto antes de enviar."}
+              </p>
+            ) : (
+              pending.obra ? <p className="text-[11px] text-slate-400">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
+            )}
           </div>
           <div className="mt-3 space-y-1.5">
             <Label>Mensagem</Label>

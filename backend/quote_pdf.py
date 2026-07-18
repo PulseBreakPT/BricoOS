@@ -136,10 +136,16 @@ def parse_supplier_pdf(pdf_bytes):
         raise ValueError("PDF não reconhecido — esperava um orçamento BandAluminios "
                          "com «Orçamento número» e a tabela de caixilhos.")
 
+    # Número da obra: identificador sequencial do PDF, usado tal e qual no
+    # assunto do email ao cliente. Se o documento tiver identificadores
+    # diferentes (ou nenhum), o assunto fica marcado para revisão manual.
+    obra_candidates = list(dict.fromkeys(
+        m.strip().rstrip(".,;") for m in re.findall(r"Obra:\s*(\S+)", full_text) if m.strip()))
     header = {
         "quote_number": re.sub(r"\s+", " ", quote_number),
         "date": _header_field(full_text, r"Data:\s*([\d-]+)"),
-        "obra": _header_field(full_text, r"Obra:\s*(\S+)"),
+        "obra": obra_candidates[0] if len(obra_candidates) == 1 else "",
+        "obra_candidates": obra_candidates,
         "client_number": _header_field(full_text, r"Nº Cliente:\s*(\d+)"),
         "nif": _header_field(full_text, r"Contribuinte:\s*(\d+)"),
         "phone": _header_field(full_text, r"Telf\.?:\s*(\d+)"),

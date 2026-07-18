@@ -1813,9 +1813,25 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
     # confirmação no ecrã de revisão — nada é enviado automaticamente.
     n = await db.notes.find_one({"id": note_id}, {"_id": 0})
     template = client_quote_template(n)
+    # Assunto automático: «Orçamento Cliente <nº da obra>», com o identificador
+    # lido do PDF do fornecedor tal e qual aparece no documento. Só é usado
+    # quando há exatamente UM identificador — caso contrário o assunto fica
+    # marcado para revisão e mantém-se o modelo habitual.
+    obra = (supplier_quote.get("obra") or "").strip()
+    candidates = supplier_quote.get("obra_candidates")
+    if candidates is None:
+        candidates = [obra] if obra else []
+    if obra and len(candidates) == 1:
+        subject = f"Orçamento Cliente {obra}"
+        subject_needs_review = False
+    else:
+        subject = template.get("subject", "")
+        subject_needs_review = True
     await db.notes.update_one({"id": note_id}, {"$set": {
         "pending_client_send": {
-            "subject": template.get("subject", ""), "body": template.get("body", ""),
+            "subject": subject, "body": template.get("body", ""),
+            "subject_needs_review": subject_needs_review,
+            "obra": obra, "obra_candidates": candidates,
             "to": (n.get("email") or "").strip(), "pdf_file_id": file_id,
             "pdf_filename": filename, "total": round(total, 2),
             "eff_margin_pct": eff_margin, "created_at": now_iso()},
