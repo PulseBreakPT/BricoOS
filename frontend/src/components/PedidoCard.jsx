@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import {
   Star, Ruler, Phone, AlertTriangle, ArrowRight, Tag, MoreVertical, Send,
   PhoneCall, PhoneMissed, CheckCircle2, Copy, ArchiveRestore, Clock, CalendarClock,
+  MailCheck,
 } from "lucide-react";
 import { getCategory } from "@/lib/categories";
 import {
@@ -103,6 +104,9 @@ export default function PedidoCard({ note, onOpen, actions }) {
           {note.is_overdue ? <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700"><AlertTriangle className="h-3 w-3" /> Parado há {note.waiting_days}d</span> : null}
           {note.days_since_supplier != null && note.status === "aguarda_fornecedor" && !note.is_overdue ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500"><Clock className="h-3 w-3" /> Enviado há {note.days_since_supplier}d</span>
+          ) : null}
+          {note.pending_client_send ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700"><MailCheck className="h-3 w-3" /> Pronto p/ enviar</span>
           ) : null}
           {note.client_no_answer_count > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600"><PhoneMissed className="h-3 w-3" /> Cliente s/ resposta {note.client_no_answer_count}×</span>

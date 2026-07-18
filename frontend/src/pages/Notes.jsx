@@ -4,7 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
-  PhoneMissed, TrendingUp, Frame, Store,
+  PhoneMissed, TrendingUp, Frame, Store, MailCheck,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/pedido";
 import PedidoCard from "@/components/PedidoCard";
 import PedidoDetail from "@/components/PedidoDetail";
+import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -118,6 +119,7 @@ export default function Notes() {
   const [detailNoteId, setDetailNoteId] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState("detalhes");
   const [detailCreateMode, setDetailCreateMode] = useState("choice");
+  const [confirmNote, setConfirmNote] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
 
@@ -399,6 +401,39 @@ export default function Notes() {
         </div>
       ) : null}
 
+      {/* Prontos para enviar — email + PDF preparados automaticamente a partir
+          do email do fornecedor; um clique abre o ecrã de confirmação */}
+      {(today?.to_confirm || []).length > 0 ? (
+        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-emerald-900">
+            <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
+          </h2>
+          <p className="mt-0.5 text-xs text-emerald-800/80">Analisados e calculados automaticamente — só falta a sua confirmação.</p>
+          <div className="mt-3 space-y-2">
+            {today.to_confirm.map((n) => (
+              <button
+                key={n.id}
+                data-testid={`to-confirm-${n.id}`}
+                onClick={() => setConfirmNote(n)}
+                className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-emerald-100/60"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-extrabold text-slate-900">{n.customer_name || "Sem nome"}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {n.pending_client_send?.pdf_filename || "PDF pronto"}
+                    {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                  <Send className="h-3.5 w-3.5" /> Rever e enviar
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* Precisa de atenção — triagem no topo, o resto é a própria lista */}
       {attention.length > 0 ? (
         <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -577,6 +612,13 @@ export default function Notes() {
         gmailStatus={gmailStatus}
         labelsList={labels}
         onChanged={reloadAll}
+      />
+
+      <ConfirmSendDialog
+        open={!!confirmNote}
+        onOpenChange={(v) => { if (!v) setConfirmNote(null); }}
+        note={confirmNote}
+        onDone={reloadAll}
       />
     </div>
   );

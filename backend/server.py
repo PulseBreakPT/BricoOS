@@ -18,6 +18,8 @@ import smtplib
 import warnings
 import email as email_lib
 from email.header import decode_header
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -1267,6 +1269,52 @@ async def contact_client(note_id: str, payload: ContactClientIn):
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
+class ClientSendIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    subject: str = ""
+    body: str = ""
+    to: str = ""
+    pdf_file_id: str = ""
+
+
+@api_router.post("/notes/{note_id}/send-client-quote")
+async def send_client_quote(note_id: str, payload: ClientSendIn):
+    """Envio do orçamento ao cliente por email, com o PDF anexado — só corre
+    depois da confirmação explícita no ecrã de revisão."""
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    to = payload.to.strip() or (n.get("email") or "").strip()
+    if not to:
+        raise HTTPException(status_code=400, detail="O cliente não tem email — adicione-o nos Detalhes.")
+    if not payload.subject.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
+    attachments = []
+    file_id = payload.pdf_file_id or (n.get("pending_client_send") or {}).get("pdf_file_id") or ""
+    if file_id:
+        f = await db.note_files.find_one({"id": file_id, "note_id": note_id}, {"_id": 0})
+        if f:
+            attachments.append({"data": base64.b64decode(f["content_b64"]), "filename": f.get("filename")})
+    await _send_email(to, payload.subject, payload.body, attachments)
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
+        "status_updated_at": now_iso(), "updated_at": now_iso()},
+        "$unset": {"pending_client_send": ""}})
+    anexo = f" com {attachments[0]['filename']}" if attachments else ""
+    await log_activity(note_id, "email_sent", f"Orçamento enviado ao cliente por email{anexo}",
+                       {"to": to, "file_id": file_id})
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
+@api_router.delete("/notes/{note_id}/pending-client-send")
+async def cancel_pending_client_send(note_id: str):
+    """Descarta o rascunho preparado automaticamente — nada foi enviado."""
+    await db.notes.update_one({"id": note_id}, {
+        "$unset": {"pending_client_send": ""}, "$set": {"updated_at": now_iso()}})
+    await log_activity(note_id, "updated", "Rascunho de email ao cliente descartado (nada foi enviado)")
+    return {"ok": True}
+
+
 @api_router.post("/notes/{note_id}/quick-log")
 async def quick_log(note_id: str, payload: QuickLogIn):
     cfg = QUICK_LOG_EVENTS[payload.event]
@@ -1759,6 +1807,17 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
     await log_activity(note_id, "updated",
                        f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA{margin_txt}){source_label}",
                        {"file_id": file_id, "eff_margin_pct": eff_margin})
+    # Prepara logo o email para o cliente com o PDF anexado. Fica PENDENTE de
+    # confirmação no ecrã de revisão — nada é enviado automaticamente.
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    template = client_quote_template(n)
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "pending_client_send": {
+            "subject": template.get("subject", ""), "body": template.get("body", ""),
+            "to": (n.get("email") or "").strip(), "pdf_file_id": file_id,
+            "pdf_filename": filename, "total": round(total, 2),
+            "eff_margin_pct": eff_margin, "created_at": now_iso()},
+        "updated_at": now_iso()}})
     return pdf_bytes, filename, file_id
 
 
@@ -1960,8 +2019,22 @@ async def gmail_disconnect():
     return {"ok": True}
 
 
-def _smtp_send(to_email, subject, body):
-    message = MIMEText(body)
+def _build_email_body(body, attachments=None):
+    """Mensagem simples ou multipart com PDFs anexados."""
+    if not attachments:
+        return MIMEText(body)
+    message = MIMEMultipart()
+    message.attach(MIMEText(body))
+    for att in attachments:
+        part = MIMEApplication(att["data"], _subtype="pdf")
+        part.add_header("Content-Disposition", "attachment",
+                        filename=att.get("filename") or "documento.pdf")
+        message.attach(part)
+    return message
+
+
+def _smtp_send(to_email, subject, body, attachments=None):
+    message = _build_email_body(body, attachments)
     message["From"] = GMAIL_SMTP_USER
     message["To"] = to_email
     message["Subject"] = subject
@@ -1970,12 +2043,12 @@ def _smtp_send(to_email, subject, body):
         smtp.sendmail(GMAIL_SMTP_USER, [to_email], message.as_string())
 
 
-async def _send_email(to_email, subject, body):
+async def _send_email(to_email, subject, body, attachments=None):
     if not to_email:
-        raise HTTPException(status_code=400, detail="O fornecedor não tem email definido.")
+        raise HTTPException(status_code=400, detail="O destinatário não tem email definido.")
     if SMTP_CONFIGURED:
         try:
-            await asyncio.to_thread(_smtp_send, to_email, subject, body)
+            await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments)
             return
         except smtplib.SMTPAuthenticationError:
             raise HTTPException(status_code=502, detail="O Gmail recusou a palavra-passe de aplicação (SMTP). "
@@ -1988,7 +2061,7 @@ async def _send_email(to_email, subject, body):
         raise HTTPException(status_code=400, detail="Gmail não está ligado. Ligue a sua conta Gmail para enviar emails automaticamente.")
     try:
         service = build("gmail", "v1", credentials=creds)
-        message = MIMEText(body)
+        message = _build_email_body(body, attachments)
         message["to"] = to_email
         message["subject"] = subject
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -2353,6 +2426,10 @@ async def build_notifications():
         if n.get("priority") == "urgente":
             out.append({"id": f"{n['id']}-urg", "note_id": n["id"], "kind": "urgent", "severity": "high",
                         "title": f"{cust} · URGENTE", "message": f"Pedido urgente. {NEXT_ACTION.get(status)}", "days": days})
+        if n.get("pending_client_send"):
+            out.append({"id": f"{n['id']}-send", "note_id": n["id"], "kind": "confirm_send", "severity": "high",
+                        "title": f"{cust} · orçamento pronto a enviar",
+                        "message": "Email e PDF preparados automaticamente — reveja e confirme o envio.", "days": days})
         for side, who in (("client", "cliente"), ("supplier", "fornecedor")):
             attempts = n.get(f"{side}_no_answer_count", 0) or 0
             if attempts and callback_due(n, now, side):
@@ -2411,6 +2488,10 @@ async def today(segment: Optional[str] = None):
     follow_up_calls = sorted(
         [d for d in open_docs if d.get("needs_callback")],
         key=lambda d: -max(d.get("client_no_answer_count", 0), d.get("supplier_no_answer_count", 0)))
+    # Orçamentos com email+PDF preparados automaticamente — só falta confirmar.
+    to_confirm = sorted(
+        [d for d in open_docs if d.get("pending_client_send")],
+        key=lambda d: (d.get("pending_client_send") or {}).get("created_at") or "", reverse=True)
     st = await stats()
     summary = st["daily"]
     if seg:
@@ -2434,10 +2515,11 @@ async def today(segment: Optional[str] = None):
     return {"attention": items[:20], "attention_count": len(items), "inbox": inbox,
             "waiting_me": waiting_me[:60], "waiting_supplier": waiting_supplier[:60],
             "waiting_client": waiting_client[:60], "long_waiting_clients": long_waiting_clients,
-            "reminder_due": reminder_due, "follow_up_calls": follow_up_calls[:20], "counts": {
+            "reminder_due": reminder_due, "follow_up_calls": follow_up_calls[:20],
+            "to_confirm": to_confirm[:20], "counts": {
                 "waiting_me": len(waiting_me), "waiting_supplier": len(waiting_supplier),
                 "waiting_client": len(waiting_client), "reminder_due": len(reminder_due),
-                "follow_up": len(follow_up_calls)},
+                "follow_up": len(follow_up_calls), "to_confirm": len(to_confirm)},
             "summary": summary, "potential_value": st["potential_value"]}
 
 
