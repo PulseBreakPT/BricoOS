@@ -488,6 +488,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
   const sendEmail = async () => {
     if (!emailSupplier) { toast.error("Escolha um fornecedor."); return; }
+    const sup = suppliers.find((s) => s.id === emailSupplier);
+    const kind = isReminder ? "o LEMBRETE" : "o pedido de cotação";
+    if (!window.confirm(`Confirmar envio d${kind} a ${sup?.name || "fornecedor"} (${sup?.email || "sem email"})?\n\nAssunto: ${emailData.subject}`)) return;
     setSending(true);
     try {
       await api.post(`/notes/${id}/send-quote-request`, {
@@ -527,6 +530,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // Envio direto ao cliente — só acontece por clique explícito neste botão.
   const sendClientEmail = async () => {
     if (sendingClient) return;
+    if (!window.confirm(`Confirmar envio do orçamento ao CLIENTE (${form.email})?\n\nAssunto: ${clientEmailData.subject}`)) return;
     setSendingClient(true);
     try {
       const { data } = await api.post(`/notes/${id}/send-client-email`, {
@@ -1155,6 +1159,21 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                             <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
                           </summary>
                           <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+                          {(m.attachments || []).length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {m.attachments.map((a) => (
+                                <a
+                                  key={a.id}
+                                  href={`${API}/emails/${m.id}/attachments/${a.id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                                >
+                                  <FileText className="h-3.5 w-3.5" /> {a.filename}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
                         </details>
                       ))}
                     </div>

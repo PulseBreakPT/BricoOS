@@ -246,6 +246,7 @@ export default function Notes() {
       openNote(note.id);
       return;
     }
+    if (!window.confirm(`Confirmar envio do lembrete por email ao fornecedor do pedido de ${note.customer_name || "este cliente"}?`)) return;
     try {
       const { data: tpl } = await api.get(`/notes/${note.id}/quote-template`, {
         params: { supplier_id: note.supplier_id, is_reminder: true },

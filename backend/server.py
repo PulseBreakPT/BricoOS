@@ -1680,22 +1680,15 @@ def _client_pdf_filename(quote_number):
     return f"Orcamento_{ref}_cliente.pdf"
 
 
-@api_router.post("/notes/{note_id}/supplier-pdf")
-async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
-    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
-    if not note:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    data = await file.read()
-    if len(data) > MAX_SUPPLIER_PDF_BYTES:
-        raise HTTPException(status_code=400, detail="O PDF é demasiado grande (máx. 15 MB).")
-    try:
-        parsed = parse_supplier_pdf(data)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
+    """Analisa o PDF do fornecedor, sugere preços de venda e guarda tudo no
+    pedido. Usado pelo upload manual e pela receção automática por email.
+    Levanta ValueError se o PDF não for reconhecido."""
+    parsed = parse_supplier_pdf(data)
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
-        "filename": file.filename or "orcamento_fornecedor.pdf",
+        "filename": filename or "orcamento_fornecedor.pdf",
         "content_b64": base64.b64encode(data).decode(), "created_at": now_iso()})
     for item in parsed["items"]:
         material = detect_material(item.get("description"))
@@ -1712,7 +1705,7 @@ async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
         "supplier_quote": supplier_quote, "updated_at": now_iso()}})
     await log_activity(note_id, "updated",
                        f"Orçamento do fornecedor importado ({supplier_quote['quote_number']}, "
-                       f"{len(parsed['items'])} linha(s))", {"file_id": file_id})
+                       f"{len(parsed['items'])} linha(s)){source_label}", {"file_id": file_id})
     # O total do fornecedor entra no fluxo normal de orçamentos recebidos
     # (muda o estado e alimenta as estatísticas de resposta).
     if parsed.get("total"):
@@ -1721,6 +1714,47 @@ async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
             product=(parsed["items"][0].get("description") or "").split("\n")[0],
             price=parsed["total"],
             notes=f"Importado do PDF {supplier_quote['quote_number']} (total c/ IVA)"))
+    return supplier_quote
+
+
+async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
+    """Gera o PDF de venda ao cliente e guarda-o no pedido. Não envia nada.
+    Levanta ValueError se não houver linhas incluídas/válidas."""
+    pdf_bytes = build_client_pdf(supplier_quote, BRICO_LOGO_PATH.read_bytes())
+    filename = _client_pdf_filename(supplier_quote.get("quote_number"))
+    file_id = str(uuid.uuid4())
+    await db.note_files.insert_one({
+        "id": file_id, "note_id": note_id, "kind": "client_pdf", "filename": filename,
+        "content_b64": base64.b64encode(pdf_bytes).decode(), "created_at": now_iso()})
+    included = [i for i in supplier_quote.get("items", []) if i.get("include", True)]
+    total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1) for i in included)
+    # Margem final efetiva sobre o custo c/IVA — fica na cronologia para ser
+    # fácil reportar a que margem o orçamento foi enviado ao cliente.
+    cost_total = sum((i.get("supplier_unit_price") or 0) * 1.23 * int(i.get("qty") or 1) for i in included)
+    eff_margin = round((total / cost_total - 1) * 100, 1) if cost_total > 0 else None
+    margin_txt = f" · margem final {eff_margin:.1f}%" if eff_margin is not None else ""
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "supplier_quote.client_pdf_file_id": file_id,
+        "supplier_quote.client_pdf_generated_at": now_iso(),
+        "supplier_quote.client_pdf_margin_pct": eff_margin, "updated_at": now_iso()}})
+    await log_activity(note_id, "updated",
+                       f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA{margin_txt}){source_label}",
+                       {"file_id": file_id, "eff_margin_pct": eff_margin})
+    return pdf_bytes, filename, file_id
+
+
+@api_router.post("/notes/{note_id}/supplier-pdf")
+async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    data = await file.read()
+    if len(data) > MAX_SUPPLIER_PDF_BYTES:
+        raise HTTPException(status_code=400, detail="O PDF é demasiado grande (máx. 15 MB).")
+    try:
+        await _apply_supplier_pdf(note_id, data, file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -1756,28 +1790,9 @@ async def generate_client_pdf(note_id: str):
     if not supplier_quote:
         raise HTTPException(status_code=400, detail="Importe primeiro o PDF do fornecedor.")
     try:
-        pdf_bytes = build_client_pdf(supplier_quote, BRICO_LOGO_PATH.read_bytes())
+        pdf_bytes, filename, _ = await _generate_client_pdf_file(note_id, supplier_quote)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    filename = _client_pdf_filename(supplier_quote.get("quote_number"))
-    file_id = str(uuid.uuid4())
-    await db.note_files.insert_one({
-        "id": file_id, "note_id": note_id, "kind": "client_pdf", "filename": filename,
-        "content_b64": base64.b64encode(pdf_bytes).decode(), "created_at": now_iso()})
-    included = [i for i in supplier_quote.get("items", []) if i.get("include", True)]
-    total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1) for i in included)
-    # Margem final efetiva sobre o custo c/IVA — fica na cronologia para ser
-    # fácil reportar a que margem o orçamento foi enviado ao cliente.
-    cost_total = sum((i.get("supplier_unit_price") or 0) * 1.23 * int(i.get("qty") or 1) for i in included)
-    eff_margin = round((total / cost_total - 1) * 100, 1) if cost_total > 0 else None
-    margin_txt = f" · margem final {eff_margin:.1f}%" if eff_margin is not None else ""
-    await db.notes.update_one({"id": note_id}, {"$set": {
-        "supplier_quote.client_pdf_file_id": file_id,
-        "supplier_quote.client_pdf_generated_at": now_iso(),
-        "supplier_quote.client_pdf_margin_pct": eff_margin, "updated_at": now_iso()}})
-    await log_activity(note_id, "updated",
-                       f"PDF de orçamento para o cliente gerado ({total:.2f} € c/ IVA{margin_txt})",
-                       {"file_id": file_id, "eff_margin_pct": eff_margin})
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -1999,6 +2014,21 @@ def _email_text_body(msg):
     return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
 
 
+def _email_pdf_attachments(msg):
+    """Extrai anexos PDF (máx. 5, até MAX_SUPPLIER_PDF_BYTES cada)."""
+    out = []
+    for part in msg.walk():
+        filename = _decode_mime_header(part.get_filename() or "")
+        if part.get_content_type() != "application/pdf" and not filename.lower().endswith(".pdf"):
+            continue
+        payload = part.get_payload(decode=True)
+        if payload and len(payload) <= MAX_SUPPLIER_PDF_BYTES:
+            out.append({"filename": filename or "documento.pdf", "data": payload})
+        if len(out) >= 5:
+            break
+    return out
+
+
 def _imap_fetch_since(last_uid):
     box = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
     try:
@@ -2023,6 +2053,7 @@ def _imap_fetch_since(last_uid):
                 "from_email": (parseaddr(msg.get("From") or "")[1] or "").lower(),
                 "subject": _decode_mime_header(msg.get("Subject")),
                 "body": _email_text_body(msg)[:20000].strip(),
+                "attachments": _email_pdf_attachments(msg),
             })
         return messages
     finally:
@@ -2057,12 +2088,25 @@ async def _match_note_for_reply(from_email, subject):
     if not from_email:
         return None, None, None
     sup = None
-    async for s in db.suppliers.find({}, {"_id": 0}):
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(2000)
+    for s in suppliers:
         emails = {(s.get("email") or "").lower()}
         emails |= {(c.get("email") or "").lower() for c in (s.get("contacts") or [])}
         if from_email in emails - {""}:
             sup = s
             break
+    if not sup:
+        # Fallback: qualquer endereço do domínio do fornecedor conta (ex.:
+        # comercial@bandaluminios.com quando só temos geral@bandaluminios.com,
+        # ou o nome "BandAluminios" contido no domínio do remetente).
+        domain = re.sub(r"[^a-z0-9.]", "", from_email.split("@")[-1])
+        for s in suppliers:
+            sup_domain = (s.get("email") or "").lower().split("@")[-1]
+            slug = re.sub(r"[^a-z0-9]", "", (s.get("name") or "").lower())
+            if (sup_domain and "@" in (s.get("email") or "") and domain == sup_domain) or \
+               (slug and len(slug) >= 5 and slug in domain.replace(".", "")):
+                sup = s
+                break
     if not sup:
         return None, None, None
     docs = await db.notes.find(
@@ -2090,15 +2134,26 @@ async def poll_supplier_replies():
         note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
         if not note_id and not supplier_id:
             continue  # sem relação com fornecedores — o resto da caixa é ignorado
+        email_id = str(uuid.uuid4())
+        attachments_meta = []
+        for att in m.get("attachments", []):
+            att_id = str(uuid.uuid4())
+            await db.email_attachments.insert_one({
+                "id": att_id, "email_id": email_id, "note_id": note_id or "",
+                "filename": att["filename"], "content_b64": base64.b64encode(att["data"]).decode(),
+                "created_at": now_iso()})
+            attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
         await db.received_emails.insert_one({
-            "id": str(uuid.uuid4()), "uid": m["uid"], "note_id": note_id or "",
+            "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
-            "received_at": now_iso()})
+            "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
+            "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
             await log_activity(note_id, "email_received",
-                               f"Resposta recebida de {supplier_name or m['from_email']}: {m['subject'] or '(sem assunto)'}",
+                               f"Resposta recebida de {supplier_name or m['from_email']}: {m['subject'] or '(sem assunto)'}"
+                               + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
                                {"from": m["from_email"], "uid": m["uid"]})
             n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
             if n and n.get("status") in WAITING_SUPPLIER:
@@ -2107,6 +2162,27 @@ async def poll_supplier_replies():
                 await log_activity(note_id, "status_change",
                                    "Estado alterado para Orçamento recebido (resposta por email)",
                                    {"to": "orcamento_recebido"})
+            # PDF da BandAluminios em anexo → analisa e gera automaticamente o
+            # PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
+            # enviado sem confirmação explícita do utilizador.
+            if m.get("attachments"):
+                first = m["attachments"][0]
+                try:
+                    supplier_quote = await _apply_supplier_pdf(
+                        note_id, first["data"], first["filename"], source_label=" (recebido por email)")
+                    try:
+                        await _generate_client_pdf_file(
+                            note_id, supplier_quote,
+                            source_label=" — automático, reveja e envie quando quiser")
+                    except ValueError as e:
+                        await log_activity(note_id, "updated",
+                                           f"PDF do fornecedor analisado, mas o PDF de cliente não foi gerado: {e}")
+                except ValueError as e:
+                    await log_activity(note_id, "updated",
+                                       f"PDF recebido por email ({first['filename']}) mas não reconhecido "
+                                       f"como orçamento do fornecedor: {e}")
+                except Exception as e:
+                    logger.error(f"Falha ao processar PDF recebido por email: {e}")
     await db.imap_state.update_one({"id": "inbox"}, {"$set": {
         "id": "inbox", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
     return {"ok": True, "new": matched, "seen": len(messages)}
@@ -2127,6 +2203,36 @@ async def emails_sync():
 @api_router.get("/notes/{note_id}/emails")
 async def note_received_emails(note_id: str):
     return await db.received_emails.find({"note_id": note_id}, {"_id": 0}).sort("received_at", -1).to_list(100)
+
+
+@api_router.get("/emails/unseen")
+async def unseen_supplier_emails():
+    """Emails de fornecedores ainda não vistos — alimenta o aviso amarelo global."""
+    docs = await db.received_emails.find(
+        {"seen": {"$ne": True}}, {"_id": 0, "body": 0},
+    ).sort("received_at", -1).to_list(50)
+    return {"count": len(docs), "items": docs}
+
+
+@api_router.post("/emails/{email_id}/seen")
+async def mark_email_seen(email_id: str):
+    await db.received_emails.update_one({"id": email_id}, {"$set": {"seen": True}})
+    return {"ok": True}
+
+
+@api_router.post("/emails/seen-all")
+async def mark_all_emails_seen():
+    r = await db.received_emails.update_many({"seen": {"$ne": True}}, {"$set": {"seen": True}})
+    return {"ok": True, "marked": r.modified_count}
+
+
+@api_router.get("/emails/{email_id}/attachments/{attachment_id}")
+async def download_email_attachment(email_id: str, attachment_id: str):
+    f = await db.email_attachments.find_one({"id": attachment_id, "email_id": email_id}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="Anexo não encontrado")
+    return Response(content=base64.b64decode(f["content_b64"]), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "anexo.pdf")}"'})
 
 
 class ClientEmailIn(BaseModel):
@@ -2837,7 +2943,9 @@ async def ensure_indexes():
             await db.notes.create_index(f)
         except Exception:
             pass
-    for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("quotes", "note_id")]:
+    for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("quotes", "note_id"),
+                        ("received_emails", "note_id"), ("received_emails", "seen"),
+                        ("email_attachments", "email_id")]:
         try:
             await db[coll].create_index(field)
         except Exception:

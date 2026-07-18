@@ -1,6 +1,92 @@
-import { Link, NavLink, useLocation, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
+import api from "@/lib/api";
+import { timeAgo } from "@/lib/pedido";
+
+// Aviso global, grande e amarelo: aparece em TODAS as páginas sempre que chega
+// qualquer email de um fornecedor (associado a um pedido ou não), até ser
+// marcado como visto. Verificado a cada 45s e ao voltar à janela.
+function SupplierEmailAlert() {
+  const [data, setData] = useState({ count: 0, items: [] });
+  const navigate = useNavigate();
+
+  const load = useCallback(async () => {
+    try {
+      const { data: d } = await api.get("/emails/unseen");
+      setData(d);
+    } catch { /* sem rede/backend — o aviso volta na próxima verificação */ }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 45000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  }, [load]);
+
+  if (!data.count) return null;
+
+  const openItem = async (m) => {
+    try { await api.post(`/emails/${m.id}/seen`); } catch { /* segue na mesma */ }
+    await load();
+    if (m.note_id) navigate(`/?open=${m.note_id}&tab=orcamentos`);
+    else navigate("/fornecedores");
+  };
+  const markAll = async () => {
+    try { await api.post("/emails/seen-all"); } catch { /* noop */ }
+    await load();
+  };
+
+  return (
+    <div
+      data-testid="supplier-email-alert"
+      className="mb-5 rounded-2xl border-4 border-yellow-400 bg-yellow-300 p-4 shadow-xl shadow-yellow-300/50 sm:p-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 animate-bounce items-center justify-center rounded-2xl bg-yellow-400 text-yellow-900 sm:h-12 sm:w-12">
+            <Mail className="h-6 w-6" strokeWidth={2.5} />
+          </span>
+          <div className="min-w-0">
+            <p className="font-heading text-lg font-extrabold leading-tight text-yellow-900 sm:text-2xl">
+              {data.count === 1 ? "Recebeu 1 email de fornecedor!" : `Recebeu ${data.count} emails de fornecedores!`}
+            </p>
+            <div className="mt-2 space-y-1.5">
+              {data.items.slice(0, 3).map((m) => (
+                <button
+                  key={m.id}
+                  data-testid={`email-alert-${m.id}`}
+                  onClick={() => openItem(m)}
+                  className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-yellow-200/80 px-3 py-2 text-left text-yellow-900 transition-colors hover:bg-yellow-100"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold">
+                    {m.supplier_name || m.from_email}
+                    <span className="ml-1.5 font-semibold opacity-80">{m.subject || "(sem assunto)"}</span>
+                  </span>
+                  {m.has_pdf ? <FileText className="h-4 w-4 shrink-0" title="Com PDF em anexo" /> : null}
+                  <span className="shrink-0 text-[11px] font-semibold opacity-70">{timeAgo(m.received_at)}</span>
+                </button>
+              ))}
+              {data.count > 3 ? (
+                <p className="text-xs font-bold text-yellow-900/80">… e mais {data.count - 3}.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <button
+          data-testid="email-alert-seen-all"
+          onClick={markAll}
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-yellow-900 px-3.5 py-2.5 text-xs font-extrabold text-yellow-100 transition-transform hover:-translate-y-0.5 active:scale-95"
+        >
+          <CheckCheck className="h-4 w-4" /> Marcar tudo como visto
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const NAV = [
   { to: "/", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes", end: true },
@@ -80,6 +166,7 @@ export default function Layout() {
 
       <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">
         <div className="mx-auto w-full max-w-6xl">
+          <SupplierEmailAlert />
           <Outlet />
         </div>
       </main>
