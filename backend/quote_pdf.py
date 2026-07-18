@@ -28,15 +28,21 @@ IVA_RATE = 0.23
 # Margens da loja sobre o custo do fornecedor: PVC 15%; alumínio, redes
 # mosquiteiras e portadas 18%. O material é detetado pela descrição da linha
 # (as séries vêm do catálogo BandAluminios: Euro-Design/Slinova são PVC;
-# SB/Thermostop/Thermoline/Confort e as Portadas HP são alumínio).
+# SB/Thermostop/Thermoline/Confort e as Portadas HP são alumínio). Quando a
+# descrição não permite identificar o material com segurança, aplica-se 20%
+# por defeito — nunca se arrisca uma margem baixa num artigo desconhecido.
 MARGIN_PVC_PCT = 15.0
 MARGIN_ALU_PCT = 18.0
+MARGIN_UNKNOWN_PCT = 20.0
 
 MATERIAL_MARGINS = {"pvc": MARGIN_PVC_PCT, "aluminio": MARGIN_ALU_PCT,
-                    "portada": MARGIN_ALU_PCT, "rede": MARGIN_ALU_PCT}
+                    "portada": MARGIN_ALU_PCT, "rede": MARGIN_ALU_PCT,
+                    "desconhecido": MARGIN_UNKNOWN_PCT}
 MATERIAL_LABELS = {"pvc": "PVC", "aluminio": "Alumínio",
-                   "portada": "Portada", "rede": "Rede mosquiteira"}
+                   "portada": "Portada", "rede": "Rede mosquiteira",
+                   "desconhecido": "Não identificado"}
 _PVC_HINTS = ("pvc", "euro-design", "eurodesign", "slinova")
+_ALU_HINTS = ("alumin", "thermostop", "thermoline", "confort")
 
 # Fronteiras horizontais (pontos PDF) das colunas da tabela BandAluminios,
 # medidas em orçamentos reais. O Nº fica à esquerda de X_DESC; o gráfico
@@ -78,7 +84,8 @@ def _fold(text):
 
 
 def detect_material(description):
-    """Classifica a linha para escolher a margem: pvc | aluminio | portada | rede."""
+    """Classifica a linha para escolher a margem:
+    pvc | aluminio | portada | rede | desconhecido (20% por segurança)."""
     d = _fold(description)
     if "mosquit" in d or re.search(r"\brede\b", d):
         return "rede"
@@ -86,20 +93,20 @@ def detect_material(description):
         return "portada"
     if any(hint in d for hint in _PVC_HINTS):
         return "pvc"
-    # As restantes séries BandAluminios (SB, Thermostop, Thermoline, Confort…)
-    # são alumínio — e na dúvida aplica-se também a margem de alumínio.
-    return "aluminio"
+    if any(hint in d for hint in _ALU_HINTS) or re.search(r"\bsb\b", d):
+        return "aluminio"
+    return "desconhecido"
 
 
 def margin_for_material(material):
-    return MATERIAL_MARGINS.get(material, MARGIN_ALU_PCT)
+    return MATERIAL_MARGINS.get(material, MARGIN_UNKNOWN_PCT)
 
 
 def material_label(material):
-    return MATERIAL_LABELS.get(material, "Alumínio")
+    return MATERIAL_LABELS.get(material, "Não identificado")
 
 
-def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_ALU_PCT):
+def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT):
     """Preço de venda sugerido: custo × (1+IVA) × (1+margem).
 
     Arredonda sempre PARA CIMA ao euro — nunca para baixo, para o
