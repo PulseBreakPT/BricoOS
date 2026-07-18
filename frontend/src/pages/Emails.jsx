@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Mail, Inbox, Send, FileClock, Search, Loader2, FileText, RefreshCw,
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
+  Sparkles, AlertTriangle, ArrowDown, Wand2, X,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -46,6 +47,39 @@ function KindBadge({ kind }) {
   );
 }
 
+// Prioridade calculada por IA (alta/normal/baixa) — só se destaca quando
+// sai do normal, para não poluir a lista com chips redundantes.
+function PriorityBadge({ priority }) {
+  if (priority === "alta") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+        <AlertTriangle className="h-3 w-3" /> Urgente
+      </span>
+    );
+  }
+  if (priority === "baixa") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+        <ArrowDown className="h-3 w-3" /> Baixa
+      </span>
+    );
+  }
+  return null;
+}
+
+const CATEGORY_LABELS = {
+  orcamento: "Orçamento", reclamacao: "Reclamação", duvida: "Dúvida", urgente: "Urgente", outro: "Outro",
+};
+
+function CategoryBadge({ category }) {
+  if (!category || !CATEGORY_LABELS[category]) return null;
+  return (
+    <span className="inline-flex rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+      {CATEGORY_LABELS[category]}
+    </span>
+  );
+}
+
 function EmptyState({ icon: Icon, text }) {
   return (
     <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-14 text-center text-slate-400">
@@ -57,7 +91,7 @@ function EmptyState({ icon: Icon, text }) {
 
 // Caixa de entrada — TODOS os emails recebidos, mesmo sem relação com um
 // pedido (esses ficam com etiqueta "Sem pedido associado").
-function InboxTab({ search }) {
+function InboxTab({ search, smartQuery, onClearSmart }) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -67,6 +101,9 @@ function InboxTab({ search }) {
   const [replyingId, setReplyingId] = useState(null);
   const [replyBody, setReplyBody] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [suggestingId, setSuggestingId] = useState(null);
+  const [smartResult, setSmartResult] = useState(null);
+  const [smartLoading, setSmartLoading] = useState(false);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -82,6 +119,27 @@ function InboxTab({ search }) {
   }, [search]);
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
+
+  // Pesquisa inteligente: só corre quando o utilizador confirma (Enter), não
+  // a cada tecla — cada pesquisa é uma chamada à IA para interpretar o texto.
+  useEffect(() => {
+    if (!smartQuery) { setSmartResult(null); return; }
+    let cancelled = false;
+    setSmartLoading(true);
+    api.post("/emails/smart-search", { query: smartQuery.q })
+      .then(({ data }) => { if (!cancelled) setSmartResult(data); })
+      .catch((e) => {
+        if (cancelled) return;
+        toast.error(getErrorMessage(e, "Não foi possível interpretar a pesquisa"));
+        setSmartResult({ items: [], total: 0, interpreted: null });
+      })
+      .finally(() => { if (!cancelled) setSmartLoading(false); });
+    return () => { cancelled = true; };
+  }, [smartQuery]);
+
+  const displayItems = smartQuery ? (smartResult?.items || []) : items;
+  const displayTotal = smartQuery ? (smartResult?.total || 0) : total;
+  const displayLoading = smartQuery ? smartLoading : loading;
 
   const createNoteFrom = async (m) => {
     setCreatingId(m.id);
@@ -124,6 +182,18 @@ function InboxTab({ search }) {
 
   const startReply = (id) => { setReplyingId(id); setReplyBody(""); };
 
+  const suggestReply = async (m) => {
+    setSuggestingId(m.id);
+    try {
+      const { data } = await api.post(`/emails/${m.id}/suggest-reply`);
+      setReplyBody(data.suggestion || "");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível gerar uma sugestão"));
+    } finally {
+      setSuggestingId(null);
+    }
+  };
+
   const sendReply = async (m) => {
     if (!replyBody.trim()) return;
     setSendingReply(true);
@@ -143,7 +213,7 @@ function InboxTab({ search }) {
   return (
     <div>
       <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{total} email{total === 1 ? "" : "s"} na caixa de entrada</p>
+        <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
         <div className="flex gap-2">
           <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg text-xs">
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar tudo como visto
@@ -154,13 +224,33 @@ function InboxTab({ search }) {
         </div>
       </div>
 
-      {loading ? (
+      {smartQuery ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-xs text-violet-700">
+          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          {smartResult?.interpreted ? (
+            <span>
+              Interpretado como: {[
+                smartResult.interpreted.keyword && `"${smartResult.interpreted.keyword}"`,
+                smartResult.interpreted.contact && `de ${smartResult.interpreted.contact}`,
+                smartResult.interpreted.category && CATEGORY_LABELS[smartResult.interpreted.category],
+                smartResult.interpreted.date_from && `desde ${smartResult.interpreted.date_from}`,
+                smartResult.interpreted.date_to && `até ${smartResult.interpreted.date_to}`,
+              ].filter(Boolean).join(" · ") || "sem filtros específicos"}
+            </span>
+          ) : <span>Pesquisa por "{smartQuery.q}"</span>}
+          <button onClick={onClearSmart} className="ml-auto inline-flex items-center gap-0.5 font-bold hover:underline">
+            <X className="h-3 w-3" /> Limpar
+          </button>
+        </div>
+      ) : null}
+
+      {displayLoading ? (
         <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
-      ) : items.length === 0 ? (
-        <EmptyState icon={Inbox} text="Sem emails na caixa de entrada." />
+      ) : displayItems.length === 0 ? (
+        <EmptyState icon={smartQuery ? Sparkles : Inbox} text={smartQuery ? "Sem resultados para esta pesquisa." : "Sem emails na caixa de entrada."} />
       ) : (
         <div className="mt-3 space-y-2">
-          {items.map((m) => (
+          {displayItems.map((m) => (
             <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-colors ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
               <button onClick={() => openItem(m)} className="flex w-full items-start gap-3 text-left">
                 {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
@@ -168,9 +258,12 @@ function InboxTab({ search }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
                     {m.matched ? <KindBadge kind={m.reply_kind || "supplier"} /> : <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">Sem pedido associado</span>}
+                    <PriorityBadge priority={m.priority} />
+                    <CategoryBadge category={m.category} />
                     {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-red-500" title="Com PDF em anexo" /> : null}
                   </div>
                   <p className="truncate text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
+                  {m.ai_summary ? <p className="mt-0.5 truncate text-[11px] italic text-violet-600">{m.ai_summary}</p> : null}
                   <p className="mt-0.5 text-[11px] text-slate-400">{m.from_email} · {timeAgo(m.received_at)}</p>
                 </div>
               </button>
@@ -226,7 +319,7 @@ function InboxTab({ search }) {
                         rows={4}
                         autoFocus
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           data-testid={`inbox-reply-send-${m.id}`}
                           size="sm"
@@ -236,6 +329,17 @@ function InboxTab({ search }) {
                         >
                           {sendingReply ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
                           Enviar resposta
+                        </Button>
+                        <Button
+                          data-testid={`inbox-reply-suggest-${m.id}`}
+                          size="sm"
+                          variant="outline"
+                          disabled={sendingReply || suggestingId === m.id}
+                          onClick={() => suggestReply(m)}
+                          className="h-8 rounded-lg border-violet-200 text-xs text-violet-700 hover:bg-violet-50"
+                        >
+                          {suggestingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wand2 className="mr-1.5 h-3.5 w-3.5" />}
+                          Sugerir com IA
                         </Button>
                         <Button size="sm" variant="ghost" disabled={sendingReply} onClick={() => setReplyingId(null)} className="h-8 rounded-lg text-xs">
                           Cancelar
@@ -431,11 +535,23 @@ export default function Emails() {
   const [debounced, setDebounced] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [sentKey, setSentKey] = useState(0);
+  const [smartOn, setSmartOn] = useState(false);
+  const [smartQuery, setSmartQuery] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  const runSmartSearch = () => {
+    if (!search.trim()) return;
+    setSmartQuery({ q: search.trim() });
+  };
+
+  const toggleSmart = () => {
+    setSmartOn((v) => !v);
+    setSmartQuery(null);
+  };
 
   return (
     <div>
@@ -460,9 +576,30 @@ export default function Emails() {
         onSent={() => { setTab("sent"); setSentKey((k) => k + 1); }}
       />
 
-      <div className="relative mt-4">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <Input data-testid="emails-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar por remetente, destinatário ou assunto..." className="h-11 rounded-xl pl-10" />
+      <div className="mt-4 flex gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            data-testid="emails-search"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); if (smartOn) setSmartQuery(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && smartOn && tab === "inbox") { e.preventDefault(); runSmartSearch(); } }}
+            placeholder={smartOn && tab === "inbox" ? 'Pergunte em linguagem natural e prima Enter — ex.: "emails do fornecedor X esta semana"' : "Procurar por remetente, destinatário ou assunto..."}
+            className="h-11 rounded-xl pl-10"
+          />
+        </div>
+        {tab === "inbox" ? (
+          <Button
+            data-testid="emails-smart-toggle"
+            type="button"
+            variant={smartOn ? "default" : "outline"}
+            onClick={toggleSmart}
+            className={`h-11 shrink-0 rounded-xl px-3 ${smartOn ? "bg-violet-600 hover:bg-violet-700" : "text-violet-700"}`}
+            title="Pesquisa inteligente com IA"
+          >
+            <Sparkles className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pesquisa IA</span>
+          </Button>
+        ) : null}
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
@@ -471,7 +608,9 @@ export default function Emails() {
           <TabsTrigger value="sent" data-testid="emails-tab-sent"><Send className="mr-1.5 h-3.5 w-3.5" /> Enviados</TabsTrigger>
           <TabsTrigger value="drafts" data-testid="emails-tab-drafts"><FileClock className="mr-1.5 h-3.5 w-3.5" /> Rascunhos</TabsTrigger>
         </TabsList>
-        <TabsContent value="inbox" className="focus-visible:outline-none"><InboxTab search={debounced} /></TabsContent>
+        <TabsContent value="inbox" className="focus-visible:outline-none">
+          <InboxTab search={debounced} smartQuery={smartOn ? smartQuery : null} onClearSmart={() => setSmartQuery(null)} />
+        </TabsContent>
         <TabsContent value="sent" className="focus-visible:outline-none"><SentTab key={sentKey} search={debounced} /></TabsContent>
         <TabsContent value="drafts" className="focus-visible:outline-none"><DraftsTab search={debounced} /></TabsContent>
       </Tabs>

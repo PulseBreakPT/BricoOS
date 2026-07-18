@@ -115,6 +115,9 @@ VALID_CATEGORIES = ["construcao", "bricolage", "decoracao", "jardim"]
 TASK_PRIORITIES = ["nenhuma", "baixa", "media", "alta"]
 TASK_PRIORITY_RANK = {"alta": 0, "media": 1, "baixa": 2, "nenhuma": 3}
 TASK_REPEATS = ["none", "daily", "weekly", "monthly"]
+EMAIL_PRIORITIES = ["alta", "normal", "baixa"]
+EMAIL_PRIORITY_RANK = {"alta": 0, "normal": 1, "baixa": 2}
+EMAIL_CATEGORIES = ["orcamento", "reclamacao", "duvida", "urgente", "outro"]
 STATUSES = [
     "novo", "pendente", "em_preparacao", "enviado_fornecedor", "aguarda_fornecedor",
     "orcamento_recebido", "aguarda_cliente", "aprovado", "rejeitado", "encomendado",
@@ -2365,6 +2368,7 @@ async def poll_supplier_replies():
                 "filename": att["filename"], "content_b64": base64.b64encode(att["data"]).decode(),
                 "created_at": now_iso()})
             attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
+        classification = await _classify_email(m["subject"], m["body"])
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -2372,6 +2376,7 @@ async def poll_supplier_replies():
             "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
+            **classification,
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -2477,7 +2482,7 @@ def _email_search_clause(search, fields):
 
 @api_router.get("/emails/inbox")
 async def emails_inbox(search: Optional[str] = None, matched: Optional[bool] = None,
-                       skip: int = 0, limit: int = 50):
+                       sort: str = "priority", skip: int = 0, limit: int = 50):
     q = {}
     if matched is not None:
         q["matched"] = matched
@@ -2487,7 +2492,8 @@ async def emails_inbox(search: Optional[str] = None, matched: Optional[bool] = N
     skip = max(skip, 0)
     limit = min(max(limit, 1), 100)
     total = await db.received_emails.count_documents(q)
-    docs = await db.received_emails.find(q, {"_id": 0}).sort("received_at", -1).skip(skip).limit(limit).to_list(limit)
+    order = [("priority_rank", 1), ("received_at", -1)] if sort == "priority" else [("received_at", -1)]
+    docs = await db.received_emails.find(q, {"_id": 0}).sort(order).skip(skip).limit(limit).to_list(limit)
     return {"items": docs, "total": total}
 
 
@@ -2600,6 +2606,99 @@ async def reply_to_email(email_id: str, payload: QuickReplyIn):
         await log_activity(e["note_id"], "email_sent", f"Resposta rápida enviada a {to}", {"to": to})
     await db.received_emails.update_one({"id": email_id}, {"$set": {"seen": True}})
     return {"ok": True, "to": to}
+
+
+@api_router.post("/emails/{email_id}/suggest-reply")
+async def suggest_email_reply(email_id: str):
+    """Sugestão de resposta gerada por IA — o utilizador revê e edita antes
+    de enviar; nada é enviado a partir daqui."""
+    if not ai_available():
+        raise HTTPException(status_code=400, detail="Integração OpenAI não configurada.")
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    context = ""
+    if e.get("note_id"):
+        n = await db.notes.find_one({"id": e["note_id"]}, {"_id": 0})
+        if n:
+            context = f"Pedido relacionado: {n.get('description') or ''} para {n.get('customer_name') or ''}.\n"
+    system = ("Escreves respostas de email em português de Portugal, em nome de uma loja Bricomarché. "
+              "Tom profissional, simpático e direto. Escreves só o corpo da mensagem, sem assunto, "
+              "sem saudação de despedida nem assinatura (é adicionada automaticamente a seguir).")
+    prompt = (
+        f"{context}Escreve uma resposta a este email.\n\n"
+        f"De: {e.get('from_name') or e.get('from_email')}\n"
+        f"Assunto: {e.get('subject') or ''}\n\n"
+        f"\"\"\"{(e.get('body') or '')[:3000]}\"\"\""
+    )
+    try:
+        suggestion = (await ai_complete(system, prompt, session=f"suggest-reply-{uuid.uuid4()}")).strip()
+    except Exception as ex:
+        logger.error(f"AI suggest-reply falhou: {ex}")
+        raise HTTPException(status_code=502, detail="Falha na chamada à OpenAI. Verifique a chave e o saldo.")
+    return {"suggestion": suggestion}
+
+
+class SmartSearchIn(BaseModel):
+    query: str = ""
+
+
+@api_router.post("/emails/smart-search")
+async def emails_smart_search(payload: SmartSearchIn):
+    """Pesquisa em linguagem natural na caixa de entrada — ex.: 'emails do
+    fornecedor X sobre alumínio da semana passada'. Sem IA configurada (ou
+    se a interpretação falhar), cai para pesquisa literal normal."""
+    q_text = payload.query.strip()
+    if not q_text:
+        return {"items": [], "total": 0, "interpreted": None}
+
+    async def literal():
+        rx = _email_search_clause(q_text, ["from_email", "subject", "supplier_name", "from_name", "body"])
+        docs = await db.received_emails.find(rx or {}, {"_id": 0}).sort("received_at", -1).limit(50).to_list(50)
+        return {"items": docs, "total": len(docs), "interpreted": None}
+
+    if not ai_available():
+        return await literal()
+    today = datetime.now(timezone.utc).date().isoformat()
+    system = ("Interpretas pesquisas em linguagem natural sobre a caixa de email de uma loja Bricomarché "
+              "em Portugal. Respondes SEMPRE apenas com JSON válido, sem texto extra.")
+    prompt = (
+        f"Hoje é {today}. Converte esta pesquisa numa consulta estruturada. Responde APENAS com JSON:\n"
+        '{"keyword": "palavras-chave a procurar no assunto/corpo, ou \\"\\"", '
+        '"contact": "nome ou email do remetente/fornecedor/cliente mencionado, ou \\"\\"", '
+        '"date_from": "YYYY-MM-DD ou \\"\\"", "date_to": "YYYY-MM-DD ou \\"\\"", '
+        '"category": "orcamento|reclamacao|duvida|urgente|outro ou \\"\\""}\n\n'
+        f'Pesquisa: "{q_text}"'
+    )
+    try:
+        raw = await ai_complete(system, prompt, session=f"smart-search-{uuid.uuid4()}")
+    except Exception as e:
+        logger.error(f"AI smart-search falhou: {e}")
+        return await literal()
+    data = extract_json(raw)
+    if not data:
+        return await literal()
+    clauses = []
+    keyword = (data.get("keyword") or "").strip()
+    if keyword:
+        rx = {"$regex": re.escape(keyword), "$options": "i"}
+        clauses.append({"$or": [{"subject": rx}, {"body": rx}]})
+    contact = (data.get("contact") or "").strip()
+    if contact:
+        rx = {"$regex": re.escape(contact), "$options": "i"}
+        clauses.append({"$or": [{"from_email": rx}, {"from_name": rx}, {"supplier_name": rx}]})
+    category = data.get("category") or ""
+    if category in EMAIL_CATEGORIES:
+        clauses.append({"category": category})
+    date_from = (data.get("date_from") or "").strip()
+    date_to = (data.get("date_to") or "").strip()
+    if date_from:
+        clauses.append({"received_at": {"$gte": date_from}})
+    if date_to:
+        clauses.append({"received_at": {"$lte": date_to + "T23:59:59"}})
+    q = {"$and": clauses} if clauses else {}
+    docs = await db.received_emails.find(q, {"_id": 0}).sort("received_at", -1).limit(50).to_list(50)
+    return {"items": docs, "total": len(docs), "interpreted": data}
 
 
 @api_router.post("/emails/{email_id}/create-note")
@@ -3195,6 +3294,36 @@ def extract_json(text):
         return None
 
 
+async def _classify_email(subject, body):
+    """Classifica um email recebido por IA — prioridade, categoria e resumo
+    de uma linha, mostrados na caixa de entrada sem precisar abrir o email.
+    Best-effort: sem IA configurada (ou se a chamada falhar), a caixa
+    continua a funcionar normalmente com os valores por omissão."""
+    default = {"priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": ""}
+    if not ai_available():
+        return default
+    system = ("Classificas emails recebidos por uma loja Bricomarché em Portugal (de fornecedores e "
+              "clientes). Respondes SEMPRE apenas com JSON válido, sem texto extra.")
+    prompt = (
+        "Classifica este email. Responde APENAS com JSON com as chaves:\n"
+        '{"priority": "alta"|"normal"|"baixa", "category": "orcamento"|"reclamacao"|"duvida"|"urgente"|"outro", '
+        '"summary": "resumo em português, máx. 15 palavras"}\n'
+        '- priority "alta": reclamação, urgência, cliente a desistir, prazo a expirar.\n'
+        '- priority "baixa": newsletters, confirmações automáticas, sem ação necessária.\n\n'
+        f"Assunto: {subject or '(sem assunto)'}\n\nCorpo:\n\"\"\"{(body or '')[:3000]}\"\"\""
+    )
+    try:
+        raw = await ai_complete(system, prompt, session=f"classify-email-{uuid.uuid4()}")
+    except Exception as e:
+        logger.error(f"AI classify-email falhou: {e}")
+        return default
+    data = extract_json(raw) or {}
+    priority = data.get("priority") if data.get("priority") in EMAIL_PRIORITIES else "normal"
+    category = data.get("category") if data.get("category") in EMAIL_CATEGORIES else ""
+    summary = (data.get("summary") or "").strip()[:200]
+    return {"priority": priority, "priority_rank": EMAIL_PRIORITY_RANK[priority], "category": category, "ai_summary": summary}
+
+
 @api_router.get("/ai/status")
 async def ai_status():
     return {"available": ai_available(), "model": AI_MODEL}
@@ -3337,6 +3466,12 @@ async def migrate():
         {"reply_kind": {"$exists": False}, "supplier_id": {"$ne": ""}}, {"$set": {"reply_kind": "supplier"}})
     await db.received_emails.update_many(
         {"reply_kind": {"$exists": False}}, {"$set": {"reply_kind": ""}})
+    # Classificação por IA (prioridade/categoria/resumo) é nova — registos
+    # antigos ficam com prioridade "normal" em vez de ficarem de fora da
+    # ordenação por prioridade.
+    await db.received_emails.update_many(
+        {"priority_rank": {"$exists": False}},
+        {"$set": {"priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": ""}})
 
 
 async def _normalize_existing_phones():
