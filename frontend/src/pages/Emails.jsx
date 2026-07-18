@@ -212,9 +212,9 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
 
   return (
     <div>
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg text-xs">
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar tudo como visto
           </Button>
