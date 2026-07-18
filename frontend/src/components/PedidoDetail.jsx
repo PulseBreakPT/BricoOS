@@ -584,25 +584,45 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const setSqItem = (n, patch) => {
     setSq((q) => ({ ...q, items: q.items.map((i) => (i.n === n ? { ...i, ...patch } : i)) }));
   };
-  // Margem por linha (PVC 15% · alumínio/redes/portadas 18%, editável).
-  // Arredonda para cima ao euro — igual ao servidor — para não comer a margem.
+  // Lógica de preço EXATA do software da loja (Bricomarché/Les Mousquetaires):
+  // a margem é definida sobre o preço de venda final com IVA, não sobre o
+  // custo — margem = 1/(1+IVA) - custo/PV. Só a margem é editável; o
+  // coeficiente e o preço final são sempre recalculados automaticamente
+  // com esta fórmula (nunca escritos ou corrigidos à mão), replicando ao
+  // cêntimo os valores do software oficial. Espelha backend/quote_pdf.py.
+  const IVA_RATE = 0.23;
+  const MAX_MARGIN_PCT = Math.round(((1 / (1 + IVA_RATE)) * 100 - 1) * 10) / 10; // 80.3
+  const roundHalfUp = (value, digits) => {
+    const factor = 10 ** digits;
+    return Math.round((value + Number.EPSILON) * factor) / factor;
+  };
+  const priceCoefficient = (marginPct) => {
+    const denom = 1 / (1 + IVA_RATE) - (parseFloat(marginPct) || 0) / 100;
+    return denom > 0 ? 1 / denom : null;
+  };
+  const suggestClientPrice = (cost, marginPct) => {
+    const coef = priceCoefficient(marginPct);
+    if (!cost || cost <= 0 || coef == null) return 0;
+    return roundHalfUp(cost * coef, 2);
+  };
   const applyItemMargin = (n, pct) => {
     setSq((q) => ({
       ...q,
       items: q.items.map((i) => {
         if (i.n !== n) return i;
-        const price = i.supplier_unit_price
-          ? Math.ceil(i.supplier_unit_price * 1.23 * (1 + (parseFloat(pct) || 0) / 100))
-          : i.client_price;
-        return { ...i, margin_pct: pct, client_price: price };
+        const coef = priceCoefficient(pct);
+        const price = suggestClientPrice(i.supplier_unit_price, pct);
+        return {
+          ...i, margin_pct: pct, client_price: price,
+          coefficient: coef != null ? roundHalfUp(coef, 3) : i.coefficient,
+        };
       }),
     }));
   };
   const saveSupplierQuote = async () => {
     await api.put(`/notes/${id}/supplier-quote`, {
-      items: sq.items.map(({ n, description, qty, client_price, margin_pct, include }) => ({
+      items: sq.items.map(({ n, description, qty, margin_pct, include }) => ({
         n, description, qty: parseInt(qty, 10) || 1,
-        client_price: parseFloat(client_price) || 0,
         margin_pct: parseFloat(margin_pct) || 18, include: include !== false,
       })),
     });
@@ -631,17 +651,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const sqTotal = (sq?.items || [])
     .filter((i) => i.include !== false)
     .reduce((acc, i) => acc + (parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1), 0);
-  // Margem final efetiva sobre o custo c/IVA — é o número a reportar ao chefe.
-  // Recalcula em tempo real, mesmo quando o preço é escrito à mão.
+  // Margem final efetiva — mesma definição da loja (sobre o PV c/ IVA, não
+  // sobre o custo): margem = 1/(1+IVA) - custo/PV. É o número a reportar.
   const itemEffMargin = (i) => {
-    const cost = (i.supplier_unit_price || 0) * 1.23;
-    if (cost <= 0) return null;
-    return (((parseFloat(i.client_price) || 0) / cost) - 1) * 100;
+    const price = parseFloat(i.client_price) || 0;
+    if (price <= 0) return null;
+    return (1 / (1 + IVA_RATE) - (i.supplier_unit_price || 0) / price) * 100;
   };
   const sqCostTotal = (sq?.items || [])
     .filter((i) => i.include !== false)
-    .reduce((acc, i) => acc + (i.supplier_unit_price || 0) * 1.23 * (parseInt(i.qty, 10) || 1), 0);
-  const sqEffMargin = sqCostTotal > 0 ? ((sqTotal / sqCostTotal) - 1) * 100 : null;
+    .reduce((acc, i) => acc + (i.supplier_unit_price || 0) * (parseInt(i.qty, 10) || 1), 0);
+  const sqEffMargin = sqTotal > 0 ? (1 / (1 + IVA_RATE) - sqCostTotal / sqTotal) * 100 : null;
 
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
@@ -1259,7 +1279,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-400">
-                        Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — ajustáveis linha a linha.
+                        Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — a margem é ajustável linha a linha; o coeficiente e o preço final recalculam-se sozinhos com a fórmula exata da loja.
                       </p>
                     </div>
 
@@ -1291,11 +1311,19 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                 </label>
                                 <label className="text-[11px] font-semibold text-slate-500">
                                   Margem %
-                                  <Input data-testid={`sq-margin-${i.n}`} type="number" min="0" max="95" step="0.5" value={i.margin_pct ?? 18} onChange={(e) => applyItemMargin(i.n, e.target.value)} className="mt-0.5 h-8 w-20 rounded-lg font-mono text-xs" />
+                                  <Input data-testid={`sq-margin-${i.n}`} type="number" min="0" max={MAX_MARGIN_PCT} step="0.5" value={i.margin_pct ?? 18} onChange={(e) => applyItemMargin(i.n, e.target.value)} className="mt-0.5 h-8 w-20 rounded-lg font-mono text-xs" />
                                 </label>
-                                <label className="text-[11px] font-semibold text-slate-500">
+                                <label className="text-[11px] font-semibold text-slate-500" title="Calculado automaticamente pela mesma fórmula do software da loja — nunca editável.">
+                                  Coeficiente
+                                  <span data-testid={`sq-coef-${i.n}`} className="mt-0.5 flex h-8 w-16 items-center rounded-lg bg-slate-100 px-2 font-mono text-xs text-slate-500">
+                                    {(i.coefficient ?? priceCoefficient(i.margin_pct ?? 18))?.toFixed(3) ?? "—"}
+                                  </span>
+                                </label>
+                                <label className="text-[11px] font-semibold text-slate-500" title="Preço final — calculado automaticamente a partir da margem, nunca editável.">
                                   PVP/ud. (€, c/ IVA)
-                                  <Input data-testid={`sq-price-${i.n}`} type="number" min="0" step="0.01" value={i.client_price} onChange={(e) => setSqItem(i.n, { client_price: e.target.value })} className="mt-0.5 h-8 w-24 rounded-lg font-mono text-xs" />
+                                  <span data-testid={`sq-price-${i.n}`} className="mt-0.5 flex h-8 w-24 items-center rounded-lg bg-slate-100 px-2 font-mono text-xs font-bold text-slate-700">
+                                    {Number(i.client_price || 0).toFixed(2)} €
+                                  </span>
                                 </label>
                                 <p className="ml-auto text-[11px] text-slate-400">
                                   <span data-testid={`sq-material-${i.n}`} className="mr-1.5 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{i.material_label || "Alumínio"}</span>
@@ -1321,7 +1349,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         <p className="text-sm font-bold">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal opacity-70">c/ IVA</span></p>
                         {sqEffMargin != null ? (
                           <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] opacity-80">
-                            Margem final sobre o custo c/ IVA: <span className="font-mono font-bold">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
+                            Margem final: <span className="font-mono font-bold">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
                           </p>
                         ) : null}
                       </div>

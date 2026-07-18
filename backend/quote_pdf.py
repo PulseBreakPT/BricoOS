@@ -9,9 +9,9 @@ total único com IVA incluído — réplica do documento que a loja já fazia à
 
 import base64
 import io
-import math
 import re
 import unicodedata
+from decimal import ROUND_HALF_UP, Decimal
 
 import fitz  # PyMuPDF
 from reportlab.lib import colors
@@ -106,16 +106,63 @@ def material_label(material):
     return MATERIAL_LABELS.get(material, "Não identificado")
 
 
-def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT):
-    """Preço de venda sugerido: custo × (1+IVA) × (1+margem).
+def _round_half_up(value, ndigits):
+    """Arredondamento comercial (0,5 sobe sempre), igual ao do software da
+    loja — evita o "round-half-to-even" do round() nativo do Python e as
+    armadilhas de binário do float (usa Decimal a partir da representação
+    em string do valor)."""
+    quantum = Decimal(1).scaleb(-ndigits)
+    return float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP))
 
-    Arredonda sempre PARA CIMA ao euro — nunca para baixo, para o
-    arredondamento não comer a margem.
+
+# Limite teórico da margem para este IVA: quando margem/100 se aproxima de
+# 1/(1+IVA) o coeficiente diverge para infinito (preço de venda infinito).
+# Nunca se deve pedir margens tão altas na loja; usa-se uma margem folgada
+# abaixo do limite para não deixar o cálculo explodir com um valor inválido.
+MAX_MARGIN_PCT = round((1 / (1 + IVA_RATE)) * 100 - 1, 1)
+
+
+def price_coefficient(margin_pct):
+    """Coeficiente exato PV_com_IVA = Custo × coeficiente, replicando a
+    lógica do software oficial da loja (grupo Les Mousquetaires): a margem
+    é definida sobre o preço de venda final (com IVA), não sobre o custo.
+
+        margem = (PV_sem_IVA - Custo) / PV_com_IVA
+               = 1/(1+IVA) - Custo/PV_com_IVA
+
+    Resolvendo para o coeficiente (PV_com_IVA = Custo × coeficiente):
+
+        coeficiente = 1 / (1/(1+IVA) - margem)
+
+    Fórmula confirmada ao cêntimo contra os exemplos reais da loja
+    (Custo 199,00€ · margem 15% → coef. 1,508 · PV 300,15€; margem 18% →
+    coef. 1,580 · PV 314,37€) e contra múltiplos artigos reais da ficha de
+    artigo (RYOBI, LAVAT. FLATE 70, DIVERCOL, MDV MESA, etc.).
     """
+    denom = (1 / (1 + IVA_RATE)) - (margin_pct / 100.0)
+    if denom <= 0:
+        raise ValueError(
+            f"Margem inválida: {margin_pct}% é demasiado alta para IVA a "
+            f"{IVA_RATE * 100:.0f}% (máximo praticável: {MAX_MARGIN_PCT}%).")
+    return 1 / denom
+
+
+def coefficient_for_margin(margin_pct):
+    """Coeficiente arredondado a 3 casas — apenas para visualização (campo
+    'Coeficiente', nunca editável). O preço final usa sempre o coeficiente
+    exato (não o arredondado) para não perder precisão ao cêntimo."""
+    return _round_half_up(price_coefficient(margin_pct), 3)
+
+
+def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT):
+    """Preço de venda ao cliente, exatamente como o software oficial da loja:
+    PV_com_IVA = Custo / (1/(1+IVA) - margem), arredondado ao cêntimo com
+    arredondamento comercial (nunca aproximações nem tabelas de coeficientes
+    — a fórmula reproduz os valores oficiais ao cêntimo)."""
     if not supplier_unit_price or supplier_unit_price <= 0:
         return 0.0
-    exact = supplier_unit_price * (1 + IVA_RATE) * (1 + margin_pct / 100)
-    return float(math.ceil(round(exact, 2)))
+    exact = supplier_unit_price * price_coefficient(margin_pct)
+    return _round_half_up(exact, 2)
 
 
 def _header_field(text, pattern):
