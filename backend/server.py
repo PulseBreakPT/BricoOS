@@ -46,8 +46,9 @@ try:
         material_labels as caixilharia_material_labels,
     )
     from quote_pdf import (
-        build_client_pdf, detect_material, margin_for_material, material_label,
-        parse_supplier_pdf, suggest_client_price,
+        IVA_RATE, MAX_MARGIN_PCT, build_client_pdf, coefficient_for_margin,
+        detect_material, margin_for_material, material_label, parse_supplier_pdf,
+        suggest_client_price,
     )
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
@@ -66,8 +67,9 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         material_labels as caixilharia_material_labels,
     )
     from .quote_pdf import (
-        build_client_pdf, detect_material, margin_for_material, material_label,
-        parse_supplier_pdf, suggest_client_price,
+        IVA_RATE, MAX_MARGIN_PCT, build_client_pdf, coefficient_for_margin,
+        detect_material, margin_for_material, material_label, parse_supplier_pdf,
+        suggest_client_price,
     )
 
 from google_auth_oauthlib.flow import Flow
@@ -1736,7 +1738,6 @@ class SupplierQuoteItemIn(BaseModel):
     n: int
     description: str = ""
     qty: int = 1
-    client_price: float = 0.0
     margin_pct: float = 18.0
     include: bool = True
 
@@ -1767,6 +1768,7 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         item["material_label"] = material_label(material)
         item["margin_pct"] = margin_for_material(material)
         item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
+        item["coefficient"] = coefficient_for_margin(item["margin_pct"])
         item["include"] = True
     supplier_quote = {**parsed,
                       "margin_rules": {"pvc": margin_for_material("pvc"),
@@ -1799,10 +1801,12 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
         "content_b64": base64.b64encode(pdf_bytes).decode(), "created_at": now_iso()})
     included = [i for i in supplier_quote.get("items", []) if i.get("include", True)]
     total = sum(float(i.get("client_price") or 0) * int(i.get("qty") or 1) for i in included)
-    # Margem final efetiva sobre o custo c/IVA — fica na cronologia para ser
-    # fácil reportar a que margem o orçamento foi enviado ao cliente.
-    cost_total = sum((i.get("supplier_unit_price") or 0) * 1.23 * int(i.get("qty") or 1) for i in included)
-    eff_margin = round((total / cost_total - 1) * 100, 1) if cost_total > 0 else None
+    # Margem final efetiva — mesma definição da loja (margem sobre o preço
+    # de venda com IVA, não sobre o custo): margem = 1/(1+IVA) - custo/PV.
+    # Fica na cronologia para ser fácil reportar a que margem o orçamento
+    # foi enviado ao cliente.
+    cost_total = sum((i.get("supplier_unit_price") or 0) * int(i.get("qty") or 1) for i in included)
+    eff_margin = round((1 / (1 + IVA_RATE) - cost_total / total) * 100, 1) if total > 0 else None
     margin_txt = f" · margem final {eff_margin:.1f}%" if eff_margin is not None else ""
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote.client_pdf_file_id": file_id,
@@ -1879,8 +1883,12 @@ async def update_supplier_quote(note_id: str, payload: SupplierQuoteIn):
             continue
         item["description"] = edit.description.strip() or item["description"]
         item["qty"] = max(1, edit.qty)
-        item["client_price"] = max(0.0, round(edit.client_price, 2))
-        item["margin_pct"] = min(max(edit.margin_pct, 0.0), 95.0)
+        # O utilizador só altera a margem — coeficiente e preço final são
+        # sempre recalculados pelo sistema com a fórmula exata da loja,
+        # nunca introduzidos ou corrigidos manualmente.
+        item["margin_pct"] = min(max(edit.margin_pct, 0.0), MAX_MARGIN_PCT)
+        item["coefficient"] = coefficient_for_margin(item["margin_pct"])
+        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
         item["include"] = edit.include
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote": supplier_quote, "updated_at": now_iso()}})
