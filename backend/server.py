@@ -1,9 +1,11 @@
-from fastapi import FastAPI, APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import RedirectResponse, Response
+from fastapi import FastAPI, APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
+import hashlib
+import secrets
 import os
 import re
 import difflib
@@ -2981,6 +2983,125 @@ async def on_startup():
         task = asyncio.create_task(_imap_poll_loop())
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
+
+
+# ---------- Proteção por PIN (dispositivos verificados) ----------
+# Toda a API exige um token de dispositivo emitido após introduzir o PIN.
+# O middleware cobre automaticamente qualquer rota atual ou futura; as únicas
+# exceções são a própria autenticação e o callback OAuth do Gmail (chega por
+# redirect do Google, sem headers nossos).
+INITIAL_PIN = os.environ.get("ACCESS_PIN", "250724")
+PIN_MAX_ATTEMPTS = 3
+PIN_LOCK_MINUTES = 10
+AUTH_EXEMPT_PREFIXES = ("/api/auth/", "/api/oauth/", "/api/gmail/connect")
+
+
+def _hash_pin(pin, salt):
+    return hashlib.sha256(f"{salt}:{pin}".encode()).hexdigest()
+
+
+async def _get_pin_doc():
+    doc = await db.settings.find_one({"key": "access_pin"}, {"_id": 0})
+    if not doc:
+        salt = secrets.token_hex(16)
+        doc = {"key": "access_pin", "salt": salt, "hash": _hash_pin(INITIAL_PIN, salt), "created_at": now_iso()}
+        await db.settings.update_one({"key": "access_pin"}, {"$setOnInsert": doc}, upsert=True)
+    return doc
+
+
+# Cache em memória de tokens já confirmados — evita uma consulta ao Mongo por
+# pedido. Só guarda tokens válidos, com prazo curto.
+_device_token_cache = {}
+
+
+async def _device_token_valid(token):
+    if not token:
+        return False
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if _device_token_cache.get(token, 0) > now_ts:
+        return True
+    doc = await db.auth_devices.find_one({"token": token}, {"_id": 0, "id": 1})
+    if not doc:
+        return False
+    _device_token_cache[token] = now_ts + 300
+    return True
+
+
+def _client_ip(request):
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    return forwarded or (request.client.host if request.client else "")
+
+
+def _attempt_key(request, device_id):
+    # Bloqueio por IP + dispositivo: trocar de identificador de dispositivo no
+    # mesmo IP não dá tentativas extra, porque o IP faz parte da chave.
+    return f"{_client_ip(request)}|{(device_id or '')[:64]}"
+
+
+async def _lock_state(request, device_id):
+    now = datetime.now(timezone.utc)
+    key = _attempt_key(request, device_id)
+    doc = await db.auth_attempts.find_one({"key": key}, {"_id": 0}) or {}
+    locked_until = parse_dt(doc.get("locked_until"))
+    if locked_until and locked_until > now:
+        return {"locked": True, "retry_in_seconds": max(1, int((locked_until - now).total_seconds())), "attempts_left": 0}
+    if locked_until:
+        # Bloqueio expirado — repõe as tentativas.
+        await db.auth_attempts.delete_one({"key": key})
+        doc = {}
+    return {"locked": False, "retry_in_seconds": 0,
+            "attempts_left": max(0, PIN_MAX_ATTEMPTS - doc.get("fails", 0))}
+
+
+class PinVerifyIn(BaseModel):
+    pin: str = ""
+    device_id: str = ""
+
+
+@api_router.get("/auth/status")
+async def auth_status(request: Request, device_id: str = ""):
+    verified = await _device_token_valid(request.headers.get("x-device-token"))
+    lock = await _lock_state(request, device_id)
+    return {"verified": verified, **lock}
+
+
+@api_router.post("/auth/verify-pin")
+async def verify_pin(payload: PinVerifyIn, request: Request):
+    lock = await _lock_state(request, payload.device_id)
+    if lock["locked"]:
+        return {"ok": False, **lock}
+    pin = re.sub(r"\D", "", payload.pin or "")
+    pin_doc = await _get_pin_doc()
+    key = _attempt_key(request, payload.device_id)
+    ip = _client_ip(request)
+    if pin and secrets.compare_digest(_hash_pin(pin, pin_doc["salt"]), pin_doc["hash"]):
+        await db.auth_attempts.delete_one({"key": key})
+        token = secrets.token_urlsafe(32)
+        await db.auth_devices.insert_one({
+            "id": str(uuid.uuid4()), "token": token, "device_id": payload.device_id[:64],
+            "ip": ip, "user_agent": (request.headers.get("user-agent") or "")[:300],
+            "created_at": now_iso(), "last_seen": now_iso()})
+        logger.info(f"PIN validado — novo dispositivo verificado (ip={ip})")
+        return {"ok": True, "token": token}
+    fails = ((await db.auth_attempts.find_one({"key": key}, {"_id": 0}) or {}).get("fails", 0)) + 1
+    update = {"key": key, "fails": fails, "ip": ip, "updated_at": now_iso()}
+    if fails >= PIN_MAX_ATTEMPTS:
+        update["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=PIN_LOCK_MINUTES)).isoformat()
+    await db.auth_attempts.update_one({"key": key}, {"$set": update}, upsert=True)
+    logger.warning(f"PIN errado (ip={ip}, tentativa {fails}/{PIN_MAX_ATTEMPTS})")
+    if fails >= PIN_MAX_ATTEMPTS:
+        return {"ok": False, "locked": True, "retry_in_seconds": PIN_LOCK_MINUTES * 60, "attempts_left": 0}
+    return {"ok": False, "locked": False, "retry_in_seconds": 0, "attempts_left": PIN_MAX_ATTEMPTS - fails}
+
+
+@app.middleware("http")
+async def pin_gate(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api") and not path.startswith(AUTH_EXEMPT_PREFIXES):
+        token = request.headers.get("x-device-token") or request.query_params.get("device_token")
+        if not await _device_token_valid(token):
+            return JSONResponse({"detail": "Acesso protegido — introduza o PIN."}, status_code=401)
+    return await call_next(request)
 
 
 app.include_router(api_router)
