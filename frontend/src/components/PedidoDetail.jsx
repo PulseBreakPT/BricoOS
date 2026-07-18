@@ -18,7 +18,7 @@ import {
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
-  FileUp, FileText, Download,
+  FileUp, FileText, Download, Inbox, RefreshCw,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
@@ -44,7 +44,7 @@ const DRAFT_KEY = "brico_draft_new_note";
 const ACT_ICONS = {
   created: Sparkles, status_change: ArrowRightLeft, priority_change: Flag,
   quote_added: Receipt, quote_removed: Trash2, quote_approved: BadgeCheck,
-  email_sent: Send, comment: MessageSquare, updated: Pencil, task_added: Bell,
+  email_sent: Send, email_received: Inbox, comment: MessageSquare, updated: Pencil, task_added: Bell,
   client_contact: PhoneCall, supplier_contact: PhoneCall,
   contact_attempt: PhoneMissed, auto_archived: Cloud,
 };
@@ -80,6 +80,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [receivedEmails, setReceivedEmails] = useState([]);
+  const [syncingEmails, setSyncingEmails] = useState(false);
+  const [sendingClient, setSendingClient] = useState(false);
   const [comment, setComment] = useState("");
   const [labelInput, setLabelInput] = useState("");
   const [newTask, setNewTask] = useState({ title: "", due_date: "" });
@@ -121,12 +124,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
-    const [q, a, t] = await Promise.all([
+    const [q, a, t, m] = await Promise.all([
       api.get(`/notes/${nid}/quotes`),
       api.get(`/notes/${nid}/activities`),
       api.get(`/notes/${nid}/tasks`),
+      api.get(`/notes/${nid}/emails`).catch(() => ({ data: [] })),
     ]);
-    setQuotes(q.data); setActivities(a.data); setTasks(t.data);
+    setQuotes(q.data); setActivities(a.data); setTasks(t.data); setReceivedEmails(m.data || []);
   }, []);
 
   const loadNote = useCallback(async (nid) => {
@@ -518,6 +522,36 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       await refresh();
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível registar o envio"));
+    }
+  };
+  // Envio direto ao cliente — só acontece por clique explícito neste botão.
+  const sendClientEmail = async () => {
+    if (sendingClient) return;
+    setSendingClient(true);
+    try {
+      const { data } = await api.post(`/notes/${id}/send-client-email`, {
+        subject: clientEmailData.subject, body: clientEmailData.body,
+      });
+      toast.success(`Email enviado ao cliente (${data.to})`);
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível enviar o email ao cliente"));
+    } finally {
+      setSendingClient(false);
+    }
+  };
+  // Verificação manual da caixa de entrada — só leitura, nunca envia nada.
+  const syncEmails = async () => {
+    if (syncingEmails) return;
+    setSyncingEmails(true);
+    try {
+      const { data } = await api.post("/emails/sync");
+      toast.success(data.new ? `${data.new} resposta(s) nova(s) associada(s)` : "Sem respostas novas de fornecedores");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível verificar a caixa de entrada"));
+    } finally {
+      setSyncingEmails(false);
     }
   };
 
@@ -1093,6 +1127,41 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
               </section>
 
+              {/* Respostas recebidas do fornecedor (IMAP, só leitura) */}
+              {gmailStatus?.method === "smtp" || receivedEmails.length > 0 ? (
+                <section data-testid="received-emails-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
+                      <Inbox className="h-4 w-4 text-slate-700" /> Respostas do fornecedor
+                    </h4>
+                    {gmailStatus?.method === "smtp" ? (
+                      <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-8 shrink-0 rounded-lg text-xs">
+                        {syncingEmails ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Verificar agora
+                      </Button>
+                    ) : null}
+                  </div>
+                  {receivedEmails.length === 0 ? (
+                    <p className="mt-2 text-xs text-slate-400">
+                      Ainda sem respostas. A caixa de entrada é verificada automaticamente e, quando o fornecedor responder,
+                      a resposta aparece aqui e o estado avança sozinho para «Orçamento recebido».
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {receivedEmails.map((m) => (
+                        <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                          <summary className="cursor-pointer select-none">
+                            <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_email}</span>
+                            <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
+                            <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
+                          </summary>
+                          <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+                        </details>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
               {/* Orçamento do fornecedor (PDF) → PDF de venda ao cliente */}
               <section data-testid="supplier-pdf-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -1256,7 +1325,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <Textarea data-testid="client-email-body" value={clientEmailData.body} onChange={(e) => setClientEmailData((d) => ({ ...d, body: e.target.value }))} rows={7} className="bg-white font-mono text-xs" />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button data-testid="open-client-email" onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className="rounded-xl bg-blue-700 hover:bg-blue-800">
+                    {gmailStatus?.connected ? (
+                      <Button data-testid="send-client-email" onClick={sendClientEmail} disabled={!form.email || !clientEmailData.body || sendingClient || clientTemplateLoading} className="rounded-xl bg-blue-700 hover:bg-blue-800">
+                        {sendingClient ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Enviar por email
+                      </Button>
+                    ) : null}
+                    <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-white" : "bg-blue-700 hover:bg-blue-800"}`}>
                       <Mail className="mr-2 h-4 w-4" /> Abrir no email
                     </Button>
                     <Button data-testid="copy-client-email" variant="outline" onClick={copyClientEmail} disabled={!clientEmailData.body} className="rounded-xl bg-white">

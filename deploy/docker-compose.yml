@@ -73,6 +73,8 @@ services:
       # Alternativa por SMTP com palavra-passe de aplicação (tem prioridade sobre o OAuth).
       GMAIL_SMTP_USER: ${GMAIL_SMTP_USER:-}
       GMAIL_SMTP_APP_PASSWORD: ${GMAIL_SMTP_APP_PASSWORD:-}
+      # Minutos entre verificações automáticas da caixa de entrada (0 = desligado).
+      IMAP_POLL_MINUTES: ${IMAP_POLL_MINUTES:-5}
       # IA (opcional — sem chave, os endpoints de IA respondem "não configurado").
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-gpt-5.4}
