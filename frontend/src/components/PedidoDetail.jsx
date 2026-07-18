@@ -1138,12 +1138,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
               </section>
 
-              {/* Respostas recebidas do fornecedor (IMAP, só leitura) */}
+              {/* Respostas recebidas — fornecedor ou cliente (IMAP, só leitura) */}
               {gmailStatus?.method === "smtp" || receivedEmails.length > 0 ? (
                 <section data-testid="received-emails-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
-                      <Inbox className="h-4 w-4 text-slate-700" /> Respostas do fornecedor
+                      <Inbox className="h-4 w-4 text-slate-700" /> Respostas recebidas
                     </h4>
                     {gmailStatus?.method === "smtp" ? (
                       <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-8 shrink-0 rounded-lg text-xs">
@@ -1153,15 +1153,19 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </div>
                   {receivedEmails.length === 0 ? (
                     <p className="mt-2 text-xs text-slate-400">
-                      Ainda sem respostas. A caixa de entrada é verificada automaticamente e, quando o fornecedor responder,
-                      a resposta aparece aqui e o estado avança sozinho para «Orçamento recebido».
+                      Ainda sem respostas. A caixa de entrada é verificada automaticamente — quando o fornecedor ou o
+                      cliente responderem, a mensagem aparece aqui (e uma resposta do fornecedor avança o estado
+                      sozinho para «Orçamento recebido»).
                     </p>
                   ) : (
                     <div className="mt-3 space-y-2">
                       {receivedEmails.map((m) => (
                         <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                           <summary className="cursor-pointer select-none">
-                            <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_email}</span>
+                            <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
+                            {m.reply_kind === "client" ? (
+                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cliente</span>
+                            ) : null}
                             <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
                             <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
                           </summary>
