@@ -28,6 +28,7 @@ import {
   buildEmail, formatDateTime, getNextActionCta, getNextActionMode, timeAgo,
 } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
+import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -95,6 +96,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [clientEmailData, setClientEmailData] = useState({ subject: "", body: "", to: "" });
   const [clientTemplateLoading, setClientTemplateLoading] = useState(false);
   const [caixOpen, setCaixOpen] = useState(false);
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false);
 
   // Orçamento do fornecedor importado de PDF (BandAluminios) → PDF de venda
   const [sq, setSq] = useState(null);
@@ -616,8 +618,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       a.download = `Orcamento_${(sq.quote_number || "cliente").replace(/[^A-Za-z0-9]+/g, "_")}_cliente.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("PDF para o cliente gerado e descarregado");
+      toast.success("PDF gerado — email ao cliente pronto para confirmar");
       await refresh();
+      // O email já está preparado com o PDF anexado — abre logo a confirmação.
+      setConfirmSendOpen(true);
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível gerar o PDF"));
     } finally {
@@ -1184,6 +1188,32 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </section>
               ) : null}
 
+              {/* Email + PDF prontos — confirmação a um clique, sem sair do pedido */}
+              {note?.pending_client_send ? (
+                <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-emerald-900">
+                        <Send className="h-4 w-4 text-emerald-600" /> Pronto para enviar ao cliente
+                      </h4>
+                      <p className="mt-0.5 text-xs text-emerald-800/80">
+                        {note.pending_client_send.pdf_filename || "PDF"} anexado
+                        {note.pending_client_send.total != null ? ` · ${Number(note.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
+                        {note.pending_client_send.eff_margin_pct != null ? ` · margem ${Number(note.pending_client_send.eff_margin_pct).toFixed(1)}%` : ""}
+                        {" — nada é enviado sem a sua confirmação."}
+                      </p>
+                    </div>
+                    <Button
+                      data-testid="open-confirm-send"
+                      onClick={() => setConfirmSendOpen(true)}
+                      className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Send className="mr-2 h-4 w-4" /> Rever e enviar
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
+
               {/* Orçamento do fornecedor (PDF) → PDF de venda ao cliente */}
               <section data-testid="supplier-pdf-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -1462,6 +1492,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       </DialogContent>
 
       <CaixilhariaDialog open={caixOpen} onOpenChange={setCaixOpen} note={note} suppliers={suppliers} onSaved={refresh} />
+      <ConfirmSendDialog
+        open={confirmSendOpen}
+        onOpenChange={setConfirmSendOpen}
+        note={note}
+        onDone={refresh}
+      />
     </Dialog>
   );
 }

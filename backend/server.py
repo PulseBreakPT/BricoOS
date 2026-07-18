@@ -1832,9 +1832,17 @@ async def import_supplier_pdf(note_id: str, file: UploadFile = File(...)):
     if len(data) > MAX_SUPPLIER_PDF_BYTES:
         raise HTTPException(status_code=400, detail="O PDF é demasiado grande (máx. 15 MB).")
     try:
-        await _apply_supplier_pdf(note_id, data, file.filename)
+        supplier_quote = await _apply_supplier_pdf(note_id, data, file.filename)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    # Igual ao fluxo automático por email: gera já o PDF de venda e prepara o
+    # email ao cliente com o anexo — pronto a rever/enviar sem mais cliques.
+    # (Se o utilizador ajustar preços e regenerar, o rascunho é substituído.)
+    try:
+        await _generate_client_pdf_file(note_id, supplier_quote, " — automático após importação")
+    except ValueError as e:
+        await log_activity(note_id, "updated",
+                           f"PDF importado, mas o PDF de cliente não foi gerado: {e}")
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
