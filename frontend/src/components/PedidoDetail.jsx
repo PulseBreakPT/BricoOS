@@ -69,7 +69,7 @@ const QUICK_LOG_TONES = {
   green: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
 };
 
-export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
+export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", initialCreateMode = "choice", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
   const [id, setId] = useState(noteId);
   const [note, setNote] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -173,7 +173,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
-      setCreateMode("choice");
+      // Cada área abre logo o assistente certo: «band» na área Banda
+      // Alumínios, «normal» na área geral da loja.
+      setCreateMode(initialCreateMode || "choice");
       setCreateStep(0);
       setCaixSpec(createEmptyCaixilharia());
       setCreating(false);
@@ -193,7 +195,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         setNote(null); setQuotes([]); setActivities([]); setTasks([]);
       }
     }
-  }, [open, noteId, initialTab, loadNote, loadSub]);
+  }, [open, noteId, initialTab, initialCreateMode, loadNote, loadSub]);
 
   // Cada separador começa no topo. Evita abrir uma aba curta na posição de
   // scroll deixada por outra aba longa, sobretudo em Android/iOS.
