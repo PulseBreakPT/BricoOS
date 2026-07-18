@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mail, Inbox, Send, FileClock, Search, Loader2, FileText, RefreshCw,
-  CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus,
+  CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
 import { timeAgo, formatDateTime } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
+import ComposeEmailDialog from "@/components/ComposeEmailDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -62,6 +64,9 @@ function InboxTab({ search }) {
   const [syncing, setSyncing] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [creatingId, setCreatingId] = useState(null);
+  const [replyingId, setReplyingId] = useState(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -114,6 +119,25 @@ function InboxTab({ search }) {
   const openItem = async (m) => {
     if (!m.seen) { try { await api.post(`/emails/${m.id}/seen`); setItems((prev) => prev.map((x) => (x.id === m.id ? { ...x, seen: true } : x))); } catch { /* segue */ } }
     setExpanded((cur) => (cur === m.id ? null : m.id));
+    setReplyingId(null);
+  };
+
+  const startReply = (id) => { setReplyingId(id); setReplyBody(""); };
+
+  const sendReply = async (m) => {
+    if (!replyBody.trim()) return;
+    setSendingReply(true);
+    try {
+      await api.post(`/emails/${m.id}/reply`, { body: replyBody });
+      toast.success(`Resposta enviada a ${m.from_email}`);
+      setReplyingId(null);
+      setReplyBody("");
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível enviar a resposta"));
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   return (
@@ -163,21 +187,61 @@ function InboxTab({ search }) {
                       ))}
                     </div>
                   ) : null}
-                  {m.note_id ? (
-                    <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
-                      Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  ) : !m.matched ? (
-                    <Button
-                      data-testid={`inbox-create-note-${m.id}`}
-                      size="sm"
-                      disabled={creatingId === m.id}
-                      onClick={() => createNoteFrom(m)}
-                      className="mt-3 h-8 rounded-lg text-xs"
-                    >
-                      {creatingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
-                      Criar pedido a partir deste email
-                    </Button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {m.note_id ? (
+                      <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
+                        Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    ) : !m.matched ? (
+                      <Button
+                        data-testid={`inbox-create-note-${m.id}`}
+                        size="sm"
+                        disabled={creatingId === m.id}
+                        onClick={() => createNoteFrom(m)}
+                        className="h-8 rounded-lg text-xs"
+                      >
+                        {creatingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+                        Criar pedido a partir deste email
+                      </Button>
+                    ) : null}
+                    {replyingId !== m.id ? (
+                      <Button
+                        data-testid={`inbox-reply-${m.id}`}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startReply(m.id)}
+                        className="h-8 rounded-lg text-xs"
+                      >
+                        <Reply className="mr-1.5 h-3.5 w-3.5" /> Responder
+                      </Button>
+                    ) : null}
+                  </div>
+                  {replyingId === m.id ? (
+                    <div className="mt-2 space-y-2">
+                      <Textarea
+                        data-testid={`inbox-reply-body-${m.id}`}
+                        value={replyBody}
+                        onChange={(e) => setReplyBody(e.target.value)}
+                        placeholder={`Responder a ${m.from_email}...`}
+                        rows={4}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          data-testid={`inbox-reply-send-${m.id}`}
+                          size="sm"
+                          disabled={sendingReply || !replyBody.trim()}
+                          onClick={() => sendReply(m)}
+                          className="h-8 rounded-lg text-xs"
+                        >
+                          {sendingReply ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
+                          Enviar resposta
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={sendingReply} onClick={() => setReplyingId(null)} className="h-8 rounded-lg text-xs">
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -365,6 +429,8 @@ export default function Emails() {
   const [tab, setTab] = useState("inbox");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [sentKey, setSentKey] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -373,15 +439,26 @@ export default function Emails() {
 
   return (
     <div>
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Toda a atividade de email</p>
-        <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-          <Mail className="h-6 w-6 text-slate-700 sm:h-8 sm:w-8" /> Emails
-        </h1>
-        <p className="text-sm text-slate-500">
-          Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
-        </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Toda a atividade de email</p>
+          <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+            <Mail className="h-6 w-6 text-slate-700 sm:h-8 sm:w-8" /> Emails
+          </h1>
+          <p className="text-sm text-slate-500">
+            Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
+          </p>
+        </div>
+        <Button data-testid="emails-compose-btn" onClick={() => setComposeOpen(true)} className="mt-2 h-10 shrink-0 rounded-xl sm:mt-1">
+          <Pencil className="mr-1.5 h-4 w-4" /> Novo email
+        </Button>
       </div>
+
+      <ComposeEmailDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        onSent={() => { setTab("sent"); setSentKey((k) => k + 1); }}
+      />
 
       <div className="relative mt-4">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -395,7 +472,7 @@ export default function Emails() {
           <TabsTrigger value="drafts" data-testid="emails-tab-drafts"><FileClock className="mr-1.5 h-3.5 w-3.5" /> Rascunhos</TabsTrigger>
         </TabsList>
         <TabsContent value="inbox" className="focus-visible:outline-none"><InboxTab search={debounced} /></TabsContent>
-        <TabsContent value="sent" className="focus-visible:outline-none"><SentTab search={debounced} /></TabsContent>
+        <TabsContent value="sent" className="focus-visible:outline-none"><SentTab key={sentKey} search={debounced} /></TabsContent>
         <TabsContent value="drafts" className="focus-visible:outline-none"><DraftsTab search={debounced} /></TabsContent>
       </Tabs>
     </div>
