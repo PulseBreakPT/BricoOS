@@ -8,6 +8,7 @@ import Notes from "@/pages/Notes";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
 import Catalog from "@/pages/Catalog";
+import Emails from "@/pages/Emails";
 
 // A antiga página "Hoje" fundiu-se com "Pedidos" em "/". Links antigos para
 // /clientes (ex.: ?open=<id> em notificações guardadas) continuam a funcionar.
@@ -30,6 +31,7 @@ function App() {
               <Route path="/clientes" element={<LegacyClientesRedirect />} />
               <Route path="/estatisticas" element={<Dashboard />} />
               <Route path="/fornecedores" element={<Suppliers />} />
+              <Route path="/emails" element={<Emails />} />
               <Route path="/tarefas" element={<Tasks />} />
               <Route path="/catalogo-tecnico" element={<Catalog />} />
             </Route>

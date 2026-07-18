@@ -91,6 +91,7 @@ function SupplierEmailAlert() {
 const NAV = [
   { to: "/", label: "Pedidos", icon: ClipboardList, testid: "nav-clientes", end: true },
   { to: "/fornecedores", label: "Fornecedores", icon: Truck, testid: "nav-fornecedores" },
+  { to: "/emails", label: "Emails", icon: Mail, testid: "nav-emails" },
   { to: "/catalogo-tecnico", label: "Catálogo técnico", icon: BookOpenCheck, testid: "nav-catalogo", mobile: false },
   { to: "/tarefas", label: "Tarefas", icon: ListChecks, testid: "nav-tarefas" },
   { to: "/estatisticas", label: "Estatísticas", icon: BarChart3, testid: "nav-estatisticas" },

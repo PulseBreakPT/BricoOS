@@ -1297,7 +1297,8 @@ async def send_client_quote(note_id: str, payload: ClientSendIn):
         f = await db.note_files.find_one({"id": file_id, "note_id": note_id}, {"_id": 0})
         if f:
             attachments.append({"data": base64.b64decode(f["content_b64"]), "filename": f.get("filename")})
-    await _send_email(to, payload.subject, payload.body, attachments)
+    await _send_email(to, payload.subject, payload.body, attachments,
+                      note_id=note_id, kind="client", to_label=n.get("customer_name") or "", pdf_file_id=file_id)
     await db.notes.update_one({"id": note_id}, {"$set": {
         "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
         "status_updated_at": now_iso(), "updated_at": now_iso()},
@@ -2108,12 +2109,25 @@ def _smtp_send(to_email, subject, body, attachments=None):
         smtp.sendmail(GMAIL_SMTP_USER, [to_email], message.as_string())
 
 
-async def _send_email(to_email, subject, body, attachments=None):
+async def _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id):
+    """Ponto único de registo de envios — cobre fornecedores, clientes e
+    qualquer envio futuro, para a secção "Emails" mostrar tudo o que saiu,
+    mesmo sem pedido associado."""
+    await db.sent_emails.insert_one({
+        "id": str(uuid.uuid4()), "to": to_email, "to_label": to_label or "",
+        "subject": subject, "body": body, "note_id": note_id or "", "kind": kind,
+        "pdf_file_id": pdf_file_id or "",
+        "attachments": [{"filename": a.get("filename")} for a in (attachments or [])],
+        "sent_at": now_iso()})
+
+
+async def _send_email(to_email, subject, body, attachments=None, note_id=None, kind="other", to_label="", pdf_file_id=""):
     if not to_email:
         raise HTTPException(status_code=400, detail="O destinatário não tem email definido.")
     if SMTP_CONFIGURED:
         try:
             await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments)
+            await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id)
             return
         except smtplib.SMTPAuthenticationError:
             raise HTTPException(status_code=502, detail="O Gmail recusou a palavra-passe de aplicação (SMTP). "
@@ -2131,6 +2145,7 @@ async def _send_email(to_email, subject, body, attachments=None):
         message["subject"] = subject
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -2289,8 +2304,10 @@ async def poll_supplier_replies():
         if await db.received_emails.find_one({"uid": m["uid"]}):
             continue
         note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
-        if not note_id and not supplier_id:
-            continue  # sem relação com fornecedores — o resto da caixa é ignorado
+        # Guarda TODOS os emails da caixa de entrada — mesmo sem relação com
+        # nenhum pedido — para a secção "Emails" mostrar a caixa completa.
+        # Os efeitos automáticos (estado do pedido, análise de PDF) continuam
+        # a só acontecer quando há um pedido associado.
         email_id = str(uuid.uuid4())
         attachments_meta = []
         for att in m.get("attachments", []):
@@ -2303,6 +2320,7 @@ async def poll_supplier_replies():
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
+            "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
             "seen": False, "received_at": now_iso()})
@@ -2364,9 +2382,11 @@ async def note_received_emails(note_id: str):
 
 @api_router.get("/emails/unseen")
 async def unseen_supplier_emails():
-    """Emails de fornecedores ainda não vistos — alimenta o aviso amarelo global."""
+    """Emails de FORNECEDORES ainda não vistos — alimenta o aviso amarelo
+    global. Correspondência com pedidos/fornecedores; emails sem relação
+    (agora também guardados) não entram aqui — só na secção "Emails"."""
     docs = await db.received_emails.find(
-        {"seen": {"$ne": True}}, {"_id": 0, "body": 0},
+        {"seen": {"$ne": True}, "matched": True}, {"_id": 0, "body": 0},
     ).sort("received_at", -1).to_list(50)
     return {"count": len(docs), "items": docs}
 
@@ -2381,6 +2401,61 @@ async def mark_email_seen(email_id: str):
 async def mark_all_emails_seen():
     r = await db.received_emails.update_many({"seen": {"$ne": True}}, {"$set": {"seen": True}})
     return {"ok": True, "marked": r.modified_count}
+
+
+# ---------- Secção "Emails": caixa completa, enviados e rascunhos ----------
+# Ao contrário do painel de cada pedido (que só mostra o que lhe pertence),
+# esta secção mostra TUDO — incluindo emails sem qualquer pedido associado.
+
+def _email_search_clause(search, fields):
+    if not search:
+        return None
+    rx = {"$regex": re.escape(search), "$options": "i"}
+    return {"$or": [{f: rx} for f in fields]}
+
+
+@api_router.get("/emails/inbox")
+async def emails_inbox(search: Optional[str] = None, matched: Optional[bool] = None,
+                       skip: int = 0, limit: int = 50):
+    q = {}
+    if matched is not None:
+        q["matched"] = matched
+    rx = _email_search_clause(search, ["from_email", "subject", "supplier_name", "body"])
+    if rx:
+        q.update(rx)
+    skip = max(skip, 0)
+    limit = min(max(limit, 1), 100)
+    total = await db.received_emails.count_documents(q)
+    docs = await db.received_emails.find(q, {"_id": 0}).sort("received_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"items": docs, "total": total}
+
+
+@api_router.get("/emails/sent")
+async def emails_sent(kind: Optional[str] = None, search: Optional[str] = None,
+                      skip: int = 0, limit: int = 50):
+    q = {}
+    if kind in ("supplier", "client", "other"):
+        q["kind"] = kind
+    rx = _email_search_clause(search, ["to", "to_label", "subject", "body"])
+    if rx:
+        q.update(rx)
+    skip = max(skip, 0)
+    limit = min(max(limit, 1), 100)
+    total = await db.sent_emails.count_documents(q)
+    docs = await db.sent_emails.find(q, {"_id": 0}).sort("sent_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"items": docs, "total": total}
+
+
+@api_router.get("/emails/drafts")
+async def emails_drafts():
+    """Emails preparados automaticamente (ou manualmente) e ainda por
+    confirmar — em qualquer pedido, de qualquer área."""
+    docs = await db.notes.find(
+        {"pending_client_send": {"$exists": True, "$ne": None}},
+        {"_id": 0, "id": 1, "customer_name": 1, "email": 1, "phone": 1, "pending_client_send": 1},
+    ).to_list(500)
+    docs.sort(key=lambda d: (d.get("pending_client_send") or {}).get("created_at") or "", reverse=True)
+    return {"items": docs, "total": len(docs)}
 
 
 @api_router.get("/emails/{email_id}/attachments/{attachment_id}")
@@ -2409,7 +2484,7 @@ async def send_client_email(note_id: str, payload: ClientEmailIn):
         raise HTTPException(status_code=400, detail="O cliente não tem email definido nos Detalhes.")
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
-    await _send_email(to, payload.subject, payload.body)
+    await _send_email(to, payload.subject, payload.body, note_id=note_id, kind="client", to_label=n.get("customer_name") or "")
     await db.notes.update_one({"id": note_id}, {"$set": {
         "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
         "status_updated_at": now_iso(), "updated_at": now_iso()}})
@@ -2441,7 +2516,8 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
             failed.append({"supplier_id": sid, "supplier_name": name, "reason": "Sem email definido"})
             continue
         try:
-            await _send_email(supplier["email"], payload.subject, payload.body)
+            await _send_email(supplier["email"], payload.subject, payload.body,
+                              note_id=note_id, kind="supplier", to_label=name)
         except HTTPException as e:
             failed.append({"supplier_id": sid, "supplier_name": name, "reason": e.detail})
             continue
@@ -3065,6 +3141,10 @@ async def migrate():
     except Exception:
         pass
     await _normalize_existing_phones()
+    # Antes de guardar TODA a caixa de entrada, só os emails associados a um
+    # pedido/fornecedor eram guardados — logo todos os registos antigos sem o
+    # campo "matched" eram, por definição, associados.
+    await db.received_emails.update_many({"matched": {"$exists": False}}, {"$set": {"matched": True}})
 
 
 async def _normalize_existing_phones():
@@ -3141,6 +3221,8 @@ async def ensure_indexes():
             pass
     for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("quotes", "note_id"),
                         ("received_emails", "note_id"), ("received_emails", "seen"),
+                        ("received_emails", "matched"), ("received_emails", "received_at"),
+                        ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
                         ("email_attachments", "email_id")]:
         try:
             await db[coll].create_index(field)
