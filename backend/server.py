@@ -1168,7 +1168,7 @@ async def check_duplicate(payload: DuplicateCheckIn):
 async def create_note(payload: NoteIn):
     doc = payload.model_dump()
     doc.update({"id": str(uuid.uuid4()), "created_by": AUTHOR, "archived": False,
-                "last_supplier_sent_at": "", "last_client_contact_at": "",
+                "last_supplier_sent_at": "", "last_client_contact_at": "", "last_client_reply_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
                 "last_client_attempt_at": "", "last_supplier_attempt_at": "",
@@ -1356,6 +1356,7 @@ async def duplicate_note(note_id: str):
                 "status": "novo", "sla_days": src.get("sla_days", DEFAULT_SLA_DAYS),
                 "reminder_interval_days": src.get("reminder_interval_days", 3), "favorite": False,
                 "archived": False, "created_by": AUTHOR, "last_supplier_sent_at": "", "last_client_contact_at": "",
+                "last_client_reply_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
                 "last_client_attempt_at": "", "last_supplier_attempt_at": "",
@@ -2220,9 +2221,11 @@ def _imap_fetch_since(last_uid):
             if not raw:
                 continue
             msg = email_lib.message_from_bytes(raw)
+            display_name, addr = parseaddr(_decode_mime_header(msg.get("From") or ""))
             messages.append({
                 "uid": uid,
-                "from_email": (parseaddr(msg.get("From") or "")[1] or "").lower(),
+                "from_email": (addr or "").lower(),
+                "from_name": display_name.strip(),
                 "subject": _decode_mime_header(msg.get("Subject")),
                 "body": _email_text_body(msg)[:20000].strip(),
                 "attachments": _email_pdf_attachments(msg),
@@ -2289,6 +2292,33 @@ async def _match_note_for_reply(from_email, subject):
     return (docs[0]["id"] if docs else None), sup["id"], sup.get("name")
 
 
+async def _match_client_reply(from_email, subject):
+    """Associa a resposta ao pedido pelo lado do CLIENTE — simétrico ao
+    matching de fornecedor acima, mas ainda não existia: até agora, se um
+    cliente respondesse a um orçamento, o email ficava na caixa sem qualquer
+    ligação ao pedido. Tenta primeiro pelo assunto (Re: do email que
+    enviámos ao cliente, registado em sent_emails), depois pelo endereço do
+    cliente gravado no próprio pedido (o mais recentemente atualizado)."""
+    clean = _clean_subject(subject)
+    if clean:
+        sent = await db.sent_emails.find(
+            {"kind": "client"}, {"_id": 0, "note_id": 1, "subject": 1},
+        ).sort("sent_at", -1).to_list(500)
+        for r in sent:
+            if r.get("note_id") and _clean_subject(r.get("subject")) == clean:
+                return r["note_id"]
+    if not from_email:
+        return None
+    docs = await db.notes.find(
+        {"email": {"$regex": f"^{re.escape(from_email)}$", "$options": "i"}},
+        {"_id": 0, "id": 1, "updated_at": 1},
+    ).to_list(50)
+    if not docs:
+        return None
+    docs.sort(key=lambda d: d.get("updated_at") or "", reverse=True)
+    return docs[0]["id"]
+
+
 async def poll_supplier_replies():
     if not SMTP_CONFIGURED:
         return {"ok": False, "new": 0, "detail": "SMTP não configurado."}
@@ -2304,6 +2334,16 @@ async def poll_supplier_replies():
         if await db.received_emails.find_one({"uid": m["uid"]}):
             continue
         note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
+        reply_kind = "supplier" if note_id else ""
+        if not note_id:
+            # Ou não há fornecedor conhecido, ou há um fornecedor conhecido mas
+            # nenhum pedido atualmente à sua espera — nesse caso, antes de
+            # desistir, tenta-se o lado do cliente (simétrico ao matching de
+            # fornecedor, que até agora não existia).
+            client_note_id = await _match_client_reply(m["from_email"], m["subject"])
+            if client_note_id:
+                note_id, reply_kind = client_note_id, "client"
+                supplier_id, supplier_name = None, None
         # Guarda TODOS os emails da caixa de entrada — mesmo sem relação com
         # nenhum pedido — para a secção "Emails" mostrar a caixa completa.
         # Os efeitos automáticos (estado do pedido, análise de PDF) continuam
@@ -2320,44 +2360,57 @@ async def poll_supplier_replies():
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
+            "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
             "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
+            quem = supplier_name or m.get("from_name") or m["from_email"]
+            verbo = "Resposta recebida de" if reply_kind == "supplier" else "Resposta recebida do cliente"
             await log_activity(note_id, "email_received",
-                               f"Resposta recebida de {supplier_name or m['from_email']}: {m['subject'] or '(sem assunto)'}"
+                               f"{verbo} {quem}: {m['subject'] or '(sem assunto)'}"
                                + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
-                               {"from": m["from_email"], "uid": m["uid"]})
-            n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
-            if n and n.get("status") in WAITING_SUPPLIER:
-                await db.notes.update_one({"id": note_id}, {"$set": {
-                    "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
-                await log_activity(note_id, "status_change",
-                                   "Estado alterado para Orçamento recebido (resposta por email)",
-                                   {"to": "orcamento_recebido"})
-            # PDF da BandAluminios em anexo → analisa e gera automaticamente o
-            # PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
-            # enviado sem confirmação explícita do utilizador.
-            if m.get("attachments"):
-                first = m["attachments"][0]
-                try:
-                    supplier_quote = await _apply_supplier_pdf(
-                        note_id, first["data"], first["filename"], source_label=" (recebido por email)")
+                               {"from": m["from_email"], "uid": m["uid"], "reply_kind": reply_kind})
+            if reply_kind == "supplier":
+                n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
+                if n and n.get("status") in WAITING_SUPPLIER:
+                    await db.notes.update_one({"id": note_id}, {"$set": {
+                        "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
+                    await log_activity(note_id, "status_change",
+                                       "Estado alterado para Orçamento recebido (resposta por email)",
+                                       {"to": "orcamento_recebido"})
+                # PDF da BandAluminios em anexo → analisa e gera automaticamente
+                # o PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
+                # enviado sem confirmação explícita do utilizador.
+                if m.get("attachments"):
+                    first = m["attachments"][0]
                     try:
-                        await _generate_client_pdf_file(
-                            note_id, supplier_quote,
-                            source_label=" — automático, reveja e envie quando quiser")
+                        supplier_quote = await _apply_supplier_pdf(
+                            note_id, first["data"], first["filename"], source_label=" (recebido por email)")
+                        try:
+                            await _generate_client_pdf_file(
+                                note_id, supplier_quote,
+                                source_label=" — automático, reveja e envie quando quiser")
+                        except ValueError as e:
+                            await log_activity(note_id, "updated",
+                                               f"PDF do fornecedor analisado, mas o PDF de cliente não foi gerado: {e}")
                     except ValueError as e:
                         await log_activity(note_id, "updated",
-                                           f"PDF do fornecedor analisado, mas o PDF de cliente não foi gerado: {e}")
-                except ValueError as e:
-                    await log_activity(note_id, "updated",
-                                       f"PDF recebido por email ({first['filename']}) mas não reconhecido "
-                                       f"como orçamento do fornecedor: {e}")
-                except Exception as e:
-                    logger.error(f"Falha ao processar PDF recebido por email: {e}")
+                                           f"PDF recebido por email ({first['filename']}) mas não reconhecido "
+                                           f"como orçamento do fornecedor: {e}")
+                    except Exception as e:
+                        logger.error(f"Falha ao processar PDF recebido por email: {e}")
+            else:
+                # Resposta do cliente: nunca avança o estado sozinho (não há
+                # forma segura de saber se aprovou, recusou ou só perguntou
+                # algo) — mas fica marcado e reaparece bem visível nos
+                # alertas para alguém decidir. Um cliente que responde está
+                # claramente contactável, por isso repõe o contador de
+                # chamadas sem resposta.
+                await db.notes.update_one({"id": note_id}, {"$set": {
+                    "last_client_reply_at": now_iso(), "client_no_answer_count": 0, "updated_at": now_iso()}})
     await db.imap_state.update_one({"id": "inbox"}, {"$set": {
         "id": "inbox", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
     return {"ok": True, "new": matched, "seen": len(messages)}
@@ -2458,6 +2511,31 @@ async def emails_drafts():
     return {"items": docs, "total": len(docs)}
 
 
+@api_router.post("/emails/{email_id}/create-note")
+async def create_note_from_email(email_id: str):
+    """Um email chegou sem corresponder a nenhum pedido conhecido (ex.: um
+    cliente novo a pedir pela primeira vez) — em vez de o utilizador ter de
+    criar o pedido à mão e copiar tudo, um único clique cria-o já preenchido
+    e liga o email como primeira mensagem na cronologia."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    if e.get("note_id"):
+        raise HTTPException(status_code=400, detail="Este email já está associado a um pedido.")
+    description = (e.get("subject") or "").strip() or (e.get("body") or "").strip()[:120] or "Pedido recebido por email"
+    note = await create_note(NoteIn(
+        customer_name=e.get("from_name") or e.get("from_email") or "Cliente",
+        email=e.get("from_email") or "", description=description,
+        details=(e.get("body") or "").strip()[:2000]))
+    await db.received_emails.update_one({"id": email_id}, {"$set": {
+        "note_id": note["id"], "matched": True, "reply_kind": "client"}})
+    await db.email_attachments.update_many({"email_id": email_id}, {"$set": {"note_id": note["id"]}})
+    await log_activity(note["id"], "email_received",
+                       f"Pedido criado a partir de um email recebido de {e.get('from_email')}",
+                       {"from": e.get("from_email"), "uid": e.get("uid")})
+    return enrich_note(await db.notes.find_one({"id": note["id"]}, {"_id": 0}))
+
+
 @api_router.get("/emails/{email_id}/attachments/{attachment_id}")
 async def download_email_attachment(email_id: str, attachment_id: str):
     f = await db.email_attachments.find_one({"id": attachment_id, "email_id": email_id}, {"_id": 0})
@@ -2547,6 +2625,17 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
 async def build_notifications():
     now = datetime.now(timezone.utc)
     notes = await db.notes.find({"archived": {"$ne": True}}, {"_id": 0}).to_list(5000)
+    # Respostas de cliente por email ainda não vistas — mostradas aqui em vez
+    # de avançar o estado sozinho, porque só um humano sabe se a resposta é
+    # uma aprovação, uma recusa ou só uma pergunta. Marcar o email como visto
+    # (na secção Emails ou na aba Orçamentos do pedido) resolve o alerta.
+    unseen_client_replies = {}
+    async for e in db.received_emails.find(
+        {"reply_kind": "client", "seen": {"$ne": True}, "note_id": {"$ne": ""}},
+        {"_id": 0, "note_id": 1, "subject": 1, "received_at": 1}):
+        cur = unseen_client_replies.get(e["note_id"])
+        if not cur or e.get("received_at", "") > cur.get("received_at", ""):
+            unseen_client_replies[e["note_id"]] = e
     out = []
     for n in notes:
         status = n.get("status", "novo")
@@ -2571,6 +2660,12 @@ async def build_notifications():
             out.append({"id": f"{n['id']}-send", "note_id": n["id"], "kind": "confirm_send", "severity": "high",
                         "title": f"{cust} · orçamento pronto a enviar",
                         "message": "Email e PDF preparados automaticamente — reveja e confirme o envio.", "days": days})
+        reply = unseen_client_replies.get(n["id"])
+        if reply:
+            out.append({"id": f"{n['id']}-reply", "note_id": n["id"], "kind": "client_reply", "severity": "high",
+                        "title": f"{cust} · o cliente respondeu",
+                        "message": f"«{reply.get('subject') or '(sem assunto)'}» — associado automaticamente ao pedido.",
+                        "days": days})
         for side, who in (("client", "cliente"), ("supplier", "fornecedor")):
             attempts = n.get(f"{side}_no_answer_count", 0) or 0
             if attempts and callback_due(n, now, side):
@@ -3132,7 +3227,7 @@ async def migrate():
                 "quantity": "", "color": "", "reminder_interval_days": 3,
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
-                "last_client_attempt_at": "", "last_supplier_attempt_at": ""}
+                "last_client_attempt_at": "", "last_supplier_attempt_at": "", "last_client_reply_at": ""}
     for k, v in defaults.items():
         await db.notes.update_many({k: {"$exists": False}}, {"$set": {k: v}})
     await db.notes.update_many({"status": {"$in": list(ARCHIVE_STATUSES)}, "archived": {"$ne": True}}, {"$set": {"archived": True}})
@@ -3145,6 +3240,12 @@ async def migrate():
     # pedido/fornecedor eram guardados — logo todos os registos antigos sem o
     # campo "matched" eram, por definição, associados.
     await db.received_emails.update_many({"matched": {"$exists": False}}, {"$set": {"matched": True}})
+    # reply_kind é novo: os registos antigos só podiam ser respostas de
+    # fornecedor (o matching do lado do cliente não existia ainda).
+    await db.received_emails.update_many(
+        {"reply_kind": {"$exists": False}, "supplier_id": {"$ne": ""}}, {"$set": {"reply_kind": "supplier"}})
+    await db.received_emails.update_many(
+        {"reply_kind": {"$exists": False}}, {"$set": {"reply_kind": ""}})
 
 
 async def _normalize_existing_phones():
@@ -3222,6 +3323,7 @@ async def ensure_indexes():
     for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("quotes", "note_id"),
                         ("received_emails", "note_id"), ("received_emails", "seen"),
                         ("received_emails", "matched"), ("received_emails", "received_at"),
+                        ("received_emails", "reply_kind"), ("notes", "email"),
                         ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
                         ("email_attachments", "email_id")]:
         try:

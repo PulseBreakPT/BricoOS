@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
 
 // Aviso global, grande e amarelo: aparece em TODAS as páginas sempre que chega
-// qualquer email de um fornecedor (associado a um pedido ou não), até ser
-// marcado como visto. Verificado a cada 45s e ao voltar à janela.
+// um email associado a um pedido — de um fornecedor OU de um cliente que
+// respondeu — até ser marcado como visto. Verificado a cada 45s e ao voltar
+// à janela.
 function SupplierEmailAlert() {
   const [data, setData] = useState({ count: 0, items: [] });
   const navigate = useNavigate();
@@ -32,9 +33,10 @@ function SupplierEmailAlert() {
   const openItem = async (m) => {
     try { await api.post(`/emails/${m.id}/seen`); } catch { /* segue na mesma */ }
     await load();
-    if (m.note_id) navigate(`/?open=${m.note_id}&tab=orcamentos`);
+    if (m.note_id) navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`);
     else navigate("/fornecedores");
   };
+  const allClient = data.items.length > 0 && data.items.every((m) => m.reply_kind === "client");
   const markAll = async () => {
     try { await api.post("/emails/seen-all"); } catch { /* noop */ }
     await load();
@@ -52,7 +54,9 @@ function SupplierEmailAlert() {
           </span>
           <div className="min-w-0">
             <p className="font-heading text-lg font-extrabold leading-tight text-yellow-900 sm:text-2xl">
-              {data.count === 1 ? "Recebeu 1 email de fornecedor!" : `Recebeu ${data.count} emails de fornecedores!`}
+              {data.count === 1
+                ? (allClient ? "O cliente respondeu!" : "Recebeu 1 novo email!")
+                : (allClient ? `${data.count} clientes responderam!` : `Recebeu ${data.count} novos emails!`)}
             </p>
             <div className="mt-2 space-y-1.5">
               {data.items.slice(0, 3).map((m) => (
@@ -62,8 +66,9 @@ function SupplierEmailAlert() {
                   onClick={() => openItem(m)}
                   className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-yellow-200/80 px-3 py-2 text-left text-yellow-900 transition-colors hover:bg-yellow-100"
                 >
+                  {m.reply_kind === "client" ? <User className="h-4 w-4 shrink-0" title="Cliente" /> : null}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                    {m.supplier_name || m.from_email}
+                    {m.supplier_name || m.from_name || m.from_email}
                     <span className="ml-1.5 font-semibold opacity-80">{m.subject || "(sem assunto)"}</span>
                   </span>
                   {m.has_pdf ? <FileText className="h-4 w-4 shrink-0" title="Com PDF em anexo" /> : null}

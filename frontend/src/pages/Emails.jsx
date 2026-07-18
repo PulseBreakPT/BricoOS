@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mail, Inbox, Send, FileClock, Search, Loader2, FileText, RefreshCw,
-  CheckCheck, ArrowRight, Truck, User, Paperclip,
+  CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -14,6 +14,19 @@ import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
+
+// Atualização silenciosa em segundo plano: a caixa é verificada
+// automaticamente no servidor (IMAP), mas sem isto a página só refletia
+// respostas novas depois de recarregar à mão. Sem spinner, sem interromper
+// o que o utilizador está a ver (ex.: um email expandido).
+function useAutoRefresh(callback, ms = 45000) {
+  useEffect(() => {
+    const id = setInterval(callback, ms);
+    const onFocus = () => callback();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+  }, [callback, ms]);
+}
 
 // Chip pequeno "recebido de / enviado para", com ícone consoante o tipo.
 function KindBadge({ kind }) {
@@ -48,20 +61,35 @@ function InboxTab({ search }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [expanded, setExpanded] = useState(null);
+  const [creatingId, setCreatingId] = useState(null);
   const navigate = useNavigate();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/inbox", { params: { search: search || undefined, limit: PAGE_SIZE } });
       setItems(data.items); setTotal(data.total);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao carregar a caixa de entrada"));
+      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar a caixa de entrada"));
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   }, [search]);
   useEffect(() => { load(); }, [load]);
+  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
+
+  const createNoteFrom = async (m) => {
+    setCreatingId(m.id);
+    try {
+      const { data } = await api.post(`/emails/${m.id}/create-note`);
+      toast.success("Pedido criado a partir do email");
+      navigate(`/?open=${data.id}`);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível criar o pedido"));
+    } finally {
+      setCreatingId(null);
+    }
+  };
 
   const sync = async () => {
     setSyncing(true);
@@ -114,8 +142,8 @@ function InboxTab({ search }) {
                 {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate text-sm font-bold text-slate-900">{m.supplier_name || m.from_email}</span>
-                    {m.matched ? <KindBadge kind="supplier" /> : <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">Sem pedido associado</span>}
+                    <span className="truncate text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
+                    {m.matched ? <KindBadge kind={m.reply_kind || "supplier"} /> : <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">Sem pedido associado</span>}
                     {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-red-500" title="Com PDF em anexo" /> : null}
                   </div>
                   <p className="truncate text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
@@ -136,9 +164,20 @@ function InboxTab({ search }) {
                     </div>
                   ) : null}
                   {m.note_id ? (
-                    <button onClick={() => navigate(`/?open=${m.note_id}&tab=orcamentos`)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
+                    <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
                       Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
                     </button>
+                  ) : !m.matched ? (
+                    <Button
+                      data-testid={`inbox-create-note-${m.id}`}
+                      size="sm"
+                      disabled={creatingId === m.id}
+                      onClick={() => createNoteFrom(m)}
+                      className="mt-3 h-8 rounded-lg text-xs"
+                    >
+                      {creatingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+                      Criar pedido a partir deste email
+                    </Button>
                   ) : null}
                 </div>
               ) : null}
@@ -160,20 +199,21 @@ function SentTab({ search }) {
   const [expanded, setExpanded] = useState(null);
   const navigate = useNavigate();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/sent", {
         params: { search: search || undefined, kind: kind === "todos" ? undefined : kind, limit: PAGE_SIZE },
       });
       setItems(data.items); setTotal(data.total);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao carregar os emails enviados"));
+      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os emails enviados"));
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   }, [search, kind]);
   useEffect(() => { load(); }, [load]);
+  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
 
   return (
     <div>
@@ -250,22 +290,28 @@ function DraftsTab({ search }) {
   const [loading, setLoading] = useState(true);
   const [confirmNote, setConfirmNote] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/drafts");
       setItems(data.items);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao carregar os rascunhos"));
+      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os rascunhos"));
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
 
-  const filtered = search
+  const filtered = (search
     ? items.filter((n) => `${n.customer_name} ${n.pending_client_send?.subject} ${n.pending_client_send?.to}`.toLowerCase().includes(search.toLowerCase()))
-    : items;
+    : items
+  // O mais antigo primeiro: o que está há mais tempo por confirmar é o que
+  // mais precisa de atenção, não o que acabou de chegar.
+  ).slice().sort((a, b) => (a.pending_client_send?.created_at || "").localeCompare(b.pending_client_send?.created_at || ""));
+
+  const isStale = (iso) => iso && (Date.now() - new Date(iso).getTime()) > 24 * 60 * 60 * 1000;
 
   return (
     <div>
@@ -283,7 +329,12 @@ function DraftsTab({ search }) {
               <button key={n.id} data-testid={`draft-email-${n.id}`} onClick={() => setConfirmNote(n)}
                 className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-left transition-colors hover:bg-emerald-50">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-900">{n.customer_name || "Sem nome"}</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="truncate text-sm font-bold text-slate-900">{n.customer_name || "Sem nome"}</p>
+                    {isStale(p?.created_at) ? (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Há mais de 24h</span>
+                    ) : null}
+                  </div>
                   <p className="truncate text-xs text-slate-600">{p?.subject}</p>
                   <p className="mt-0.5 text-[11px] text-slate-400">
                     {p?.pdf_filename ? `${p.pdf_filename} · ` : ""}
