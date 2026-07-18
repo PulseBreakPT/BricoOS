@@ -79,7 +79,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="caixilharia-dialog"
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-5xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-5xl xl:max-w-6xl"
       >
         <DialogHeader className="shrink-0 border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="pr-8 font-heading text-base font-extrabold tracking-tight sm:text-xl">

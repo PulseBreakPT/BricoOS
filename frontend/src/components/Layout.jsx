@@ -171,7 +171,7 @@ export default function Layout() {
       </header>
 
       <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">
-        <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto w-full max-w-6xl 2xl:max-w-[1600px]">
           <SupplierEmailAlert />
           <Outlet />
         </div>

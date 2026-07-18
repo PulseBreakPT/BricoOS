@@ -525,7 +525,7 @@ export default function Notes() {
         </div>
 
         {/* Saved filters / presets */}
-        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1">
+        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
           {PRESETS.map((p) => (
             <button
               key={p.key}
@@ -541,7 +541,7 @@ export default function Notes() {
         </div>
 
         {/* Category pills */}
-        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1">
+        <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
           <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${category === "todos" ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-200"}`}>Todas as secções</button>
           {CATEGORY_LIST.map((c) => {
             const Icon = c.icon;
@@ -581,7 +581,7 @@ export default function Notes() {
           ) : null}
         </div>
       ) : (
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {items.map((note) => (
               <PedidoCard key={note.id} note={note} onOpen={openNote} actions={actions} />

@@ -670,7 +670,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="note-dialog"
-        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl" : "sm:max-w-3xl"}`}
+        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl xl:max-w-6xl" : "sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl"}`}
       >
         {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
