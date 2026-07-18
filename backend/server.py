@@ -2519,6 +2519,89 @@ async def emails_drafts():
     return {"items": docs, "total": len(docs)}
 
 
+@api_router.get("/emails/contacts")
+async def email_contacts(search: Optional[str] = None):
+    """Sugestões de destinatário para o botão 'Novo email' — fornecedores e
+    clientes com email guardado, para não obrigar a copiar o endereço à mão."""
+    q_sup = {"email": {"$nin": ["", None]}}
+    q_note = {"email": {"$nin": ["", None]}}
+    if search:
+        rx = {"$regex": re.escape(search), "$options": "i"}
+        q_sup = {**q_sup, "$or": [{"name": rx}, {"email": rx}]}
+        q_note = {**q_note, "$or": [{"customer_name": rx}, {"email": rx}]}
+    sups = await db.suppliers.find(q_sup, {"_id": 0, "name": 1, "email": 1}).sort("name", 1).to_list(15)
+    notes = await db.notes.find(q_note, {"_id": 0, "customer_name": 1, "email": 1}).sort("updated_at", -1).to_list(15)
+    seen, out = set(), []
+    for s in sups:
+        e = (s.get("email") or "").strip().lower()
+        if not e or e in seen:
+            continue
+        seen.add(e)
+        out.append({"email": s["email"].strip(), "label": s.get("name") or s["email"], "kind": "supplier"})
+    for n in notes:
+        e = (n.get("email") or "").strip().lower()
+        if not e or e in seen:
+            continue
+        seen.add(e)
+        out.append({"email": n["email"].strip(), "label": n.get("customer_name") or n["email"], "kind": "client"})
+    return {"items": out[:20]}
+
+
+class ComposeEmailIn(BaseModel):
+    to: str
+    subject: str
+    body: str
+    to_label: str = ""
+
+    @field_validator("to")
+    @classmethod
+    def _v_to(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O destinatário é obrigatório")
+        return normalize_email(v)
+
+
+@api_router.post("/emails/compose")
+async def compose_email(payload: ComposeEmailIn):
+    """Novo email livre, sem pedido associado — usado pelo botão 'Novo email'
+    na secção Emails."""
+    if not payload.subject.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
+    await _send_email(payload.to, payload.subject, payload.body, to_label=payload.to_label.strip())
+    return {"ok": True, "to": payload.to}
+
+
+class QuickReplyIn(BaseModel):
+    body: str
+    subject: Optional[str] = None
+
+
+@api_router.post("/emails/{email_id}/reply")
+async def reply_to_email(email_id: str, payload: QuickReplyIn):
+    """Resposta rápida a um email recebido, sem sair da caixa de entrada —
+    mesmo destinatário e mesmo pedido associado (se houver)."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    to = (e.get("from_email") or "").strip()
+    if not to:
+        raise HTTPException(status_code=400, detail="Este email não tem um remetente válido.")
+    if not payload.body.strip():
+        raise HTTPException(status_code=400, detail="A mensagem não pode estar vazia.")
+    orig_subject = (e.get("subject") or "").strip()
+    subject = (payload.subject or "").strip()
+    if not subject:
+        subject = orig_subject if orig_subject.lower().startswith("re:") else f"Re: {orig_subject}".strip()
+    kind = e.get("reply_kind") if e.get("reply_kind") in ("supplier", "client") else "other"
+    to_label = e.get("supplier_name") or e.get("from_name") or ""
+    await _send_email(to, subject, payload.body, note_id=e.get("note_id") or None, kind=kind, to_label=to_label)
+    if e.get("note_id"):
+        await log_activity(e["note_id"], "email_sent", f"Resposta rápida enviada a {to}", {"to": to})
+    await db.received_emails.update_one({"id": email_id}, {"$set": {"seen": True}})
+    return {"ok": True, "to": to}
+
+
 @api_router.post("/emails/{email_id}/create-note")
 async def create_note_from_email(email_id: str):
     """Um email chegou sem corresponder a nenhum pedido conhecido (ex.: um
