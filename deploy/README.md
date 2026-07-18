@@ -75,6 +75,12 @@ bash deploy/auto-deploy.sh --branch X   # outra branch
 
 Nunca expira e dispensa o botão "Ligar Gmail". Tem prioridade sobre a opção B.
 
+Com o SMTP configurado, a app também **verifica a caixa de entrada** (IMAP,
+em modo só-leitura — nunca envia, apaga nem marca emails): quando um
+fornecedor responde a um pedido de cotação, a resposta aparece na aba
+Orçamentos do pedido e o estado avança sozinho para «Orçamento recebido».
+Intervalo configurável com `IMAP_POLL_MINUTES` (predefinição 5; 0 desliga).
+
 **Opção B — OAuth (Google Cloud Console):**
 
 1. Em https://console.cloud.google.com/apis/credentials cria credenciais

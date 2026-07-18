@@ -11,8 +11,12 @@ import json as _json
 import logging
 import uuid
 import base64
+import imaplib
 import smtplib
 import warnings
+import email as email_lib
+from email.header import decode_header
+from email.utils import parseaddr
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing import List, Optional
@@ -84,6 +88,9 @@ REDIRECT_URI = f"{PUBLIC_BASE_URL}/api/oauth/gmail/callback"
 GMAIL_SMTP_USER = os.environ.get('GMAIL_SMTP_USER', '').strip()
 GMAIL_SMTP_APP_PASSWORD = os.environ.get('GMAIL_SMTP_APP_PASSWORD', '').replace(" ", "").strip()
 SMTP_CONFIGURED = bool(GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD)
+# Intervalo (minutos) da verificação automática de respostas na caixa de
+# entrada, por IMAP em modo só-leitura. 0 desliga a verificação automática.
+IMAP_POLL_MINUTES = int(os.environ.get('IMAP_POLL_MINUTES', '5') or 0)
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 AI_MODEL = os.environ.get('AI_MODEL', 'gpt-5.4')
@@ -1959,6 +1966,195 @@ async def _send_email(to_email, subject, body):
         raise HTTPException(status_code=502, detail="Falha ao enviar o email pelo Gmail.")
 
 
+# ---------- Receção de respostas dos fornecedores (IMAP, só leitura) ----------
+# Nada aqui envia, apaga ou marca emails: a caixa é aberta em modo readonly e
+# as mensagens são lidas com BODY.PEEK, por isso continuam "não lidas" no Gmail.
+
+def _decode_mime_header(value):
+    parts = decode_header(value or "")
+    out = []
+    for text, charset in parts:
+        out.append(text.decode(charset or "utf-8", errors="replace") if isinstance(text, bytes) else text)
+    return "".join(out).strip()
+
+
+def _email_text_body(msg):
+    if msg.is_multipart():
+        for part in msg.walk():
+            disposition = str(part.get("Content-Disposition") or "")
+            if part.get_content_type() == "text/plain" and "attachment" not in disposition:
+                payload = part.get_payload(decode=True)
+                if payload is not None:
+                    return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                payload = part.get_payload(decode=True)
+                if payload is not None:
+                    html = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+                    return re.sub(r"<[^>]+>", " ", html)
+        return ""
+    payload = msg.get_payload(decode=True)
+    if payload is None:
+        return str(msg.get_payload() or "")
+    return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
+
+
+def _imap_fetch_since(last_uid):
+    box = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
+    try:
+        box.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
+        box.select("INBOX", readonly=True)
+        if last_uid:
+            _, data = box.uid("search", None, f"UID {last_uid + 1}:*")
+        else:
+            since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%d-%b-%Y")
+            _, data = box.uid("search", None, f"SINCE {since}")
+        uids = sorted(int(u) for u in (data[0].split() if data and data[0] else []))
+        uids = [u for u in uids if u > (last_uid or 0)][-50:]
+        messages = []
+        for uid in uids:
+            _, msg_data = box.uid("fetch", str(uid), "(BODY.PEEK[])")
+            raw = next((p[1] for p in msg_data if isinstance(p, tuple)), None)
+            if not raw:
+                continue
+            msg = email_lib.message_from_bytes(raw)
+            messages.append({
+                "uid": uid,
+                "from_email": (parseaddr(msg.get("From") or "")[1] or "").lower(),
+                "subject": _decode_mime_header(msg.get("Subject")),
+                "body": _email_text_body(msg)[:20000].strip(),
+            })
+        return messages
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+
+
+def _clean_subject(subject):
+    s = (subject or "").strip()
+    while True:
+        m = re.match(r"^(re|fw|fwd|enc)\s*:\s*", s, re.IGNORECASE)
+        if not m:
+            break
+        s = s[m.end():].strip()
+    return s.lower()
+
+
+async def _match_note_for_reply(from_email, subject):
+    """Associa a resposta ao pedido: primeiro pelo assunto (Re: do email que
+    enviámos), depois pelo remetente (fornecedor conhecido, incluindo os
+    emails dos contactos adicionais)."""
+    clean = _clean_subject(subject)
+    if clean:
+        reqs = await db.quote_requests.find(
+            {}, {"_id": 0, "note_id": 1, "subject": 1, "supplier_id": 1, "supplier_name": 1},
+        ).sort("sent_at", -1).to_list(500)
+        for r in reqs:
+            if _clean_subject(r.get("subject")) == clean:
+                return r.get("note_id"), r.get("supplier_id"), r.get("supplier_name")
+    if not from_email:
+        return None, None, None
+    sup = None
+    async for s in db.suppliers.find({}, {"_id": 0}):
+        emails = {(s.get("email") or "").lower()}
+        emails |= {(c.get("email") or "").lower() for c in (s.get("contacts") or [])}
+        if from_email in emails - {""}:
+            sup = s
+            break
+    if not sup:
+        return None, None, None
+    docs = await db.notes.find(
+        {"archived": {"$ne": True}, "supplier_id": sup["id"], "status": {"$in": list(WAITING_SUPPLIER)}},
+        {"_id": 0, "id": 1, "last_supplier_sent_at": 1},
+    ).to_list(200)
+    docs.sort(key=lambda d: d.get("last_supplier_sent_at") or "", reverse=True)
+    return (docs[0]["id"] if docs else None), sup["id"], sup.get("name")
+
+
+async def poll_supplier_replies():
+    if not SMTP_CONFIGURED:
+        return {"ok": False, "new": 0, "detail": "SMTP não configurado."}
+    state = await db.imap_state.find_one({"id": "inbox"}) or {}
+    last_uid = int(state.get("last_uid") or 0)
+    messages = await asyncio.to_thread(_imap_fetch_since, last_uid)
+    matched = 0
+    max_uid = last_uid
+    for m in messages:
+        max_uid = max(max_uid, m["uid"])
+        if m["from_email"] == GMAIL_SMTP_USER.lower():
+            continue
+        if await db.received_emails.find_one({"uid": m["uid"]}):
+            continue
+        note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
+        if not note_id and not supplier_id:
+            continue  # sem relação com fornecedores — o resto da caixa é ignorado
+        await db.received_emails.insert_one({
+            "id": str(uuid.uuid4()), "uid": m["uid"], "note_id": note_id or "",
+            "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
+            "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
+            "received_at": now_iso()})
+        if note_id:
+            matched += 1
+            await log_activity(note_id, "email_received",
+                               f"Resposta recebida de {supplier_name or m['from_email']}: {m['subject'] or '(sem assunto)'}",
+                               {"from": m["from_email"], "uid": m["uid"]})
+            n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
+            if n and n.get("status") in WAITING_SUPPLIER:
+                await db.notes.update_one({"id": note_id}, {"$set": {
+                    "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
+                await log_activity(note_id, "status_change",
+                                   "Estado alterado para Orçamento recebido (resposta por email)",
+                                   {"to": "orcamento_recebido"})
+    await db.imap_state.update_one({"id": "inbox"}, {"$set": {
+        "id": "inbox", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
+    return {"ok": True, "new": matched, "seen": len(messages)}
+
+
+@api_router.post("/emails/sync")
+async def emails_sync():
+    """Verificação manual da caixa de entrada — só leitura, nunca envia nada."""
+    try:
+        return await poll_supplier_replies()
+    except imaplib.IMAP4.error as e:
+        raise HTTPException(status_code=502, detail=f"O Gmail recusou a ligação IMAP: {e}")
+    except Exception as e:
+        logger.error(f"Sincronização IMAP falhou: {e}")
+        raise HTTPException(status_code=502, detail="Não foi possível verificar a caixa de entrada.")
+
+
+@api_router.get("/notes/{note_id}/emails")
+async def note_received_emails(note_id: str):
+    return await db.received_emails.find({"note_id": note_id}, {"_id": 0}).sort("received_at", -1).to_list(100)
+
+
+class ClientEmailIn(BaseModel):
+    subject: str
+    body: str
+
+
+@api_router.post("/notes/{note_id}/send-client-email")
+async def send_client_email(note_id: str, payload: ClientEmailIn):
+    """Envia a resposta ao cliente pela conta configurada. Só é chamado por
+    ação explícita do utilizador no botão 'Enviar por email'."""
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    to = (n.get("email") or "").strip()
+    if not to:
+        raise HTTPException(status_code=400, detail="O cliente não tem email definido nos Detalhes.")
+    if not payload.subject.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
+    await _send_email(to, payload.subject, payload.body)
+    await db.notes.update_one({"id": note_id}, {"$set": {
+        "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
+        "status_updated_at": now_iso(), "updated_at": now_iso()}})
+    await log_activity(note_id, "email_sent", f"Orçamento enviado ao cliente por email ({to})",
+                       {"to": to, "client": True})
+    return {"ok": True, "to": to}
+
+
 @api_router.post("/notes/{note_id}/send-quote-request")
 async def send_quote_request(note_id: str, payload: QuoteRequestIn):
     note = await db.notes.find_one({"id": note_id}, {"_id": 0})
@@ -2648,6 +2844,22 @@ async def ensure_indexes():
             pass
 
 
+_background_tasks = set()
+
+
+async def _imap_poll_loop():
+    """Verifica a caixa de entrada a cada IMAP_POLL_MINUTES. Só leitura."""
+    await asyncio.sleep(20)
+    while True:
+        try:
+            result = await poll_supplier_replies()
+            if result.get("new"):
+                logger.info(f"IMAP: {result['new']} resposta(s) de fornecedor associada(s) a pedidos.")
+        except Exception as e:
+            logger.error(f"Verificação IMAP falhou: {e}")
+        await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -2657,6 +2869,10 @@ async def on_startup():
         await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
+    if SMTP_CONFIGURED and IMAP_POLL_MINUTES > 0:
+        task = asyncio.create_task(_imap_poll_loop())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
 
 app.include_router(api_router)
