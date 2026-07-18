@@ -63,6 +63,20 @@ bash deploy/auto-deploy.sh --branch X   # outra branch
 
 ## 📧 Ativar o envio de emails (Gmail)
 
+**Opção A — SMTP com palavra-passe de aplicação (recomendada, 2 min):**
+
+1. Ativa a verificação em 2 passos na conta Google.
+2. Gera uma palavra-passe de aplicação em https://myaccount.google.com/apppasswords
+3. No VPS, edita `deploy/.env.production` e preenche `GMAIL_SMTP_USER` e
+   `GMAIL_SMTP_APP_PASSWORD` (os espaços da palavra-passe são ignorados).
+4. `sudo brico2 backend`
+5. Verifica sem enviar nada: `curl http://127.0.0.1:8001/api/gmail/test`
+   → deve responder `"Login SMTP válido — nenhum email foi enviado."`
+
+Nunca expira e dispensa o botão "Ligar Gmail". Tem prioridade sobre a opção B.
+
+**Opção B — OAuth (Google Cloud Console):**
+
 1. Em https://console.cloud.google.com/apis/credentials cria credenciais
    OAuth 2.0 do tipo **Aplicação Web**.
 2. Adiciona o redirect URI: `https://lusorae.pt/api/oauth/gmail/callback`

@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
 import os
 import re
 import difflib
@@ -10,6 +11,7 @@ import json as _json
 import logging
 import uuid
 import base64
+import smtplib
 import warnings
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -74,6 +76,14 @@ PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 REDIRECT_URI = f"{PUBLIC_BASE_URL}/api/oauth/gmail/callback"
+
+# Envio por SMTP com palavra-passe de aplicação do Gmail — alternativa mais
+# simples ao OAuth (sem Cloud Console, nunca expira). Quando configurado,
+# tem prioridade sobre a Gmail API. Os espaços da palavra-passe (formato de
+# apresentação da Google, "xxxx xxxx xxxx xxxx") são removidos.
+GMAIL_SMTP_USER = os.environ.get('GMAIL_SMTP_USER', '').strip()
+GMAIL_SMTP_APP_PASSWORD = os.environ.get('GMAIL_SMTP_APP_PASSWORD', '').replace(" ", "").strip()
+SMTP_CONFIGURED = bool(GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD)
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 AI_MODEL = os.environ.get('AI_MODEL', 'gpt-5.4')
@@ -1827,9 +1837,34 @@ async def get_gmail_creds():
 
 @api_router.get("/gmail/status")
 async def gmail_status():
+    if SMTP_CONFIGURED:
+        return {"configured": True, "connected": True, "email": GMAIL_SMTP_USER, "method": "smtp"}
     token = await db.gmail_tokens.find_one({"account": "store"}, {"_id": 0})
     return {"configured": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET), "connected": bool(token),
-            "email": token.get("email") if token else None}
+            "email": token.get("email") if token else None, "method": "oauth"}
+
+
+@api_router.get("/gmail/test")
+async def gmail_smtp_test():
+    """Valida as credenciais SMTP autenticando no Gmail — NÃO envia nenhum email."""
+    if not SMTP_CONFIGURED:
+        raise HTTPException(status_code=400, detail="SMTP não configurado: defina GMAIL_SMTP_USER e "
+                                                    "GMAIL_SMTP_APP_PASSWORD no .env.production e reinicie o backend.")
+
+    def _check_login():
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as smtp:
+            smtp.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
+
+    try:
+        await asyncio.to_thread(_check_login)
+    except smtplib.SMTPAuthenticationError:
+        raise HTTPException(status_code=502, detail="O Gmail recusou o login: confirme o email e a "
+                                                    "palavra-passe de aplicação (e que a verificação em 2 passos está ativa).")
+    except Exception as e:
+        logger.error(f"Teste SMTP falhou: {e}")
+        raise HTTPException(status_code=502, detail=f"Não foi possível ligar a smtp.gmail.com: {e}")
+    return {"ok": True, "email": GMAIL_SMTP_USER,
+            "message": "Login SMTP válido — nenhum email foi enviado."}
 
 
 @api_router.get("/gmail/connect")
@@ -1884,12 +1919,32 @@ async def gmail_disconnect():
     return {"ok": True}
 
 
+def _smtp_send(to_email, subject, body):
+    message = MIMEText(body)
+    message["From"] = GMAIL_SMTP_USER
+    message["To"] = to_email
+    message["Subject"] = subject
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+        smtp.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
+        smtp.sendmail(GMAIL_SMTP_USER, [to_email], message.as_string())
+
+
 async def _send_email(to_email, subject, body):
+    if not to_email:
+        raise HTTPException(status_code=400, detail="O fornecedor não tem email definido.")
+    if SMTP_CONFIGURED:
+        try:
+            await asyncio.to_thread(_smtp_send, to_email, subject, body)
+            return
+        except smtplib.SMTPAuthenticationError:
+            raise HTTPException(status_code=502, detail="O Gmail recusou a palavra-passe de aplicação (SMTP). "
+                                                        "Confirme GMAIL_SMTP_USER e GMAIL_SMTP_APP_PASSWORD no servidor.")
+        except Exception as e:
+            logger.error(f"Erro ao enviar email por SMTP: {e}")
+            raise HTTPException(status_code=502, detail="Falha ao enviar o email por SMTP.")
     creds = await get_gmail_creds()
     if not creds:
         raise HTTPException(status_code=400, detail="Gmail não está ligado. Ligue a sua conta Gmail para enviar emails automaticamente.")
-    if not to_email:
-        raise HTTPException(status_code=400, detail="O fornecedor não tem email definido.")
     try:
         service = build("gmail", "v1", credentials=creds)
         message = MIMEText(body)
@@ -1914,8 +1969,7 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
         raise HTTPException(status_code=400, detail="Escolha pelo menos um fornecedor.")
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
-    creds = await get_gmail_creds()
-    if not creds:
+    if not SMTP_CONFIGURED and not await get_gmail_creds():
         raise HTTPException(status_code=400, detail="Gmail não está ligado. Ligue a sua conta Gmail para enviar emails automaticamente.")
     sent_names, sent_ids, failed = [], [], []
     for sid in ids:
