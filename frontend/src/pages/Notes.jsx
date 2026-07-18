@@ -45,6 +45,7 @@ const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
 const SEGMENTS = {
   geral: {
     title: "Pedidos Gerais da Loja",
+    shortTitle: "Pedidos Gerais",
     subtitle: "Todos os pedidos da loja exceto os da Banda Alumínios.",
     icon: Store,
     accent: "text-slate-900",
@@ -54,6 +55,7 @@ const SEGMENTS = {
   },
   band: {
     title: "Orçamentos Banda Alumínios",
+    shortTitle: "Banda Alumínios",
     subtitle: "Só caixilharia à medida e pedidos ao fornecedor BandAluminios.",
     icon: Frame,
     accent: "text-orange-600",
@@ -363,7 +365,7 @@ export default function Notes() {
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{cfg.title}</span>
+              <span className="truncate">{cfg.shortTitle || cfg.title}</span>
             </button>
           );
         })}

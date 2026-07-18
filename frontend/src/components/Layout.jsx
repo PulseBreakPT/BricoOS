@@ -195,7 +195,7 @@ export default function Layout() {
                 <span className={`flex h-8 w-full max-w-[60px] items-center justify-center rounded-lg transition-colors duration-200 ${isActive ? "bg-primary text-primary-foreground" : "text-slate-500"}`}>
                   <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />
                 </span>
-                <span className={`w-full truncate text-center text-[10px] font-semibold leading-tight ${isActive ? "text-slate-900" : "text-slate-500"}`}>{item.label}</span>
+                <span className={`w-full truncate text-center text-[9px] font-semibold leading-tight tracking-tight ${isActive ? "text-slate-900" : "text-slate-500"}`}>{item.label}</span>
               </NavLink>
             );
           })}
