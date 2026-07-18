@@ -3483,7 +3483,11 @@ async def verify_pin(payload: PinVerifyIn, request: Request):
 @app.middleware("http")
 async def pin_gate(request: Request, call_next):
     path = request.url.path
-    if path.startswith("/api") and not path.startswith(AUTH_EXEMPT_PREFIXES):
+    # A raiz da API não devolve nada sensível (só uma mensagem estática) e é
+    # o endpoint usado pelo HEALTHCHECK do Docker e pelo hostinger-setup.sh
+    # para confirmar que o backend arrancou — tem de responder sem PIN,
+    # senão o deploy nunca vê o backend como saudável.
+    if path.startswith("/api") and path not in ("/api", "/api/") and not path.startswith(AUTH_EXEMPT_PREFIXES):
         token = request.headers.get("x-device-token") or request.query_params.get("device_token")
         if not await _device_token_valid(token):
             return JSONResponse({"detail": "Acesso protegido — introduza o PIN."}, status_code=401)
