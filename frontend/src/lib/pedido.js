@@ -101,7 +101,7 @@ export function buildEmail(note) {
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
   if (note.color) lines.push(`Cor / acabamento: ${note.color}`);
   if (note.details) lines.push(`Observações: ${note.details}`);
-  lines.push("", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro");
+  lines.push("", "Com os melhores cumprimentos,");
   return { subject, body: lines.join("\n") };
 }
 
@@ -112,6 +112,6 @@ export function buildReminder(note) {
     `Artigo: ${note.description || "-"}`];
   if (note.measurements) lines.push(`Medidas: ${note.measurements}`);
   if (note.quantity) lines.push(`Quantidade: ${note.quantity}`);
-  lines.push("", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro");
+  lines.push("", "Com os melhores cumprimentos,");
   return { subject, body: lines.join("\n") };
 }

@@ -17,7 +17,9 @@ test("o pedido de cotação usa o tom habitual sem referência interna", () => {
   expect(template.body).toMatch(/^(Bom dia|Boa tarde) Exmos\. Senhores,/);
   expect(template.body).toContain("para os seguintes artigos:");
   expect(template.body).toContain("Código EAN13: ART-44");
-  expect(template.body).toContain("Tiago Jesus");
+  // A identificação vem da assinatura em imagem; o texto termina no cumprimento.
+  expect(template.body).not.toContain("Tiago Jesus");
+  expect(template.body).toContain("Com os melhores cumprimentos,");
 });
 
 test("o lembrete não expõe a referência interna ao fornecedor", () => {

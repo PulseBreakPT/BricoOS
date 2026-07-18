@@ -1692,7 +1692,7 @@ def caixilharia_email(n, spec, is_reminder=False):
     if (spec.get("observacoes") or "").strip():
         lines += ["", f"Observações: {spec['observacoes']}"]
     lines += [
-        "", "Com os melhores cumprimentos,", "Tiago Jesus", "Bricomarché Faro",
+        "", "Com os melhores cumprimentos,",
     ]
 
     prefix = "Lembrete · " if is_reminder else ""
