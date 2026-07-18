@@ -57,8 +57,6 @@ def supplier_quote_template(note, is_reminder=False, now=None):
     lines += [
         "",
         "Com os melhores cumprimentos,",
-        "Tiago Jesus",
-        "Bricomarché Faro",
     ]
     prefix = "Lembrete · " if is_reminder else ""
     subject = f"{prefix}Pedido de cotação — {description}"
@@ -81,7 +79,5 @@ def client_quote_template(note, now=None):
         "O prazo de entrega encontra-se indicado no orçamento em anexo.",
         "",
         "Com os melhores cumprimentos,",
-        "Tiago Jesus",
-        "Bricomarché Faro",
     ])
     return {"subject": subject, "body": body}
