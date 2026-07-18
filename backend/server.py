@@ -1054,13 +1054,26 @@ class QuoteRequestIn(BaseModel):
 
 
 # ---------- Notes ----------
+async def segment_clause(segment):
+    """Filtro Mongo que separa as duas áreas da app: «band» (Orçamentos Banda
+    Alumínios) e «geral» (Pedidos Gerais da Loja). Um pedido pertence à Banda
+    quando tem caixilharia à medida ou está associado a um fornecedor Band*.
+    Cada área só vê os seus pedidos — nunca se misturam."""
+    if segment not in ("band", "geral"):
+        return None
+    band_ids = [s["id"] async for s in db.suppliers.find(
+        {"name": {"$regex": "band", "$options": "i"}}, {"_id": 0, "id": 1})]
+    band_or = [{"caixilharia": {"$exists": True, "$ne": None}}, {"supplier_id": {"$in": band_ids}}]
+    return {"$or": band_or} if segment == "band" else {"$nor": band_or}
+
+
 @api_router.get("/notes")
 async def list_notes(
     search: Optional[str] = None, status: Optional[str] = None, priority: Optional[str] = None,
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
     favorite: Optional[bool] = None, overdue: Optional[bool] = None, archived: Optional[bool] = None,
     waiting: Optional[str] = None, reminder_due: Optional[bool] = None, callback: Optional[bool] = None,
-    sort: str = "smart", skip: int = 0, limit: int = 300,
+    segment: Optional[str] = None, sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
     q = {}
     q["archived"] = True if archived else {"$ne": True}
@@ -1085,6 +1098,10 @@ async def list_notes(
         digits = re.sub(r"\D", "", search)
         if len(digits) >= 3:
             q["$or"].append({"phone": {"$regex": r"\D*".join(digits)}})
+    seg = await segment_clause(segment)
+    if seg:
+        # $and evita colisão com o $or da pesquisa.
+        q = {"$and": [q, seg]}
     docs = await db.notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
     now = datetime.now(timezone.utc)
     docs = [enrich_note(d, now) for d in docs]
@@ -2363,14 +2380,25 @@ async def notifications():
 
 
 @api_router.get("/today")
-async def today():
+async def today(segment: Optional[str] = None):
     now = datetime.now(timezone.utc)
+    seg = await segment_clause(segment)
+
+    def with_seg(q):
+        return {"$and": [q, seg]} if seg else q
+
     items = await build_notifications()
-    inbox = await db.notes.find({"status": "novo", "archived": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    inbox = await db.notes.find(with_seg({"status": "novo", "archived": {"$ne": True}}), {"_id": 0}).sort("created_at", -1).to_list(50)
     inbox = [enrich_note(d, now) for d in inbox]
     open_docs = await db.notes.find(
-        {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}}, {"_id": 0}).to_list(5000)
+        with_seg({"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}}), {"_id": 0}).to_list(5000)
     open_docs = [enrich_note(d, now) for d in open_docs]
+    if seg:
+        # Alertas restritos à área ativa. Lembretes soltos (sem pedido
+        # associado) ficam na área geral da loja.
+        allowed_ids = {d["id"] for d in open_docs}
+        items = [it for it in items
+                 if (it.get("note_id") in allowed_ids) or (not it.get("note_id") and segment == "geral")]
     waiting_me = [d for d in open_docs if d["waiting_on"] == "me"]
     waiting_supplier = [d for d in open_docs if d["waiting_on"] == "supplier"]
     waiting_client = [d for d in open_docs if d["waiting_on"] == "client"]
@@ -2384,6 +2412,25 @@ async def today():
         [d for d in open_docs if d.get("needs_callback")],
         key=lambda d: -max(d.get("client_no_answer_count", 0), d.get("supplier_no_answer_count", 0)))
     st = await stats()
+    summary = st["daily"]
+    if seg:
+        # Resumo do dia calculado só com os pedidos da área ativa.
+        today_d = now.date()
+        all_docs = await db.notes.find(
+            with_seg({}), {"_id": 0, "status": 1, "created_at": 1, "status_updated_at": 1}).to_list(10000)
+        novos_hoje = concluidos_hoje = 0
+        for d in all_docs:
+            created = parse_dt(d.get("created_at"))
+            if created and created.date() == today_d:
+                novos_hoje += 1
+            if d.get("status") == "concluido":
+                done = parse_dt(d.get("status_updated_at"))
+                if done and done.date() == today_d:
+                    concluidos_hoje += 1
+        summary = {"novo": sum(1 for d in open_docs if d.get("status") == "novo"),
+                   "pendentes": len(open_docs),
+                   "atrasados": sum(1 for d in open_docs if d.get("is_overdue")),
+                   "novos_hoje": novos_hoje, "concluidos_hoje": concluidos_hoje}
     return {"attention": items[:20], "attention_count": len(items), "inbox": inbox,
             "waiting_me": waiting_me[:60], "waiting_supplier": waiting_supplier[:60],
             "waiting_client": waiting_client[:60], "long_waiting_clients": long_waiting_clients,
@@ -2391,7 +2438,7 @@ async def today():
                 "waiting_me": len(waiting_me), "waiting_supplier": len(waiting_supplier),
                 "waiting_client": len(waiting_client), "reminder_due": len(reminder_due),
                 "follow_up": len(follow_up_calls)},
-            "summary": st["daily"], "potential_value": st["potential_value"]}
+            "summary": summary, "potential_value": st["potential_value"]}
 
 
 # ---------- Assistant endpoints (preflight, history, learning, batches) ----------

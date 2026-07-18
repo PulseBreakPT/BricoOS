@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
-  Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, Sun, AlertTriangle, Clock,
-  PhoneMissed, TrendingUp,
+  Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
+  PhoneMissed, TrendingUp, Frame, Store,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
@@ -38,6 +38,29 @@ const PRESETS = [
 ];
 
 const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
+
+// As duas áreas do painel — completamente separadas, cada uma só com os seus
+// pedidos: «band» = Orçamentos Banda Alumínios; «geral» = Pedidos Gerais da Loja.
+const SEGMENTS = {
+  geral: {
+    title: "Pedidos Gerais da Loja",
+    subtitle: "Todos os pedidos da loja exceto os da Banda Alumínios.",
+    icon: Store,
+    accent: "text-slate-900",
+    iconAccent: "bg-slate-900 text-white",
+    createMode: "normal",
+    empty: "Sem pedidos gerais. Crie um novo com o botão +.",
+  },
+  band: {
+    title: "Orçamentos Banda Alumínios",
+    subtitle: "Só caixilharia à medida e pedidos ao fornecedor BandAluminios.",
+    icon: Frame,
+    accent: "text-orange-600",
+    iconAccent: "bg-orange-500 text-white",
+    createMode: "band",
+    empty: "Sem orçamentos Banda Alumínios. Crie um novo com o botão +.",
+  },
+};
 
 function greeting() {
   const h = new Date().getHours();
@@ -79,6 +102,10 @@ export default function Notes() {
   const [labels, setLabels] = useState([]);
   const [today, setToday] = useState(null);
 
+  // Área ativa, lida do URL (?area=band) para sobreviver a reloads e links.
+  const [segment, setSegment] = useState(() => (
+    new URLSearchParams(window.location.search).get("area") === "band" ? "band" : "geral"
+  ));
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [preset, setPreset] = useState("todos");
@@ -90,6 +117,7 @@ export default function Notes() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailNoteId, setDetailNoteId] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState("detalhes");
+  const [detailCreateMode, setDetailCreateMode] = useState("choice");
   const [focusMode, setFocusMode] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
 
@@ -110,13 +138,13 @@ export default function Notes() {
     }
   }, []);
 
-  // Resumo do dia + alertas (antiga página "Hoje", agora no topo deste painel)
+  // Resumo do dia + alertas (antiga página "Hoje"), calculados só para a área ativa.
   const loadToday = useCallback(async () => {
     try {
-      const { data } = await api.get("/today");
+      const { data } = await api.get("/today", { params: { segment } });
       setToday(data);
     } catch { /* o painel funciona na mesma sem o resumo */ }
-  }, []);
+  }, [segment]);
 
   const loadNotes = useCallback(async () => {
     // Número de sequência: garante que uma resposta antiga (lenta) nunca
@@ -124,7 +152,7 @@ export default function Notes() {
     const seq = ++loadSeq.current;
     setLoading(true);
     const p = PRESETS.find((x) => x.key === preset)?.filters || {};
-    const params = { sort };
+    const params = { sort, segment };
     if (p.status) params.status = p.status;
     if (p.priority) params.priority = p.priority;
     if (p.overdue) params.overdue = true;
@@ -145,14 +173,24 @@ export default function Notes() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [preset, category, advSupplier, advPriority, sort, debounced]);
+  }, [preset, category, advSupplier, advPriority, sort, debounced, segment]);
 
-  useEffect(() => { loadMeta(); loadToday(); }, [loadMeta, loadToday]);
+  useEffect(() => { loadMeta(); }, [loadMeta]);
+  useEffect(() => { loadToday(); }, [loadToday]);
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
   // Depois de qualquer ação que mude pedidos, atualiza lista E resumo do dia.
   const reloadAll = useCallback(() => { loadNotes(); loadToday(); }, [loadNotes, loadToday]);
-  useEffect(() => { setFocusIndex(0); }, [preset, category, debounced, advSupplier, advPriority]);
+  useEffect(() => { setFocusIndex(0); }, [preset, category, debounced, advSupplier, advPriority, segment]);
+
+  // Mudar de área: atualiza o URL (partilhável) e limpa filtros para nunca
+  // arrastar contexto de uma área para a outra.
+  const changeSegment = useCallback((seg) => {
+    if (seg === segment) return;
+    setSegment(seg);
+    setPreset("todos"); setCategory("todos"); setAdvSupplier(""); setAdvPriority(""); setSearch("");
+    navigate(seg === "band" ? "/?area=band" : "/", { replace: true });
+  }, [segment, navigate]);
   // Se a lista encolher (ex.: pedido resolvido), o índice do modo foco não pode ficar fora dela.
   useEffect(() => {
     setFocusIndex((i) => Math.min(i, Math.max(items.length - 1, 0)));
@@ -177,12 +215,20 @@ export default function Notes() {
       setDetailInitialTab(DETAIL_TABS.includes(openTab) ? openTab : "detalhes");
       setDetailOpen(true);
     }
-    if (g || openId) navigate("/", { replace: true });
+    // Ao limpar os parâmetros transitórios (gmail/open), a área ativa mantém-se no URL.
+    if (g || openId) navigate(params.get("area") === "band" ? "/?area=band" : "/", { replace: true });
   }, [location.search, loadMeta, navigate]);
 
-  const openNew = () => { setDetailNoteId(null); setDetailInitialTab("detalhes"); setDetailOpen(true); };
+  const openNew = () => {
+    setDetailNoteId(null);
+    setDetailInitialTab("detalhes");
+    // O botão + da área Banda abre logo o assistente de caixilharia; o da
+    // área geral abre o pedido normal — cada área cria só o que lhe pertence.
+    setDetailCreateMode(SEGMENTS[segment].createMode);
+    setDetailOpen(true);
+  };
   const openNote = (nid, initialTab = "detalhes") => {
-    setDetailNoteId(nid); setDetailInitialTab(initialTab); setDetailOpen(true);
+    setDetailNoteId(nid); setDetailInitialTab(initialTab); setDetailCreateMode("choice"); setDetailOpen(true);
   };
 
   // ---- Quick actions (available on cards, focus mode, without opening) ----
@@ -292,20 +338,52 @@ export default function Notes() {
   const s = today?.summary || {};
   const counts = today?.counts || {};
   const attention = today?.attention || [];
+  const seg = SEGMENTS[segment];
+  const SegIcon = seg.icon;
 
   return (
     <div>
-      <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-          <Sun className="h-6 w-6 text-amber-400 sm:h-8 sm:w-8" /> {greeting()}, chefe
-        </h1>
-        <p className="text-sm text-slate-500">
-          {!today
-            ? "Todo o ciclo de vida — do pedido do cliente à encomenda."
-            : counts.waiting_me
-              ? `${counts.waiting_me} pedido(s) à espera da sua ação.`
-              : "Tudo tratado. Nada está à espera de si."}
-        </p>
+      {/* Abas das duas áreas — cada uma só com os seus pedidos */}
+      <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+        {Object.entries(SEGMENTS).map(([key, cfg]) => {
+          const Icon = cfg.icon;
+          const active = segment === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              data-testid={`segment-${key}`}
+              onClick={() => changeSegment(key)}
+              className={`flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-colors sm:text-sm ${
+                active
+                  ? `bg-white shadow-sm ${key === "band" ? "text-orange-600" : "text-slate-900"}`
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{cfg.title}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex items-start gap-3">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12 ${seg.iconAccent}`}>
+          <SegIcon className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-col">
+          <p className="text-[11px] font-semibold text-slate-400 sm:text-xs">{greeting()}, chefe</p>
+          <h1 data-testid="segment-title" className={`font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
+            {seg.title}
+          </h1>
+          <p className="text-sm text-slate-500">
+            {!today
+              ? seg.subtitle
+              : counts.waiting_me
+                ? `${counts.waiting_me} pedido(s) à espera da sua ação nesta área.`
+                : seg.subtitle}
+          </p>
+        </div>
       </div>
 
       {/* Resumo do dia — grelha compacta no telemóvel, sem scroll horizontal */}
@@ -479,9 +557,9 @@ export default function Notes() {
 
       {!loading && items.length === 0 && !focusMode ? (
         <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><Inbox className="h-7 w-7" /></div>
-          <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem pedidos</p>
-          <p className="text-sm text-slate-500">Ajuste os filtros ou crie um novo pedido com o botão +.</p>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><SegIcon className="h-7 w-7" /></div>
+          <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem pedidos nesta área</p>
+          <p className="text-sm text-slate-500">{seg.empty}</p>
         </div>
       ) : null}
 
@@ -494,6 +572,7 @@ export default function Notes() {
         onOpenChange={setDetailOpen}
         noteId={detailNoteId}
         initialTab={detailInitialTab}
+        initialCreateMode={detailCreateMode}
         suppliers={suppliers}
         gmailStatus={gmailStatus}
         labelsList={labels}
