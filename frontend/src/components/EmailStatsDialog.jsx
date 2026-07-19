@@ -6,7 +6,7 @@ import api, { getErrorMessage } from "@/lib/api";
 
 const CATEGORY_LABELS = { orcamento: "Orçamento", reclamacao: "Reclamação", duvida: "Dúvida", urgente: "Urgente", outro: "Outro" };
 const PRIORITY_LABELS = { alta: "Alta", normal: "Normal", baixa: "Baixa" };
-const PRIORITY_COLORS = { alta: "bg-red-400", normal: "bg-slate-300", baixa: "bg-slate-200" };
+const PRIORITY_COLORS = { alta: "bg-red-500", normal: "bg-neutral-800", baixa: "bg-slate-200" };
 
 function Tile({ label, value }) {
   return (

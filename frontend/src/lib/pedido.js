@@ -6,15 +6,15 @@ export const STATUS_CONFIG = {
   novo: { label: "Novo", bg: "#FAFAFA", text: "#737373", dot: "#A3A3A3" },
   pendente: { label: "Pendente", bg: "#F5F5F5", text: "#525252", dot: "#737373" },
   em_preparacao: { label: "Em preparação", bg: "#E5E5E5", text: "#404040", dot: "#525252" },
-  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "#E5E5E5", text: "#262626", dot: "#404040" },
-  aguarda_fornecedor: { label: "Espera fornecedor", bg: "#D4D4D4", text: "#262626", dot: "#404040" },
+  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "#D4D4D4", text: "#262626", dot: "#404040" },
+  aguarda_fornecedor: { label: "Espera fornecedor", bg: "#A3A3A3", text: "#FFFFFF", dot: "#FFFFFF" },
   orcamento_recebido: { label: "Orçamento recebido", bg: "#FEE2E2", text: "#B91C1C", dot: "#DC2626" },
-  aguarda_cliente: { label: "Espera cliente", bg: "#D4D4D4", text: "#262626", dot: "#404040" },
-  aprovado: { label: "Aprovado", bg: "#171717", text: "#FFFFFF", dot: "#FFFFFF" },
-  rejeitado: { label: "Rejeitado", bg: "#FEE2E2", text: "#991B1B", dot: "#B91C1C" },
-  encomendado: { label: "Encomendado", bg: "#262626", text: "#FFFFFF", dot: "#FFFFFF" },
+  aguarda_cliente: { label: "Espera cliente", bg: "#737373", text: "#FFFFFF", dot: "#FFFFFF" },
+  aprovado: { label: "Aprovado", bg: "#262626", text: "#FFFFFF", dot: "#FFFFFF" },
+  rejeitado: { label: "Rejeitado", bg: "#FCA5A5", text: "#7F1D1D", dot: "#DC2626" },
+  encomendado: { label: "Encomendado", bg: "#171717", text: "#FFFFFF", dot: "#FFFFFF" },
   concluido: { label: "Concluído", bg: "#000000", text: "#FFFFFF", dot: "#FFFFFF" },
-  cancelado: { label: "Cancelado", bg: "#7F1D1D", text: "#FFFFFF", dot: "#FFFFFF" },
+  cancelado: { label: "Cancelado", bg: "#7F1D1D", text: "#FFFFFF", dot: "#FCA5A5" },
 };
 export const STATUS_ORDER = Object.keys(STATUS_CONFIG);
 export const getStatusCfg = (k) => STATUS_CONFIG[k] || STATUS_CONFIG.novo;
