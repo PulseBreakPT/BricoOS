@@ -3848,7 +3848,7 @@ async def ai_analyze_reply(note_id: str, payload: ReplyIn):
 
 @api_router.get("/")
 async def root():
-    return {"message": "Bricomarché Faro - Assistente de Pedidos API"}
+    return {"message": "Brico Assistente - API"}
 
 
 # ---------- Migration / Seed ----------

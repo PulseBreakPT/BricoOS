@@ -41,6 +41,9 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# Site privado: bloqueia indexação mesmo que algum crawler ignore a
+		# meta tag/robots.txt — aplica-se a toda a resposta (HTML, API, tudo).
+		X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
 		-Server
 	}
 

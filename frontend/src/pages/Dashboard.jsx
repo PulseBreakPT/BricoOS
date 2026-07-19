@@ -47,7 +47,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-1">
         <p className="text-xs font-semibold capitalize text-slate-400 sm:text-sm">{today}</p>
         <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Painel da loja</h1>
-        <p className="text-sm text-slate-500">Bricomarché de Faro · visão em tempo real dos pedidos.</p>
+        <p className="text-sm text-slate-500">Brico Assistente · visão em tempo real dos pedidos.</p>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4">
