@@ -188,9 +188,9 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
                 {attachments.length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {attachments.map((a, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
-                        <FileText className="h-3.5 w-3.5" /> {a.filename}
-                        <button type="button" onClick={() => removeAttachment(i)} className="text-slate-400 hover:text-red-600">
+                      <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
+                        <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[45vw] truncate sm:max-w-[200px]">{a.filename}</span>
+                        <button type="button" onClick={() => removeAttachment(i)} className="shrink-0 text-slate-400 hover:text-red-600">
                           <X className="h-3 w-3" />
                         </button>
                       </span>

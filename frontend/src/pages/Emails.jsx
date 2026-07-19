@@ -267,16 +267,16 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : archivedView ? "no arquivo" : "na caixa de entrada"}</p>
         <div className="flex flex-wrap gap-2">
           {!smartQuery ? (
-            <Button data-testid="emails-toggle-archived" size="sm" variant={archivedView ? "default" : "outline"} onClick={() => setArchivedView((v) => !v)} className="h-8 rounded-lg text-xs">
-              {archivedView ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
-              {archivedView ? "Ver caixa de entrada" : "Ver arquivo"}
+            <Button data-testid="emails-toggle-archived" size="sm" variant={archivedView ? "default" : "outline"} onClick={() => setArchivedView((v) => !v)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+              {archivedView ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
+              <span className="hidden sm:inline">{archivedView ? "Ver caixa de entrada" : "Ver arquivo"}</span>
             </Button>
           ) : null}
-          <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg text-xs">
-            <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar tudo como visto
+          <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+            <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar tudo como visto</span>
           </Button>
-          <Button data-testid="emails-sync" size="sm" variant="outline" disabled={syncing} onClick={sync} className="h-8 rounded-lg text-xs">
-            {syncing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />} Verificar agora
+          <Button data-testid="emails-sync" size="sm" variant="outline" disabled={syncing} onClick={sync} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Verificar agora</span>
           </Button>
         </div>
       </div>
@@ -348,8 +348,8 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a) => (
                         <a key={a.id} href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)} target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
-                          <FileText className="h-3.5 w-3.5" /> {a.filename}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                          <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
                         </a>
                       ))}
                     </div>
@@ -368,7 +368,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         className="h-8 rounded-lg text-xs"
                       >
                         {creatingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
-                        Criar pedido a partir deste email
+                        Criar pedido<span className="hidden sm:inline"> a partir deste email</span>
                       </Button>
                     ) : null}
                     {replyingId !== m.id ? (
@@ -382,19 +382,19 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         <Reply className="mr-1.5 h-3.5 w-3.5" /> Responder
                       </Button>
                     ) : null}
-                    <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg text-xs">
-                      <Forward className="mr-1.5 h-3.5 w-3.5" /> Reencaminhar
+                    <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Reencaminhar">
+                      <Forward className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Reencaminhar</span>
                     </Button>
-                    <Button data-testid={`inbox-remind-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => remind(m)} className="h-8 rounded-lg text-xs">
-                      {busyId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <BellRing className="mr-1.5 h-3.5 w-3.5" />} Lembrar-me
+                    <Button data-testid={`inbox-remind-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => remind(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Lembrar-me">
+                      {busyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1.5" /> : <BellRing className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Lembrar-me</span>
                     </Button>
-                    <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg text-xs">
-                      {m.archived ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
-                      {m.archived ? "Restaurar" : "Arquivar"}
+                    <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title={m.archived ? "Restaurar" : "Arquivar"}>
+                      {m.archived ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
+                      <span className="hidden sm:inline">{m.archived ? "Restaurar" : "Arquivar"}</span>
                     </Button>
                     {labelEditId !== m.id ? (
-                      <Button data-testid={`inbox-labels-${m.id}`} size="sm" variant="outline" onClick={() => startEditLabels(m)} className="h-8 rounded-lg text-xs">
-                        <Tag className="mr-1.5 h-3.5 w-3.5" /> Etiquetas
+                      <Button data-testid={`inbox-labels-${m.id}`} size="sm" variant="outline" onClick={() => startEditLabels(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Etiquetas">
+                        <Tag className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Etiquetas</span>
                       </Button>
                     ) : null}
                   </div>
@@ -430,7 +430,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           className="h-8 rounded-lg text-xs"
                         >
                           {sendingReply ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
-                          Enviar resposta
+                          Enviar<span className="hidden sm:inline"> resposta</span>
                         </Button>
                         <Button
                           data-testid={`inbox-reply-suggest-${m.id}`}
@@ -441,7 +441,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           className="h-8 rounded-lg border-violet-200 text-xs text-violet-700 hover:bg-violet-50"
                         >
                           {suggestingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wand2 className="mr-1.5 h-3.5 w-3.5" />}
-                          Sugerir com IA
+                          Sugerir<span className="hidden sm:inline"> com IA</span>
                         </Button>
                         <Button size="sm" variant="ghost" disabled={sendingReply} onClick={() => setReplyingId(null)} className="h-8 rounded-lg text-xs">
                           Cancelar
@@ -544,12 +544,12 @@ function SentTab({ search }) {
                       {m.attachments.map((a, i) => (
                         m.note_id && m.pdf_file_id ? (
                           <a key={i} href={withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`)} target="_blank" rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
-                            <FileText className="h-3.5 w-3.5" /> {a.filename}
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                            <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
                           </a>
                         ) : (
-                          <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-500">
-                            <FileText className="h-3.5 w-3.5" /> {a.filename}
+                          <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-500">
+                            <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
                           </span>
                         )
                       ))}
