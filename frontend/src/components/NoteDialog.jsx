@@ -297,7 +297,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
               </div>
 
               {!gmailStatus?.connected ? (
-                <div className="mt-3 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <div>
                     <p className="font-semibold">Gmail ainda não está ligado</p>
@@ -309,7 +309,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                         data-testid="connect-gmail-inline"
                         size="sm"
                         onClick={connectGmail}
-                        className="mt-2 h-8 rounded-lg bg-red-600 hover:bg-red-700"
+                        className="mt-2 h-8 rounded-lg bg-amber-600 hover:bg-amber-700"
                       >
                         Ligar Gmail
                       </Button>
@@ -319,7 +319,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-neutral-300 bg-neutral-100 p-2.5 text-xs font-medium text-neutral-900">
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-medium text-emerald-700">
                   <CheckCircle2 className="h-4 w-4" /> Ligado como {gmailStatus.email}
                 </div>
               )}
@@ -402,14 +402,14 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                         key={q.id}
                         data-testid={`quote-row-${q.id}`}
                         className={`flex items-center justify-between rounded-xl border p-3 ${
-                          isBest ? "border-neutral-900 bg-neutral-50" : "border-slate-200 bg-white"
+                          isBest ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
                         }`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-semibold text-slate-900">{q.supplier_name}</p>
                             {isBest ? (
-                              <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                                 Melhor preço
                               </span>
                             ) : null}
@@ -418,7 +418,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                           {q.notes ? <p className="truncate text-xs text-slate-400">{q.notes}</p> : null}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className={`font-mono text-base font-bold ${isBest ? "text-neutral-900" : "text-slate-900"}`}>
+                          <span className={`font-mono text-base font-bold ${isBest ? "text-emerald-700" : "text-slate-900"}`}>
                             {q.price.toFixed(2)} €
                           </span>
                           <button

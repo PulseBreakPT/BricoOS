@@ -20,8 +20,8 @@ const StatCard = ({ icon: Icon, label, value, accent, testid, danger }) => (
 
 const SEV_ICON = {
   high: { bg: "bg-red-100 text-red-600", ring: "border-red-100 bg-red-50/60" },
-  medium: { bg: "bg-neutral-900 text-white", ring: "border-neutral-200 bg-neutral-50" },
-  low: { bg: "bg-slate-100 text-slate-600", ring: "border-slate-100 bg-slate-50/60" },
+  medium: { bg: "bg-amber-100 text-amber-600", ring: "border-amber-100 bg-amber-50/60" },
+  low: { bg: "bg-blue-100 text-blue-600", ring: "border-blue-100 bg-blue-50/60" },
 };
 
 export default function Dashboard() {
@@ -51,10 +51,10 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4">
-        <StatCard testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#171717" />
-        <StatCard testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#737373" />
+        <StatCard testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#7C3AED" />
+        <StatCard testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#2563EB" />
         <StatCard testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="#DC2626" danger />
-        <StatCard testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="#404040" />
+        <StatCard testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="#16A34A" />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -69,7 +69,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 space-y-2">
               {notifs.items.length === 0 ? (
-                <div className="flex items-center gap-2 rounded-xl bg-neutral-100 p-4 text-sm font-medium text-neutral-900"><CheckCircle2 className="h-4 w-4" /> Tudo em dia. Nenhum pedido esquecido!</div>
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Tudo em dia. Nenhum pedido esquecido!</div>
               ) : notifs.items.slice(0, 6).map((n) => {
                 const sev = SEV_ICON[n.severity] || SEV_ICON.low;
                 return (
@@ -121,7 +121,7 @@ export default function Dashboard() {
               ) : stats.fastest_suppliers.map((f, i) => (
                 <div key={f.supplier} data-testid={`fast-supplier-${i}`} className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5">
                   <span className="truncate text-sm font-semibold text-slate-700">{i + 1}. {f.supplier}</span>
-                  <span className="font-mono text-xs font-bold text-neutral-900">{formatHours(f.avg_hours)}</span>
+                  <span className="font-mono text-xs font-bold text-emerald-600">{formatHours(f.avg_hours)}</span>
                 </div>
               ))}
             </div>
@@ -157,7 +157,7 @@ export default function Dashboard() {
             </div>
             {gmail.connected ? (
               <div className="mt-3">
-                <div className="flex items-center gap-2 rounded-xl border border-neutral-300 bg-neutral-50 p-3 text-sm font-medium text-neutral-900"><CheckCircle2 className="h-4 w-4" /><span className="truncate">{gmail.email}</span></div>
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" /><span className="truncate">{gmail.email}</span></div>
                 <Button data-testid="disconnect-gmail-btn" variant="outline" size="sm" onClick={async () => { await api.post("/gmail/disconnect"); load(); }} className="mt-3 w-full rounded-xl">Desligar Gmail</Button>
               </div>
             ) : (
@@ -166,7 +166,7 @@ export default function Dashboard() {
                 {gmail.configured ? (
                   <Button data-testid="connect-gmail-btn" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-3 w-full rounded-xl"><Link2 className="mr-2 h-4 w-4" /> Ligar Gmail</Button>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">Credenciais Google por configurar no servidor.</div>
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Credenciais Google por configurar no servidor.</div>
                 )}
               </div>
             )}

@@ -38,9 +38,9 @@ function useAutoRefresh(callback, ms = 45000) {
 // Chip pequeno "recebido de / enviado para", com ícone consoante o tipo.
 function KindBadge({ kind }) {
   const map = {
-    supplier: { label: "Fornecedor", cls: "bg-neutral-100 text-neutral-800", icon: Truck },
-    client: { label: "Cliente", cls: "bg-red-50 text-red-700", icon: User },
-    other: { label: "Outro", cls: "bg-slate-100 text-slate-600", icon: Mail },
+    supplier: { label: "Fornecedor", cls: "bg-blue-50 text-blue-700", icon: Truck },
+    client: { label: "Cliente", cls: "bg-emerald-50 text-emerald-700", icon: User },
+    other: { label: "Outro", cls: "bg-violet-50 text-violet-700", icon: Mail },
   };
   const cfg = map[kind] || map.other;
   const Icon = cfg.icon;
@@ -63,7 +63,7 @@ function PriorityBadge({ priority }) {
   }
   if (priority === "baixa") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
         <ArrowDown className="h-3 w-3" /> Baixa
       </span>
     );
@@ -75,14 +75,13 @@ const CATEGORY_LABELS = {
   orcamento: "Orçamento", reclamacao: "Reclamação", duvida: "Dúvida", urgente: "Urgente", outro: "Outro",
 };
 
-// Cada categoria com um tratamento visual diferente dentro da paleta
-// preto/branco/vermelho, para se distinguirem ao primeiro olhar.
+// Cada categoria com uma cor própria, para se reconhecerem à distância.
 const CATEGORY_STYLES = {
-  orcamento: "bg-neutral-100 text-neutral-800",
-  reclamacao: "bg-neutral-900 text-white",
-  duvida: "bg-white text-neutral-600 ring-1 ring-inset ring-neutral-300",
-  urgente: "bg-red-100 text-red-700",
-  outro: "bg-neutral-50 text-neutral-500",
+  orcamento: "bg-blue-50 text-blue-700",
+  reclamacao: "bg-rose-50 text-rose-700",
+  duvida: "bg-purple-50 text-purple-700",
+  urgente: "bg-orange-50 text-orange-700",
+  outro: "bg-amber-50 text-amber-700",
 };
 
 function CategoryBadge({ category }) {
@@ -304,7 +303,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : null}
 
       {smartQuery ? (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-800">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-xs text-violet-700">
           <Sparkles className="h-3.5 w-3.5 shrink-0" />
           {smartResult?.interpreted ? (
             <span>
@@ -330,24 +329,24 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : (
         <div className="mt-3 space-y-2">
           {displayItems.map((m) => (
-            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-colors ${m.seen ? "border-slate-200 bg-white" : "border-red-200 bg-red-50/40"}`}>
+            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-colors ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
               <button onClick={() => openItem(m)} className="flex w-full items-start gap-3 text-left">
-                {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-600" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
+                {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
                     {m.matched ? <KindBadge kind={m.reply_kind || "supplier"} /> : <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">Sem pedido associado</span>}
                     <PriorityBadge priority={m.priority} />
                     <CategoryBadge category={m.category} />
-                    {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-slate-400" title="Com PDF em anexo" /> : null}
+                    {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-red-500" title="Com PDF em anexo" /> : null}
                     {(m.labels || []).map((l) => (
-                      <span key={l} className="inline-flex items-center gap-0.5 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-800">
+                      <span key={l} className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                         <Tag className="h-2.5 w-2.5" /> {l}
                       </span>
                     ))}
                   </div>
                   <p className="truncate text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
-                  {m.ai_summary ? <p className="mt-0.5 truncate text-[11px] italic text-slate-500">{m.ai_summary}</p> : null}
+                  {m.ai_summary ? <p className="mt-0.5 truncate text-[11px] italic text-violet-600">{m.ai_summary}</p> : null}
                   <p className="mt-0.5 text-[11px] text-slate-400">{m.from_email} · {timeAgo(m.received_at)}</p>
                 </div>
               </button>
@@ -358,7 +357,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a) => (
                         <a key={a.id} href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)} target="_blank" rel="noreferrer"
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
                           <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
                         </a>
                       ))}
@@ -448,7 +447,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           variant="outline"
                           disabled={sendingReply || suggestingId === m.id}
                           onClick={() => suggestReply(m)}
-                          className="h-8 rounded-lg border-neutral-300 text-xs text-neutral-800 hover:bg-neutral-100"
+                          className="h-8 rounded-lg border-violet-200 text-xs text-violet-700 hover:bg-violet-50"
                         >
                           {suggestingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wand2 className="mr-1.5 h-3.5 w-3.5" />}
                           Sugerir<span className="hidden sm:inline"> com IA</span>
@@ -521,7 +520,7 @@ function SentTab({ search }) {
             </button>
           ))}
           <button data-testid="sent-awaiting-toggle" onClick={() => setAwaitingOnly((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${awaitingOnly ? "bg-red-600 text-white" : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}>
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${awaitingOnly ? "bg-amber-500 text-white" : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
             <BellRing className="h-3 w-3" /> Aguardam resposta
           </button>
         </div>
@@ -554,7 +553,7 @@ function SentTab({ search }) {
                       {m.attachments.map((a, i) => (
                         m.note_id && m.pdf_file_id ? (
                           <a key={i} href={withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`)} target="_blank" rel="noreferrer"
-                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
                             <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
                           </a>
                         ) : (
@@ -638,7 +637,7 @@ function ThreadsTab({ search }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-bold text-slate-900">{t.label || "(sem nome)"}</span>
-                    {t.unseen > 0 ? <span className="inline-flex rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{t.unseen} nova(s)</span> : null}
+                    {t.unseen > 0 ? <span className="inline-flex rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{t.unseen} nova(s)</span> : null}
                   </div>
                   <p className="truncate text-xs text-slate-500">{t.last_preview || "(sem texto)"}</p>
                   <p className="mt-0.5 text-[11px] text-slate-400">{t.count} mensagem{t.count === 1 ? "" : "s"} · {timeAgo(t.last_at)}</p>
@@ -651,7 +650,7 @@ function ThreadsTab({ search }) {
                   ) : messages.length === 0 ? (
                     <p className="py-2 text-center text-xs text-slate-400">Sem mensagens.</p>
                   ) : messages.map((m, i) => (
-                    <div key={i} className={`rounded-lg p-2.5 text-xs ${m.direction === "out" ? "ml-6 bg-neutral-100" : "mr-6 bg-slate-50"}`}>
+                    <div key={i} className={`rounded-lg p-2.5 text-xs ${m.direction === "out" ? "ml-6 bg-emerald-50" : "mr-6 bg-slate-50"}`}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-slate-700">{m.direction === "out" ? `Enviado a ${m.to_label || m.to}` : `Recebido de ${m.supplier_name || m.from_name || m.from_email}`}</span>
                         <span className="shrink-0 text-slate-400">{formatDateTime(m.at)}</span>
@@ -727,7 +726,7 @@ function ScheduledTab({ search }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-slate-900">{s.to_label || s.to}</p>
                 <p className="truncate text-xs text-slate-500">{s.subject || "(sem assunto)"}</p>
-                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-blue-600">
                   <Clock className="h-3 w-3" /> {formatDateTime(s.scheduled_at)}
                 </p>
                 {s.error ? <p className="mt-0.5 text-[11px] text-red-600">Falhou: {s.error}</p> : null}
@@ -787,12 +786,12 @@ function DraftsTab({ search }) {
             const p = n.pending_client_send;
             return (
               <button key={n.id} data-testid={`draft-email-${n.id}`} onClick={() => setConfirmNote(n)}
-                className="flex w-full items-center gap-3 rounded-xl border border-neutral-300 bg-neutral-50 p-3 text-left transition-colors hover:bg-neutral-100">
+                className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-left transition-colors hover:bg-emerald-50">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="truncate text-sm font-bold text-slate-900">{n.customer_name || "Sem nome"}</p>
                     {isStale(p?.created_at) ? (
-                      <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">Há mais de 24h</span>
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Há mais de 24h</span>
                     ) : null}
                   </div>
                   <p className="truncate text-xs text-slate-600">{p?.subject}</p>
@@ -802,7 +801,7 @@ function DraftsTab({ search }) {
                     {timeAgo(p?.created_at)}
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-bold text-white">
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
                   <Send className="h-3.5 w-3.5" /> Rever e enviar
                 </span>
               </button>
@@ -913,7 +912,7 @@ export default function Emails() {
             type="button"
             variant={smartOn ? "default" : "outline"}
             onClick={toggleSmart}
-            className={`h-11 shrink-0 rounded-xl px-3 ${smartOn ? "bg-black hover:bg-black/90" : "text-neutral-800"}`}
+            className={`h-11 shrink-0 rounded-xl px-3 ${smartOn ? "bg-violet-600 hover:bg-violet-700" : "text-violet-700"}`}
             title="Pesquisa inteligente com IA"
           >
             <Sparkles className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pesquisa IA</span>

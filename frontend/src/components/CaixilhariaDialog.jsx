@@ -107,7 +107,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
                   </div>
                 </div>
                 {note?.supplier_id && bandSupplier && note.supplier_id === bandSupplier.id ? (
-                  <span className="shrink-0 rounded-full bg-neutral-900 px-2.5 py-1 text-[11px] font-bold text-white">Associado ao pedido</span>
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Associado ao pedido</span>
                 ) : (
                   <Button data-testid="caix-add-supplier" size="sm" variant="outline" onClick={addBandSupplier} disabled={addingSupplier} className="h-8 shrink-0 rounded-lg text-xs">
                     {addingSupplier ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}

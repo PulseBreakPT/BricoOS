@@ -2,10 +2,10 @@ import { Flag } from "lucide-react";
 
 // Prioridade de tarefas ao estilo TickTick: 4 níveis (nenhuma/baixa/média/alta).
 export const TASK_PRIORITIES = {
-  nenhuma: { label: "Nenhuma", color: "#A3A3A3", bg: "#FAFAFA" },
-  baixa: { label: "Baixa", color: "#404040", bg: "#E5E5E5" },
-  media: { label: "Média", color: "#FFFFFF", bg: "#171717" },
-  alta: { label: "Alta", color: "#FFFFFF", bg: "#DC2626" },
+  nenhuma: { label: "Nenhuma", color: "#15803D", bg: "#DCFCE7" },
+  baixa: { label: "Baixa", color: "#2563EB", bg: "#DBEAFE" },
+  media: { label: "Média", color: "#D97706", bg: "#FEF3C7" },
+  alta: { label: "Alta", color: "#DC2626", bg: "#FEE2E2" },
 };
 export const TASK_PRIORITY_ORDER = ["alta", "media", "baixa", "nenhuma"];
 export const getTaskPriority = (key) => TASK_PRIORITIES[key] || TASK_PRIORITIES.nenhuma;
