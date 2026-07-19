@@ -77,22 +77,29 @@ function greeting() {
 // na lista ao clicar — o resumo e a lista são o mesmo painel, não duas páginas.
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
-    slate: "bg-violet-50 text-violet-700",
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    red: "bg-red-50 text-red-700",
-    green: "bg-emerald-50 text-emerald-700",
+    slate: { tile: "bg-violet-100 text-violet-700", value: "text-violet-700" },
+    blue: { tile: "bg-blue-100 text-blue-700", value: "text-blue-700" },
+    amber: { tile: "bg-amber-100 text-amber-700", value: "text-amber-700" },
+    red: { tile: "bg-red-100 text-red-700", value: "text-red-700" },
+    green: { tile: "bg-emerald-100 text-emerald-700", value: "text-emerald-700" },
   };
+  const t = tones[tone];
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`flex min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 transition-shadow sm:gap-2 sm:shrink-0 sm:px-3 sm:py-2 ${tones[tone]} ${active ? "ring-2 ring-slate-900" : ""} ${onClick ? "cursor-pointer active:scale-95" : ""}`}
+      className={`flex min-w-0 items-center gap-2 rounded-xl border bg-white px-2.5 py-2 transition-all duration-150 sm:shrink-0 sm:px-3 ${
+        active ? "border-slate-900 shadow-md ring-1 ring-slate-900" : "border-slate-200 shadow-sm"
+      } ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:scale-95" : ""}`}
     >
-      {Icon ? <Icon className="h-4 w-4 shrink-0 min-[420px]:hidden sm:block" /> : null}
-      <span className="shrink-0 text-base font-extrabold tabular-nums sm:text-lg">{value}</span>
-      <span className="truncate text-[11px] font-semibold opacity-80 sm:text-xs">{label}</span>
+      {Icon ? (
+        <span className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:flex ${t.tile}`}>
+          <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
+        </span>
+      ) : null}
+      <span className={`shrink-0 font-heading text-base font-extrabold tabular-nums sm:text-lg ${t.value}`}>{value}</span>
+      <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
     </Tag>
   );
 }
@@ -357,7 +364,7 @@ export default function Notes() {
   return (
     <div>
       {/* Abas das duas áreas — cada uma só com os seus pedidos */}
-      <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+      <div className="relative grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-900 p-1.5 shadow-lg shadow-slate-300/50">
         {Object.entries(SEGMENTS).map(([key, cfg]) => {
           const Icon = cfg.icon;
           const active = segment === key;
@@ -367,33 +374,34 @@ export default function Notes() {
               type="button"
               data-testid={`segment-${key}`}
               onClick={() => changeSegment(key)}
-              className={`flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-colors sm:text-sm ${
+              className={`relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-all duration-200 sm:text-sm ${
                 active
-                  ? `bg-white shadow-sm ${key === "band" ? "text-orange-600" : "text-blue-700"}`
-                  : "text-slate-500 hover:text-slate-800"
+                  ? `bg-white shadow-md ${key === "band" ? "text-orange-600" : "text-blue-700"}`
+                  : "text-white/55 hover:text-white"
               }`}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />
               <span className="truncate">{cfg.shortTitle || cfg.title}</span>
+              {active ? <span className={`absolute -bottom-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full ${key === "band" ? "bg-orange-500" : "bg-blue-600"}`} /> : null}
             </button>
           );
         })}
       </div>
 
-      <div className="mt-4 flex items-start gap-3">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-12 sm:w-12 ${seg.iconAccent}`}>
+      <div className="mt-5 flex items-start gap-3.5">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-lg sm:h-13 sm:w-13 ${seg.iconAccent} ${segment === "band" ? "shadow-orange-300/50" : "shadow-blue-300/50"}`}>
           <SegIcon className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-col">
-          <p className="text-[11px] font-semibold text-slate-400 sm:text-xs">{greeting()}, chefe</p>
-          <h1 data-testid="segment-title" className={`font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
+          <p className="kicker">{greeting()}, chefe</p>
+          <h1 data-testid="segment-title" className={`mt-0.5 font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
             {seg.title}
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500">
             {!today
               ? seg.subtitle
               : counts.waiting_me
-                ? `${counts.waiting_me} pedido(s) à espera da sua ação nesta área.`
+                ? `${counts.waiting_me} pedido${counts.waiting_me === 1 ? "" : "s"} à espera da sua ação nesta área.`
                 : seg.subtitle}
           </p>
         </div>
@@ -545,8 +553,10 @@ export default function Notes() {
               key={p.key}
               data-testid={`preset-${p.key}`}
               onClick={() => setPreset(p.key)}
-              className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-transform active:scale-95 ${
-                preset === p.key ? "bg-primary text-primary-foreground" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${
+                preset === p.key
+                  ? "bg-slate-900 text-white shadow-md shadow-slate-400/40"
+                  : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               }`}
             >
               {p.label}
@@ -556,14 +566,14 @@ export default function Notes() {
 
         {/* Category pills */}
         <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
-          <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${category === "todos" ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-200"}`}>Todas as secções</button>
+          <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-500 shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}>Todas as secções</button>
           {CATEGORY_LIST.map((c) => {
             const Icon = c.icon;
             const active = category === c.key;
             return (
               <button key={c.key} data-testid={`filter-${c.key}`} onClick={() => setCategory(c.key)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-transform active:scale-95"
-                style={{ backgroundColor: active ? c.accent : c.bg, color: active ? "#fff" : c.text }}>
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 active:scale-95 hover:-translate-y-0.5 ${active ? "shadow-md" : "shadow-sm"}`}
+                style={{ backgroundColor: active ? c.accent : c.bg, color: active ? "#fff" : c.text, boxShadow: active ? `0 6px 16px -6px ${c.accent}99` : undefined }}>
                 <Icon className="h-3.5 w-3.5" strokeWidth={2.6} /> {c.label}
               </button>
             );
@@ -571,8 +581,10 @@ export default function Notes() {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <p className="text-sm text-slate-500">{total} pedido{total === 1 ? "" : "s"}</p>
+      <div className="mt-5 flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+          <span className="font-mono text-sm tabular-nums text-slate-900">{total}</span> pedido{total === 1 ? "" : "s"}
+        </p>
         {loading ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" /> : null}
       </div>
 
@@ -607,15 +619,23 @@ export default function Notes() {
       )}
 
       {!loading && items.length === 0 && !focusMode && !kanbanView ? (
-        <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><SegIcon className="h-7 w-7" /></div>
-          <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem pedidos nesta área</p>
-          <p className="text-sm text-slate-500">{seg.empty}</p>
+        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+            <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg ${seg.iconAccent}`}>
+              <SegIcon className="h-7 w-7" />
+            </div>
+          </div>
+          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Sem pedidos nesta área</p>
+          <p className="mt-1 max-w-xs text-sm text-slate-500">{seg.empty}</p>
+          <button onClick={openNew} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+            <Plus className="h-4 w-4" strokeWidth={2.6} /> Criar o primeiro pedido
+          </button>
         </div>
       ) : null}
 
-      <button data-testid="fab-new-note" onClick={openNew} className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
-        <Plus className="h-7 w-7" strokeWidth={2.4} />
+      <button data-testid="fab-new-note" onClick={openNew} className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_-8px_rgba(220,38,38,0.45)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
+        <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
       </button>
 
       <PedidoDetail

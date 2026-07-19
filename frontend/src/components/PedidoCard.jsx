@@ -29,9 +29,12 @@ export default function PedidoCard({ note, onOpen, actions }) {
       transition={{ duration: 0.22 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note.id)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200 hover:border-slate-300"}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     >
-      <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
+      <span
+        className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2"
+        style={{ background: `linear-gradient(180deg, ${c.accent}, ${c.accent}66)` }}
+      />
       <div className="pl-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -134,9 +137,9 @@ export default function PedidoCard({ note, onOpen, actions }) {
 
         {note.next_status && !archived ? (
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-            <p className="min-w-0 flex-1 truncate text-xs text-slate-500"><span className="font-semibold text-slate-700">Próximo:</span> {note.next_action}</p>
-            <button data-testid={`advance-${note.id}`} onClick={stop(actions.advance)} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 active:scale-95">
-              {getNextActionCta(note)} <ArrowRight className="h-3.5 w-3.5" />
+            <p className="min-w-0 flex-1 truncate text-xs text-slate-500"><span className="font-bold text-slate-700">Próximo:</span> {note.next_action}</p>
+            <button data-testid={`advance-${note.id}`} onClick={stop(actions.advance)} className="group/cta inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-md active:scale-95">
+              {getNextActionCta(note)} <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover/cta:translate-x-0.5" />
             </button>
           </div>
         ) : null}

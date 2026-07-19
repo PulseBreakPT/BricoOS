@@ -95,6 +95,8 @@ export default function Tasks() {
 
   const pending = filtered.filter((t) => !t.done).sort(smartTaskSort);
   const done = filtered.filter((t) => t.done);
+  const allDone = tasks.filter((t) => t.done).length;
+  const pct = tasks.length ? Math.round((allDone / tasks.length) * 100) : 0;
 
   const Row = ({ t }) => {
     const c = getCategory(t.category);
@@ -104,7 +106,7 @@ export default function Tasks() {
     return (
       <div
         data-testid={`task-row-${t.id}`}
-        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+        className="group flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 card-elevated-hover"
       >
         <Checkbox
           data-testid={`task-toggle-${t.id}`}
@@ -147,14 +149,30 @@ export default function Tasks() {
 
   return (
     <div>
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Coisas por fazer</p>
-        <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Tarefas</h1>
-        <p className="text-sm text-slate-500">Por secção: construção, bricolagem, decoração e jardim.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <p className="kicker">Coisas por fazer</p>
+          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Tarefas</h1>
+          <p className="text-sm text-slate-500">Por secção: construção, bricolagem, decoração e jardim.</p>
+        </div>
+        {tasks.length > 0 ? (
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="leading-tight">
+              <p className="font-mono text-lg font-bold tabular-nums text-slate-900">{allDone}<span className="text-slate-300">/{tasks.length}</span></p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">concluídas</p>
+            </div>
+            <div className="w-24 sm:w-32">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-slate-900"}`} style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-slate-400">{pct}%</p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Add task */}
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             data-testid="task-title-input"
@@ -198,7 +216,7 @@ export default function Tasks() {
             key={v.key}
             data-testid={`task-view-${v.key}`}
             onClick={() => setView(v.key)}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold ${view === v.key ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}`}
+            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${view === v.key ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"}`}
           >
             {v.label}
           </button>
@@ -210,7 +228,7 @@ export default function Tasks() {
         <button
           data-testid="task-filter-todos"
           onClick={() => setCategory("todos")}
-          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold ${category === "todos" ? "bg-primary text-primary-foreground" : "border border-slate-200 bg-white text-slate-600"}`}
+          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           Todas as secções
         </button>
@@ -221,8 +239,8 @@ export default function Tasks() {
               key={c.key}
               data-testid={`task-filter-${c.key}`}
               onClick={() => setCategory(c.key)}
-              className="shrink-0 rounded-full px-3.5 py-2 text-xs font-bold"
-              style={{ backgroundColor: active ? c.accent : c.bg, color: active ? "#fff" : c.text }}
+              className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 hover:-translate-y-0.5 ${active ? "shadow-md" : "shadow-sm"}`}
+              style={{ backgroundColor: active ? c.accent : c.bg, color: active ? "#fff" : c.text, boxShadow: active ? `0 6px 16px -6px ${c.accent}99` : undefined }}
             >
               {c.label}
             </button>
@@ -244,12 +262,15 @@ export default function Tasks() {
       ) : null}
 
       {filtered.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-            <ListChecks className="h-7 w-7" />
+        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg">
+              <ListChecks className="h-7 w-7" />
+            </div>
           </div>
-          <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem tarefas</p>
-          <p className="text-sm text-slate-500">Adicione a primeira tarefa acima.</p>
+          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Nada por fazer aqui</p>
+          <p className="mt-1 max-w-xs text-sm text-slate-500">Escreva a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</p>
         </div>
       ) : null}
 

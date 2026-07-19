@@ -100,6 +100,65 @@ button, a, [role="button"], [role="tab"] {
     scrollbar-width: none;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Sistema de superfícies premium                                     */
+/* ------------------------------------------------------------------ */
+
+/* Cartão elevado — sombra ambiente em duas camadas + realce interior de
+   1px. Dá profundidade real sem escurecer a interface. */
+.card-elevated {
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.04),
+        0 8px 24px -12px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.card-elevated-hover:hover {
+    box-shadow:
+        0 2px 4px rgba(15, 23, 42, 0.05),
+        0 18px 40px -16px rgba(15, 23, 42, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Fundo de página com grelha de pontos muito subtil — dá textura técnica
+   sem competir com o conteúdo. */
+.bg-dot-grid {
+    background-image: radial-gradient(circle, rgba(15, 23, 42, 0.055) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+.bg-dot-grid-dark {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 26px 26px;
+}
+
+/* Kicker — etiqueta de secção acima dos títulos, com traço à esquerda. */
+.kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #94a3b8;
+}
+.kicker::before {
+    content: "";
+    display: inline-block;
+    width: 1.25rem;
+    height: 2px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.25));
+}
+
+/* Números tabulares por omissão em valores estatísticos. */
+.tnum {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Animações                                                          */
+/* ------------------------------------------------------------------ */
+
 /* Feedback de PIN incorreto — abanão curto, sem interferir com o layout. */
 @keyframes shake {
     10%, 90% { transform: translateX(-1px); }
@@ -152,6 +211,64 @@ button, a, [role="button"], [role="tab"] {
 }
 .animate-page-enter {
     animation: page-enter 0.35s ease-out both;
+}
+
+/* Entrada em cascata — aplicar com --stagger-i por elemento. */
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+    animation: fade-up 0.45s cubic-bezier(.21, .61, .35, 1) both;
+    animation-delay: calc(var(--stagger-i, 0) * 55ms);
+}
+
+/* Zoom de entrada delicado — cartões e diálogos. */
+@keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+    animation: scale-in 0.3s cubic-bezier(.21, .61, .35, 1) both;
+}
+
+/* Respiração de brilho vermelho — realce da marca no ecrã de PIN. */
+@keyframes glow-breathe {
+    0%, 100% { box-shadow: 0 0 24px -6px rgba(220, 38, 38, 0.55), 0 0 0 1px rgba(220, 38, 38, 0.35) inset; }
+    50% { box-shadow: 0 0 42px -4px rgba(220, 38, 38, 0.8), 0 0 0 1px rgba(220, 38, 38, 0.5) inset; }
+}
+.animate-glow-breathe {
+    animation: glow-breathe 3.2s ease-in-out infinite;
+}
+
+/* Brilho a atravessar — skeletons e superfícies em carregamento. */
+@keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+.animate-shimmer {
+    background: linear-gradient(110deg, transparent 25%, rgba(255, 255, 255, 0.65) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+}
+
+/* Flutuação lenta — elementos ambiente decorativos. */
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+.animate-float-slow {
+    animation: float-slow 7s ease-in-out infinite;
+}
+
+/* Preenchimento de um ponto do PIN — pequeno salto elástico. */
+@keyframes dot-fill {
+    0% { transform: scale(0.4); }
+    60% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+.animate-dot-fill {
+    animation: dot-fill 0.28s cubic-bezier(.34, 1.56, .64, 1) both;
 }
 
 @layer base {

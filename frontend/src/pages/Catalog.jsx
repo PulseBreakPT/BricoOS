@@ -33,8 +33,10 @@ export default function Catalog() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <header className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-xl sm:rounded-3xl">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-60" />
         <div className="relative p-4 sm:p-6 lg:p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-red-600/10 blur-3xl" />
           <Link to="/" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" /> Voltar aos pedidos
           </Link>

@@ -152,35 +152,49 @@ export default function Suppliers() {
     <div>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Contactos</p>
-          <h1 className="font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Fornecedores</h1>
-          <p className="text-sm text-slate-500">Para onde enviar os pedidos de orçamento.</p>
+          <p className="kicker">Contactos</p>
+          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Fornecedores</h1>
+          <p className="text-sm text-slate-500">
+            {suppliers.length > 0
+              ? `${suppliers.length} contacto${suppliers.length === 1 ? "" : "s"} pronto${suppliers.length === 1 ? "" : "s"} a receber pedidos de orçamento.`
+              : "Para onde enviar os pedidos de orçamento."}
+          </p>
         </div>
-        <Button data-testid="add-supplier-btn" onClick={openNew} className="hidden rounded-xl sm:inline-flex">
+        <Button data-testid="add-supplier-btn" onClick={openNew} className="hidden rounded-xl shadow-lg shadow-slate-400/30 transition-all hover:-translate-y-0.5 hover:shadow-xl sm:inline-flex">
           <Plus className="mr-2 h-4 w-4" /> Novo fornecedor
         </Button>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {suppliers.map((s) => {
+        {suppliers.map((s, idx) => {
           const c = getCategory(s.category);
+          const initials = s.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
           return (
             <div
               key={s.id}
               data-testid={`supplier-card-${s.id}`}
-              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg sm:p-5"
+              className="group relative animate-fade-up overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 sm:p-5"
+              style={{ "--stagger-i": Math.min(idx, 8) }}
             >
-              <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
+              <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ background: `linear-gradient(180deg, ${c.accent}, ${c.accent}66)` }} />
               <div className="flex items-start justify-between gap-3 pl-2">
-                <div className="min-w-0">
-                  <h3 className="font-heading text-base font-extrabold tracking-tight text-slate-900">{s.name}</h3>
-                  {s.category ? <div className="mt-2"><CategoryBadge category={s.category} /></div> : null}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-heading text-sm font-extrabold shadow-sm transition-transform duration-200 group-hover:scale-110"
+                    style={{ backgroundColor: c.bg, color: c.text }}
+                  >
+                    {initials}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-slate-900">{s.name}</h3>
+                    {s.category ? <div className="mt-1"><CategoryBadge category={s.category} /></div> : null}
+                  </div>
                 </div>
                 <div className="flex gap-1">
-                  <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                  <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-slate-400 transition-all duration-150 hover:scale-110 hover:bg-slate-100 hover:text-slate-700 active:scale-90">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-slate-400 transition-all duration-150 hover:scale-110 hover:bg-red-50 hover:text-red-600 active:scale-90">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -240,21 +254,27 @@ export default function Suppliers() {
       </div>
 
       {suppliers.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-            <Truck className="h-7 w-7" />
+        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg">
+              <Truck className="h-7 w-7" />
+            </div>
           </div>
-          <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem fornecedores</p>
-          <p className="text-sm text-slate-500">Adicione fornecedores para pedir orçamentos.</p>
+          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Ainda sem fornecedores</p>
+          <p className="mt-1 max-w-xs text-sm text-slate-500">Adicione o primeiro contacto para começar a pedir orçamentos num clique.</p>
+          <button onClick={openNew} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+            <Plus className="h-4 w-4" strokeWidth={2.6} /> Adicionar fornecedor
+          </button>
         </div>
       ) : null}
 
       <button
         data-testid="fab-new-supplier"
         onClick={openNew}
-        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-xl shadow-slate-400/40 transition-transform duration-150 hover:-translate-y-0.5 active:scale-95 sm:hidden"
+        className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 active:scale-95 sm:hidden"
       >
-        <Plus className="h-7 w-7" strokeWidth={2.4} />
+        <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

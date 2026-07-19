@@ -102,9 +102,14 @@ function CategoryBadge({ category }) {
 
 function EmptyState({ icon: Icon, text }) {
   return (
-    <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-14 text-center text-slate-400">
-      <Icon className="h-8 w-8" />
-      <p className="mt-3 text-sm font-semibold">{text}</p>
+    <div className="mt-4 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-14 text-center">
+      <div className="relative">
+        <div className="absolute inset-0 animate-float-slow rounded-2xl bg-slate-200/60 blur-lg" />
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <Icon className="h-6 w-6" />
+        </div>
+      </div>
+      <p className="mt-4 text-sm font-semibold text-slate-500">{text}</p>
     </div>
   );
 }
@@ -1002,9 +1007,12 @@ export default function Emails() {
     <div>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 sm:text-sm">Toda a atividade de email</p>
-          <h1 className="flex items-center gap-2 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-            <Mail className="h-6 w-6 text-slate-700 sm:h-8 sm:w-8" /> Emails
+          <p className="kicker">Toda a atividade de email</p>
+          <h1 className="mt-0.5 flex items-center gap-2.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg shadow-slate-400/30 sm:h-11 sm:w-11">
+              <Mail className="h-5 w-5 sm:h-6 sm:w-6" />
+            </span>
+            Emails
           </h1>
           <p className="text-sm text-slate-500">
             Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
@@ -1029,7 +1037,7 @@ export default function Emails() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button data-testid="emails-compose-btn" onClick={() => { setForwardTarget(null); setComposeOpen(true); }} className="h-10 flex-1 rounded-xl sm:flex-none">
+          <Button data-testid="emails-compose-btn" onClick={() => { setForwardTarget(null); setComposeOpen(true); }} className="h-10 flex-1 rounded-xl shadow-lg shadow-slate-400/30 transition-all hover:-translate-y-0.5 hover:shadow-xl sm:flex-none">
             <Pencil className="mr-1.5 h-4 w-4" /> Novo email
           </Button>
         </div>
@@ -1072,12 +1080,12 @@ export default function Emails() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="inbox" data-testid="emails-tab-inbox"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
-          <TabsTrigger value="sent" data-testid="emails-tab-sent"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
-          <TabsTrigger value="threads" data-testid="emails-tab-threads"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>
-          <TabsTrigger value="scheduled" data-testid="emails-tab-scheduled"><Clock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Agendados</span></TabsTrigger>
-          <TabsTrigger value="drafts" data-testid="emails-tab-drafts"><FileClock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Rascunhos</span></TabsTrigger>
+        <TabsList className="grid h-11 w-full grid-cols-5 rounded-xl bg-slate-900 p-1 text-white/55 shadow-lg shadow-slate-300/50 [&_[data-state=active]]:bg-white [&_[data-state=active]]:text-slate-900 [&_[data-state=active]]:shadow-md">
+          <TabsTrigger value="inbox" data-testid="emails-tab-inbox" className="rounded-lg font-bold"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
+          <TabsTrigger value="sent" data-testid="emails-tab-sent" className="rounded-lg font-bold"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
+          <TabsTrigger value="threads" data-testid="emails-tab-threads" className="rounded-lg font-bold"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>
+          <TabsTrigger value="scheduled" data-testid="emails-tab-scheduled" className="rounded-lg font-bold"><Clock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Agendados</span></TabsTrigger>
+          <TabsTrigger value="drafts" data-testid="emails-tab-drafts" className="rounded-lg font-bold"><FileClock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Rascunhos</span></TabsTrigger>
         </TabsList>
         <TabsContent value="inbox" className="focus-visible:outline-none">
           <InboxTab search={debounced} smartQuery={smartOn ? smartQuery : null} onClearSmart={() => setSmartQuery(null)} onForward={openForward} />

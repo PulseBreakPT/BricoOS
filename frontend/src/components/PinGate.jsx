@@ -1,20 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Delete, Loader2, Lock, ShieldCheck, TimerReset } from "lucide-react";
+import { Check, Delete, Hammer, Loader2, ShieldCheck, TimerReset } from "lucide-react";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
 
 const PIN_LENGTH = 6;
 // Pequena pausa antes de revelar a app: dá tempo ao "check" de sucesso ser
 // visto, sem se tornar um atraso percetível a abrir a app.
-const SUCCESS_DELAY_MS = 550;
+const SUCCESS_DELAY_MS = 650;
 
-// Ambiente decorativo do ecrã de PIN — dois círculos desfocados muito
-// suaves, fixos atrás do cartão. Puramente visual, não interfere com nada.
+// Letras por tecla, como nos telefones — detalhe tátil que dá densidade
+// premium ao teclado sem ocupar espaço.
+const KEY_LETTERS = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
+
+// Ambiente do ecrã de PIN — "cofre" escuro com brilho vermelho da marca,
+// grelha de pontos subtil e vinheta. Puramente decorativo.
 function Ambient() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/[0.07] blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-[320px] w-[320px] translate-x-1/4 translate-y-1/4 rounded-full bg-red-600/[0.08] blur-3xl" />
+      <div className="absolute inset-0 bg-dot-grid-dark opacity-70" />
+      <div className="absolute left-1/2 top-[-180px] h-[480px] w-[640px] -translate-x-1/2 rounded-full bg-red-600/[0.13] blur-3xl" />
+      <div className="absolute bottom-[-160px] right-[-120px] h-[420px] w-[420px] rounded-full bg-white/[0.045] blur-3xl" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
+    </div>
+  );
+}
+
+// Relógio ao vivo — hora em destaque no topo do cofre. Atualiza ao minuto.
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 15000);
+    return () => clearInterval(t);
+  }, []);
+  const time = now.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  const date = now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <div className="flex flex-col items-center">
+      <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-white sm:text-5xl">{time}</p>
+      <p className="mt-1 text-xs font-semibold capitalize tracking-wide text-white/40">{date}</p>
+    </div>
+  );
+}
+
+function BrandMark({ locked }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-colors duration-300 ${locked ? "bg-red-950" : "bg-gradient-to-br from-red-600 to-red-700 animate-glow-breathe"}`}>
+        {locked ? <TimerReset className="h-7 w-7 text-red-400" /> : <Hammer className="h-7 w-7" strokeWidth={2.3} />}
+      </span>
+      <h1 className="mt-4 font-heading text-lg font-black uppercase tracking-[0.28em] text-white">
+        Brico<span className="text-red-500">·</span>Assistente
+      </h1>
+      <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.22em] text-white/35">Acesso reservado</p>
     </div>
   );
 }
@@ -163,23 +200,26 @@ export default function PinGate({ children }) {
 
   if (status === "checking") {
     return (
-      <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-50">
+      <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#09090B]">
         <Ambient />
-        <Loader2 className="relative h-8 w-8 animate-spin text-slate-300" />
+        <Loader2 className="relative h-8 w-8 animate-spin text-white/25" />
       </div>
     );
   }
 
   if (status === "success") {
     return (
-      <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-10">
+      <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#09090B] px-6 py-10">
         <Ambient />
-        <div className="relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200/70 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.15)] animate-in fade-in-0 zoom-in-95 duration-300">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 text-white ring-1 ring-inset ring-red-600 animate-in zoom-in-90 duration-300">
-            <Check className="h-7 w-7" strokeWidth={2.5} />
+        <div className="relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl animate-scale-in">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-700 text-white shadow-[0_0_40px_-6px_rgba(220,38,38,0.7)] animate-in zoom-in-50 duration-300">
+            <Check className="h-8 w-8" strokeWidth={2.5} />
           </span>
-          <p className="mt-4 font-heading text-lg font-extrabold tracking-tight text-slate-900">Acesso confirmado</p>
-          <p className="mt-1 text-sm text-slate-500">A abrir…</p>
+          <p className="mt-5 font-heading text-xl font-extrabold tracking-tight text-white">Acesso confirmado</p>
+          <p className="mt-1 text-sm text-white/45">A preparar o seu painel…</p>
+          <div className="mt-5 h-1 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="h-full w-full origin-left animate-[fade-up_0.6s_ease-out] rounded-full bg-gradient-to-r from-red-600 to-red-400" />
+          </div>
         </div>
       </div>
     );
@@ -190,97 +230,116 @@ export default function PinGate({ children }) {
   const ss = String(lockSeconds % 60).padStart(2, "0");
   const ringPct = lockTotal > 0 ? Math.max(0, Math.min(100, (lockSeconds / lockTotal) * 100)) : 0;
 
+  const keyBase = "group relative h-16 select-none rounded-2xl border border-white/[0.07] bg-white/[0.045] text-white backdrop-blur-sm transition-all duration-150 active:scale-95 active:bg-white/[0.12] disabled:opacity-25 sm:hover:border-white/20 sm:hover:bg-white/[0.09]";
+
   return (
-    <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-10">
+    <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#09090B] px-6 py-8">
       <Ambient />
-      <div className="relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200/70 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.15)] animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-        <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset transition-colors ${locked ? "bg-red-50 text-red-600 ring-red-100" : "bg-primary/[0.06] text-primary ring-primary/10"}`}>
-          {locked ? <TimerReset className="h-7 w-7" /> : <Lock className="h-7 w-7" />}
-        </span>
-        <span className="mt-4 h-1 w-10 rounded-full bg-gradient-to-r from-primary to-primary/20" />
-        <h1 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-slate-900">Brico Assistente</h1>
-        <p className="mt-1 text-center text-sm text-slate-500">
+
+      <div className="relative flex w-full max-w-xs flex-col items-center">
+        <div className="animate-fade-up" style={{ "--stagger-i": 0 }}>
+          <LiveClock />
+        </div>
+
+        <div className="mt-7 animate-fade-up" style={{ "--stagger-i": 1 }}>
+          <BrandMark locked={locked} />
+        </div>
+
+        <p className="mt-3 h-4 animate-fade-up text-center text-xs text-white/40" style={{ "--stagger-i": 2 }}>
           {locked ? "Acesso bloqueado por tentativas falhadas." : "Introduza o PIN de 6 dígitos para verificar este dispositivo."}
         </p>
 
         {locked ? (
-          <div data-testid="pin-countdown" className="mt-6 flex flex-col items-center">
+          <div data-testid="pin-countdown" className="mt-7 flex animate-fade-up flex-col items-center" style={{ "--stagger-i": 3 }}>
             <div
-              className="relative flex h-32 w-32 items-center justify-center rounded-full"
-              style={{ background: `conic-gradient(#dc2626 ${ringPct}%, #fee2e2 ${ringPct}%)` }}
+              className="relative flex h-36 w-36 items-center justify-center rounded-full shadow-[0_0_50px_-12px_rgba(220,38,38,0.5)]"
+              style={{ background: `conic-gradient(#dc2626 ${ringPct}%, rgba(255,255,255,0.08) ${ringPct}%)` }}
             >
-              <div className="flex h-[104px] w-[104px] flex-col items-center justify-center rounded-full bg-white">
-                <p className="font-mono text-2xl font-bold tabular-nums text-slate-900">{mm}:{ss}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">restante</p>
+              <div className="flex h-[124px] w-[124px] flex-col items-center justify-center rounded-full bg-[#0d0d10]">
+                <p className="font-mono text-3xl font-bold tabular-nums text-white">{mm}:{ss}</p>
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">restante</p>
               </div>
             </div>
-            <p className="mt-4 text-center text-xs text-slate-400">Poderá tentar novamente quando o tempo terminar.</p>
+            <p className="mt-5 max-w-[220px] text-center text-xs leading-relaxed text-white/35">
+              Por segurança, o teclado volta a ficar disponível quando o tempo terminar.
+            </p>
           </div>
         ) : (
-          <div data-testid="pin-dots" className={`mt-6 flex items-center gap-3 ${flash ? "animate-shake" : ""}`}>
-            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-              <span
-                key={i}
-                className={`h-3.5 w-3.5 rounded-full border-2 transition-all duration-150 ${
-                  flash ? "border-red-500 bg-red-500"
-                    : i < pin.length ? "scale-110 border-primary bg-primary"
-                      : "border-slate-200 bg-transparent"
-                }`}
-              />
-            ))}
-          </div>
+          <>
+            <div data-testid="pin-dots" className={`mt-6 flex animate-fade-up items-center gap-3.5 ${flash ? "animate-shake" : ""}`} style={{ "--stagger-i": 3 }}>
+              {Array.from({ length: PIN_LENGTH }).map((_, i) => {
+                const filled = i < pin.length;
+                return (
+                  <span
+                    key={i}
+                    className={`h-3.5 w-3.5 rounded-full transition-colors duration-150 ${
+                      flash
+                        ? "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)]"
+                        : filled
+                          ? "animate-dot-fill bg-red-500 shadow-[0_0_14px_rgba(220,38,38,0.9)]"
+                          : "border border-white/20 bg-white/[0.03]"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+
+            <p className={`mt-3 h-5 text-center text-xs font-semibold ${error ? "text-red-400" : "text-white/30"}`}>
+              {error || (attemptsLeft < 3 ? `${attemptsLeft} tentativa${attemptsLeft === 1 ? "" : "s"} restante${attemptsLeft === 1 ? "" : "s"}` : "")}
+            </p>
+
+            {/* Teclado em grelha — sem campos de texto, o teclado nativo nunca abre */}
+            <div className="mt-4 grid w-full animate-fade-up grid-cols-3 gap-2.5" style={{ "--stagger-i": 4 }}>
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  data-testid={`pin-key-${d}`}
+                  onClick={() => press(d)}
+                  disabled={locked || checkingPin}
+                  className={keyBase}
+                >
+                  <span className="block text-2xl font-semibold leading-none">{d}</span>
+                  <span className="mt-0.5 block h-3 font-mono text-[9px] font-semibold uppercase tracking-[0.25em] text-white/25">
+                    {KEY_LETTERS[d] || ""}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                data-testid="pin-clear"
+                onClick={clearAll}
+                disabled={locked || checkingPin || !pin.length}
+                className="h-16 rounded-2xl text-xs font-bold uppercase tracking-[0.14em] text-white/35 transition-all duration-150 active:scale-95 active:bg-white/[0.08] disabled:opacity-20 sm:hover:bg-white/[0.05] sm:hover:text-white/60"
+              >
+                Limpar
+              </button>
+              <button
+                type="button"
+                data-testid="pin-key-0"
+                onClick={() => press("0")}
+                disabled={locked || checkingPin}
+                className={keyBase}
+              >
+                <span className="block text-2xl font-semibold leading-none">0</span>
+                <span className="mt-0.5 block h-3" />
+              </button>
+              <button
+                type="button"
+                data-testid="pin-backspace"
+                onClick={backspace}
+                disabled={locked || checkingPin || !pin.length}
+                className="flex h-16 items-center justify-center rounded-2xl text-white/35 transition-all duration-150 active:scale-95 active:bg-white/[0.08] disabled:opacity-20 sm:hover:bg-white/[0.05] sm:hover:text-white/60"
+              >
+                <Delete className="h-6 w-6" />
+              </button>
+            </div>
+          </>
         )}
 
-        <p className={`mt-3 h-5 text-center text-xs ${error ? "text-red-600" : "text-slate-400"}`}>
-          {error || (!locked && attemptsLeft < 3 ? `${attemptsLeft} tentativa${attemptsLeft === 1 ? "" : "s"} restante${attemptsLeft === 1 ? "" : "s"}` : "")}
-        </p>
-
-        {/* Teclado em grelha — sem campos de texto, o teclado nativo nunca abre */}
-        <div className="mt-6 grid w-full grid-cols-3 gap-3">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button
-              key={d}
-              type="button"
-              data-testid={`pin-key-${d}`}
-              onClick={() => press(d)}
-              disabled={locked || checkingPin}
-              className="h-16 rounded-2xl border border-slate-200/60 bg-slate-50 text-2xl font-semibold text-slate-900 transition-all active:translate-y-0 active:scale-95 active:border-slate-200 active:bg-slate-100 active:shadow-none disabled:opacity-30 sm:hover:-translate-y-0.5 sm:hover:border-slate-300 sm:hover:bg-white sm:hover:shadow-md"
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            type="button"
-            data-testid="pin-clear"
-            onClick={clearAll}
-            disabled={locked || checkingPin || !pin.length}
-            className="h-16 rounded-2xl text-sm font-semibold text-slate-400 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-30 sm:hover:bg-slate-50"
-          >
-            Limpar
-          </button>
-          <button
-            type="button"
-            data-testid="pin-key-0"
-            onClick={() => press("0")}
-            disabled={locked || checkingPin}
-            className="h-16 rounded-2xl border border-slate-200/60 bg-slate-50 text-2xl font-semibold text-slate-900 transition-all active:translate-y-0 active:scale-95 active:border-slate-200 active:bg-slate-100 active:shadow-none disabled:opacity-30 sm:hover:-translate-y-0.5 sm:hover:border-slate-300 sm:hover:bg-white sm:hover:shadow-md"
-          >
-            0
-          </button>
-          <button
-            type="button"
-            data-testid="pin-backspace"
-            onClick={backspace}
-            disabled={locked || checkingPin || !pin.length}
-            className="flex h-16 items-center justify-center rounded-2xl text-slate-400 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-30 sm:hover:bg-slate-50"
-          >
-            <Delete className="h-6 w-6" />
-          </button>
-        </div>
-
-        <p className="mt-6 flex items-center gap-1.5 text-[11px] text-slate-400">
-          {checkingPin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {checkingPin ? "A verificar…" : "Dispositivo verificado uma única vez neste navegador"}
+        <p className="mt-7 flex animate-fade-up items-center gap-1.5 text-[11px] font-medium text-white/25" style={{ "--stagger-i": 5 }}>
+          {checkingPin ? <Loader2 className="h-3.5 w-3.5 animate-spin text-red-400" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          {checkingPin ? "A verificar o PIN…" : "Dispositivo verificado uma única vez neste navegador"}
         </p>
       </div>
     </div>
