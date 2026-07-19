@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Loader2, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
@@ -269,13 +270,20 @@ export default function Suppliers() {
         </div>
       ) : null}
 
-      <button
-        data-testid="fab-new-supplier"
-        onClick={openNew}
-        className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 active:scale-95 sm:hidden"
-      >
-        <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
-      </button>
+      {/* Portal para o <body> — mesmo motivo do botão + dos Pedidos: fica fora
+          do wrapper com transform, para o "position: fixed" prender à janela. */}
+      {createPortal(
+        <button
+          data-testid="fab-new-supplier"
+          onClick={openNew}
+          aria-label="Novo fornecedor"
+          title="Novo fornecedor"
+          className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 active:scale-95 sm:hidden"
+        >
+          <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
+        </button>,
+        document.body,
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-testid="supplier-dialog" className="sm:max-w-md">

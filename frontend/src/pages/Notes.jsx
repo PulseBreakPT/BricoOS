@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import {
@@ -634,9 +635,17 @@ export default function Notes() {
         </div>
       ) : null}
 
-      <button data-testid="fab-new-note" onClick={openNew} className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_-8px_rgba(220,38,38,0.45)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
-        <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
-      </button>
+      {/* Portal para o <body>: o botão + fica fora do wrapper com a animação
+          de entrada de página (.animate-page-enter). Assim, o seu
+          "position: fixed" prende-se sempre à janela do browser — nunca a um
+          ancestral com transform/filter — e mantém-se visível em qualquer
+          scroll, seja qual for a altura da lista. */}
+      {createPortal(
+        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_-8px_rgba(220,38,38,0.45)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
+          <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
+        </button>,
+        document.body,
+      )}
 
       <PedidoDetail
         open={detailOpen}
