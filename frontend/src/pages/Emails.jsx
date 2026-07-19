@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Mail, Inbox, Send, FileClock, Search, Loader2, FileText, RefreshCw,
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
-  Sparkles, AlertTriangle, ArrowDown, Wand2, X,
+  Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
+  BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -14,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import ComposeEmailDialog from "@/components/ComposeEmailDialog";
+import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
+import EmailRulesDialog from "@/components/EmailRulesDialog";
+import EmailStatsDialog from "@/components/EmailStatsDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -91,7 +95,7 @@ function EmptyState({ icon: Icon, text }) {
 
 // Caixa de entrada — TODOS os emails recebidos, mesmo sem relação com um
 // pedido (esses ficam com etiqueta "Sem pedido associado").
-function InboxTab({ search, smartQuery, onClearSmart }) {
+function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -104,21 +108,30 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
   const [suggestingId, setSuggestingId] = useState(null);
   const [smartResult, setSmartResult] = useState(null);
   const [smartLoading, setSmartLoading] = useState(false);
+  const [archivedView, setArchivedView] = useState(false);
+  const [availableLabels, setAvailableLabels] = useState([]);
+  const [labelFilter, setLabelFilter] = useState(null);
+  const [labelEditId, setLabelEditId] = useState(null);
+  const [labelDraft, setLabelDraft] = useState("");
+  const [busyId, setBusyId] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
     if (!opts.silent) setLoading(true);
     try {
-      const { data } = await api.get("/emails/inbox", { params: { search: search || undefined, limit: PAGE_SIZE } });
+      const { data } = await api.get("/emails/inbox", {
+        params: { search: search || undefined, limit: PAGE_SIZE, archived: archivedView, label: labelFilter || undefined },
+      });
       setItems(data.items); setTotal(data.total);
     } catch (e) {
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar a caixa de entrada"));
     } finally {
       if (!opts.silent) setLoading(false);
     }
-  }, [search]);
+  }, [search, archivedView, labelFilter]);
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
+  useEffect(() => { api.get("/emails/labels").then(({ data }) => setAvailableLabels(data.items)).catch(() => {}); }, [items]);
 
   // Pesquisa inteligente: só corre quando o utilizador confirma (Enter), não
   // a cada tecla — cada pesquisa é uma chamada à IA para interpretar o texto.
@@ -210,11 +223,55 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
     }
   };
 
+  const toggleArchive = async (m) => {
+    setBusyId(m.id);
+    try {
+      await api.post(`/emails/${m.id}/archive`);
+      toast.success(m.archived ? "Email restaurado para a caixa de entrada" : "Email arquivado");
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível arquivar"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const startEditLabels = (m) => { setLabelEditId(m.id); setLabelDraft((m.labels || []).join(", ")); };
+
+  const saveLabels = async (m) => {
+    const labels = labelDraft.split(",").map((l) => l.trim()).filter(Boolean);
+    try {
+      await api.post(`/emails/${m.id}/labels`, { labels });
+      setLabelEditId(null);
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível guardar as etiquetas"));
+    }
+  };
+
+  const remind = async (m) => {
+    setBusyId(m.id);
+    try {
+      await api.post(`/emails/${m.id}/remind`, { days: 3 });
+      toast.success("Lembrete criado — em Tarefas daqui a 3 dias");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível criar o lembrete"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
+        <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : archivedView ? "no arquivo" : "na caixa de entrada"}</p>
         <div className="flex flex-wrap gap-2">
+          {!smartQuery ? (
+            <Button data-testid="emails-toggle-archived" size="sm" variant={archivedView ? "default" : "outline"} onClick={() => setArchivedView((v) => !v)} className="h-8 rounded-lg text-xs">
+              {archivedView ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
+              {archivedView ? "Ver caixa de entrada" : "Ver arquivo"}
+            </Button>
+          ) : null}
           <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg text-xs">
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar tudo como visto
           </Button>
@@ -223,6 +280,18 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
           </Button>
         </div>
       </div>
+
+      {!smartQuery && availableLabels.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Tag className="h-3.5 w-3.5 text-slate-400" />
+          {availableLabels.map((l) => (
+            <button key={l} data-testid={`label-filter-${l}`} onClick={() => setLabelFilter((cur) => (cur === l ? null : l))}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${labelFilter === l ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {smartQuery ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-xs text-violet-700">
@@ -261,6 +330,11 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
                     <PriorityBadge priority={m.priority} />
                     <CategoryBadge category={m.category} />
                     {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-red-500" title="Com PDF em anexo" /> : null}
+                    {(m.labels || []).map((l) => (
+                      <span key={l} className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        <Tag className="h-2.5 w-2.5" /> {l}
+                      </span>
+                    ))}
                   </div>
                   <p className="truncate text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
                   {m.ai_summary ? <p className="mt-0.5 truncate text-[11px] italic text-violet-600">{m.ai_summary}</p> : null}
@@ -308,7 +382,35 @@ function InboxTab({ search, smartQuery, onClearSmart }) {
                         <Reply className="mr-1.5 h-3.5 w-3.5" /> Responder
                       </Button>
                     ) : null}
+                    <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg text-xs">
+                      <Forward className="mr-1.5 h-3.5 w-3.5" /> Reencaminhar
+                    </Button>
+                    <Button data-testid={`inbox-remind-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => remind(m)} className="h-8 rounded-lg text-xs">
+                      {busyId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <BellRing className="mr-1.5 h-3.5 w-3.5" />} Lembrar-me
+                    </Button>
+                    <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg text-xs">
+                      {m.archived ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
+                      {m.archived ? "Restaurar" : "Arquivar"}
+                    </Button>
+                    {labelEditId !== m.id ? (
+                      <Button data-testid={`inbox-labels-${m.id}`} size="sm" variant="outline" onClick={() => startEditLabels(m)} className="h-8 rounded-lg text-xs">
+                        <Tag className="mr-1.5 h-3.5 w-3.5" /> Etiquetas
+                      </Button>
+                    ) : null}
                   </div>
+                  {labelEditId === m.id ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Input
+                        data-testid={`inbox-labels-input-${m.id}`}
+                        value={labelDraft}
+                        onChange={(e) => setLabelDraft(e.target.value)}
+                        placeholder="etiquetas separadas por vírgula"
+                        className="h-8 max-w-xs text-xs"
+                      />
+                      <Button size="sm" onClick={() => saveLabels(m)} className="h-8 rounded-lg text-xs">Guardar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setLabelEditId(null)} className="h-8 rounded-lg text-xs">Cancelar</Button>
+                    </div>
+                  ) : null}
                   {replyingId === m.id ? (
                     <div className="mt-2 space-y-2">
                       <Textarea
@@ -365,42 +467,60 @@ function SentTab({ search }) {
   const [kind, setKind] = useState("todos");
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const [awaitingOnly, setAwaitingOnly] = useState(false);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
     if (!opts.silent) setLoading(true);
     try {
-      const { data } = await api.get("/emails/sent", {
-        params: { search: search || undefined, kind: kind === "todos" ? undefined : kind, limit: PAGE_SIZE },
-      });
-      setItems(data.items); setTotal(data.total);
+      if (awaitingOnly) {
+        const { data } = await api.get("/emails/awaiting-reply", { params: { days: 3 } });
+        let its = data.items;
+        if (kind !== "todos") its = its.filter((m) => m.kind === kind);
+        if (search) {
+          const q = search.toLowerCase();
+          its = its.filter((m) => `${m.to} ${m.to_label} ${m.subject}`.toLowerCase().includes(q));
+        }
+        setItems(its); setTotal(its.length);
+      } else {
+        const { data } = await api.get("/emails/sent", {
+          params: { search: search || undefined, kind: kind === "todos" ? undefined : kind, limit: PAGE_SIZE },
+        });
+        setItems(data.items); setTotal(data.total);
+      }
     } catch (e) {
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os emails enviados"));
     } finally {
       if (!opts.silent) setLoading(false);
     }
-  }, [search, kind]);
+  }, [search, kind, awaitingOnly]);
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
 
   return (
     <div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{total} email{total === 1 ? "" : "s"} enviado{total === 1 ? "" : "s"}</p>
-        <div className="flex gap-1.5">
+        <p className="text-sm text-slate-500">
+          {total} email{total === 1 ? "" : "s"} {awaitingOnly ? "sem resposta há mais de 3 dias" : "enviado" + (total === 1 ? "" : "s")}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
           {[["todos", "Todos"], ["supplier", "Fornecedores"], ["client", "Clientes"]].map(([k, label]) => (
             <button key={k} data-testid={`sent-filter-${k}`} onClick={() => setKind(k)}
               className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${kind === k ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
               {label}
             </button>
           ))}
+          <button data-testid="sent-awaiting-toggle" onClick={() => setAwaitingOnly((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${awaitingOnly ? "bg-amber-500 text-white" : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
+            <BellRing className="h-3 w-3" /> Aguardam resposta
+          </button>
         </div>
       </div>
 
       {loading ? (
         <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
       ) : items.length === 0 ? (
-        <EmptyState icon={Send} text="Sem emails enviados." />
+        <EmptyState icon={awaitingOnly ? BellRing : Send} text={awaitingOnly ? "Tudo respondido — sem emails à espera." : "Sem emails enviados."} />
       ) : (
         <div className="mt-3 space-y-2">
           {items.map((m) => (
@@ -443,6 +563,168 @@ function SentTab({ search }) {
                   ) : null}
                 </div>
               ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Conversas — agrupa recebidos+enviados do mesmo pedido/contacto numa
+// única linha do tempo, em vez de duas listas separadas.
+function ThreadsTab({ search }) {
+  const [threads, setThreads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openKey, setOpenKey] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const navigate = useNavigate();
+
+  const load = useCallback(async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
+    try {
+      const { data } = await api.get("/emails/threads");
+      setThreads(data.items);
+    } catch (e) {
+      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar as conversas"));
+    } finally {
+      if (!opts.silent) setLoading(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
+
+  const openThread = async (t) => {
+    if (openKey === t.key) { setOpenKey(null); return; }
+    setOpenKey(t.key);
+    setLoadingThread(true);
+    try {
+      const { data } = await api.get("/emails/threads/view", { params: { key: t.key } });
+      setMessages(data.items);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível abrir a conversa"));
+    } finally {
+      setLoadingThread(false);
+    }
+  };
+
+  const filtered = search
+    ? threads.filter((t) => (t.label || "").toLowerCase().includes(search.toLowerCase()) || (t.last_preview || "").toLowerCase().includes(search.toLowerCase()))
+    : threads;
+
+  return (
+    <div>
+      <p className="mt-3 text-sm text-slate-500">{filtered.length} conversa{filtered.length === 1 ? "" : "s"}</p>
+      {loading ? (
+        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={MessagesSquare} text="Sem conversas ainda." />
+      ) : (
+        <div className="mt-3 space-y-2">
+          {filtered.map((t) => (
+            <div key={t.key} data-testid={`thread-${t.key}`} className="rounded-xl border border-slate-200 bg-white p-3">
+              <button onClick={() => openThread(t)} className="flex w-full items-start gap-3 text-left">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-bold text-slate-900">{t.label || "(sem nome)"}</span>
+                    {t.unseen > 0 ? <span className="inline-flex rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{t.unseen} nova(s)</span> : null}
+                  </div>
+                  <p className="truncate text-xs text-slate-500">{t.last_preview || "(sem texto)"}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">{t.count} mensagem{t.count === 1 ? "" : "s"} · {timeAgo(t.last_at)}</p>
+                </div>
+              </button>
+              {openKey === t.key ? (
+                <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                  {loadingThread ? (
+                    <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+                  ) : messages.length === 0 ? (
+                    <p className="py-2 text-center text-xs text-slate-400">Sem mensagens.</p>
+                  ) : messages.map((m, i) => (
+                    <div key={i} className={`rounded-lg p-2.5 text-xs ${m.direction === "out" ? "ml-6 bg-emerald-50" : "mr-6 bg-slate-50"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-700">{m.direction === "out" ? `Enviado a ${m.to_label || m.to}` : `Recebido de ${m.supplier_name || m.from_name || m.from_email}`}</span>
+                        <span className="shrink-0 text-slate-400">{formatDateTime(m.at)}</span>
+                      </div>
+                      <p className="mt-1 truncate text-slate-500">{m.subject || "(sem assunto)"}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-slate-600">{(m.body || "").slice(0, 400)}</p>
+                    </div>
+                  ))}
+                  {t.note_id ? (
+                    <button onClick={() => navigate(`/?open=${t.note_id}&tab=cronologia`)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
+                      Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Agendados — emails compostos com envio marcado para uma data/hora futura.
+function ScheduledTab({ search }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [cancelingId, setCancelingId] = useState(null);
+
+  const load = useCallback(async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
+    try {
+      const { data } = await api.get("/emails/scheduled");
+      setItems(data);
+    } catch (e) {
+      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os emails agendados"));
+    } finally {
+      if (!opts.silent) setLoading(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
+
+  const cancel = async (s) => {
+    if (!window.confirm("Cancelar este envio agendado?")) return;
+    setCancelingId(s.id);
+    try {
+      await api.delete(`/emails/scheduled/${s.id}`);
+      toast.success("Envio agendado cancelado");
+      load();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível cancelar"));
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
+  const filtered = search
+    ? items.filter((s) => `${s.to} ${s.to_label} ${s.subject}`.toLowerCase().includes(search.toLowerCase()))
+    : items;
+
+  return (
+    <div>
+      <p className="mt-3 text-sm text-slate-500">{filtered.length} email{filtered.length === 1 ? "" : "s"} agendado{filtered.length === 1 ? "" : "s"}</p>
+      {loading ? (
+        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Clock} text="Sem envios agendados." />
+      ) : (
+        <div className="mt-3 space-y-2">
+          {filtered.map((s) => (
+            <div key={s.id} data-testid={`scheduled-${s.id}`} className="flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-slate-900">{s.to_label || s.to}</p>
+                <p className="truncate text-xs text-slate-500">{s.subject || "(sem assunto)"}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-blue-600">
+                  <Clock className="h-3 w-3" /> {formatDateTime(s.scheduled_at)}
+                </p>
+                {s.error ? <p className="mt-0.5 text-[11px] text-red-600">Falhou: {s.error}</p> : null}
+              </div>
+              <Button size="sm" variant="outline" disabled={cancelingId === s.id} onClick={() => cancel(s)} className="h-8 shrink-0 rounded-lg border-red-200 text-xs text-red-600 hover:bg-red-50">
+                {cancelingId === s.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Cancelar
+              </Button>
             </div>
           ))}
         </div>
@@ -534,9 +816,13 @@ export default function Emails() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [forwardTarget, setForwardTarget] = useState(null);
   const [sentKey, setSentKey] = useState(0);
   const [smartOn, setSmartOn] = useState(false);
   const [smartQuery, setSmartQuery] = useState(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
@@ -553,6 +839,14 @@ export default function Emails() {
     setSmartQuery(null);
   };
 
+  const openForward = (m) => {
+    setForwardTarget({
+      emailId: m.id, subject: m.subject, body: m.body,
+      attachmentsCount: (m.attachments || []).length,
+    });
+    setComposeOpen(true);
+  };
+
   return (
     <div>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -565,16 +859,31 @@ export default function Emails() {
             Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
           </p>
         </div>
-        <Button data-testid="emails-compose-btn" onClick={() => setComposeOpen(true)} className="mt-2 h-10 shrink-0 rounded-xl sm:mt-1">
-          <Pencil className="mr-1.5 h-4 w-4" /> Novo email
-        </Button>
+        <div className="mt-2 flex flex-wrap gap-2 sm:mt-1">
+          <Button data-testid="emails-stats-btn" variant="outline" onClick={() => setStatsOpen(true)} className="h-10 shrink-0 rounded-xl">
+            <BarChart3 className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Estatísticas</span>
+          </Button>
+          <Button data-testid="emails-rules-btn" variant="outline" onClick={() => setRulesOpen(true)} className="h-10 shrink-0 rounded-xl">
+            <Wand2 className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Regras</span>
+          </Button>
+          <Button data-testid="emails-templates-btn" variant="outline" onClick={() => setTemplatesOpen(true)} className="h-10 shrink-0 rounded-xl">
+            <FileStack className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Modelos</span>
+          </Button>
+          <Button data-testid="emails-compose-btn" onClick={() => { setForwardTarget(null); setComposeOpen(true); }} className="h-10 shrink-0 rounded-xl">
+            <Pencil className="mr-1.5 h-4 w-4" /> Novo email
+          </Button>
+        </div>
       </div>
 
       <ComposeEmailDialog
         open={composeOpen}
-        onOpenChange={setComposeOpen}
+        onOpenChange={(v) => { setComposeOpen(v); if (!v) setForwardTarget(null); }}
+        forward={forwardTarget}
         onSent={() => { setTab("sent"); setSentKey((k) => k + 1); }}
       />
+      <EmailTemplatesDialog open={templatesOpen} onOpenChange={setTemplatesOpen} />
+      <EmailRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
+      <EmailStatsDialog open={statsOpen} onOpenChange={setStatsOpen} />
 
       <div className="mt-4 flex gap-2">
         <div className="relative flex-1">
@@ -603,15 +912,19 @@ export default function Emails() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="inbox" data-testid="emails-tab-inbox"><Inbox className="mr-1.5 h-3.5 w-3.5" /> Recebidos</TabsTrigger>
-          <TabsTrigger value="sent" data-testid="emails-tab-sent"><Send className="mr-1.5 h-3.5 w-3.5" /> Enviados</TabsTrigger>
-          <TabsTrigger value="drafts" data-testid="emails-tab-drafts"><FileClock className="mr-1.5 h-3.5 w-3.5" /> Rascunhos</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="inbox" data-testid="emails-tab-inbox"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
+          <TabsTrigger value="sent" data-testid="emails-tab-sent"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
+          <TabsTrigger value="threads" data-testid="emails-tab-threads"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>
+          <TabsTrigger value="scheduled" data-testid="emails-tab-scheduled"><Clock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Agendados</span></TabsTrigger>
+          <TabsTrigger value="drafts" data-testid="emails-tab-drafts"><FileClock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Rascunhos</span></TabsTrigger>
         </TabsList>
         <TabsContent value="inbox" className="focus-visible:outline-none">
-          <InboxTab search={debounced} smartQuery={smartOn ? smartQuery : null} onClearSmart={() => setSmartQuery(null)} />
+          <InboxTab search={debounced} smartQuery={smartOn ? smartQuery : null} onClearSmart={() => setSmartQuery(null)} onForward={openForward} />
         </TabsContent>
         <TabsContent value="sent" className="focus-visible:outline-none"><SentTab key={sentKey} search={debounced} /></TabsContent>
+        <TabsContent value="threads" className="focus-visible:outline-none"><ThreadsTab search={debounced} /></TabsContent>
+        <TabsContent value="scheduled" className="focus-visible:outline-none"><ScheduledTab search={debounced} /></TabsContent>
         <TabsContent value="drafts" className="focus-visible:outline-none"><DraftsTab search={debounced} /></TabsContent>
       </Tabs>
     </div>
