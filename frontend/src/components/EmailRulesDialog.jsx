@@ -102,17 +102,21 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                 <Label>Se (todas as condições)</Label>
                 <div className="mt-1.5 space-y-2">
                   {form.conditions.map((c, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-1.5">
-                      <select value={c.field} onChange={(e) => setCondition(i, { field: e.target.value })} className={SELECT_CLS}>
-                        {Object.entries(FIELD_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                      </select>
-                      <select value={c.op} onChange={(e) => setCondition(i, { op: e.target.value })} className={SELECT_CLS}>
-                        {Object.entries(OP_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                      </select>
-                      <Input value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} placeholder="valor" className="h-8 flex-1 text-xs" />
-                      {form.conditions.length > 1 ? (
-                        <button type="button" onClick={() => removeCondition(i)} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
-                      ) : null}
+                    <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
+                      <div className="flex gap-1.5">
+                        <select value={c.field} onChange={(e) => setCondition(i, { field: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
+                          {Object.entries(FIELD_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                        </select>
+                        <select value={c.op} onChange={(e) => setCondition(i, { op: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
+                          {Object.entries(OP_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Input value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} placeholder="valor" className="h-8 flex-1 text-xs" />
+                        {form.conditions.length > 1 ? (
+                          <button type="button" onClick={() => removeCondition(i)} className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" onClick={addCondition} className="h-7 rounded-lg text-xs">
@@ -125,22 +129,28 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                 <Label>Então (todas as ações)</Label>
                 <div className="mt-1.5 space-y-2">
                   {form.actions.map((a, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-1.5">
-                      <select value={a.type} onChange={(e) => setAction(i, { type: e.target.value, value: "" })} className={SELECT_CLS}>
+                    <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
+                      <select value={a.type} onChange={(e) => setAction(i, { type: e.target.value, value: "" })} className={`${SELECT_CLS} w-full sm:w-auto`}>
                         {Object.entries(ACTION_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                       </select>
-                      {a.type === "label" ? (
-                        <Input value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} placeholder="nome da etiqueta" className="h-8 flex-1 text-xs" />
-                      ) : a.type === "priority" ? (
-                        <select value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} className={SELECT_CLS}>
-                          <option value="">escolher...</option>
-                          <option value="alta">alta</option>
-                          <option value="normal">normal</option>
-                          <option value="baixa">baixa</option>
-                        </select>
-                      ) : null}
-                      {form.actions.length > 1 ? (
-                        <button type="button" onClick={() => removeAction(i)} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                      {a.type !== "archive" ? (
+                        <div className="flex items-center gap-1.5">
+                          {a.type === "label" ? (
+                            <Input value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} placeholder="nome da etiqueta" className="h-8 flex-1 text-xs" />
+                          ) : (
+                            <select value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
+                              <option value="">escolher...</option>
+                              <option value="alta">alta</option>
+                              <option value="normal">normal</option>
+                              <option value="baixa">baixa</option>
+                            </select>
+                          )}
+                          {form.actions.length > 1 ? (
+                            <button type="button" onClick={() => removeAction(i)} className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                          ) : null}
+                        </div>
+                      ) : form.actions.length > 1 ? (
+                        <button type="button" onClick={() => removeAction(i)} className="self-end text-slate-400 hover:text-red-600 sm:self-auto"><X className="h-4 w-4" /></button>
                       ) : null}
                     </div>
                   ))}
