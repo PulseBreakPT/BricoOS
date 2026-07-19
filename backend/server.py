@@ -16,9 +16,11 @@ import base64
 import imaplib
 import smtplib
 import warnings
+import mimetypes
 import email as email_lib
+from email import encoders as email_encoders
 from email.header import decode_header
-from email.mime.application import MIMEApplication
+from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr
@@ -118,6 +120,9 @@ TASK_REPEATS = ["none", "daily", "weekly", "monthly"]
 EMAIL_PRIORITIES = ["alta", "normal", "baixa"]
 EMAIL_PRIORITY_RANK = {"alta": 0, "normal": 1, "baixa": 2}
 EMAIL_CATEGORIES = ["orcamento", "reclamacao", "duvida", "urgente", "outro"]
+EMAIL_RULE_FIELDS = ["subject", "body", "from_email", "category"]
+EMAIL_RULE_OPS = ["contains", "equals"]
+EMAIL_RULE_ACTION_TYPES = ["archive", "label", "priority"]
 STATUSES = [
     "novo", "pendente", "em_preparacao", "enviado_fornecedor", "aguarda_fornecedor",
     "orcamento_recebido", "aguarda_cliente", "aprovado", "rejeitado", "encomendado",
@@ -1734,6 +1739,7 @@ async def add_quote(note_id: str, payload: QuoteIn):
 # ---------- Orçamento do fornecedor (PDF) → PDF de venda ao cliente ----------
 BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
 MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
+MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
 
 
 class SupplierQuoteItemIn(BaseModel):
@@ -2104,9 +2110,13 @@ def _build_email_body(body, attachments=None):
     message = MIMEMultipart("mixed")
     message.attach(core)
     for att in attachments:
-        part = MIMEApplication(att["data"], _subtype="pdf")
-        part.add_header("Content-Disposition", "attachment",
-                        filename=att.get("filename") or "documento.pdf")
+        filename = att.get("filename") or "documento"
+        ctype, _ = mimetypes.guess_type(filename)
+        maintype, subtype = ctype.split("/", 1) if ctype else ("application", "octet-stream")
+        part = MIMEBase(maintype, subtype)
+        part.set_payload(att["data"])
+        email_encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
         message.attach(part)
     return message
 
@@ -2369,6 +2379,10 @@ async def poll_supplier_replies():
                 "created_at": now_iso()})
             attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
         classification = await _classify_email(m["subject"], m["body"])
+        rules_result = await _apply_rules(m["subject"], m["body"], m["from_email"], classification["category"])
+        if rules_result["priority_override"]:
+            classification["priority"] = rules_result["priority_override"]
+            classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -2377,6 +2391,7 @@ async def poll_supplier_replies():
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
             **classification,
+            "archived": rules_result["archived"], "labels": rules_result["labels"],
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -2469,6 +2484,36 @@ async def mark_all_emails_seen():
     return {"ok": True, "marked": r.modified_count}
 
 
+@api_router.post("/emails/{email_id}/archive")
+async def toggle_email_archive(email_id: str):
+    """Arquiva/desarquiva um email — sai da caixa de entrada sem ser apagado."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0, "archived": 1})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    new_archived = not e.get("archived", False)
+    await db.received_emails.update_one({"id": email_id}, {"$set": {"archived": new_archived}})
+    return {"ok": True, "archived": new_archived}
+
+
+class LabelsIn(BaseModel):
+    labels: List[str] = []
+
+
+@api_router.post("/emails/{email_id}/labels")
+async def set_email_labels(email_id: str, payload: LabelsIn):
+    labels = sorted({(l or "").strip() for l in payload.labels if (l or "").strip()})[:10]
+    r = await db.received_emails.update_one({"id": email_id}, {"$set": {"labels": labels}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    return {"ok": True, "labels": labels}
+
+
+@api_router.get("/emails/labels")
+async def list_email_labels():
+    labels = await db.received_emails.distinct("labels")
+    return {"items": sorted(l for l in labels if l)}
+
+
 # ---------- Secção "Emails": caixa completa, enviados e rascunhos ----------
 # Ao contrário do painel de cada pedido (que só mostra o que lhe pertence),
 # esta secção mostra TUDO — incluindo emails sem qualquer pedido associado.
@@ -2482,10 +2527,13 @@ def _email_search_clause(search, fields):
 
 @api_router.get("/emails/inbox")
 async def emails_inbox(search: Optional[str] = None, matched: Optional[bool] = None,
-                       sort: str = "priority", skip: int = 0, limit: int = 50):
-    q = {}
+                       sort: str = "priority", archived: bool = False, label: Optional[str] = None,
+                       skip: int = 0, limit: int = 50):
+    q = {"archived": archived}
     if matched is not None:
         q["matched"] = matched
+    if label:
+        q["labels"] = label
     rx = _email_search_clause(search, ["from_email", "subject", "supplier_name", "body"])
     if rx:
         q.update(rx)
@@ -2553,11 +2601,36 @@ async def email_contacts(search: Optional[str] = None):
     return {"items": out[:20]}
 
 
+class AttachmentIn(BaseModel):
+    filename: str = "anexo"
+    data_b64: str
+
+
+def _decode_attachments(items):
+    """Decodifica anexos enviados em base64 (máx. 10, 20 MB no total) para o
+    formato aceite por _send_email."""
+    if not items:
+        return []
+    out, total = [], 0
+    for a in items[:10]:
+        try:
+            data = base64.b64decode(a.data_b64)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Anexo inválido: {a.filename}")
+        total += len(data)
+        if total > MAX_EMAIL_ATTACHMENT_TOTAL_BYTES:
+            raise HTTPException(status_code=400, detail="Anexos demasiado grandes (máx. 20 MB no total).")
+        out.append({"filename": a.filename or "anexo", "data": data})
+    return out
+
+
 class ComposeEmailIn(BaseModel):
     to: str
     subject: str
     body: str
     to_label: str = ""
+    attachments: List[AttachmentIn] = []
+    scheduled_at: Optional[str] = None
 
     @field_validator("to")
     @classmethod
@@ -2571,16 +2644,46 @@ class ComposeEmailIn(BaseModel):
 @api_router.post("/emails/compose")
 async def compose_email(payload: ComposeEmailIn):
     """Novo email livre, sem pedido associado — usado pelo botão 'Novo email'
-    na secção Emails."""
+    na secção Emails. Com scheduled_at no futuro, fica em fila em vez de
+    sair de imediato (ver _scheduled_email_loop)."""
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
-    await _send_email(payload.to, payload.subject, payload.body, to_label=payload.to_label.strip())
+    attachments = _decode_attachments(payload.attachments)
+    if payload.scheduled_at:
+        when = parse_dt(payload.scheduled_at)
+        if not when:
+            raise HTTPException(status_code=400, detail="Data/hora de agendamento inválida.")
+        if when <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="A data de agendamento tem de ser no futuro.")
+        doc = {
+            "id": str(uuid.uuid4()), "to": payload.to, "to_label": payload.to_label.strip(),
+            "subject": payload.subject, "body": payload.body,
+            "attachments": [{"filename": a["filename"], "content_b64": base64.b64encode(a["data"]).decode()} for a in attachments],
+            "scheduled_at": payload.scheduled_at, "sent": False, "error": "", "created_at": now_iso()}
+        await db.scheduled_emails.insert_one(dict(doc))
+        return {"ok": True, "scheduled": True, "scheduled_at": payload.scheduled_at}
+    await _send_email(payload.to, payload.subject, payload.body, attachments=attachments, to_label=payload.to_label.strip())
     return {"ok": True, "to": payload.to}
+
+
+@api_router.get("/emails/scheduled")
+async def list_scheduled_emails():
+    return await db.scheduled_emails.find({"sent": False}, {"_id": 0, "attachments.content_b64": 0}) \
+        .sort("scheduled_at", 1).to_list(500)
+
+
+@api_router.delete("/emails/scheduled/{scheduled_id}")
+async def cancel_scheduled_email(scheduled_id: str):
+    r = await db.scheduled_emails.delete_one({"id": scheduled_id, "sent": False})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Email agendado não encontrado (ou já foi enviado).")
+    return {"ok": True}
 
 
 class QuickReplyIn(BaseModel):
     body: str
     subject: Optional[str] = None
+    attachments: List[AttachmentIn] = []
 
 
 @api_router.post("/emails/{email_id}/reply")
@@ -2601,11 +2704,47 @@ async def reply_to_email(email_id: str, payload: QuickReplyIn):
         subject = orig_subject if orig_subject.lower().startswith("re:") else f"Re: {orig_subject}".strip()
     kind = e.get("reply_kind") if e.get("reply_kind") in ("supplier", "client") else "other"
     to_label = e.get("supplier_name") or e.get("from_name") or ""
-    await _send_email(to, subject, payload.body, note_id=e.get("note_id") or None, kind=kind, to_label=to_label)
+    attachments = _decode_attachments(payload.attachments)
+    await _send_email(to, subject, payload.body, attachments=attachments, note_id=e.get("note_id") or None, kind=kind, to_label=to_label)
     if e.get("note_id"):
         await log_activity(e["note_id"], "email_sent", f"Resposta rápida enviada a {to}", {"to": to})
     await db.received_emails.update_one({"id": email_id}, {"$set": {"seen": True}})
     return {"ok": True, "to": to}
+
+
+class ForwardEmailIn(BaseModel):
+    to: str
+    note: str = ""
+
+    @field_validator("to")
+    @classmethod
+    def _v_to(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O destinatário é obrigatório")
+        return normalize_email(v)
+
+
+@api_router.post("/emails/{email_id}/forward")
+async def forward_email(email_id: str, payload: ForwardEmailIn):
+    """Reencaminha um email recebido para outro destinatário, com o texto
+    original citado e os anexos originais transportados."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    orig_subject = (e.get("subject") or "").strip()
+    subject = orig_subject if orig_subject.lower().startswith("fwd:") else f"Fwd: {orig_subject}".strip()
+    quoted = (
+        f"---------- Mensagem reencaminhada ----------\n"
+        f"De: {e.get('from_name') or e.get('from_email')} <{e.get('from_email')}>\n"
+        f"Assunto: {orig_subject or '(sem assunto)'}\n\n"
+        f"{e.get('body') or ''}"
+    )
+    body = f"{payload.note.strip()}\n\n{quoted}" if payload.note.strip() else quoted
+    files = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(10)
+    attachments = [{"filename": f["filename"], "data": base64.b64decode(f["content_b64"])} for f in files]
+    await _send_email(payload.to, subject, body, attachments=attachments, kind="other")
+    return {"ok": True, "to": payload.to}
 
 
 @api_router.post("/emails/{email_id}/suggest-reply")
@@ -2733,6 +2872,249 @@ async def download_email_attachment(email_id: str, attachment_id: str):
         raise HTTPException(status_code=404, detail="Anexo não encontrado")
     return Response(content=base64.b64decode(f["content_b64"]), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "anexo.pdf")}"'})
+
+
+# ---------- Modelos de resposta reutilizáveis ----------
+class EmailTemplateIn(BaseModel):
+    name: str
+    subject: str = ""
+    body: str = ""
+
+
+@api_router.get("/email-templates")
+async def list_email_templates():
+    return await db.email_templates.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+
+
+@api_router.post("/email-templates")
+async def create_email_template(payload: EmailTemplateIn):
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="O nome do modelo é obrigatório.")
+    doc = payload.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    await db.email_templates.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/email-templates/{template_id}")
+async def update_email_template(template_id: str, payload: EmailTemplateIn):
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="O nome do modelo é obrigatório.")
+    r = await db.email_templates.update_one({"id": template_id}, {"$set": payload.model_dump()})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Modelo não encontrado")
+    return await db.email_templates.find_one({"id": template_id}, {"_id": 0})
+
+
+@api_router.delete("/email-templates/{template_id}")
+async def delete_email_template(template_id: str):
+    await db.email_templates.delete_one({"id": template_id})
+    return {"ok": True}
+
+
+# ---------- Regras automáticas ----------
+class EmailRuleCondition(BaseModel):
+    field: str
+    op: str = "contains"
+    value: str = ""
+
+    @field_validator("field")
+    @classmethod
+    def _v_field(cls, v):
+        return _check_choice(v, EMAIL_RULE_FIELDS, "Campo")
+
+    @field_validator("op")
+    @classmethod
+    def _v_op(cls, v):
+        return _check_choice(v, EMAIL_RULE_OPS, "Operador")
+
+
+class EmailRuleAction(BaseModel):
+    type: str
+    value: str = ""
+
+    @field_validator("type")
+    @classmethod
+    def _v_type(cls, v):
+        return _check_choice(v, EMAIL_RULE_ACTION_TYPES, "Ação")
+
+
+class EmailRuleIn(BaseModel):
+    name: str
+    enabled: bool = True
+    conditions: List[EmailRuleCondition] = []
+    actions: List[EmailRuleAction] = []
+
+
+@api_router.get("/email-rules")
+async def list_email_rules():
+    return await db.email_rules.find({}, {"_id": 0}).sort("name", 1).to_list(200)
+
+
+@api_router.post("/email-rules")
+async def create_email_rule(payload: EmailRuleIn):
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="O nome da regra é obrigatório.")
+    if not payload.conditions or not payload.actions:
+        raise HTTPException(status_code=400, detail="A regra precisa de pelo menos uma condição e uma ação.")
+    doc = payload.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    await db.email_rules.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/email-rules/{rule_id}")
+async def update_email_rule(rule_id: str, payload: EmailRuleIn):
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="O nome da regra é obrigatório.")
+    if not payload.conditions or not payload.actions:
+        raise HTTPException(status_code=400, detail="A regra precisa de pelo menos uma condição e uma ação.")
+    r = await db.email_rules.update_one({"id": rule_id}, {"$set": payload.model_dump()})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Regra não encontrada")
+    return await db.email_rules.find_one({"id": rule_id}, {"_id": 0})
+
+
+@api_router.delete("/email-rules/{rule_id}")
+async def delete_email_rule(rule_id: str):
+    await db.email_rules.delete_one({"id": rule_id})
+    return {"ok": True}
+
+
+# ---------- Lembrete de seguimento (cria uma Tarefa ligada ao email) ----------
+class ReminderIn(BaseModel):
+    days: int = 3
+
+
+@api_router.post("/emails/{email_id}/remind")
+async def create_email_reminder(email_id: str, payload: ReminderIn):
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    days = min(max(payload.days, 1), 60)
+    due_date = (datetime.now(timezone.utc) + timedelta(days=days)).date().isoformat()
+    who = e.get("supplier_name") or e.get("from_name") or e.get("from_email")
+    title = f"Seguir email de {who}: {e.get('subject') or '(sem assunto)'}"[:200]
+    doc = {
+        "id": str(uuid.uuid4()), "title": title, "category": "construcao", "done": False,
+        "priority": "media", "due_date": due_date, "repeat": "none",
+        "note_id": e.get("note_id") or "", "subtasks": [], "created_at": now_iso(),
+    }
+    await db.tasks.insert_one(dict(doc))
+    if doc["note_id"]:
+        await log_activity(doc["note_id"], "task_added", f"Lembrete criado: {title}")
+    doc.pop("_id", None)
+    return doc
+
+
+# ---------- Vista de conversa (agrupa recebidos+enviados por pedido/contacto) ----------
+def _thread_key(note_id, contact):
+    return f"note:{note_id}" if note_id else f"email:{(contact or '').strip().lower()}"
+
+
+@api_router.get("/emails/threads")
+async def list_email_threads():
+    received = await db.received_emails.find(
+        {}, {"_id": 0, "note_id": 1, "from_email": 1, "from_name": 1, "supplier_name": 1,
+             "subject": 1, "body": 1, "received_at": 1, "seen": 1}).to_list(5000)
+    sent = await db.sent_emails.find(
+        {}, {"_id": 0, "note_id": 1, "to": 1, "to_label": 1, "subject": 1, "body": 1, "sent_at": 1}).to_list(5000)
+    groups = {}
+    for r in received:
+        k = _thread_key(r.get("note_id"), r.get("from_email"))
+        g = groups.setdefault(k, {"key": k, "label": r.get("supplier_name") or r.get("from_name") or r.get("from_email"),
+                                   "note_id": r.get("note_id") or "", "last_at": "", "last_preview": "", "count": 0, "unseen": 0})
+        g["count"] += 1
+        if not r.get("seen"):
+            g["unseen"] += 1
+        if (r.get("received_at") or "") > g["last_at"]:
+            g["last_at"] = r.get("received_at") or ""
+            g["last_preview"] = (r.get("subject") or r.get("body") or "")[:120]
+    for s in sent:
+        k = _thread_key(s.get("note_id"), s.get("to"))
+        g = groups.setdefault(k, {"key": k, "label": s.get("to_label") or s.get("to"),
+                                   "note_id": s.get("note_id") or "", "last_at": "", "last_preview": "", "count": 0, "unseen": 0})
+        g["count"] += 1
+        if (s.get("sent_at") or "") > g["last_at"]:
+            g["last_at"] = s.get("sent_at") or ""
+            g["last_preview"] = (s.get("subject") or s.get("body") or "")[:120]
+    items = sorted(groups.values(), key=lambda g: g["last_at"], reverse=True)
+    return {"items": items, "total": len(items)}
+
+
+@api_router.get("/emails/threads/view")
+async def get_email_thread(key: str):
+    """Linha do tempo completa (recebidos + enviados) de uma conversa,
+    identificada pela chave devolvida por /emails/threads."""
+    if key.startswith("note:"):
+        q_field_r, q_field_s, ident = "note_id", "note_id", key[len("note:"):]
+    elif key.startswith("email:"):
+        q_field_r, q_field_s, ident = "from_email", "to", key[len("email:"):]
+    else:
+        raise HTTPException(status_code=400, detail="Chave de conversa inválida.")
+    r_q = {q_field_r: ident} if key.startswith("note:") else {q_field_r: ident, "note_id": ""}
+    s_q = {q_field_s: ident} if key.startswith("note:") else {q_field_s: ident, "note_id": ""}
+    received = await db.received_emails.find(r_q, {"_id": 0}).to_list(500)
+    sent = await db.sent_emails.find(s_q, {"_id": 0}).to_list(500)
+    messages = [{"direction": "in", "at": r.get("received_at"), **r} for r in received]
+    messages += [{"direction": "out", "at": s.get("sent_at"), **s} for s in sent]
+    messages.sort(key=lambda m: m.get("at") or "")
+    return {"items": messages}
+
+
+# ---------- Emails enviados sem resposta ----------
+@api_router.get("/emails/awaiting-reply")
+async def emails_awaiting_reply(days: int = 3):
+    """Emails enviados há mais de N dias sem que tenha chegado nenhuma
+    resposta associada ao mesmo pedido ou contacto — para nada cair no
+    esquecimento."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max(days, 1))).isoformat()
+    sent = await db.sent_emails.find({"sent_at": {"$lte": cutoff}}, {"_id": 0}).sort("sent_at", 1).to_list(500)
+    out = []
+    for s in sent:
+        q = {"received_at": {"$gt": s["sent_at"]}}
+        if s.get("note_id"):
+            q["note_id"] = s["note_id"]
+        else:
+            q["from_email"] = s["to"]
+        replied = await db.received_emails.find_one(q, {"_id": 0, "id": 1})
+        if not replied:
+            out.append(s)
+    return {"items": out, "total": len(out)}
+
+
+# ---------- Estatísticas de email ----------
+@api_router.get("/emails/stats")
+async def emails_stats():
+    avg_response, fastest, _, _ = await compute_response()
+    since_iso = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    received = await db.received_emails.find(
+        {"received_at": {"$gte": since_iso}}, {"_id": 0, "received_at": 1, "priority": 1, "category": 1}).to_list(5000)
+    sent = await db.sent_emails.find({"sent_at": {"$gte": since_iso}}, {"_id": 0, "sent_at": 1}).to_list(5000)
+    by_day = {}
+    for r in received:
+        d = (r.get("received_at") or "")[:10]
+        if d:
+            by_day.setdefault(d, {"received": 0, "sent": 0})["received"] += 1
+    for s in sent:
+        d = (s.get("sent_at") or "")[:10]
+        if d:
+            by_day.setdefault(d, {"received": 0, "sent": 0})["sent"] += 1
+    daily = [{"date": d, **v} for d, v in sorted(by_day.items())]
+    by_category = {}
+    by_priority = {"alta": 0, "normal": 0, "baixa": 0}
+    for r in received:
+        cat = r.get("category") or "outro"
+        by_category[cat] = by_category.get(cat, 0) + 1
+        pr = r.get("priority") or "normal"
+        by_priority[pr] = by_priority.get(pr, 0) + 1
+    return {
+        "avg_response_hours": avg_response, "fastest_suppliers": fastest,
+        "daily": daily, "by_category": by_category, "by_priority": by_priority,
+        "total_received_30d": len(received), "total_sent_30d": len(sent),
+    }
 
 
 class ClientEmailIn(BaseModel):
@@ -3324,6 +3706,39 @@ async def _classify_email(subject, body):
     return {"priority": priority, "priority_rank": EMAIL_PRIORITY_RANK[priority], "category": category, "ai_summary": summary}
 
 
+def _rule_condition_matches(cond, fields):
+    value = (fields.get(cond.get("field")) or "").lower()
+    target = (cond.get("value") or "").lower().strip()
+    if not target:
+        return False
+    if cond.get("op") == "equals":
+        return value == target
+    return target in value
+
+
+async def _apply_rules(subject, body, from_email, category):
+    """Aplica as regras automáticas (definidas pelo utilizador em
+    /email-rules) a um email recebido, logo após a classificação por IA.
+    Cada regra corresponde se TODAS as suas condições corresponderem."""
+    result = {"archived": False, "labels": [], "priority_override": None}
+    fields = {"subject": subject or "", "body": body or "", "from_email": from_email or "", "category": category or ""}
+    rules = await db.email_rules.find({"enabled": True}, {"_id": 0}).to_list(200)
+    for rule in rules:
+        conditions = rule.get("conditions") or []
+        if not conditions or not all(_rule_condition_matches(c, fields) for c in conditions):
+            continue
+        for action in (rule.get("actions") or []):
+            t = action.get("type")
+            if t == "archive":
+                result["archived"] = True
+            elif t == "label" and action.get("value"):
+                if action["value"] not in result["labels"]:
+                    result["labels"].append(action["value"])
+            elif t == "priority" and action.get("value") in EMAIL_PRIORITIES:
+                result["priority_override"] = action["value"]
+    return result
+
+
 @api_router.get("/ai/status")
 async def ai_status():
     return {"available": ai_available(), "model": AI_MODEL}
@@ -3472,6 +3887,12 @@ async def migrate():
     await db.received_emails.update_many(
         {"priority_rank": {"$exists": False}},
         {"$set": {"priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": ""}})
+    # Arquivar/etiquetar é novo — registos antigos ficam visíveis (não
+    # arquivados) e sem etiquetas.
+    await db.received_emails.update_many(
+        {"archived": {"$exists": False}}, {"$set": {"archived": False}})
+    await db.received_emails.update_many(
+        {"labels": {"$exists": False}}, {"$set": {"labels": []}})
 
 
 async def _normalize_existing_phones():
@@ -3574,6 +3995,29 @@ async def _imap_poll_loop():
         await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
 
 
+async def _scheduled_email_loop():
+    """Envia os emails agendados (compose com scheduled_at) assim que chega
+    a hora marcada. Verificação a cada minuto."""
+    await asyncio.sleep(15)
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            due = await db.scheduled_emails.find(
+                {"sent": False, "scheduled_at": {"$lte": now.isoformat()}}, {"_id": 0}).to_list(50)
+            for s in due:
+                attachments = [{"filename": a["filename"], "data": base64.b64decode(a["content_b64"])}
+                               for a in s.get("attachments", [])]
+                try:
+                    await _send_email(s["to"], s["subject"], s["body"], attachments=attachments, to_label=s.get("to_label") or "")
+                    await db.scheduled_emails.update_one({"id": s["id"]}, {"$set": {"sent": True, "sent_at": now_iso()}})
+                except Exception as e:
+                    logger.error(f"Envio agendado falhou ({s['id']}): {e}")
+                    await db.scheduled_emails.update_one({"id": s["id"]}, {"$set": {"error": str(e)}})
+        except Exception as e:
+            logger.error(f"Verificação de emails agendados falhou: {e}")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -3587,6 +4031,9 @@ async def on_startup():
         task = asyncio.create_task(_imap_poll_loop())
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
+    sched_task = asyncio.create_task(_scheduled_email_loop())
+    _background_tasks.add(sched_task)
+    sched_task.add_done_callback(_background_tasks.discard)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------
