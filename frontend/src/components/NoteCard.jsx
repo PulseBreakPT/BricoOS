@@ -15,11 +15,11 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
       transition={{ duration: 0.25 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note)}
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60"
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 active:scale-[0.99]"
     >
-      <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
+      <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
       <div className="flex items-start gap-3 pl-2">
-        <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+        <div onClick={(e) => e.stopPropagation()} className="pt-0.5 transition-transform duration-150 hover:scale-110 active:scale-90">
           <Checkbox
             data-testid={`note-done-${note.id}`}
             checked={note.done}
@@ -43,9 +43,9 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
                 e.stopPropagation();
                 onToggleFavorite(note);
               }}
-              className="shrink-0 rounded-lg p-1 text-slate-300 transition-colors hover:text-amber-400"
+              className="shrink-0 rounded-lg p-1 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90"
             >
-              <Star className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
+              <Star key={note.favorite} className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400 animate-pop" : ""}`} />
             </button>
           </div>
 

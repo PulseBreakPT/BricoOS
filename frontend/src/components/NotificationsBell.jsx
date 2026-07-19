@@ -51,15 +51,15 @@ export default function NotificationsBell({ variant = "sidebar" }) {
       <SheetTrigger asChild>
         <button
           data-testid="notifications-bell"
-          className={`relative flex items-center justify-center rounded-xl transition-colors ${
+          className={`group relative flex items-center justify-center rounded-xl transition-all duration-200 active:scale-90 ${
             variant === "sidebar"
-              ? "h-10 w-10 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+              ? "h-10 w-10 border border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-100 hover:shadow-md"
               : "h-10 w-10 text-slate-600 hover:bg-slate-100"
           }`}
         >
-          <Bell className="h-[18px] w-[18px]" strokeWidth={2.2} />
+          <Bell className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110 ${count > 0 ? "animate-shake" : ""}`} strokeWidth={2.2} />
           {count > 0 ? (
-            <span data-testid="notifications-count" className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+            <span key={count} data-testid="notifications-count" className="absolute -right-1 -top-1 flex h-5 min-w-[20px] animate-pop items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
               {count > 99 ? "99+" : count}
             </span>
           ) : null}
@@ -74,7 +74,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
         <div className="mt-5 space-y-2.5">
           {data.items.length === 0 ? (
             <div className="mt-16 flex flex-col items-center text-center text-slate-400">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500">
+              <div className="flex h-16 w-16 animate-in items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 zoom-in-50 duration-500">
                 <Bell className="h-7 w-7" />
               </div>
               <p className="mt-4 font-heading text-base font-extrabold text-slate-700">Tudo em dia</p>
@@ -88,7 +88,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
                 key={n.id}
                 data-testid={`notification-${n.id}`}
                 onClick={() => go(n)}
-                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-transform hover:-translate-y-0.5 ${sev.ring}`}
+                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${sev.ring}`}
               >
                 <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sev.icon}`}>
                   <Icon className="h-4 w-4" />

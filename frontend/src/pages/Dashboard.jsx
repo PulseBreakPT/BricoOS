@@ -9,11 +9,14 @@ import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER
 import { Button } from "@/components/ui/button";
 
 const StatCard = ({ icon: Icon, label, value, accent, testid, danger }) => (
-  <div data-testid={testid} className={`relative overflow-hidden rounded-2xl border bg-white p-4 shadow-sm sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-slate-200"}`}>
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10" style={{ backgroundColor: `${accent}1a`, color: accent }}>
+  <div data-testid={testid} className={`group relative overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-slate-200 hover:border-slate-300"}`}>
+    <div
+      className="flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6 sm:h-10 sm:w-10"
+      style={{ backgroundColor: `${accent}1a`, color: accent }}
+    >
       <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
     </div>
-    <p className="mt-3 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:mt-4 sm:text-3xl">{value}</p>
+    <p className="mt-3 font-heading text-2xl font-extrabold tracking-tight text-slate-900 transition-transform duration-200 group-hover:scale-105 sm:mt-4 sm:text-3xl">{value}</p>
     <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
   </div>
 );
@@ -74,15 +77,15 @@ export default function Dashboard() {
                 const sev = SEV_ICON[n.severity] || SEV_ICON.low;
                 return (
                   <button key={n.id} data-testid={`dash-alert-${n.id}`} onClick={() => n.note_id ? navigate(`/?open=${n.note_id}`) : navigate("/tarefas")}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:brightness-[0.98] ${sev.ring}`}>
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sev.bg}`}>
+                    className={`group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${sev.ring}`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110 ${sev.bg}`}>
                       {n.kind === "urgent" ? <Zap className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-slate-900">{n.title}</p>
                       <p className="truncate text-xs text-slate-500">{n.message}</p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-500" />
                   </button>
                 );
               })}
@@ -96,7 +99,7 @@ export default function Dashboard() {
               {pipeline.length === 0 ? <p className="text-sm text-slate-400">Sem dados.</p> : pipeline.map((s) => {
                 const cfg = getStatusCfg(s);
                 return (
-                  <div key={s} data-testid={`pipeline-${s}`} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                  <div key={s} data-testid={`pipeline-${s}`} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm">
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.dot }} />
                     <span className="text-xs font-semibold text-slate-600">{cfg.label}</span>
                     <span className="font-mono text-sm font-bold text-slate-900">{stats.by_status[s]}</span>
@@ -119,7 +122,7 @@ export default function Dashboard() {
               {(stats?.fastest_suppliers || []).length === 0 ? (
                 <p className="text-sm text-slate-400">Ainda sem dados de resposta.</p>
               ) : stats.fastest_suppliers.map((f, i) => (
-                <div key={f.supplier} data-testid={`fast-supplier-${i}`} className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5">
+                <div key={f.supplier} data-testid={`fast-supplier-${i}`} className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 transition-all duration-150 hover:translate-x-1 hover:bg-slate-100">
                   <span className="truncate text-sm font-semibold text-slate-700">{i + 1}. {f.supplier}</span>
                   <span className="font-mono text-xs font-bold text-emerald-600">{formatHours(f.avg_hours)}</span>
                 </div>

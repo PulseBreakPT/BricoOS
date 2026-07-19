@@ -104,13 +104,13 @@ export default function Tasks() {
     return (
       <div
         data-testid={`task-row-${t.id}`}
-        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm"
+        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
       >
         <Checkbox
           data-testid={`task-toggle-${t.id}`}
           checked={t.done}
           onCheckedChange={() => toggle(t)}
-          className="h-5 w-5 rounded-md"
+          className="h-5 w-5 rounded-md transition-transform duration-150 hover:scale-110 active:scale-90"
         />
         <button className="min-w-0 flex-1 text-left" onClick={() => openEdit(t)}>
           <p className={`text-sm font-semibold text-slate-900 ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
@@ -138,7 +138,7 @@ export default function Tasks() {
             ) : null}
           </div>
         </button>
-        <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-slate-300 hover:bg-red-50 hover:text-red-500">
+        <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-slate-300 transition-all duration-150 hover:scale-110 hover:bg-red-50 hover:text-red-500 active:scale-90">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
