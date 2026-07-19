@@ -14,7 +14,7 @@ function Ambient() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/[0.07] blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-[320px] w-[320px] translate-x-1/4 translate-y-1/4 rounded-full bg-sky-200/40 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-[320px] w-[320px] translate-x-1/4 translate-y-1/4 rounded-full bg-red-600/[0.08] blur-3xl" />
     </div>
   );
 }
@@ -175,7 +175,7 @@ export default function PinGate({ children }) {
       <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-10">
         <Ambient />
         <div className="relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200/70 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.15)] animate-in fade-in-0 zoom-in-95 duration-300">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100 animate-in zoom-in-90 duration-300">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 text-white ring-1 ring-inset ring-red-600 animate-in zoom-in-90 duration-300">
             <Check className="h-7 w-7" strokeWidth={2.5} />
           </span>
           <p className="mt-4 font-heading text-lg font-extrabold tracking-tight text-slate-900">Acesso confirmado</p>

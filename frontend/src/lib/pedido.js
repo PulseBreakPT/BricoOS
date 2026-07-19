@@ -1,25 +1,29 @@
+// Preto/branco/vermelho, com lógica de progressão: o cinzento escurece à
+// medida que o pedido avança, o vermelho assinala sempre "é a sua vez de
+// agir" ou um desfecho negativo, e o preto sólido marca os estados finais
+// positivos.
 export const STATUS_CONFIG = {
-  novo: { label: "Novo", bg: "#F1F5F9", text: "#475569", dot: "#64748B" },
-  pendente: { label: "Pendente", bg: "#FEF3C7", text: "#B45309", dot: "#D97706" },
-  em_preparacao: { label: "Em preparação", bg: "#E0E7FF", text: "#4338CA", dot: "#6366F1" },
-  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "#DBEAFE", text: "#1D4ED8", dot: "#2563EB" },
-  aguarda_fornecedor: { label: "Espera fornecedor", bg: "#CFFAFE", text: "#0E7490", dot: "#06B6D4" },
-  orcamento_recebido: { label: "Orçamento recebido", bg: "#EDE9FE", text: "#6D28D9", dot: "#8B5CF6" },
-  aguarda_cliente: { label: "Espera cliente", bg: "#FFEDD5", text: "#C2410C", dot: "#EA580C" },
-  aprovado: { label: "Aprovado", bg: "#DCFCE7", text: "#15803D", dot: "#22C55E" },
-  rejeitado: { label: "Rejeitado", bg: "#FFE4E6", text: "#BE123C", dot: "#F43F5E" },
-  encomendado: { label: "Encomendado", bg: "#CCFBF1", text: "#0F766E", dot: "#14B8A6" },
-  concluido: { label: "Concluído", bg: "#D1FAE5", text: "#166534", dot: "#16A34A" },
-  cancelado: { label: "Cancelado", bg: "#F4F4F5", text: "#52525B", dot: "#71717A" },
+  novo: { label: "Novo", bg: "#FAFAFA", text: "#737373", dot: "#A3A3A3" },
+  pendente: { label: "Pendente", bg: "#F5F5F5", text: "#525252", dot: "#737373" },
+  em_preparacao: { label: "Em preparação", bg: "#E5E5E5", text: "#404040", dot: "#525252" },
+  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "#E5E5E5", text: "#262626", dot: "#404040" },
+  aguarda_fornecedor: { label: "Espera fornecedor", bg: "#D4D4D4", text: "#262626", dot: "#404040" },
+  orcamento_recebido: { label: "Orçamento recebido", bg: "#FEE2E2", text: "#B91C1C", dot: "#DC2626" },
+  aguarda_cliente: { label: "Espera cliente", bg: "#D4D4D4", text: "#262626", dot: "#404040" },
+  aprovado: { label: "Aprovado", bg: "#171717", text: "#FFFFFF", dot: "#FFFFFF" },
+  rejeitado: { label: "Rejeitado", bg: "#FEE2E2", text: "#991B1B", dot: "#B91C1C" },
+  encomendado: { label: "Encomendado", bg: "#262626", text: "#FFFFFF", dot: "#FFFFFF" },
+  concluido: { label: "Concluído", bg: "#000000", text: "#FFFFFF", dot: "#FFFFFF" },
+  cancelado: { label: "Cancelado", bg: "#7F1D1D", text: "#FFFFFF", dot: "#FFFFFF" },
 };
 export const STATUS_ORDER = Object.keys(STATUS_CONFIG);
 export const getStatusCfg = (k) => STATUS_CONFIG[k] || STATUS_CONFIG.novo;
 
 export const PRIORITY_CONFIG = {
-  urgente: { label: "Urgente", bg: "#FEE2E2", text: "#B91C1C", dot: "#DC2626" },
-  alta: { label: "Alta", bg: "#FFEDD5", text: "#C2410C", dot: "#EA580C" },
-  media: { label: "Média", bg: "#DBEAFE", text: "#1D4ED8", dot: "#3B82F6" },
-  baixa: { label: "Baixa", bg: "#F1F5F9", text: "#64748B", dot: "#94A3B8" },
+  urgente: { label: "Urgente", bg: "#DC2626", text: "#FFFFFF", dot: "#FFFFFF" },
+  alta: { label: "Alta", bg: "#FEE2E2", text: "#B91C1C", dot: "#DC2626" },
+  media: { label: "Média", bg: "#E5E5E5", text: "#404040", dot: "#525252" },
+  baixa: { label: "Baixa", bg: "#F5F5F5", text: "#737373", dot: "#A3A3A3" },
 };
 export const PRIORITY_ORDER = ["urgente", "alta", "media", "baixa"];
 export const getPriorityCfg = (k) => PRIORITY_CONFIG[k] || PRIORITY_CONFIG.media;

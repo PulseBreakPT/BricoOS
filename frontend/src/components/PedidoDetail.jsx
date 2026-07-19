@@ -66,8 +66,8 @@ const QUICK_LOG_OPTIONS = [
 
 const QUICK_LOG_TONES = {
   red: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-  amber: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
-  green: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+  amber: "border-neutral-300 bg-neutral-50 text-neutral-700 hover:bg-neutral-100",
+  green: "border-neutral-900 bg-neutral-900 text-white hover:bg-black",
 };
 
 export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", initialCreateMode = "choice", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
@@ -690,7 +690,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
                     : "Sem telefone")}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
-                {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
+                {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-neutral-500"><Check className="h-3 w-3" /> guardado</span> : null}
                 {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
               {!isCreate && note ? (
@@ -700,8 +700,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               ) : null}
             </div>
             {!isCreate && note ? (
-              <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-amber-400">
-                <Star className={`h-5 w-5 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
+              <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-red-500">
+                <Star className={`h-5 w-5 ${note.favorite ? "fill-red-500 text-red-500" : ""}`} />
               </button>
             ) : null}
           </div>
@@ -737,7 +737,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {note.archived ? (
                 <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">Reabrir</Button>
               ) : (
-                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 w-full rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 sm:w-auto sm:shrink-0">
+                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 w-full rounded-lg border-neutral-900 text-neutral-900 hover:bg-neutral-100 sm:w-auto sm:shrink-0">
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
@@ -797,7 +797,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {createSteps.map((label, i) => (
                     <div key={label} className="flex items-center gap-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-emerald-500 text-white" : i === createStep ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-neutral-700 text-white" : i === createStep ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"}`}>
                         {i < createStep ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </span>
                       <span className={`text-xs font-semibold ${i === createStep ? "text-slate-900" : "text-slate-400"}`}>{label}</span>
@@ -810,7 +810,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {createStep === 0 ? (
                   <>
                     {dupWarn.length > 0 ? (
-                      <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      <div data-testid="dup-warning" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                         <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
                         <ul className="mt-1.5 space-y-1">
                           {dupWarn.map((d) => (
@@ -1009,7 +1009,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                             {note.caixilharia.data_entrega ? ` · entrega ${note.caixilharia.data_entrega}` : ""}
                           </p>
                           {note.caixilharia.display?.comparison_count ? (
-                            <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            <span className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
                               {note.caixilharia.display.comparison_count} comparação(ões) de material
                             </span>
                           ) : null}
@@ -1106,18 +1106,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <h4 className="font-heading text-sm font-extrabold text-slate-900">Pedir preço a fornecedor</h4>
                 </div>
                 {!gmailStatus?.connected ? (
-                  <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div>
                       <p className="font-semibold">Gmail não ligado</p>
                       <p className="text-xs">Ligue o Gmail para enviar automaticamente, ou copie o email.</p>
                       {gmailStatus?.configured ? (
-                        <Button data-testid="connect-gmail-inline" size="sm" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-2 h-8 rounded-lg bg-amber-600 hover:bg-amber-700">Ligar Gmail</Button>
+                        <Button data-testid="connect-gmail-inline" size="sm" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-2 h-8 rounded-lg bg-red-600 hover:bg-red-700">Ligar Gmail</Button>
                       ) : null}
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-medium text-emerald-700">
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-neutral-300 bg-neutral-100 p-2.5 text-xs font-medium text-neutral-900">
                     <CheckCircle2 className="h-4 w-4" /> Ligado como {gmailStatus.email}
                   </div>
                 )}
@@ -1184,7 +1184,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           <summary className="cursor-pointer select-none">
                             <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
                             {m.reply_kind === "client" ? (
-                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cliente</span>
+                              <span className="ml-2 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">Cliente</span>
                             ) : null}
                             <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
                             <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
@@ -1198,7 +1198,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700"
                                 >
                                   <FileText className="h-3.5 w-3.5" /> {a.filename}
                                 </a>
@@ -1214,13 +1214,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
               {/* Email + PDF prontos — confirmação a um clique, sem sair do pedido */}
               {note?.pending_client_send ? (
-                <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5">
+                <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-neutral-300 bg-neutral-50 p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-emerald-900">
-                        <Send className="h-4 w-4 text-emerald-600" /> Pronto para enviar ao cliente
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-neutral-900">
+                        <Send className="h-4 w-4 text-black" /> Pronto para enviar ao cliente
                       </h4>
-                      <p className="mt-0.5 text-xs text-emerald-800/80">
+                      <p className="mt-0.5 text-xs text-neutral-600">
                         {note.pending_client_send.pdf_filename || "PDF"} anexado
                         {note.pending_client_send.total != null ? ` · ${Number(note.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                         {note.pending_client_send.eff_margin_pct != null ? ` · margem ${Number(note.pending_client_send.eff_margin_pct).toFixed(1)}%` : ""}
@@ -1230,7 +1230,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <Button
                       data-testid="open-confirm-send"
                       onClick={() => setConfirmSendOpen(true)}
-                      className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                      className="rounded-xl bg-black hover:bg-black/90"
                     >
                       <Send className="mr-2 h-4 w-4" /> Rever e enviar
                     </Button>
@@ -1333,7 +1333,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   {itemEffMargin(i) != null ? (
                                     <>
                                       <span className="mx-1.5">·</span>
-                                      Margem final: <span data-testid={`sq-eff-margin-${i.n}`} className={`font-mono font-bold ${itemEffMargin(i) + 0.05 < (parseFloat(i.margin_pct) || 0) ? "text-red-600" : "text-emerald-600"}`}>{itemEffMargin(i).toFixed(1)}%</span>
+                                      Margem final: <span data-testid={`sq-eff-margin-${i.n}`} className={`font-mono font-bold ${itemEffMargin(i) + 0.05 < (parseFloat(i.margin_pct) || 0) ? "text-red-600" : "text-neutral-900"}`}>{itemEffMargin(i).toFixed(1)}%</span>
                                     </>
                                   ) : null}
                                 </p>
@@ -1380,20 +1380,20 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               </section>
 
               {quotes.length > 0 ? (
-                <section data-testid="client-email-panel" className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 sm:p-5">
+                <section data-testid="client-email-panel" className="mt-6 rounded-2xl border border-red-200 bg-red-50/50 p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Send className="h-4 w-4 text-blue-700" />
+                        <Send className="h-4 w-4 text-red-700" />
                         <h4 className="font-heading text-sm font-extrabold text-slate-900">Responder ao cliente</h4>
                       </div>
                       <p className="mt-1 text-xs text-slate-600">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
                     </div>
-                    {clientTemplateLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" /> : null}
+                    {clientTemplateLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-red-500" /> : null}
                   </div>
 
                   {!form.email ? (
-                    <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800">
+                    <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-red-200 bg-red-50 p-3 text-left text-xs text-red-800">
                       <span className="font-bold">Falta o email do cliente.</span> Toque aqui para o adicionar nos Detalhes.
                     </button>
                   ) : (
@@ -1410,17 +1410,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {gmailStatus?.connected ? (
-                      <Button data-testid="send-client-email" onClick={sendClientEmail} disabled={!form.email || !clientEmailData.body || sendingClient || clientTemplateLoading} className="rounded-xl bg-blue-700 hover:bg-blue-800">
+                      <Button data-testid="send-client-email" onClick={sendClientEmail} disabled={!form.email || !clientEmailData.body || sendingClient || clientTemplateLoading} className="rounded-xl bg-red-700 hover:bg-red-800">
                         {sendingClient ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Enviar por email
                       </Button>
                     ) : null}
-                    <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-white" : "bg-blue-700 hover:bg-blue-800"}`}>
+                    <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-white" : "bg-red-700 hover:bg-red-800"}`}>
                       <Mail className="mr-2 h-4 w-4" /> Abrir no email
                     </Button>
                     <Button data-testid="copy-client-email" variant="outline" onClick={copyClientEmail} disabled={!clientEmailData.body} className="rounded-xl bg-white">
                       <Copy className="mr-2 h-4 w-4" /> Copiar resposta
                     </Button>
-                    <Button data-testid="register-client-email" variant="ghost" onClick={registerClientEmail} disabled={!clientEmailData.body} className="rounded-xl text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800">
+                    <Button data-testid="register-client-email" variant="ghost" onClick={registerClientEmail} disabled={!clientEmailData.body} className="rounded-xl text-neutral-900 hover:bg-neutral-100 hover:text-black">
                       <CheckCircle2 className="mr-2 h-4 w-4" /> Registar envio
                     </Button>
                   </div>

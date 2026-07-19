@@ -46,15 +46,15 @@ function SupplierEmailAlert() {
   return (
     <div
       data-testid="supplier-email-alert"
-      className="mb-5 rounded-2xl border-4 border-yellow-400 bg-yellow-300 p-4 shadow-xl shadow-yellow-300/50 sm:p-5"
+      className="mb-5 rounded-2xl border-4 border-red-600 bg-red-600 p-4 shadow-xl shadow-red-600/30 sm:p-5"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 animate-bounce items-center justify-center rounded-2xl bg-yellow-400 text-yellow-900 sm:h-12 sm:w-12">
+          <span className="flex h-11 w-11 shrink-0 animate-bounce items-center justify-center rounded-2xl bg-black text-white sm:h-12 sm:w-12">
             <Mail className="h-6 w-6" strokeWidth={2.5} />
           </span>
           <div className="min-w-0">
-            <p className="font-heading text-lg font-extrabold leading-tight text-yellow-900 sm:text-2xl">
+            <p className="font-heading text-lg font-extrabold leading-tight text-white sm:text-2xl">
               {data.count === 1
                 ? (allClient ? "O cliente respondeu!" : "Recebeu 1 novo email!")
                 : (allClient ? `${data.count} clientes responderam!` : `Recebeu ${data.count} novos emails!`)}
@@ -65,7 +65,7 @@ function SupplierEmailAlert() {
                   key={m.id}
                   data-testid={`email-alert-${m.id}`}
                   onClick={() => openItem(m)}
-                  className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-yellow-200/80 px-3 py-2 text-left text-yellow-900 transition-colors hover:bg-yellow-100"
+                  className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-left text-white transition-colors hover:bg-white/25"
                 >
                   {m.reply_kind === "client" ? <User className="h-4 w-4 shrink-0" title="Cliente" /> : null}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">
@@ -77,7 +77,7 @@ function SupplierEmailAlert() {
                 </button>
               ))}
               {data.count > 3 ? (
-                <p className="text-xs font-bold text-yellow-900/80">… e mais {data.count - 3}.</p>
+                <p className="text-xs font-bold text-white/80">… e mais {data.count - 3}.</p>
               ) : null}
             </div>
           </div>
@@ -85,7 +85,7 @@ function SupplierEmailAlert() {
         <button
           data-testid="email-alert-seen-all"
           onClick={markAll}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-yellow-900 px-3.5 py-2.5 text-xs font-extrabold text-yellow-100 transition-transform hover:-translate-y-0.5 active:scale-95"
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-black px-3.5 py-2.5 text-xs font-extrabold text-white transition-transform hover:-translate-y-0.5 active:scale-95"
         >
           <CheckCheck className="h-4 w-4" /> Marcar tudo como visto
         </button>

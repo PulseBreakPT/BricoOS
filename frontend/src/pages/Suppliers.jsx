@@ -35,7 +35,7 @@ function PhoneActions({ phone }) {
       <a href={`tel:${phone}`} title="Ligar" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
         <Phone className="h-3.5 w-3.5" />
       </a>
-      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">
+      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600">
         <MessageCircle className="h-3.5 w-3.5" />
       </a>
     </span>
@@ -223,12 +223,12 @@ export default function Suppliers() {
               {(s.open_notes > 0 || s.quotes_given > 0) ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2 pl-2">
                   {s.open_notes > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-bold text-neutral-800">
                       <ClipboardList className="h-3 w-3" /> {s.open_notes} pedido{s.open_notes === 1 ? "" : "s"} em aberto
                     </span>
                   ) : null}
                   {s.quotes_given > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-black px-2 py-0.5 text-[11px] font-bold text-white">
                       <Receipt className="h-3 w-3" /> {s.quotes_approved}/{s.quotes_given} orçamento{s.quotes_given === 1 ? "" : "s"} aprovado{s.quotes_approved === 1 ? "" : "s"}
                     </span>
                   ) : null}

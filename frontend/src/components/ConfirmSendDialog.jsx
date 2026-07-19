@@ -104,9 +104,9 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
           </div>
           <div className="mt-3 space-y-1.5">
             <Label>Assunto</Label>
-            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-amber-400 bg-amber-50" : ""} />
+            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-red-400 bg-red-50" : ""} />
             {pending.subject_needs_review ? (
-              <p data-testid="subject-review-warning" className="text-xs text-amber-700">
+              <p data-testid="subject-review-warning" className="text-xs text-red-700">
                 {(pending.obra_candidates || []).length > 1
                   ? `O PDF tem vários números de obra possíveis (${pending.obra_candidates.join(", ")}) — confirme o assunto antes de enviar.`
                   : "Não foi possível ler o número da obra no PDF — confirme o assunto antes de enviar."}
@@ -135,7 +135,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               <ShieldCheck className="h-3.5 w-3.5" /> Envio só com confirmação
             </p>
           </div>
-          {!to.trim() ? <p className="mt-1.5 text-xs text-amber-600">Falta o email do cliente — preencha «Para» ou adicione-o nos Detalhes do pedido.</p> : null}
+          {!to.trim() ? <p className="mt-1.5 text-xs text-red-600">Falta o email do cliente — preencha «Para» ou adicione-o nos Detalhes do pedido.</p> : null}
         </div>
       </DialogContent>
     </Dialog>
