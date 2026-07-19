@@ -1612,6 +1612,76 @@ async def delete_task(task_id: str):
     return {"ok": True}
 
 
+# ---------- Workspace: pesquisa global + IA contextual ----------
+@api_router.get("/search")
+async def global_search(q: str = ""):
+    """Pesquisa unificada usada pela Área de Trabalho (Cmd+K / pesquisa
+    global) — devolve os melhores resultados de cada tipo de conteúdo numa
+    só chamada, para abrir o painel certo sem sair de onde se está."""
+    term = (q or "").strip()
+    if len(term) < 2:
+        return {"notes": [], "suppliers": [], "tasks": [], "emails": []}
+    rx = {"$regex": re.escape(term), "$options": "i"}
+    note_or = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"reference": rx}]
+    digits = re.sub(r"\D", "", term)
+    if len(digits) >= 3:
+        note_or.append({"phone": {"$regex": r"\D*".join(digits)}})
+    notes = await db.notes.find(
+        {"$or": note_or},
+        {"_id": 0, "id": 1, "customer_name": 1, "description": 1, "status": 1, "phone": 1, "archived": 1},
+    ).sort("created_at", -1).limit(6).to_list(6)
+    suppliers = await db.suppliers.find(
+        {"$or": [{"name": rx}, {"email": rx}]},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "category": 1},
+    ).limit(6).to_list(6)
+    tasks = await db.tasks.find(
+        {"title": rx},
+        {"_id": 0, "id": 1, "title": 1, "done": 1, "due_date": 1, "note_id": 1},
+    ).limit(6).to_list(6)
+    emails = await db.received_emails.find(
+        {"$or": [{"subject": rx}, {"from_name": rx}, {"from_email": rx}, {"supplier_name": rx}]},
+        {"_id": 0, "id": 1, "subject": 1, "from_name": 1, "from_email": 1, "supplier_name": 1,
+         "received_at": 1, "note_id": 1},
+    ).sort("received_at", -1).limit(6).to_list(6)
+    return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails}
+
+
+class AiAskIn(BaseModel):
+    question: str
+    note_id: str = ""
+
+
+@api_router.post("/ai/ask")
+async def ai_ask(payload: AiAskIn):
+    """IA contextual de acesso rápido (painel flutuante) — responde a
+    perguntas livres, opcionalmente com o contexto do pedido atualmente
+    em foco na Área de Trabalho."""
+    if not ai_available():
+        raise HTTPException(status_code=400, detail="Integração OpenAI não configurada.")
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Escreva uma pergunta.")
+    ctx = ""
+    if payload.note_id:
+        n = await db.notes.find_one({"id": payload.note_id}, {"_id": 0})
+        if n:
+            en = enrich_note(dict(n))
+            ctx = (
+                f"Contexto atual — pedido de {n.get('customer_name') or 'cliente'}:\n"
+                f"Artigo: {n.get('description') or '—'}; Medidas: {n.get('measurements') or '—'}; "
+                f"Estado: {en.get('status_label')}; Próxima ação: {en.get('next_action')}\n\n"
+            )
+    system = ("És o assistente da loja dentro do Brico Assistente. Respondes em português de Portugal, "
+              "de forma curta e direta, sem markdown. Se não souberes algo com os dados disponíveis, diz isso claramente.")
+    prompt = ctx + f"Pergunta: {question}"
+    try:
+        answer = (await ai_complete(system, prompt, session=f"ask-{uuid.uuid4()}")).strip()
+    except Exception as e:
+        logger.error(f"AI ask falhou: {e}")
+        raise HTTPException(status_code=502, detail="Falha na chamada à OpenAI. Verifique a chave e o saldo.")
+    return {"answer": answer}
+
+
 # ---------- Caixilharia à medida ----------
 @api_router.get("/caixilharia/catalog")
 async def caixilharia_catalog():

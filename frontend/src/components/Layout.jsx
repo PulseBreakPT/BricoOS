@@ -1,10 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
+import { WorkspaceProvider } from "@/context/WorkspaceContext";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
+import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
+import CommandPalette from "@/components/workspace/CommandPalette";
+import AiAssistantPanel from "@/components/workspace/AiAssistantPanel";
 
 // Aviso global, grande e amarelo: aparece em TODAS as páginas sempre que chega
 // um email associado a um pedido — de um fornecedor OU de um cliente que
@@ -117,15 +122,40 @@ const Brand = () => (
 
 export default function Layout() {
   const location = useLocation();
+  const isDesktop = useIsDesktop();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
+  // escrever texto, para não interromper o utilizador).
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
+    <WorkspaceProvider>
     <div className="min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white/80 px-5 py-7 backdrop-blur-xl lg:flex">
         <div className="flex items-center justify-between">
           <Brand />
           <NotificationsBell variant="sidebar" />
         </div>
-        <nav className="mt-10 flex flex-1 flex-col gap-1.5">
+        <button
+          data-testid="sidebar-search-btn"
+          onClick={() => setPaletteOpen(true)}
+          className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm text-slate-400 transition-colors hover:border-slate-300 hover:bg-white"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1">Pesquisar tudo...</span>
+          <span className="shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-400">⌘K</span>
+        </button>
+        <nav className="mt-6 flex flex-1 flex-col gap-1.5">
           {NAV.map((item) => {
             const Icon = item.icon;
             return (
@@ -151,7 +181,7 @@ export default function Layout() {
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold text-slate-900">Nunca esquecer</p>
           <p className="mt-1 text-xs text-slate-500">
-            Pedidos sem ação regressam ao topo até serem tratados. Atalhos: N novo · / procurar · F foco.
+            Pedidos sem ação regressam ao topo até serem tratados. Atalhos: N novo · / procurar · F foco · ⌘K pesquisa global.
           </p>
         </div>
       </aside>
@@ -159,6 +189,15 @@ export default function Layout() {
       <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/80 px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3 lg:hidden">
         <Brand />
         <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            data-testid="mobile-search-btn"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Pesquisar tudo"
+            title="Pesquisar tudo"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all duration-200 active:scale-90 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+          >
+            <Search className="h-[18px] w-[18px]" />
+          </button>
           <Link
             to="/catalogo-tecnico"
             aria-label="Abrir catálogo técnico"
@@ -171,12 +210,14 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">
+      <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-20 lg:pt-10">
         <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-page-enter 2xl:max-w-[1600px]">
           <SupplierEmailAlert />
           <Outlet />
         </div>
       </main>
+
+      {isDesktop ? <DesktopWorkspace /> : null}
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-around px-1 py-1.5">
@@ -204,6 +245,9 @@ export default function Layout() {
       </nav>
 
       <InstallPwaBanner />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <AiAssistantPanel />
     </div>
+    </WorkspaceProvider>
   );
 }
