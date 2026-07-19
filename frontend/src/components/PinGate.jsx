@@ -8,12 +8,12 @@ const PIN_LENGTH = 6;
 // visto, sem se tornar um atraso percetível a abrir a app.
 const SUCCESS_DELAY_MS = 650;
 
-// Tempo sem interação até a app se voltar a trancar sozinha — protege quem
-// mostra o telemóvel a um cliente e é interrompido a meio.
-const IDLE_LIMIT_MS = 5 * 60 * 1000;
+// Tempo até a app se voltar a trancar sozinha — protege quem mostra o
+// telemóvel a um cliente e é interrompido a meio. A contagem corre sempre,
+// sem pausar com o uso normal da app; só um toque no contador a reinicia.
+const IDLE_LIMIT_MS = 8 * 60 * 1000;
 // Últimos segundos do contador em que o aviso fica vermelho, a chamar a atenção.
 const IDLE_WARNING_MS = 30 * 1000;
-const IDLE_ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "wheel", "scroll"];
 
 // Letras por tecla, como nos telefones — detalhe tátil que dá densidade
 // premium ao teclado sem ocupar espaço.
@@ -50,8 +50,10 @@ function LiveClock() {
 }
 
 // Contador fixo e discreto — mostra quanto tempo falta até a app se trancar
-// sozinha por inatividade. Um toque reinicia a contagem sem precisar de mexer
-// no resto do ecrã.
+// sozinha. Um toque reinicia a contagem sem precisar de mexer no resto do
+// ecrã. Fica no canto inferior esquerdo em ecrãs pequenos (o cabeçalho e o
+// botão "+" de novo pedido já ocupam os outros cantos) e sobe para o topo
+// direito a partir do "lg", onde o layout de secretária deixa esse canto livre.
 function IdleCountdown({ msLeft, onExtend }) {
   const totalSeconds = Math.max(0, Math.ceil(msLeft / 1000));
   const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
@@ -63,7 +65,7 @@ function IdleCountdown({ msLeft, onExtend }) {
       data-testid="idle-countdown"
       onClick={onExtend}
       title="Toca para manter a sessão ativa"
-      className={`fixed right-3 top-3 z-50 flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-sm backdrop-blur transition-colors ${
+      className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 z-50 flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-sm backdrop-blur transition-colors lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 ${
         warning
           ? "animate-pulse border-red-300 bg-red-50 text-red-600"
           : "border-slate-200 bg-white/90 text-slate-400"
@@ -178,16 +180,14 @@ export default function PinGate({ children }) {
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
-  // Trava automaticamente ao fim de IDLE_LIMIT_MS sem interação — protege
-  // quem larga o telemóvel destrancado ou o mostra a um cliente e é
-  // interrompido a meio. Qualquer toque, clique ou tecla reinicia a contagem.
+  // Trava automaticamente ao fim de IDLE_LIMIT_MS — protege quem larga o
+  // telemóvel destrancado ou o mostra a um cliente e é interrompido a meio.
+  // A contagem corre sempre, sem pausar com o uso normal da app: só reinicia
+  // com um toque explícito no contador (ver extendIdleSession).
   useEffect(() => {
     if (status !== "ok") return undefined;
     lastActivityRef.current = Date.now();
     setIdleMsLeft(IDLE_LIMIT_MS);
-
-    const bumpActivity = () => { lastActivityRef.current = Date.now(); };
-    IDLE_ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, bumpActivity, { passive: true }));
 
     const tick = () => {
       const left = IDLE_LIMIT_MS - (Date.now() - lastActivityRef.current);
@@ -199,7 +199,6 @@ export default function PinGate({ children }) {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      IDLE_ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, bumpActivity));
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(idleInterval);
     };
