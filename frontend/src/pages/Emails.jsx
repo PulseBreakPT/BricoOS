@@ -5,6 +5,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
   BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
+  MoreHorizontal,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -13,6 +14,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import ComposeEmailDialog from "@/components/ComposeEmailDialog";
 import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
@@ -876,17 +880,26 @@ export default function Emails() {
             Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
           </p>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2 sm:mt-1">
-          <Button data-testid="emails-stats-btn" variant="outline" onClick={() => setStatsOpen(true)} className="h-10 shrink-0 rounded-xl">
-            <BarChart3 className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Estatísticas</span>
-          </Button>
-          <Button data-testid="emails-rules-btn" variant="outline" onClick={() => setRulesOpen(true)} className="h-10 shrink-0 rounded-xl">
-            <Wand2 className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Regras</span>
-          </Button>
-          <Button data-testid="emails-templates-btn" variant="outline" onClick={() => setTemplatesOpen(true)} className="h-10 shrink-0 rounded-xl">
-            <FileStack className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Modelos</span>
-          </Button>
-          <Button data-testid="emails-compose-btn" onClick={() => { setForwardTarget(null); setComposeOpen(true); }} className="h-10 shrink-0 rounded-xl">
+        <div className="mt-2 flex shrink-0 gap-2 sm:mt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button data-testid="emails-more-btn" variant="outline" className="h-10 shrink-0 rounded-xl px-3" aria-label="Mais ações">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem data-testid="emails-stats-btn" onClick={() => setStatsOpen(true)}>
+                <BarChart3 className="mr-2 h-4 w-4" /> Estatísticas
+              </DropdownMenuItem>
+              <DropdownMenuItem data-testid="emails-rules-btn" onClick={() => setRulesOpen(true)}>
+                <Wand2 className="mr-2 h-4 w-4" /> Regras
+              </DropdownMenuItem>
+              <DropdownMenuItem data-testid="emails-templates-btn" onClick={() => setTemplatesOpen(true)}>
+                <FileStack className="mr-2 h-4 w-4" /> Modelos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button data-testid="emails-compose-btn" onClick={() => { setForwardTarget(null); setComposeOpen(true); }} className="h-10 flex-1 rounded-xl sm:flex-none">
             <Pencil className="mr-1.5 h-4 w-4" /> Novo email
           </Button>
         </div>
