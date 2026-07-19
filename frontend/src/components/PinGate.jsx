@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Delete, Hammer, Loader2, ShieldCheck, TimerReset } from "lucide-react";
+import { Check, Delete, Hammer, Loader2, Lock, ShieldCheck, TimerReset } from "lucide-react";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
 
@@ -7,6 +7,13 @@ const PIN_LENGTH = 6;
 // Pequena pausa antes de revelar a app: dá tempo ao "check" de sucesso ser
 // visto, sem se tornar um atraso percetível a abrir a app.
 const SUCCESS_DELAY_MS = 650;
+
+// Tempo sem interação até a app se voltar a trancar sozinha — protege quem
+// mostra o telemóvel a um cliente e é interrompido a meio.
+const IDLE_LIMIT_MS = 5 * 60 * 1000;
+// Últimos segundos do contador em que o aviso fica vermelho, a chamar a atenção.
+const IDLE_WARNING_MS = 30 * 1000;
+const IDLE_ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "wheel", "scroll"];
 
 // Letras por tecla, como nos telefones — detalhe tátil que dá densidade
 // premium ao teclado sem ocupar espaço.
@@ -42,6 +49,32 @@ function LiveClock() {
   );
 }
 
+// Contador fixo e discreto — mostra quanto tempo falta até a app se trancar
+// sozinha por inatividade. Um toque reinicia a contagem sem precisar de mexer
+// no resto do ecrã.
+function IdleCountdown({ msLeft, onExtend }) {
+  const totalSeconds = Math.max(0, Math.ceil(msLeft / 1000));
+  const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const ss = String(totalSeconds % 60).padStart(2, "0");
+  const warning = msLeft <= IDLE_WARNING_MS;
+  return (
+    <button
+      type="button"
+      data-testid="idle-countdown"
+      onClick={onExtend}
+      title="Toca para manter a sessão ativa"
+      className={`fixed right-3 top-3 z-50 flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-sm backdrop-blur transition-colors ${
+        warning
+          ? "animate-pulse border-red-300 bg-red-50 text-red-600"
+          : "border-slate-200 bg-white/90 text-slate-400"
+      }`}
+    >
+      <Lock className="h-3 w-3" />
+      {mm}:{ss}
+    </button>
+  );
+}
+
 function BrandMark({ locked }) {
   return (
     <div className="flex flex-col items-center">
@@ -69,7 +102,20 @@ export default function PinGate({ children }) {
   const [lockTotal, setLockTotal] = useState(0);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
+  const [lockMessage, setLockMessage] = useState("");
+  const [idleMsLeft, setIdleMsLeft] = useState(IDLE_LIMIT_MS);
   const timerRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+
+  // Ponto único de bloqueio: usado tanto por um 401 vindo do servidor como
+  // pelo temporizador de inatividade abaixo. Limpa sempre o token local, para
+  // que um simples refresh não volte a entrar sozinho.
+  const lockDevice = useCallback((message = "") => {
+    clearDeviceToken();
+    setPin("");
+    setLockMessage(message);
+    setStatus("locked");
+  }, []);
 
   const startCountdown = useCallback((seconds) => {
     setLockSeconds(seconds);
@@ -125,12 +171,44 @@ export default function PinGate({ children }) {
 
   // Qualquer 401 vindo de qualquer página (atual ou futura) volta a trancar.
   useEffect(() => {
-    const onAuthRequired = () => { setPin(""); setStatus("locked"); };
+    const onAuthRequired = () => lockDevice();
     window.addEventListener("brico-auth-required", onAuthRequired);
     return () => window.removeEventListener("brico-auth-required", onAuthRequired);
-  }, []);
+  }, [lockDevice]);
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  // Trava automaticamente ao fim de IDLE_LIMIT_MS sem interação — protege
+  // quem larga o telemóvel destrancado ou o mostra a um cliente e é
+  // interrompido a meio. Qualquer toque, clique ou tecla reinicia a contagem.
+  useEffect(() => {
+    if (status !== "ok") return undefined;
+    lastActivityRef.current = Date.now();
+    setIdleMsLeft(IDLE_LIMIT_MS);
+
+    const bumpActivity = () => { lastActivityRef.current = Date.now(); };
+    IDLE_ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, bumpActivity, { passive: true }));
+
+    const tick = () => {
+      const left = IDLE_LIMIT_MS - (Date.now() - lastActivityRef.current);
+      if (left <= 0) lockDevice("Sessão trancada por inatividade — introduz o PIN para continuar.");
+      else setIdleMsLeft(left);
+    };
+    const idleInterval = setInterval(tick, 1000);
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      IDLE_ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, bumpActivity));
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(idleInterval);
+    };
+  }, [status, lockDevice]);
+
+  const extendIdleSession = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    setIdleMsLeft(IDLE_LIMIT_MS);
+  }, []);
 
   const submit = useCallback(async (candidate) => {
     setCheckingPin(true);
@@ -140,6 +218,7 @@ export default function PinGate({ children }) {
       if (data.ok && data.token) {
         setDeviceToken(data.token);
         setPin("");
+        setLockMessage("");
         setStatus("success");
         setTimeout(() => setStatus("ok"), SUCCESS_DELAY_MS);
         return;
@@ -196,7 +275,14 @@ export default function PinGate({ children }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [status, press, backspace, clearAll]);
 
-  if (status === "ok") return children;
+  if (status === "ok") {
+    return (
+      <>
+        {children}
+        <IdleCountdown msLeft={idleMsLeft} onExtend={extendIdleSession} />
+      </>
+    );
+  }
 
   if (status === "checking") {
     return (
@@ -246,7 +332,9 @@ export default function PinGate({ children }) {
         </div>
 
         <p className="mt-3 h-4 animate-fade-up text-center text-xs text-slate-500" style={{ "--stagger-i": 2 }}>
-          {locked ? "Acesso bloqueado por tentativas falhadas." : "Introduz o PIN de 6 dígitos para verificar este dispositivo."}
+          {locked
+            ? "Acesso bloqueado por tentativas falhadas."
+            : (lockMessage || "Introduz o PIN de 6 dígitos para verificar este dispositivo.")}
         </p>
 
         {locked ? (
