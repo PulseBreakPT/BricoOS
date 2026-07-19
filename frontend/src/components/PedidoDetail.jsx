@@ -80,6 +80,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [saving, setSaving] = useState(false);
   const [autoState, setAutoState] = useState("idle"); // idle | saving | saved | error
   const [autoError, setAutoError] = useState("");
+  // Pedidos existentes abrem sempre só em visualização — só é possível
+  // editar depois de premir "Editar", e só grava depois de premir "Guardar".
+  const [editMode, setEditMode] = useState(false);
 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -187,6 +190,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
+      setEditMode(false);
       setPhotos([]);
       setLightboxPhoto(null);
       // Cada área abre logo o assistente certo: «band» na área Banda
@@ -241,36 +245,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     }
   }, [open, createMode, caixCatalog]);
 
-  // Autosave (existing notes) / draft (new notes)
+  // Rascunho local (só para pedidos novos, no assistente de criação). Pedidos
+  // já existentes NUNCA gravam sozinhos: só o botão "Guardar", em modo de
+  // edição — ver editMode mais abaixo. Isto é o que torna "Cancelar" um
+  // cancelamento a sério, e não apenas cosmético.
   useEffect(() => {
-    if (!open) return;
-    if (isCreate) {
-      if (dirty.current) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* noop */ } }
-      return;
-    }
-    if (!id || !dirty.current) return;
-    setAutoState("saving");
-    const t = setTimeout(async () => {
-      try {
-        await api.put(`/notes/${id}`, {
-          customer_name: form.customer_name, phone: form.phone, email: form.email,
-          description: form.description, details: form.details, category: form.category,
-          quantity: form.quantity, reference: form.reference,
-          sla_days: form.sla_days, reminder_interval_days: form.reminder_interval_days,
-        });
-        setAutoState("saved");
-        setAutoError("");
-        dirty.current = false;
-        onChanged && onChanged();
-      } catch (e) {
-        // Guarda o rascunho inválido (ex.: telefone incompleto) mesmo sem
-        // conseguir gravar, para não perder o que o utilizador escreveu.
-        setAutoState("error");
-        setAutoError(getErrorMessage(e, "Não foi possível guardar"));
-      }
-    }, 900);
-    return () => clearTimeout(t);
-  }, [form, id, isCreate, open]);
+    if (!open || !isCreate) return;
+    if (dirty.current) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* noop */ } }
+  }, [form, isCreate, open]);
 
   // Duplicate detection while creating
   useEffect(() => {
@@ -291,6 +273,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     onChanged && onChanged();
   };
 
+  // Usado pelas ações rápidas de estado/prioridade (sempre disponíveis,
+  // mesmo em modo de edição). Ao contrário de refresh(), não toca no
+  // formulário quando há uma edição em curso — mudar o estado no meio de
+  // uma edição não pode apagar texto ainda não guardado.
+  const refreshChrome = async () => {
+    if (!id) return;
+    const { data } = await api.get(`/notes/${id}`);
+    setNote(data);
+    if (!editMode) setForm({ ...emptyForm, ...data });
+    onChanged && onChanged();
+  };
+
   const saveDetails = async () => {
     if (!form.customer_name && !form.description) {
       toast.error("Preencha o cliente ou a descrição."); return;
@@ -302,6 +296,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       toast.error("O telefone do cliente parece incompleto."); return;
     }
     setSaving(true);
+    if (!isCreate) setAutoState("saving");
     try {
       if (isCreate) {
         const { data } = await api.post("/notes", form);
@@ -315,13 +310,33 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         dirty.current = false;
         toast.success("Alterações guardadas");
         await refresh();
+        setAutoState("saved");
+        setAutoError("");
+        // Guardado com sucesso: sai do modo de edição e volta à
+        // visualização, como pedido — evita alterações por engano depois
+        // de gravar.
+        setEditMode(false);
       }
       onChanged && onChanged();
     } catch (e) {
       toast.error(getErrorMessage(e, "Erro ao guardar"));
+      if (!isCreate) {
+        setAutoState("error");
+        setAutoError(getErrorMessage(e, "Não foi possível guardar"));
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  // Descarta quaisquer alterações locais por gravar e volta à visualização
+  // — como o formulário nunca grava sozinho enquanto em edição (ver acima),
+  // isto é um cancelamento a sério: nada chegou a ir para o servidor.
+  const cancelEdit = () => {
+    if (note) setForm({ ...emptyForm, ...note });
+    dirty.current = false;
+    setAutoState("idle");
+    setEditMode(false);
   };
 
   // ---- Assistente de criação por etapas ----
@@ -400,12 +415,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const changeStatus = async (status) => {
     await api.patch(`/notes/${id}/status`, { status });
     toast.success("Estado atualizado");
-    await refresh();
+    await refreshChrome();
   };
   const changePriority = async (priority) => {
     set("priority", priority);
     await api.put(`/notes/${id}`, { priority });
-    await refresh();
+    await refreshChrome();
   };
   const advance = async () => {
     if (!note?.next_status) return;
@@ -425,7 +440,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
   const toggleFav = async () => {
     await api.put(`/notes/${id}`, { favorite: !note.favorite });
-    await refresh();
+    await refreshChrome();
   };
   const remove = async () => {
     const who = note?.customer_name || "este pedido";
@@ -442,12 +457,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const resolveNote = async () => {
     await api.post(`/notes/${id}/resolve`);
     toast.success("Pedido resolvido e arquivado");
-    await refresh();
+    await refreshChrome();
   };
   const reopenNote = async () => {
     await api.post(`/notes/${id}/reopen`);
     toast.success("Pedido reaberto");
-    await refresh();
+    await refreshChrome();
   };
 
   const addLabel = async (val) => {
@@ -790,6 +805,26 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
+
+              {/* Visualização vs edição: os dados do pedido só ficam editáveis
+                  depois de premir "Editar" — o estado/prioridade acima
+                  continuam sempre disponíveis, sem precisar de entrar em
+                  modo de edição. */}
+              {editMode ? (
+                <>
+                  <Button data-testid="detail-save" size="sm" onClick={saveDetails} disabled={saving} className="col-span-2 h-9 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 sm:col-span-1 sm:w-auto sm:shrink-0">
+                    {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />} Guardar
+                  </Button>
+                  <Button data-testid="detail-cancel-edit" size="sm" variant="outline" onClick={cancelEdit} disabled={saving} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
+                    <X className="mr-1.5 h-3.5 w-3.5" /> Cancelar
+                  </Button>
+                </>
+              ) : (
+                <Button data-testid="detail-edit" size="sm" variant="outline" onClick={() => setEditMode(true)} className="h-9 w-full rounded-lg border-slate-300 font-bold sm:w-auto sm:shrink-0">
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
+                </Button>
+              )}
+
               <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-red-200 text-red-600 hover:bg-red-50 sm:ml-auto sm:w-auto sm:shrink-0">
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -1002,43 +1037,77 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
             <TabsContent value="detalhes" className="mt-0 focus-visible:outline-none">
               <SectionTitle first title="Cliente" />
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Nome do cliente</Label>
-                  <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Telefone</Label>
-                  <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
-                </div>
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Nome do cliente</Label>
+                    <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
+                  </div>
+                ) : (
+                  <ViewField label="Nome do cliente" value={form.customer_name} />
+                )}
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Telefone</Label>
+                    <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
+                  </div>
+                ) : (
+                  <ViewField label="Telefone" value={form.phone} mono link={form.phone ? `tel:${form.phone}` : null} />
+                )}
               </div>
-              <div className="mt-4 space-y-1.5">
-                <Label>Email do cliente</Label>
-                <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
-              </div>
+              {editMode ? (
+                <div className="mt-4 space-y-1.5">
+                  <Label>Email do cliente</Label>
+                  <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <ViewField label="Email do cliente" value={form.email} link={form.email ? `mailto:${form.email}` : null} />
+                </div>
+              )}
 
               <SectionTitle title="Artigo" />
-              <div className="mt-3 space-y-1.5">
-                <Label>Pedido do cliente</Label>
-                <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
-              </div>
+              {editMode ? (
+                <div className="mt-3 space-y-1.5">
+                  <Label>Pedido do cliente</Label>
+                  <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <ViewField label="Pedido do cliente" value={form.description} multiline />
+                </div>
+              )}
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div className="col-span-2 space-y-1.5 sm:col-span-1">
-                  <Label>Código EAN13</Label>
-                  <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Secção</Label>
-                  <Select value={form.category} onValueChange={(v) => set("category", v)}>
-                    <SelectTrigger data-testid="select-category"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key} data-testid={`category-option-${c.key}`}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Quantidade</Label>
-                  <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
-                </div>
+                {editMode ? (
+                  <div className="col-span-2 space-y-1.5 sm:col-span-1">
+                    <Label>Código EAN13</Label>
+                    <Input data-testid="input-reference" value={form.reference} onChange={(e) => set("reference", e.target.value)} className="font-mono" placeholder="Ex.: 5601234567890" />
+                  </div>
+                ) : (
+                  <div className="col-span-2 sm:col-span-1">
+                    <ViewField label="Código EAN13" value={form.reference} mono />
+                  </div>
+                )}
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Secção</Label>
+                    <Select value={form.category} onValueChange={(v) => set("category", v)}>
+                      <SelectTrigger data-testid="select-category"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key} data-testid={`category-option-${c.key}`}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <ViewField label="Secção" value={CATEGORY_LIST.find((c) => c.key === form.category)?.label} />
+                )}
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Quantidade</Label>
+                    <Input data-testid="input-quantity" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="Ex.: 2 unidades" />
+                  </div>
+                ) : (
+                  <ViewField label="Quantidade" value={form.quantity} />
+                )}
               </div>
               {/* Caixilharia à medida (BandAluminios) — só em pedidos criados no
                   fluxo à medida; um pedido normal de loja nunca ganha caixilharia */}
@@ -1099,55 +1168,90 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
               <SectionTitle title="Etiquetas" />
               <div className="mt-3 space-y-1.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {form.labels.map((l) => (
-                    <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                      <Tag className="h-3 w-3" /> {l}
-                      <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
-                    </span>
-                  ))}
-                  <Input
-                    data-testid="label-input"
-                    value={labelInput}
-                    onChange={(e) => setLabelInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLabel(); } }}
-                    placeholder="+ etiqueta"
-                    className="h-8 w-32 rounded-full text-xs"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(labelsList || []).filter((l) => !form.labels.includes(l)).slice(0, 6).map((l) => (
-                    <button key={l} data-testid={`suggest-label-${l}`} onClick={() => addLabel(l)} className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-[11px] text-slate-500 hover:border-slate-400 hover:text-slate-700">+ {l}</button>
-                  ))}
-                </div>
+                {form.labels.length === 0 && !editMode ? (
+                  <p className="text-sm italic text-slate-400">Sem etiquetas.</p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {form.labels.map((l) => (
+                      <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <Tag className="h-3 w-3" /> {l}
+                        {editMode ? (
+                          <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
+                        ) : null}
+                      </span>
+                    ))}
+                    {editMode ? (
+                      <Input
+                        data-testid="label-input"
+                        value={labelInput}
+                        onChange={(e) => setLabelInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLabel(); } }}
+                        placeholder="+ etiqueta"
+                        className="h-8 w-32 rounded-full text-xs"
+                      />
+                    ) : null}
+                  </div>
+                )}
+                {editMode ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(labelsList || []).filter((l) => !form.labels.includes(l)).slice(0, 6).map((l) => (
+                      <button key={l} data-testid={`suggest-label-${l}`} onClick={() => addLabel(l)} className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-[11px] text-slate-500 hover:border-slate-400 hover:text-slate-700">+ {l}</button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <SectionTitle title="Fornecedor e alertas" />
-              <div className="mt-3 space-y-1.5">
-                <Label>Fornecedor preferido</Label>
-                <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
-                  <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {editMode ? (
+                <div className="mt-3 space-y-1.5">
+                  <Label>Fornecedor preferido</Label>
+                  <Select value={form.supplier_id || "none"} onValueChange={(v) => set("supplier_id", v === "none" ? "" : v)}>
+                    <SelectTrigger data-testid="select-pref-supplier"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <ViewField label="Fornecedor preferido" value={suppliers.find((s) => s.id === form.supplier_id)?.name} />
+                </div>
+              )}
               <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Prazo alerta (dias)</Label>
-                  <Input data-testid="input-sla" type="number" min={1} value={form.sla_days} onChange={(e) => set("sla_days", parseInt(e.target.value) || 2)} className="font-mono" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Lembrete a cada (dias)</Label>
-                  <Input data-testid="input-reminder-interval" type="number" min={1} value={form.reminder_interval_days} onChange={(e) => set("reminder_interval_days", parseInt(e.target.value) || 3)} className="font-mono" />
-                </div>
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Prazo alerta (dias)</Label>
+                    <Input data-testid="input-sla" type="number" min={1} value={form.sla_days} onChange={(e) => set("sla_days", parseInt(e.target.value) || 2)} className="font-mono" />
+                  </div>
+                ) : (
+                  <ViewField label="Prazo alerta (dias)" value={form.sla_days} mono />
+                )}
+                {editMode ? (
+                  <div className="space-y-1.5">
+                    <Label>Lembrete a cada (dias)</Label>
+                    <Input data-testid="input-reminder-interval" type="number" min={1} value={form.reminder_interval_days} onChange={(e) => set("reminder_interval_days", parseInt(e.target.value) || 3)} className="font-mono" />
+                  </div>
+                ) : (
+                  <ViewField label="Lembrete a cada (dias)" value={form.reminder_interval_days} mono />
+                )}
               </div>
 
-              <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="mt-6 w-full rounded-xl">
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Guardar alterações
-              </Button>
+              {editMode ? (
+                <div className="mt-6 flex gap-2">
+                  <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700">
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                    Guardar
+                  </Button>
+                  <Button data-testid="cancel-note-btn" variant="outline" onClick={cancelEdit} disabled={saving} className="rounded-xl">
+                    <X className="mr-2 h-4 w-4" /> Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <Button data-testid="detalhes-edit-btn" variant="outline" onClick={() => setEditMode(true)} className="mt-6 w-full rounded-xl border-slate-300 font-bold">
+                  <Pencil className="mr-2 h-4 w-4" /> Editar pedido
+                </Button>
+              )}
             </TabsContent>
 
             {/* ORCAMENTOS */}
@@ -1698,6 +1802,27 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         </DialogContent>
       </Dialog>
     </Dialog>
+  );
+}
+
+// Campo em modo de leitura — mesmo espaço/alinhamento do campo editável
+// equivalente, para o layout não "saltar" ao entrar/sair do modo de edição.
+function ViewField({ label, value, mono = false, link = null, multiline = false }) {
+  const empty = value === null || value === undefined || value === "";
+  const content = empty ? "—" : value;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      {link && !empty ? (
+        <a href={link} className={`block text-sm font-semibold text-slate-900 hover:underline ${mono ? "font-mono" : ""}`}>
+          {content}
+        </a>
+      ) : (
+        <p className={`text-sm font-semibold text-slate-900 ${multiline ? "whitespace-pre-wrap" : "truncate"} ${mono ? "font-mono" : ""} ${empty ? "font-normal italic text-slate-400" : ""}`}>
+          {content}
+        </p>
+      )}
+    </div>
   );
 }
 
