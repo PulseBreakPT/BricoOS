@@ -146,8 +146,8 @@ export default function PinGate({ children }) {
 
   if (status === "checking") {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+      <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
       </div>
     );
   }
@@ -157,42 +157,42 @@ export default function PinGate({ children }) {
   const ss = String(lockSeconds % 60).padStart(2, "0");
 
   return (
-    <div data-testid="pin-screen" className="flex min-h-[100dvh] flex-col items-center justify-center bg-slate-950 px-6 py-10 text-white">
-      <div className="flex w-full max-w-xs flex-col items-center">
-        <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${locked ? "bg-red-500/15 text-red-400" : "bg-white/10 text-slate-200"}`}>
+    <div data-testid="pin-screen" className="flex min-h-[100dvh] flex-col items-center justify-center bg-slate-50 px-6 py-10">
+      <div className="flex w-full max-w-xs flex-col items-center rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60">
+        <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ring-1 ring-inset ${locked ? "bg-red-50 text-red-600 ring-red-100" : "bg-primary/[0.06] text-primary ring-primary/10"}`}>
           {locked ? <TimerReset className="h-7 w-7" /> : <Lock className="h-7 w-7" />}
         </span>
-        <h1 className="mt-4 font-heading text-xl font-extrabold tracking-tight">Brico2 · Acesso protegido</h1>
-        <p className="mt-1 text-center text-sm text-slate-400">
+        <h1 className="mt-4 font-heading text-xl font-extrabold tracking-tight text-slate-900">Brico Assistente</h1>
+        <p className="mt-1 text-center text-sm text-slate-500">
           {locked ? "Acesso bloqueado por tentativas falhadas." : "Introduza o PIN de 6 dígitos para verificar este dispositivo."}
         </p>
 
         {locked ? (
-          <div data-testid="pin-countdown" className="mt-6 rounded-2xl bg-red-500/10 px-6 py-4 text-center">
-            <p className="font-mono text-3xl font-bold tabular-nums text-red-300">{mm}:{ss}</p>
-            <p className="mt-1 text-xs text-red-300/80">Poderá tentar novamente quando o tempo terminar.</p>
+          <div data-testid="pin-countdown" className="mt-6 w-full rounded-2xl border border-red-100 bg-red-50 px-6 py-4 text-center">
+            <p className="font-mono text-3xl font-bold tabular-nums text-red-600">{mm}:{ss}</p>
+            <p className="mt-1 text-xs text-red-500/80">Poderá tentar novamente quando o tempo terminar.</p>
           </div>
         ) : (
-          <div data-testid="pin-dots" className={`mt-6 flex items-center gap-3 ${flash ? "animate-pulse" : ""}`}>
+          <div data-testid="pin-dots" className={`mt-6 flex items-center gap-3 ${flash ? "animate-shake" : ""}`}>
             {Array.from({ length: PIN_LENGTH }).map((_, i) => (
               <span
                 key={i}
-                className={`h-3.5 w-3.5 rounded-full border transition-colors ${
-                  flash ? "border-red-400 bg-red-400"
-                    : i < pin.length ? "border-white bg-white"
-                      : "border-slate-600 bg-transparent"
+                className={`h-3.5 w-3.5 rounded-full border-2 transition-colors duration-150 ${
+                  flash ? "border-red-500 bg-red-500"
+                    : i < pin.length ? "border-primary bg-primary"
+                      : "border-slate-200 bg-transparent"
                 }`}
               />
             ))}
           </div>
         )}
 
-        <p className={`mt-3 h-5 text-center text-xs ${error ? "text-red-400" : "text-slate-500"}`}>
+        <p className={`mt-3 h-5 text-center text-xs ${error ? "text-red-600" : "text-slate-400"}`}>
           {error || (!locked && attemptsLeft < 3 ? `${attemptsLeft} tentativa${attemptsLeft === 1 ? "" : "s"} restante${attemptsLeft === 1 ? "" : "s"}` : "")}
         </p>
 
         {/* Teclado em grelha — sem campos de texto, o teclado nativo nunca abre */}
-        <div className="mt-4 grid w-full grid-cols-3 gap-3">
+        <div className="mt-6 grid w-full grid-cols-3 gap-3">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
             <button
               key={d}
@@ -200,7 +200,7 @@ export default function PinGate({ children }) {
               data-testid={`pin-key-${d}`}
               onClick={() => press(d)}
               disabled={locked || checkingPin}
-              className="h-16 rounded-2xl bg-white/5 text-2xl font-semibold text-white transition-colors active:bg-white/25 disabled:opacity-30 sm:hover:bg-white/15"
+              className="h-16 rounded-2xl bg-slate-50 text-2xl font-semibold text-slate-900 transition-all active:scale-95 active:bg-slate-200 disabled:opacity-30 sm:hover:bg-slate-100"
             >
               {d}
             </button>
@@ -210,7 +210,7 @@ export default function PinGate({ children }) {
             data-testid="pin-clear"
             onClick={clearAll}
             disabled={locked || checkingPin || !pin.length}
-            className="h-16 rounded-2xl text-sm font-semibold text-slate-400 transition-colors active:bg-white/10 disabled:opacity-30 sm:hover:bg-white/10"
+            className="h-16 rounded-2xl text-sm font-semibold text-slate-400 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-30 sm:hover:bg-slate-50"
           >
             Limpar
           </button>
@@ -219,7 +219,7 @@ export default function PinGate({ children }) {
             data-testid="pin-key-0"
             onClick={() => press("0")}
             disabled={locked || checkingPin}
-            className="h-16 rounded-2xl bg-white/5 text-2xl font-semibold text-white transition-colors active:bg-white/25 disabled:opacity-30 sm:hover:bg-white/15"
+            className="h-16 rounded-2xl bg-slate-50 text-2xl font-semibold text-slate-900 transition-all active:scale-95 active:bg-slate-200 disabled:opacity-30 sm:hover:bg-slate-100"
           >
             0
           </button>
@@ -228,13 +228,13 @@ export default function PinGate({ children }) {
             data-testid="pin-backspace"
             onClick={backspace}
             disabled={locked || checkingPin || !pin.length}
-            className="flex h-16 items-center justify-center rounded-2xl text-slate-400 transition-colors active:bg-white/10 disabled:opacity-30 sm:hover:bg-white/10"
+            className="flex h-16 items-center justify-center rounded-2xl text-slate-400 transition-all active:scale-95 active:bg-slate-100 disabled:opacity-30 sm:hover:bg-slate-50"
           >
             <Delete className="h-6 w-6" />
           </button>
         </div>
 
-        <p className="mt-6 flex items-center gap-1.5 text-[11px] text-slate-600">
+        <p className="mt-6 flex items-center gap-1.5 text-[11px] text-slate-400">
           {checkingPin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           {checkingPin ? "A verificar…" : "Dispositivo verificado uma única vez neste navegador"}
         </p>
