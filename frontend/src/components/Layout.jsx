@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
+import InstallPwaBanner from "@/components/InstallPwaBanner";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
 
@@ -201,6 +202,8 @@ export default function Layout() {
           })}
         </div>
       </nav>
+
+      <InstallPwaBanner />
     </div>
   );
 }
