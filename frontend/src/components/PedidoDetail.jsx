@@ -1501,12 +1501,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       ))}
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 p-3 text-white">
+                    <div className="card-elevated mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <div>
-                        <p className="text-sm font-bold">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal opacity-70">c/ IVA</span></p>
+                        <p className="text-sm font-bold text-slate-900">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal text-slate-500">c/ IVA</span></p>
                         {sqEffMargin != null ? (
-                          <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] opacity-80">
-                            Margem final: <span className="font-mono font-bold">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
+                          <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] text-slate-500">
+                            Margem final: <span className="font-mono font-bold text-slate-700">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
                           </p>
                         ) : null}
                       </div>
@@ -1515,7 +1515,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           <a
                             data-testid="sq-download-last"
                             href={withDeviceToken(`${API}/notes/${id}/files/${sq.client_pdf_file_id}`)}
-                            className="inline-flex items-center rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
                           >
                             <Download className="mr-1.5 h-3.5 w-3.5" /> Último PDF
                           </a>
@@ -1525,7 +1525,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           size="sm"
                           disabled={generatingPdf}
                           onClick={generateClientPdf}
-                          className="rounded-lg bg-white text-slate-900 hover:bg-slate-100"
+                          className="rounded-lg"
                         >
                           {generatingPdf ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
                           Gerar PDF para o cliente
@@ -1766,14 +1766,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       <Dialog open={!!lightboxPhoto} onOpenChange={(v) => { if (!v) setLightboxPhoto(null); }}>
         <DialogContent data-testid="photo-lightbox" className="max-w-3xl border-0 bg-transparent p-0 shadow-none">
           {lightboxPhoto ? (
-            <div className="overflow-hidden rounded-2xl bg-slate-950">
-              <img
-                src={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
-                alt={lightboxPhoto.filename}
-                className="max-h-[75vh] w-full object-contain"
-              />
-              <div className="flex items-center justify-between gap-2 bg-slate-950 p-3">
-                <p className="truncate text-xs font-medium text-slate-300">{lightboxPhoto.filename}</p>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="bg-slate-100">
+                <img
+                  src={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
+                  alt={lightboxPhoto.filename}
+                  className="max-h-[75vh] w-full object-contain"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-white p-3">
+                <p className="truncate text-xs font-medium text-slate-600">{lightboxPhoto.filename}</p>
                 <div className="flex shrink-0 gap-1.5">
                   <a
                     href={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
@@ -1781,7 +1783,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <Button size="sm" variant="outline" className="rounded-xl bg-white/10 text-white hover:bg-white/20" data-testid="photo-download">
+                    <Button size="sm" variant="outline" className="rounded-xl" data-testid="photo-download">
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Descarregar
                     </Button>
                   </a>

@@ -364,7 +364,7 @@ export default function Notes() {
   return (
     <div>
       {/* Abas das duas áreas — cada uma só com os seus pedidos */}
-      <div className="relative grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-900 p-1.5 shadow-lg shadow-slate-300/50">
+      <div className="card-elevated relative grid grid-cols-2 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5">
         {Object.entries(SEGMENTS).map(([key, cfg]) => {
           const Icon = cfg.icon;
           const active = segment === key;
@@ -376,8 +376,8 @@ export default function Notes() {
               onClick={() => changeSegment(key)}
               className={`relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-all duration-200 sm:text-sm ${
                 active
-                  ? `bg-white shadow-md ${key === "band" ? "text-orange-600" : "text-blue-700"}`
-                  : "text-white/55 hover:text-white"
+                  ? `shadow-sm ${key === "band" ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200" : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"}`
+                  : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
               }`}
             >
               <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />

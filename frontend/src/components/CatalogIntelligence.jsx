@@ -8,7 +8,7 @@ import {
 const MISSING = "Dados não encontrados em fontes oficiais.";
 
 const scoreTone = (score) => {
-  if (score === null || score === undefined) return "border-slate-600 bg-slate-800 text-slate-300";
+  if (score === null || score === undefined) return "border-slate-200 bg-slate-100 text-slate-400";
   if (score >= 90) return "border-amber-300 bg-amber-300 text-slate-950";
   if (score >= 75) return "border-emerald-400 bg-emerald-400 text-slate-950";
   if (score >= 60) return "border-blue-400 bg-blue-400 text-slate-950";
@@ -52,20 +52,20 @@ function RankingCard({ model, selected, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[13rem] ${selected ? "border-amber-300 bg-white/10 ring-1 ring-amber-300" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}
+      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[13rem] ${selected ? "border-amber-400 bg-amber-50/70 shadow-md shadow-amber-200/50 ring-1 ring-amber-300" : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"}`}
     >
       <div className="flex items-start gap-3">
         <OverallBadge overall={overall} compact />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {overall.medal ? <Medal className="h-3.5 w-3.5 text-amber-300" /> : null}
-            <p className="truncate text-sm font-extrabold text-white">{model.name}</p>
+            {overall.medal ? <Medal className="h-3.5 w-3.5 text-amber-500" /> : null}
+            <p className="truncate text-sm font-extrabold text-slate-900">{model.name}</p>
           </div>
-          <p className="mt-0.5 truncate text-[10px] text-slate-400">{model.material} · {model.category_label}</p>
+          <p className="mt-0.5 truncate text-[10px] text-slate-500">{model.material} · {model.category_label}</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            {overall.category ? <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-black text-white">{overall.category}</span> : null}
-            {overall.rank ? <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-slate-300">#{overall.rank}</span> : null}
-            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-slate-300">{overall.coverage_percent}% cobertura</span>
+            {overall.category ? <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-black text-white">{overall.category}</span> : null}
+            {overall.rank ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">#{overall.rank}</span> : null}
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">{overall.coverage_percent}% cobertura</span>
           </div>
         </div>
       </div>
@@ -77,10 +77,10 @@ function WinnerStrip({ winners }) {
   return (
     <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
       {Object.entries(winners || {}).filter(([key]) => key !== "quality_price").map(([key, winner]) => (
-        <div key={key} className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{winner.label}</p>
-          <p className="mt-1 text-[11px] font-bold leading-snug text-slate-200">{winner.value}</p>
-          {winner.score !== undefined ? <p className="mt-1 font-mono text-[10px] text-amber-300">{winner.score}/100</p> : null}
+        <div key={key} className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{winner.label}</p>
+          <p className="mt-1 text-[11px] font-bold leading-snug text-slate-700">{winner.value}</p>
+          {winner.score !== undefined ? <p className="mt-1 font-mono text-[10px] font-bold text-amber-600">{winner.score}/100</p> : null}
         </div>
       ))}
     </div>
@@ -194,8 +194,8 @@ function FeatureAudit({ feature }) {
       <div className="space-y-2 border-t border-slate-100 p-3 text-[10px] leading-relaxed text-slate-600">
         <p>{feature.explanation}</p>
         {feature.formula ? (
-          <div className="rounded-lg bg-slate-950 p-2.5 text-slate-200">
-            <p className="flex items-center gap-1 font-bold text-white"><Calculator className="h-3 w-3" /> Cálculo</p>
+          <div className="rounded-lg border border-slate-200 bg-slate-100/80 p-2.5 text-slate-600">
+            <p className="flex items-center gap-1 font-bold text-slate-900"><Calculator className="h-3 w-3" /> Cálculo</p>
             <p className="mt-1 font-mono text-[9px]">{feature.formula}</p>
           </div>
         ) : null}
@@ -228,7 +228,7 @@ function ModelAnalysis({ model }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="font-heading text-lg font-black text-slate-950">{model.name}</h4>
-            {model.overall.category ? <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-black text-white">{model.overall.category}</span> : null}
+            {model.overall.category ? <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">{model.overall.category}</span> : null}
             {model.overall.medal ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800"><Award className="h-3 w-3" /> {model.overall.medal}</span> : null}
           </div>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">{model.description}</p>
@@ -333,18 +333,18 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
   const spotlight = ranked.length ? ranked.slice(0, 3) : models.slice(0, 3);
 
   return (
-    <section className={`${standalone ? "" : "mt-4"} overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-xl sm:rounded-3xl`}>
+    <section className={`${standalone ? "" : "mt-4"} card-elevated overflow-hidden rounded-2xl border border-slate-200 bg-white sm:rounded-3xl`}>
       <div className="relative p-3 sm:p-5">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-100/60 blur-3xl" />
         <div className="relative flex flex-col items-start justify-between gap-3 sm:flex-row">
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-300"><Trophy className="h-5 w-5" /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-600"><Trophy className="h-5 w-5" /></span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-heading text-base font-black text-white">Overall técnico do catálogo</h3>
-                <span className="rounded-full border border-white/10 px-2 py-0.5 font-mono text-[9px] text-slate-400">{analysis.methodology.name}</span>
+                <h3 className="font-heading text-base font-black text-slate-900">Overall técnico do catálogo</h3>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[9px] text-slate-500">{analysis.methodology.name}</span>
               </div>
-              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">Comparação rápida com fórmula, norma e fonte em cada nota. É um índice Brico2 auditável — não uma certificação.</p>
+              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">Comparação rápida com fórmula, norma e fonte em cada nota. É um índice Brico2 auditável — não uma certificação.</p>
             </div>
           </div>
           <div className="grid w-full grid-cols-3 gap-2 text-center sm:w-auto">
@@ -360,12 +360,12 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
         <WinnerStrip winners={analysis.winners} />
       </div>
 
-      <details open={analysisOpen} onToggle={(event) => setAnalysisOpen(event.currentTarget.open)} className="group border-t border-white/10 bg-slate-900/60">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-extrabold text-white hover:bg-white/[0.03] sm:px-5">
-          <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-300" /> {analysisOpen ? "Ocultar análise detalhada" : "Abrir análise, comparação e auditoria completa"}</span>
-          <ArrowRight className="h-4 w-4 text-slate-500 transition group-open:rotate-90" />
+      <details open={analysisOpen} onToggle={(event) => setAnalysisOpen(event.currentTarget.open)} className="group border-t border-slate-200 bg-slate-50/70">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-extrabold text-slate-900 transition-colors hover:bg-slate-100/70 sm:px-5">
+          <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-500" /> {analysisOpen ? "Ocultar análise detalhada" : "Abrir análise, comparação e auditoria completa"}</span>
+          <ArrowRight className="h-4 w-4 text-slate-400 transition group-open:rotate-90" />
         </summary>
-        <div className="space-y-4 border-t border-white/10 bg-slate-100 p-2 sm:p-4">
+        <div className="space-y-4 border-t border-slate-200 bg-slate-50 p-2 sm:p-4">
           <div className="grid gap-4 xl:grid-cols-[22rem_1fr]">
             <div className="order-2 space-y-3 xl:order-1">
               <ComparisonPanel analysis={analysis} leftId={leftId} rightId={rightId} onLeft={setLeftId} onRight={setRightId} />
@@ -373,9 +373,9 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
                 <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900"><Database className="h-4 w-4 text-blue-700" /> Todos os modelos</p>
                 <div className="mt-2 space-y-1">
                   {models.map((model) => (
-                    <button key={model.id} type="button" onClick={() => setSelectedId(model.id)} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left ${selected.id === model.id ? "bg-slate-950 text-white" : "hover:bg-slate-50"}`}>
+                    <button key={model.id} type="button" onClick={() => setSelectedId(model.id)} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${selected.id === model.id ? "bg-slate-900 text-white shadow-md shadow-slate-400/30" : "hover:bg-slate-50"}`}>
                       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-mono text-[10px] font-black ${selected.id === model.id ? scoreTone(model.overall.score) : "border-slate-200 bg-slate-50 text-slate-600"}`}>{model.overall.score ?? "N/D"}</span>
-                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{model.name}</span><span className={`block truncate text-[9px] ${selected.id === model.id ? "text-slate-400" : "text-slate-400"}`}>{model.category_label}</span></span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{model.name}</span><span className={`block truncate text-[9px] ${selected.id === model.id ? "text-white/50" : "text-slate-400"}`}>{model.category_label}</span></span>
                       {model.conflicts.length ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> : null}
                     </button>
                   ))}
@@ -432,9 +432,9 @@ function MethodologyPanel({ methodology, models }) {
 
 function Stat({ value, label }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5">
-      <p className="font-mono text-sm font-black text-white">{value}</p>
-      <p className="text-[8px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+      <p className="font-mono text-sm font-black text-slate-900">{value}</p>
+      <p className="text-[8px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
     </div>
   );
 }

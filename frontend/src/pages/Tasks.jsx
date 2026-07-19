@@ -265,7 +265,7 @@ export default function Tasks() {
         <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
           <div className="relative">
             <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg">
+            <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
               <ListChecks className="h-7 w-7" />
             </div>
           </div>

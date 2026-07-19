@@ -392,19 +392,19 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : null}
 
       {selected.size > 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-white">
-          <span className="text-xs font-bold">{selected.size} selecionado{selected.size === 1 ? "" : "s"}</span>
+        <div className="card-elevated mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <span className="text-xs font-bold text-slate-900"><span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span> selecionado{selected.size === 1 ? "" : "s"}</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button data-testid="bulk-seen" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+            <Button data-testid="bulk-seen" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
               <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar visto</span>
             </Button>
-            <Button data-testid="bulk-archive" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkArchive} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+            <Button data-testid="bulk-archive" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkArchive} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
               {archivedView ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">{archivedView ? "Restaurar" : "Arquivar"}</span>
             </Button>
-            <Button data-testid="bulk-label-toggle" size="sm" variant="outline" disabled={bulkBusy} onClick={() => setBulkLabelOpen((v) => !v)} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+            <Button data-testid="bulk-label-toggle" size="sm" variant="outline" disabled={bulkBusy} onClick={() => setBulkLabelOpen((v) => !v)} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
               <Tag className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Etiqueta</span>
             </Button>
-            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2 text-xs text-white hover:bg-white/10 hover:text-white">
+            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -1080,7 +1080,7 @@ export default function Emails() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
-        <TabsList className="grid h-11 w-full grid-cols-5 rounded-xl bg-slate-900 p-1 text-white/55 shadow-lg shadow-slate-300/50 [&_[data-state=active]]:bg-white [&_[data-state=active]]:text-slate-900 [&_[data-state=active]]:shadow-md">
+        <TabsList className="card-elevated grid h-11 w-full grid-cols-5 rounded-xl border border-slate-200 bg-white p-1 text-slate-500 [&_[data-state=active]]:bg-slate-900 [&_[data-state=active]]:text-white [&_[data-state=active]]:shadow-md [&_[data-state=active]]:shadow-slate-400/30">
           <TabsTrigger value="inbox" data-testid="emails-tab-inbox" className="rounded-lg font-bold"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
           <TabsTrigger value="sent" data-testid="emails-tab-sent" className="rounded-lg font-bold"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
           <TabsTrigger value="threads" data-testid="emails-tab-threads" className="rounded-lg font-bold"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>

@@ -213,18 +213,18 @@ export default function Layout() {
             </div>
           ))}
         </nav>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-black p-4 text-white shadow-lg shadow-slate-400/30">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-red-600/25 blur-2xl" />
-          <p className="relative flex items-center gap-1.5 text-xs font-extrabold">
-            <Sparkles className="h-3.5 w-3.5 text-red-400" /> Nunca esquecer
+        <div className="card-elevated relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-red-200/50 blur-2xl" />
+          <p className="relative flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
+            <Sparkles className="h-3.5 w-3.5 text-red-500" /> Nunca esquecer
           </p>
-          <p className="relative mt-1.5 text-[11px] leading-relaxed text-white/60">
+          <p className="relative mt-1.5 text-[11px] leading-relaxed text-slate-500">
             Pedidos sem ação regressam ao topo até serem tratados.
           </p>
           <div className="relative mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
             {TIPS.map((tip) => (
-              <span key={tip.k} className="flex items-center gap-1 text-[10px] text-white/50">
-                <kbd className="rounded border border-white/15 bg-white/10 px-1 font-mono text-[9px] font-bold text-white/80">{tip.k}</kbd>
+              <span key={tip.k} className="flex items-center gap-1 text-[10px] text-slate-400">
+                <kbd className="rounded border border-slate-200 bg-white px-1 font-mono text-[9px] font-bold text-slate-600 shadow-sm">{tip.k}</kbd>
                 {tip.t}
               </span>
             ))}

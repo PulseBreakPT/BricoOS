@@ -32,47 +32,47 @@ export default function Catalog() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <header className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-xl sm:rounded-3xl">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-60" />
+      <header className="card-elevated relative overflow-hidden rounded-2xl border border-slate-200 bg-white sm:rounded-3xl">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid opacity-70" />
         <div className="relative p-4 sm:p-6 lg:p-8">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-          <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-red-600/10 blur-3xl" />
-          <Link to="/" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-200/40 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-red-200/30 blur-3xl" />
+          <Link to="/" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 transition-colors hover:text-slate-900">
             <ArrowLeft className="h-3.5 w-3.5" /> Voltar aos pedidos
           </Link>
 
           <div className="relative mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-300">
+              <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700">
                 <BookOpenCheck className="h-4 w-4" /> Centro técnico BandAlumínios
               </div>
-              <h1 className="mt-2 font-heading text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+              <h1 className="mt-2 font-heading text-2xl font-black tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
                 Compare primeiro. Escolha depois.
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
                 Rankings, classificações, normas e fontes ficam concentrados aqui, sem alongar o preenchimento do pedido.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold text-emerald-200">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
                   <ShieldCheck className="h-3 w-3" /> Apenas dados verificáveis
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-200">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
                   <Ruler className="h-3 w-3" /> {catalog?.aviso || "Vãos vistos por dentro"}
                 </span>
               </div>
             </div>
 
             {catalog?.catalog_meta?.source_url ? (
-              <a href={catalog.catalog_meta.source_url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.06] px-3 text-xs font-bold text-white hover:bg-white/[0.1]">
+              <a href={catalog.catalog_meta.source_url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
                 Catálogo oficial <ExternalLink className="h-3.5 w-3.5" />
               </a>
             ) : null}
           </div>
         </div>
 
-        <div className="flex h-3 items-end justify-between overflow-hidden border-t border-white/10 px-4 sm:px-6">
+        <div className="flex h-3 items-end justify-between overflow-hidden border-t border-slate-200 bg-slate-50/80 px-4 sm:px-6">
           {Array.from({ length: 32 }).map((_, index) => (
-            <span key={index} className={`block w-px shrink-0 bg-amber-300/50 ${index % 5 === 0 ? "h-3" : "h-1.5"}`} />
+            <span key={index} className={`block w-px shrink-0 bg-amber-500/60 ${index % 5 === 0 ? "h-3" : "h-1.5"}`} />
           ))}
         </div>
       </header>

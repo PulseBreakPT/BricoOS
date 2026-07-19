@@ -55,11 +55,11 @@ export default function AiAssistantPanel() {
           data-testid="ai-assistant-panel"
           className="fixed inset-x-3 bottom-[calc(13.5rem+env(safe-area-inset-bottom))] z-40 flex h-[60vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:inset-x-auto sm:right-4 sm:h-[520px] sm:w-96 lg:bottom-40"
         >
-          <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-900 px-4 py-3 text-white">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <p className="flex-1 text-sm font-bold">Assistente</p>
+          <div className="flex items-center gap-2 border-b border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-3">
+            <Sparkles className="h-4 w-4 shrink-0 text-red-500" />
+            <p className="flex-1 text-sm font-bold text-slate-900">Assistente</p>
             {activeContext ? (
-              <span className="max-w-[45%] truncate rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold">{activeContext.label}</span>
+              <span className="max-w-[45%] truncate rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{activeContext.label}</span>
             ) : null}
           </div>
           <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3">
