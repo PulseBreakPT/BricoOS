@@ -124,7 +124,7 @@ export default function Tasks() {
             {t.due_date ? (
               <span
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  overdue ? "bg-red-100 text-red-700" : isToday(t.due_date) ? "bg-neutral-900 text-white" : "bg-slate-100 text-slate-600"
+                  overdue ? "bg-red-100 text-red-700" : isToday(t.due_date) ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
                 }`}
               >
                 <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}

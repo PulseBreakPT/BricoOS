@@ -13,9 +13,9 @@ const KIND_ICON = {
   reminder_overdue: Bell,
 };
 const SEV = {
-  high: { ring: "border-red-200 bg-red-50", icon: "bg-red-600 text-white", dot: "#DC2626" },
-  medium: { ring: "border-neutral-300 bg-neutral-50", icon: "bg-black text-white", dot: "#0A0A0A" },
-  low: { ring: "border-slate-200 bg-slate-50", icon: "bg-slate-100 text-slate-600", dot: "#64748B" },
+  high: { ring: "border-red-200 bg-red-50", icon: "bg-red-100 text-red-600", dot: "#DC2626" },
+  medium: { ring: "border-amber-200 bg-amber-50", icon: "bg-amber-100 text-amber-600", dot: "#D97706" },
+  low: { ring: "border-blue-200 bg-blue-50", icon: "bg-blue-100 text-blue-600", dot: "#2563EB" },
 };
 
 export default function NotificationsBell({ variant = "sidebar" }) {
@@ -74,7 +74,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
         <div className="mt-5 space-y-2.5">
           {data.items.length === 0 ? (
             <div className="mt-16 flex flex-col items-center text-center text-slate-400">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-900">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500">
                 <Bell className="h-7 w-7" />
               </div>
               <p className="mt-4 font-heading text-base font-extrabold text-slate-700">Tudo em dia</p>

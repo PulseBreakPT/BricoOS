@@ -153,7 +153,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
           </div>
         </div>
         {!form.due_date && form.repeat !== "none" ? (
-          <p className="text-xs text-red-600">Defina uma data limite para poder repetir a tarefa.</p>
+          <p className="text-xs text-amber-600">Defina uma data limite para poder repetir a tarefa.</p>
         ) : null}
 
         <div className="space-y-2">

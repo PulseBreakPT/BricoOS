@@ -43,9 +43,9 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
                 e.stopPropagation();
                 onToggleFavorite(note);
               }}
-              className="shrink-0 rounded-lg p-1 text-slate-300 transition-colors hover:text-red-500"
+              className="shrink-0 rounded-lg p-1 text-slate-300 transition-colors hover:text-amber-400"
             >
-              <Star className={`h-4 w-4 ${note.favorite ? "fill-red-500 text-red-500" : ""}`} />
+              <Star className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
             </button>
           </div>
 

@@ -11,7 +11,7 @@ import api, { getErrorMessage } from "@/lib/api";
 const FIELD_LABELS = { subject: "Assunto", body: "Corpo", from_email: "Remetente", category: "Categoria (IA)" };
 const OP_LABELS = { contains: "contém", equals: "é igual a" };
 const ACTION_LABELS = { archive: "Arquivar", label: "Adicionar etiqueta", priority: "Definir prioridade" };
-const SELECT_CLS = "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-red-500";
+const SELECT_CLS = "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500";
 
 const EMPTY = { name: "", enabled: true, conditions: [{ field: "subject", op: "contains", value: "" }], actions: [{ type: "archive", value: "" }] };
 

@@ -34,14 +34,14 @@ export default function Catalog() {
     <div className="space-y-4 sm:space-y-6">
       <header className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-xl sm:rounded-3xl">
         <div className="relative p-4 sm:p-6 lg:p-8">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-red-600/20 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
           <Link to="/" className="relative inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" /> Voltar aos pedidos
           </Link>
 
           <div className="relative mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-red-400">
+              <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-300">
                 <BookOpenCheck className="h-4 w-4" /> Centro técnico BandAlumínios
               </div>
               <h1 className="mt-2 font-heading text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
@@ -51,10 +51,10 @@ export default function Catalog() {
                 Rankings, classificações, normas e fontes ficam concentrados aqui, sem alongar o preenchimento do pedido.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold text-emerald-200">
                   <ShieldCheck className="h-3 w-3" /> Apenas dados verificáveis
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-red-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-200">
                   <Ruler className="h-3 w-3" /> {catalog?.aviso || "Vãos vistos por dentro"}
                 </span>
               </div>
@@ -70,7 +70,7 @@ export default function Catalog() {
 
         <div className="flex h-3 items-end justify-between overflow-hidden border-t border-white/10 px-4 sm:px-6">
           {Array.from({ length: 32 }).map((_, index) => (
-            <span key={index} className={`block w-px shrink-0 bg-red-400/50 ${index % 5 === 0 ? "h-3" : "h-1.5"}`} />
+            <span key={index} className={`block w-px shrink-0 bg-amber-300/50 ${index % 5 === 0 ? "h-3" : "h-1.5"}`} />
           ))}
         </div>
       </header>
