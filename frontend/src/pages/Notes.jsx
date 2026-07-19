@@ -4,7 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
-  PhoneMissed, TrendingUp, Frame, Store, MailCheck,
+  PhoneMissed, TrendingUp, Frame, Store, MailCheck, KanbanSquare, LayoutGrid,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
@@ -13,6 +13,7 @@ import {
   getNextActionCta, getNextActionMode,
 } from "@/lib/pedido";
 import PedidoCard from "@/components/PedidoCard";
+import PedidoKanban from "@/components/PedidoKanban";
 import PedidoDetail from "@/components/PedidoDetail";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import { Input } from "@/components/ui/input";
@@ -124,6 +125,7 @@ export default function Notes() {
   const [confirmNote, setConfirmNote] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
+  const [kanbanView, setKanbanView] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -290,6 +292,13 @@ export default function Notes() {
       openNote(data.id);
     } catch (e) { toast.error(getErrorMessage(e)); }
   };
+  const changeStatus = async (note, status) => {
+    try {
+      await api.patch(`/notes/${note.id}/status`, { status });
+      toast.success(`Estado alterado para "${getStatusCfg(status).label}"`);
+      reloadAll();
+    } catch (e) { toast.error(getErrorMessage(e, "Erro ao mudar de estado")); }
+  };
   const sendReminder = async (note) => {
     if (!note.supplier_id) {
       toast.message("Escolha o fornecedor no separador Orçamentos.");
@@ -311,7 +320,7 @@ export default function Notes() {
       openNote(note.id);
     }
   };
-  const actions = { toggleFav, advance, contactClient, resolve, reopen, duplicate, sendReminder };
+  const actions = { toggleFav, advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus };
 
   // ---- Keyboard shortcuts ----
   useEffect(() => {
@@ -475,8 +484,11 @@ export default function Notes() {
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo..." className="h-11 rounded-xl pl-10" />
           </div>
-          <Button data-testid="focus-mode-btn" variant={focusMode ? "default" : "outline"} onClick={() => setFocusMode((v) => !v)} className="h-11 shrink-0 rounded-xl" title="Modo de foco (F)">
+          <Button data-testid="focus-mode-btn" variant={focusMode ? "default" : "outline"} onClick={() => { setFocusMode((v) => !v); setKanbanView(false); }} className="h-11 shrink-0 rounded-xl" title="Modo de foco (F)">
             <Focus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Foco</span>
+          </Button>
+          <Button data-testid="kanban-view-btn" variant={kanbanView ? "default" : "outline"} onClick={() => { setKanbanView((v) => !v); setFocusMode(false); }} className="h-11 shrink-0 rounded-xl" title="Vista Kanban">
+            {kanbanView ? <LayoutGrid className="h-4 w-4 sm:mr-2" /> : <KanbanSquare className="h-4 w-4 sm:mr-2" />} <span className="hidden sm:inline">{kanbanView ? "Lista" : "Kanban"}</span>
           </Button>
           <Popover>
             <PopoverTrigger asChild>
@@ -582,6 +594,8 @@ export default function Notes() {
             />
           ) : null}
         </div>
+      ) : kanbanView ? (
+        <PedidoKanban items={items} onOpen={openNote} onMove={changeStatus} />
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
@@ -592,7 +606,7 @@ export default function Notes() {
         </div>
       )}
 
-      {!loading && items.length === 0 && !focusMode ? (
+      {!loading && items.length === 0 && !focusMode && !kanbanView ? (
         <div className="mt-16 flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><SegIcon className="h-7 w-7" /></div>
           <p className="mt-4 font-heading text-lg font-bold text-slate-900">Sem pedidos nesta área</p>
