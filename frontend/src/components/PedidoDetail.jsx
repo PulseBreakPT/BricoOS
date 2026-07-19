@@ -18,7 +18,7 @@ import {
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
-  FileUp, FileText, Download, Inbox, RefreshCw,
+  FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -42,6 +42,7 @@ const emptyForm = {
 };
 
 const DRAFT_KEY = "brico_draft_new_note";
+const MAX_PHOTOS_PER_NOTE = 30;
 
 const ACT_ICONS = {
   created: Sparkles, status_change: ArrowRightLeft, priority_change: Flag,
@@ -49,6 +50,7 @@ const ACT_ICONS = {
   email_sent: Send, email_received: Inbox, comment: MessageSquare, updated: Pencil, task_added: Bell,
   client_contact: PhoneCall, supplier_contact: PhoneCall,
   contact_attempt: PhoneMissed, auto_archived: Cloud,
+  photo_added: Camera, photo_removed: ImageOff,
 };
 
 // Registos de um toque: gravam o resultado do contacto na cronologia e
@@ -104,6 +106,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const supplierPdfInputRef = useRef(null);
 
+  // Fotos do pedido — disponíveis tanto em Pedidos Gerais como em Banda
+  // Alumínios (ex.: fotos do local, do vão, de danos, de referência).
+  const [photos, setPhotos] = useState([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const photoInputRef = useRef(null);
+
   // Assistente de criação por etapas: escolha do tipo → passos
   const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
   const [createStep, setCreateStep] = useState(0);
@@ -127,13 +137,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
-    const [q, a, t, m] = await Promise.all([
+    const [q, a, t, m, p] = await Promise.all([
       api.get(`/notes/${nid}/quotes`),
       api.get(`/notes/${nid}/activities`),
       api.get(`/notes/${nid}/tasks`),
       api.get(`/notes/${nid}/emails`).catch(() => ({ data: [] })),
+      api.get(`/notes/${nid}/photos`).catch(() => ({ data: [] })),
     ]);
     setQuotes(q.data); setActivities(a.data); setTasks(t.data); setReceivedEmails(m.data || []);
+    setPhotos(p.data || []);
   }, []);
 
   const loadNote = useCallback(async (nid) => {
@@ -175,6 +187,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
       setAutoState("idle");
+      setPhotos([]);
+      setLightboxPhoto(null);
       // Cada área abre logo o assistente certo: «band» na área Banda
       // Alumínios, «normal» na área geral da loja.
       setCreateMode(initialCreateMode || "choice");
@@ -581,6 +595,41 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       if (supplierPdfInputRef.current) supplierPdfInputRef.current.value = "";
     }
   };
+
+  // ---- Fotos do pedido ----
+  const uploadPhotos = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploadingPhotos(true);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const { data } = await api.post(`/notes/${id}/photos`, fd);
+      setPhotos((prev) => [...prev, ...data]);
+      toast.success(`${data.length} foto${data.length === 1 ? "" : "s"} adicionada${data.length === 1 ? "" : "s"}`);
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível adicionar as fotos"));
+    } finally {
+      setUploadingPhotos(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
+  const deletePhoto = async (photoId) => {
+    setDeletingPhotoId(photoId);
+    try {
+      await api.delete(`/notes/${id}/photos/${photoId}`);
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      if (lightboxPhoto?.id === photoId) setLightboxPhoto(null);
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível remover a foto"));
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
   const setSqItem = (n, patch) => {
     setSq((q) => ({ ...q, items: q.items.map((i) => (i.n === n ? { ...i, ...patch } : i)) }));
   };
@@ -937,9 +986,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
             {/* No telemóvel as tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
-            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-4">
+            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-5">
               <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="shrink-0 text-xs">Detalhes</TabsTrigger>
               <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="shrink-0 text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
+              <TabsTrigger value="fotos" data-testid="tab-fotos" className="shrink-0 text-xs" disabled={isCreate}>
+                Fotos{photos.length ? ` (${photos.length})` : ""}
+              </TabsTrigger>
               <TabsTrigger value="cronologia" data-testid="tab-cronologia" className="shrink-0 text-xs" disabled={isCreate}>Cronologia</TabsTrigger>
               <TabsTrigger value="tarefas" data-testid="tab-tarefas" className="shrink-0 text-xs" disabled={isCreate}>Lembretes</TabsTrigger>
             </TabsList>
@@ -1429,6 +1481,81 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
             </TabsContent>
 
+            {/* FOTOS — disponível tanto em Pedidos Gerais como em Banda Alumínios */}
+            <TabsContent value="fotos" className="mt-0 focus-visible:outline-none">
+              <section data-testid="photos-panel">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
+                      <Camera className="h-4 w-4 text-slate-700" /> Fotos do pedido
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Fotos do local, do vão, de danos ou de referência — até {MAX_PHOTOS_PER_NOTE} por pedido.
+                    </p>
+                  </div>
+                  <input
+                    ref={photoInputRef}
+                    data-testid="photo-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => uploadPhotos(e.target.files)}
+                  />
+                  <Button
+                    data-testid="photo-upload-btn"
+                    size="sm"
+                    disabled={uploadingPhotos || photos.length >= MAX_PHOTOS_PER_NOTE}
+                    onClick={() => photoInputRef.current?.click()}
+                    className="rounded-xl"
+                  >
+                    {uploadingPhotos ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-1.5 h-4 w-4" />}
+                    Adicionar fotos
+                  </Button>
+                </div>
+
+                {photos.length === 0 ? (
+                  <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-12 text-center text-slate-400">
+                    <Camera className="h-8 w-8" />
+                    <p className="mt-3 text-sm font-semibold">Sem fotos ainda.</p>
+                    <p className="mt-0.5 text-xs">Toque em "Adicionar fotos" para tirar ou escolher uma foto.</p>
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+                    {photos.map((p) => (
+                      <div
+                        key={p.id}
+                        data-testid={`photo-thumb-${p.id}`}
+                        className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setLightboxPhoto(p)}
+                          className="block h-full w-full"
+                        >
+                          <img
+                            src={withDeviceToken(`${API}/notes/${id}/files/${p.id}`)}
+                            alt={p.filename}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`photo-delete-${p.id}`}
+                          onClick={() => deletePhoto(p.id)}
+                          disabled={deletingPhotoId === p.id}
+                          className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-red-600 active:scale-90 group-hover:opacity-100"
+                        >
+                          {deletingPhotoId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+
             {/* CRONOLOGIA */}
             <TabsContent value="cronologia" className="mt-0 focus-visible:outline-none">
               <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
@@ -1530,6 +1657,46 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         note={note}
         onDone={refresh}
       />
+
+      <Dialog open={!!lightboxPhoto} onOpenChange={(v) => { if (!v) setLightboxPhoto(null); }}>
+        <DialogContent data-testid="photo-lightbox" className="max-w-3xl border-0 bg-transparent p-0 shadow-none">
+          {lightboxPhoto ? (
+            <div className="overflow-hidden rounded-2xl bg-slate-950">
+              <img
+                src={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
+                alt={lightboxPhoto.filename}
+                className="max-h-[75vh] w-full object-contain"
+              />
+              <div className="flex items-center justify-between gap-2 bg-slate-950 p-3">
+                <p className="truncate text-xs font-medium text-slate-300">{lightboxPhoto.filename}</p>
+                <div className="flex shrink-0 gap-1.5">
+                  <a
+                    href={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
+                    download={lightboxPhoto.filename}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Button size="sm" variant="outline" className="rounded-xl bg-white/10 text-white hover:bg-white/20" data-testid="photo-download">
+                      <Download className="mr-1.5 h-3.5 w-3.5" /> Descarregar
+                    </Button>
+                  </a>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={deletingPhotoId === lightboxPhoto.id}
+                    onClick={() => deletePhoto(lightboxPhoto.id)}
+                    className="rounded-xl"
+                    data-testid="photo-lightbox-delete"
+                  >
+                    {deletingPhotoId === lightboxPhoto.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
+                    Remover
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
