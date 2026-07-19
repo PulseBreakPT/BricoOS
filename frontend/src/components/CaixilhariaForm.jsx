@@ -555,7 +555,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
           ) : null}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-amber-700">Escolha primeiro o material.</p>
+        <p className="mt-2 text-xs text-amber-700">Escolhe primeiro o material.</p>
       )}
 
       {selectedModel ? (

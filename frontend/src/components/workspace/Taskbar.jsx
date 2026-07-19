@@ -42,7 +42,7 @@ export default function Taskbar() {
 
       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
         {panels.length === 0 ? (
-          <span className="text-xs text-slate-400">Sem painéis abertos — escolha uma aplicação à esquerda.</span>
+          <span className="text-xs text-slate-400">Sem painéis abertos — escolhe uma aplicação à esquerda.</span>
         ) : panels.map((p) => {
           const meta = PANEL_TYPES[p.type];
           if (!meta) return null;

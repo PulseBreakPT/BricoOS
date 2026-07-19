@@ -54,7 +54,7 @@ export default function Tasks() {
   useEffect(() => { load(); }, [load]);
 
   const add = async () => {
-    if (!title.trim()) { toast.error("Escreva a tarefa."); return; }
+    if (!title.trim()) { toast.error("Escreve a tarefa."); return; }
     try {
       await api.post("/tasks", { title: title.trim(), category: addCategory, priority: addPriority });
       setTitle("");
@@ -270,7 +270,7 @@ export default function Tasks() {
             </div>
           </div>
           <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Nada por fazer aqui</p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">Escreva a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</p>
+          <p className="mt-1 max-w-xs text-sm text-slate-500">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</p>
         </div>
       ) : null}
 

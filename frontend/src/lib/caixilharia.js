@@ -109,9 +109,9 @@ export function normalizeCaixilhariaSpec(spec) {
 
 export function validateCaixilhariaSpec(spec, catalog) {
   const normalized = normalizeCaixilhariaSpec(spec);
-  if (!normalized.linhas.length) return { ok: false, error: "Adicione pelo menos um elemento." };
+  if (!normalized.linhas.length) return { ok: false, error: "Adiciona pelo menos um elemento." };
   if (normalized.tipo_pedido === "encomenda" && normalized.linhas.some((line) => line.opcoes.length > 1)) {
-    return { ok: false, error: "Numa encomenda escolha uma só opção por elemento. Para comparar materiais, use Orçamento." };
+    return { ok: false, error: "Numa encomenda escolhe uma só opção por elemento. Para comparar materiais, usa Orçamento." };
   }
 
   const lines = [];
@@ -124,14 +124,14 @@ export function validateCaixilhariaSpec(spec, catalog) {
     const leaves = line.numero_folhas === "" || line.numero_folhas === null
       ? null : parseInt(line.numero_folhas, 10);
     if (!quantity || quantity < 1 || quantity > 999) {
-      return { ok: false, error: `Elemento ${number}: indique uma quantidade entre 1 e 999.` };
+      return { ok: false, error: `Elemento ${number}: indica uma quantidade entre 1 e 999.` };
     }
     if (!width || !height || width < 50 || height < 50 || width > 10000 || height > 10000) {
       return { ok: false, error: `Elemento ${number}: largura e altura devem estar entre 50 e 10000 mm.` };
     }
-    if (!line.opcoes.length) return { ok: false, error: `Elemento ${number}: adicione uma opção de fabrico.` };
+    if (!line.opcoes.length) return { ok: false, error: `Elemento ${number}: adiciona uma opção de fabrico.` };
     if (leaves !== null && (!leaves || leaves < 1 || leaves > 6)) {
-      return { ok: false, error: `Elemento ${number}: indique entre 1 e 6 folhas.` };
+      return { ok: false, error: `Elemento ${number}: indica entre 1 e 6 folhas.` };
     }
 
     const seen = new Set();
@@ -139,7 +139,7 @@ export function validateCaixilhariaSpec(spec, catalog) {
     for (const [optionIndex, option] of line.opcoes.entries()) {
       const optionNumber = optionIndex + 1;
       if (!option.familia || !option.sistema) {
-        return { ok: false, error: `Elemento ${number}, opção ${optionNumber}: escolha o material e o sistema.` };
+        return { ok: false, error: `Elemento ${number}, opção ${optionNumber}: escolhe o material e o sistema.` };
       }
       const family = catalog?.familias?.[option.familia];
       if (family && !family.produtos.includes(line.produto)) {
@@ -159,7 +159,7 @@ export function validateCaixilhariaSpec(spec, catalog) {
       if (glazing && model?.glass_limit_mm && glazing > model.glass_limit_mm) {
         warnings.push(
           `Elemento ${number}, opção ${optionNumber}: a composição indicada soma ${glazing} mm e ultrapassa `
-          + `os ${model.glass_limit_mm} mm publicados para ${model.name}. Confirme com a BandAlumínios.`,
+          + `os ${model.glass_limit_mm} mm publicados para ${model.name}. Confirma com a BandAlumínios.`,
         );
       }
       const maxWhite = model?.max_dimensions?.white;
@@ -176,7 +176,7 @@ export function validateCaixilhariaSpec(spec, catalog) {
     }
 
     if (line.produto === "porta" && width > height) {
-      warnings.push(`Elemento ${number}: a largura da porta é maior do que a altura; confirme a ordem das medidas.`);
+      warnings.push(`Elemento ${number}: a largura da porta é maior do que a altura; confirma a ordem das medidas.`);
     }
     lines.push({
       ...line, quantidade: quantity, largura_mm: width, altura_mm: height,

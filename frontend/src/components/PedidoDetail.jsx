@@ -289,7 +289,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   const saveDetails = async () => {
     if (!form.customer_name && !form.description) {
-      toast.error("Preencha o cliente ou a descrição."); return;
+      toast.error("Preenche o cliente ou a descrição."); return;
     }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       toast.error("O email do cliente não parece válido."); return;
@@ -347,7 +347,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   const validClientStep = () => {
     if (!form.customer_name.trim() && !form.phone.trim()) {
-      toast.error("Indique pelo menos o nome ou o telefone do cliente."); return false;
+      toast.error("Indica pelo menos o nome ou o telefone do cliente."); return false;
     }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       toast.error("O email do cliente não parece válido."); return false;
@@ -366,7 +366,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const wizardNext = () => {
     if (createStep === 0 && !validClientStep()) return;
     if (createMode === "normal" && createStep === 1 && !form.description.trim()) {
-      toast.error("Descreva o pedido do cliente."); return;
+      toast.error("Descreve o pedido do cliente."); return;
     }
     setCreateStep((s) => s + 1);
   };
@@ -430,10 +430,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     if (mode !== "status") {
       setTab("orcamentos");
       const guidance = {
-        compose_supplier_email: "Revise e envie o email ao fornecedor. O estado muda automaticamente depois do envio.",
-        record_quote: "Registe o orçamento recebido. O estado muda automaticamente quando o guardar.",
-        reply_to_client: "Prepare a resposta ao cliente e anexe o orçamento antes de registar o envio.",
-        record_client_decision: "Registe a decisão aprovando um orçamento ou escolhendo o estado adequado.",
+        compose_supplier_email: "Revê e envia o email ao fornecedor. O estado muda automaticamente depois do envio.",
+        record_quote: "Regista o orçamento recebido. O estado muda automaticamente quando o guardares.",
+        reply_to_client: "Prepara a resposta ao cliente e anexa o orçamento antes de registar o envio.",
+        record_client_decision: "Regista a decisão aprovando um orçamento ou escolhendo o estado adequado.",
       };
       toast.message(getNextActionCta(note), { description: guidance[mode] });
       return;
@@ -502,7 +502,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
 
   const addTask = async () => {
-    if (!newTask.title.trim()) { toast.error("Escreva o lembrete."); return; }
+    if (!newTask.title.trim()) { toast.error("Escreve o lembrete."); return; }
     await api.post(`/notes/${id}/tasks`, { title: newTask.title.trim(), due_date: newTask.due_date });
     setNewTask({ title: "", due_date: "" });
     await refresh();
@@ -523,7 +523,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     toast.success("Email copiado");
   };
   const sendEmail = async () => {
-    if (!emailSupplier) { toast.error("Escolha um fornecedor."); return; }
+    if (!emailSupplier) { toast.error("Escolhe um fornecedor."); return; }
     const sup = suppliers.find((s) => s.id === emailSupplier);
     const kind = isReminder ? "o LEMBRETE" : "o pedido de cotação";
     if (!window.confirm(`Confirmar envio d${kind} a ${sup?.name || "fornecedor"} (${sup?.email || "sem email"})?\n\nAssunto: ${emailData.subject}`)) return;
@@ -547,7 +547,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
   const openClientEmail = () => {
     const to = (form.email || clientEmailData.to || "").trim();
-    if (!to) { toast.error("Adicione primeiro o email do cliente nos Detalhes."); return; }
+    if (!to) { toast.error("Adiciona primeiro o email do cliente nos Detalhes."); return; }
     const url = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(clientEmailData.subject)}&body=${encodeURIComponent(clientEmailData.body)}`;
     window.location.href = url;
   };
@@ -603,7 +603,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       const fd = new FormData();
       fd.append("file", file);
       await api.post(`/notes/${id}/supplier-pdf`, fd);
-      toast.success("Orçamento do fornecedor importado — reveja os preços de venda");
+      toast.success("Orçamento do fornecedor importado — revê os preços de venda");
       await refresh();
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível ler o PDF do fornecedor"));
@@ -750,7 +750,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
                 {isCreate
                   ? (createMode === "choice"
-                    ? "Escolha o tipo de pedido"
+                    ? "Escolhe o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
                   : (form.phone
                     ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
@@ -1268,7 +1268,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div>
                       <p className="font-semibold">Gmail não ligado</p>
-                      <p className="text-xs">Ligue o Gmail para enviar automaticamente, ou copie o email.</p>
+                      <p className="text-xs">Liga o Gmail para enviar automaticamente, ou copia o email.</p>
                       {gmailStatus?.configured ? (
                         <Button data-testid="connect-gmail-inline" size="sm" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-2 h-8 rounded-lg bg-amber-600 hover:bg-amber-700">Ligar Gmail</Button>
                       ) : null}
@@ -1381,7 +1381,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         {note.pending_client_send.pdf_filename || "PDF"} anexado
                         {note.pending_client_send.total != null ? ` · ${Number(note.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                         {note.pending_client_send.eff_margin_pct != null ? ` · margem ${Number(note.pending_client_send.eff_margin_pct).toFixed(1)}%` : ""}
-                        {" — nada é enviado sem a sua confirmação."}
+                        {" — nada é enviado sem a tua confirmação."}
                       </p>
                     </div>
                     <Button
@@ -1404,7 +1404,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <h4 className="font-heading text-sm font-extrabold text-slate-900">Orçamento do fornecedor (PDF)</h4>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      Envie o PDF da BandAluminios: a app lê as linhas, sugere preços de venda e gera o PDF com a marca da loja para entregar ao cliente.
+                      Envia o PDF da BandAluminios: a app lê as linhas, sugere preços de venda e gera o PDF com a marca da loja para entregar ao cliente.
                     </p>
                   </div>
                 </div>
@@ -1551,7 +1551,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
                   {!form.email ? (
                     <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800">
-                      <span className="font-bold">Falta o email do cliente.</span> Toque aqui para o adicionar nos Detalhes.
+                      <span className="font-bold">Falta o email do cliente.</span> Toca aqui para o adicionar nos Detalhes.
                     </button>
                   ) : (
                     <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 font-mono text-xs text-slate-600">Para: {form.email}</p>
@@ -1623,7 +1623,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-12 text-center text-slate-400">
                     <Camera className="h-8 w-8" />
                     <p className="mt-3 text-sm font-semibold">Sem fotos ainda.</p>
-                    <p className="mt-0.5 text-xs">Toque em "Adicionar fotos" para tirar ou escolher uma foto.</p>
+                    <p className="mt-0.5 text-xs">Toca em "Adicionar fotos" para tirar ou escolher uma foto.</p>
                   </div>
                 ) : (
                   <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">

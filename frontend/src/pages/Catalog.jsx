@@ -47,7 +47,7 @@ export default function Catalog() {
                 <BookOpenCheck className="h-4 w-4" /> Centro técnico BandAlumínios
               </div>
               <h1 className="mt-2 font-heading text-2xl font-black tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-                Compare primeiro. Escolha depois.
+                Compara primeiro. Escolhe depois.
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
                 Rankings, classificações, normas e fontes ficam concentrados aqui, sem alongar o preenchimento do pedido.

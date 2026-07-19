@@ -149,14 +149,14 @@ export default function PinGate({ children }) {
       setTimeout(() => setFlash(false), 650);
       if (data.locked) {
         applyServerState(data);
-        setError("Demasiadas tentativas. Aguarde para tentar novamente.");
+        setError("Demasiadas tentativas. Aguarda para tentar novamente.");
       } else {
         setAttemptsLeft(data.attempts_left ?? 0);
         setError(`PIN incorreto. Resta${data.attempts_left === 1 ? "" : "m"} ${data.attempts_left} tentativa${data.attempts_left === 1 ? "" : "s"}.`);
       }
     } catch {
       setPin("");
-      setError("Não foi possível verificar o PIN. Tente novamente.");
+      setError("Não foi possível verificar o PIN. Tenta novamente.");
     } finally {
       setCheckingPin(false);
     }
@@ -216,7 +216,7 @@ export default function PinGate({ children }) {
             <Check className="h-8 w-8" strokeWidth={2.5} />
           </span>
           <p className="mt-5 font-heading text-xl font-extrabold tracking-tight text-slate-900">Acesso confirmado</p>
-          <p className="mt-1 text-sm text-slate-500">A preparar o seu painel…</p>
+          <p className="mt-1 text-sm text-slate-500">A preparar o teu painel…</p>
           <div className="mt-5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
             <div className="h-full w-full origin-left animate-[fade-up_0.6s_ease-out] rounded-full bg-gradient-to-r from-red-600 to-red-400" />
           </div>
@@ -246,7 +246,7 @@ export default function PinGate({ children }) {
         </div>
 
         <p className="mt-3 h-4 animate-fade-up text-center text-xs text-slate-500" style={{ "--stagger-i": 2 }}>
-          {locked ? "Acesso bloqueado por tentativas falhadas." : "Introduza o PIN de 6 dígitos para verificar este dispositivo."}
+          {locked ? "Acesso bloqueado por tentativas falhadas." : "Introduz o PIN de 6 dígitos para verificar este dispositivo."}
         </p>
 
         {locked ? (

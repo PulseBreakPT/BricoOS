@@ -85,7 +85,7 @@ export default function Suppliers() {
   const removeContact = (i) => setForm((f) => ({ ...f, contacts: f.contacts.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
-    if (!form.name.trim()) { toast.error("Indique o nome do fornecedor."); return; }
+    if (!form.name.trim()) { toast.error("Indica o nome do fornecedor."); return; }
     if (form.email && !EMAIL_RX.test(form.email.trim())) {
       toast.error("O email do fornecedor não parece válido.");
       return;
@@ -263,7 +263,7 @@ export default function Suppliers() {
             </div>
           </div>
           <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Ainda sem fornecedores</p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">Adicione o primeiro contacto para começar a pedir orçamentos num clique.</p>
+          <p className="mt-1 max-w-xs text-sm text-slate-500">Adiciona o primeiro contacto para começar a pedir orçamentos num clique.</p>
           <button onClick={openNew} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
             <Plus className="h-4 w-4" strokeWidth={2.6} /> Adicionar fornecedor
           </button>

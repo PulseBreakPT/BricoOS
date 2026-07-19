@@ -102,10 +102,10 @@ export default function InstallPwaBanner() {
                 ) : (
                     <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                         <p className="flex items-center gap-1.5">
-                            <Share className="h-3.5 w-3.5 shrink-0" /> 1. Toque em "Partilhar" na barra do Safari
+                            <Share className="h-3.5 w-3.5 shrink-0" /> 1. Toca em "Partilhar" na barra do Safari
                         </p>
                         <p className="mt-1.5 flex items-center gap-1.5">
-                            <SquarePlus className="h-3.5 w-3.5 shrink-0" /> 2. Escolha "Adicionar ao Ecrã Principal"
+                            <SquarePlus className="h-3.5 w-3.5 shrink-0" /> 2. Escolhe "Adicionar ao Ecrã Principal"
                         </p>
                     </div>
                 )}
