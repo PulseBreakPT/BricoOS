@@ -207,7 +207,11 @@ button, a, [role="button"], [role="tab"] {
 /* Entrada suave do conteúdo principal ao trocar de rota. */
 @keyframes page-enter {
     from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    /* "transform: none" (não translateY(0)) é de propósito — qualquer valor de
+       transform diferente de none cria um containing block para os
+       descendentes "position: fixed" (ex.: o botão + de novo pedido), o que
+       os desalinha da janela assim que a animação assenta. */
+    to { opacity: 1; transform: none; }
 }
 .animate-page-enter {
     animation: page-enter 0.35s ease-out both;
@@ -216,7 +220,7 @@ button, a, [role="button"], [role="tab"] {
 /* Entrada em cascata — aplicar com --stagger-i por elemento. */
 @keyframes fade-up {
     from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    to { opacity: 1; transform: none; }
 }
 .animate-fade-up {
     animation: fade-up 0.45s cubic-bezier(.21, .61, .35, 1) both;
@@ -226,7 +230,7 @@ button, a, [role="button"], [role="tab"] {
 /* Zoom de entrada delicado — cartões e diálogos. */
 @keyframes scale-in {
     from { opacity: 0; transform: scale(0.96); }
-    to { opacity: 1; transform: scale(1); }
+    to { opacity: 1; transform: none; }
 }
 .animate-scale-in {
     animation: scale-in 0.3s cubic-bezier(.21, .61, .35, 1) both;

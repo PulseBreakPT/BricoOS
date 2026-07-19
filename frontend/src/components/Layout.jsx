@@ -9,7 +9,6 @@ import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
-import AiAssistantPanel from "@/components/workspace/AiAssistantPanel";
 
 // Aviso global, impossível de ignorar mas elegante: aparece em TODAS as
 // páginas sempre que chega um email associado a um pedido — de um fornecedor
@@ -293,7 +292,6 @@ export default function Layout() {
 
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <AiAssistantPanel />
     </div>
     </WorkspaceProvider>
   );
