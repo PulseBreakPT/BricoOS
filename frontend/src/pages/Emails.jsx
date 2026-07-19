@@ -75,10 +75,20 @@ const CATEGORY_LABELS = {
   orcamento: "Orçamento", reclamacao: "Reclamação", duvida: "Dúvida", urgente: "Urgente", outro: "Outro",
 };
 
+// Cada categoria com um tratamento visual diferente dentro da paleta
+// preto/branco/vermelho, para se distinguirem ao primeiro olhar.
+const CATEGORY_STYLES = {
+  orcamento: "bg-neutral-100 text-neutral-800",
+  reclamacao: "bg-neutral-900 text-white",
+  duvida: "bg-white text-neutral-600 ring-1 ring-inset ring-neutral-300",
+  urgente: "bg-red-100 text-red-700",
+  outro: "bg-neutral-50 text-neutral-500",
+};
+
 function CategoryBadge({ category }) {
   if (!category || !CATEGORY_LABELS[category]) return null;
   return (
-    <span className="inline-flex rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-800">
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${CATEGORY_STYLES[category]}`}>
       {CATEGORY_LABELS[category]}
     </span>
   );

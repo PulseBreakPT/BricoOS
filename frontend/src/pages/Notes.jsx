@@ -77,10 +77,10 @@ function greeting() {
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
     slate: "bg-slate-100 text-slate-700",
-    blue: "bg-neutral-900/[0.06] text-neutral-900",
-    amber: "bg-neutral-900/[0.06] text-neutral-900",
+    blue: "bg-neutral-300 text-neutral-900",
+    amber: "bg-white text-neutral-600 ring-1 ring-inset ring-neutral-200",
     red: "bg-red-50 text-red-700",
-    green: "bg-neutral-900/[0.06] text-neutral-900",
+    green: "bg-black text-white",
   };
   const Tag = onClick ? "button" : "div";
   return (
