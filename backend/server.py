@@ -23,7 +23,7 @@ from email.header import decode_header
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from email.utils import parseaddr
+from email.utils import parseaddr, make_msgid, parsedate_to_datetime
 from html import escape as html_escape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -2196,35 +2196,41 @@ def _build_email_body(body, attachments=None):
     return message
 
 
-def _smtp_send(to_email, subject, body, attachments=None):
+def _smtp_send(to_email, subject, body, attachments=None, message_id=None):
     message = _build_email_body(body, attachments)
     message["From"] = GMAIL_SMTP_USER
     message["To"] = to_email
     message["Subject"] = subject
+    if message_id:
+        message["Message-ID"] = message_id
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
         smtp.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
         smtp.sendmail(GMAIL_SMTP_USER, [to_email], message.as_string())
 
 
-async def _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id):
+async def _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id,
+                          message_id="", source="site"):
     """Ponto único de registo de envios — cobre fornecedores, clientes e
     qualquer envio futuro, para a secção "Emails" mostrar tudo o que saiu,
-    mesmo sem pedido associado."""
+    mesmo sem pedido associado. message_id identifica o email de forma única
+    (mesmo Message-ID que vai no cabeçalho enviado) para a sincronização da
+    pasta "Enviados" do Gmail não duplicar o que a própria app já enviou."""
     await db.sent_emails.insert_one({
         "id": str(uuid.uuid4()), "to": to_email, "to_label": to_label or "",
         "subject": subject, "body": body, "note_id": note_id or "", "kind": kind,
         "pdf_file_id": pdf_file_id or "",
         "attachments": [{"filename": a.get("filename")} for a in (attachments or [])],
-        "sent_at": now_iso()})
+        "message_id": message_id or "", "source": source, "sent_at": now_iso()})
 
 
 async def _send_email(to_email, subject, body, attachments=None, note_id=None, kind="other", to_label="", pdf_file_id=""):
     if not to_email:
         raise HTTPException(status_code=400, detail="O destinatário não tem email definido.")
+    msgid = make_msgid(domain="gmail.com")
     if SMTP_CONFIGURED:
         try:
-            await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments)
-            await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id)
+            await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments, msgid)
+            await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid)
             return
         except smtplib.SMTPAuthenticationError:
             raise HTTPException(status_code=502, detail="O Gmail recusou a palavra-passe de aplicação (SMTP). "
@@ -2240,9 +2246,10 @@ async def _send_email(to_email, subject, body, attachments=None, note_id=None, k
         message = _build_email_body(body, attachments)
         message["to"] = to_email
         message["subject"] = subject
+        message["message-id"] = msgid
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         service.users().messages().send(userId="me", body={"raw": raw}).execute()
-        await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id)
+        await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid)
     except HTTPException:
         raise
     except Exception as e:
@@ -2325,6 +2332,83 @@ def _imap_fetch_since(last_uid):
                 "subject": _decode_mime_header(msg.get("Subject")),
                 "body": _email_text_body(msg)[:20000].strip(),
                 "attachments": _email_pdf_attachments(msg),
+            })
+        return messages
+    finally:
+        try:
+            box.logout()
+        except Exception:
+            pass
+
+
+def _imap_find_sent_folder(box):
+    """Descobre o nome da pasta "Enviados" via SPECIAL-USE (\\Sent) — o Gmail
+    suporta RFC 6154, por isso funciona em qualquer idioma da conta, em vez
+    de depender do nome literal ("[Gmail]/Sent Mail", "[Gmail]/E-mails
+    enviados", etc.)."""
+    try:
+        _, folders = box.list()
+    except Exception:
+        folders = None
+    for raw in (folders or []):
+        line = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
+        if "\\Sent" not in line:
+            continue
+        m = re.search(r'"([^"]*)"$|(\S+)$', line)
+        if m:
+            name = m.group(1) or m.group(2)
+            return name.strip('"')
+    # Fallback para os nomes habituais, caso o servidor não anuncie SPECIAL-USE.
+    for guess in ("[Gmail]/Sent Mail", "[Gmail]/E-mails enviados", "[Gmail]/Enviados", "Sent"):
+        try:
+            status, _ = box.select(f'"{guess}"', readonly=True)
+            if status == "OK":
+                return guess
+        except Exception:
+            continue
+    return None
+
+
+def _imap_fetch_sent_since(last_uid):
+    """Lê a pasta "Enviados" do Gmail — inclui tudo o que saiu da conta,
+    enviado pela app ou diretamente pelo Gmail (site/telemóvel)."""
+    box = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
+    try:
+        box.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
+        folder = _imap_find_sent_folder(box)
+        if not folder:
+            return []
+        box.select(f'"{folder}"', readonly=True)
+        if last_uid:
+            _, data = box.uid("search", None, f"UID {last_uid + 1}:*")
+        else:
+            since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%d-%b-%Y")
+            _, data = box.uid("search", None, f"SINCE {since}")
+        uids = sorted(int(u) for u in (data[0].split() if data and data[0] else []))
+        uids = [u for u in uids if u > (last_uid or 0)][-50:]
+        messages = []
+        for uid in uids:
+            _, msg_data = box.uid("fetch", str(uid), "(BODY.PEEK[])")
+            raw = next((p[1] for p in msg_data if isinstance(p, tuple)), None)
+            if not raw:
+                continue
+            msg = email_lib.message_from_bytes(raw)
+            display_name, addr = parseaddr(_decode_mime_header(msg.get("To") or ""))
+            sent_at = now_iso()
+            try:
+                date_hdr = msg.get("Date")
+                if date_hdr:
+                    sent_at = parsedate_to_datetime(date_hdr).astimezone(timezone.utc).isoformat()
+            except Exception:
+                pass
+            messages.append({
+                "uid": uid,
+                "message_id": (msg.get("Message-ID") or "").strip(),
+                "to_email": (addr or "").lower(),
+                "to_name": display_name.strip(),
+                "subject": _decode_mime_header(msg.get("Subject")),
+                "body": _email_text_body(msg)[:20000].strip(),
+                "sent_at": sent_at,
             })
         return messages
     finally:
@@ -2519,11 +2603,60 @@ async def poll_supplier_replies():
     return {"ok": True, "new": matched, "seen": len(messages)}
 
 
+async def poll_sent_folder():
+    """Lê a pasta "Enviados" do Gmail — cobre emails enviados diretamente
+    pela app do Gmail (site ou telemóvel), não só os enviados através desta
+    aplicação. Os que a própria app já enviou e registou são reconhecidos
+    pelo Message-ID e ignorados, para não duplicar."""
+    if not SMTP_CONFIGURED:
+        return {"ok": False, "new": 0, "detail": "SMTP não configurado."}
+    state = await db.imap_state.find_one({"id": "sent"}) or {}
+    last_uid = int(state.get("last_uid") or 0)
+    messages = await asyncio.to_thread(_imap_fetch_sent_since, last_uid)
+    added = 0
+    max_uid = last_uid
+    for m in messages:
+        max_uid = max(max_uid, m["uid"])
+        if m["message_id"] and await db.sent_emails.find_one({"message_id": m["message_id"]}):
+            continue  # já registado quando a app enviou este email
+        if not m["to_email"]:
+            continue
+        note_id, supplier_id, supplier_name = await _match_note_for_reply(m["to_email"], m["subject"])
+        kind = "supplier" if note_id else ""
+        to_label = supplier_name or m.get("to_name") or ""
+        if not note_id:
+            client_note_id = await _match_client_reply(m["to_email"], m["subject"])
+            if client_note_id:
+                note_id, kind = client_note_id, "client"
+                to_label = m.get("to_name") or ""
+        await db.sent_emails.insert_one({
+            "id": str(uuid.uuid4()), "to": m["to_email"], "to_label": to_label,
+            "subject": m["subject"], "body": m["body"], "note_id": note_id or "",
+            "kind": kind or "other", "pdf_file_id": "", "attachments": [],
+            "message_id": m["message_id"], "source": "gmail", "sent_at": m["sent_at"]})
+        added += 1
+        if note_id:
+            quem = to_label or m["to_email"]
+            await log_activity(note_id, "email_sent", f"Email enviado pelo Gmail a {quem}: {m['subject'] or '(sem assunto)'}",
+                               {"to": m["to_email"], "uid": m["uid"]})
+    await db.imap_state.update_one({"id": "sent"}, {"$set": {
+        "id": "sent", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
+    return {"ok": True, "new": added, "seen": len(messages)}
+
+
 @api_router.post("/emails/sync")
 async def emails_sync():
-    """Verificação manual da caixa de entrada — só leitura, nunca envia nada."""
+    """Verificação manual da caixa de entrada e da pasta Enviados — só
+    leitura, nunca envia nada."""
     try:
-        return await poll_supplier_replies()
+        inbox_result = await poll_supplier_replies()
+        sent_result = await poll_sent_folder()
+        return {
+            "ok": inbox_result.get("ok", True) and sent_result.get("ok", True),
+            "new": inbox_result.get("new", 0) + sent_result.get("new", 0),
+            "new_received": inbox_result.get("new", 0),
+            "new_sent": sent_result.get("new", 0),
+        }
     except imaplib.IMAP4.error as e:
         raise HTTPException(status_code=502, detail=f"O Gmail recusou a ligação IMAP: {e}")
     except Exception as e:
@@ -4047,6 +4180,7 @@ async def ensure_indexes():
                         ("received_emails", "matched"), ("received_emails", "received_at"),
                         ("received_emails", "reply_kind"), ("notes", "email"),
                         ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
+                        ("sent_emails", "message_id"),
                         ("email_attachments", "email_id")]:
         try:
             await db[coll].create_index(field)
@@ -4058,7 +4192,9 @@ _background_tasks = set()
 
 
 async def _imap_poll_loop():
-    """Verifica a caixa de entrada a cada IMAP_POLL_MINUTES. Só leitura."""
+    """Verifica a caixa de entrada e a pasta Enviados a cada IMAP_POLL_MINUTES.
+    Só leitura — cobre também emails enviados diretamente pelo Gmail (site
+    ou telemóvel), não só os enviados através desta app."""
     await asyncio.sleep(20)
     while True:
         try:
@@ -4066,7 +4202,13 @@ async def _imap_poll_loop():
             if result.get("new"):
                 logger.info(f"IMAP: {result['new']} resposta(s) de fornecedor associada(s) a pedidos.")
         except Exception as e:
-            logger.error(f"Verificação IMAP falhou: {e}")
+            logger.error(f"Verificação IMAP (receção) falhou: {e}")
+        try:
+            sent_result = await poll_sent_folder()
+            if sent_result.get("new"):
+                logger.info(f"IMAP: {sent_result['new']} email(s) enviado(s) pelo Gmail sincronizado(s).")
+        except Exception as e:
+            logger.error(f"Verificação IMAP (enviados) falhou: {e}")
         await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
 
 

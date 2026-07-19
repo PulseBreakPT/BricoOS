@@ -180,7 +180,10 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     setSyncing(true);
     try {
       const { data } = await api.post("/emails/sync");
-      toast.success(data.new ? `${data.new} nova(s) resposta(s) associada(s) a pedidos` : "Caixa de entrada verificada");
+      const parts = [];
+      if (data.new_received) parts.push(`${data.new_received} recebido(s)`);
+      if (data.new_sent) parts.push(`${data.new_sent} enviado(s) pelo Gmail`);
+      toast.success(parts.length ? `Sincronizado: ${parts.join(" · ")}` : "Caixa de entrada e enviados verificados — sem novidades");
       await load();
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível verificar a caixa de entrada"));
@@ -539,6 +542,11 @@ function SentTab({ search }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-bold text-slate-900">{m.to_label || m.to}</span>
                     <KindBadge kind={m.kind} />
+                    {m.source === "gmail" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600" title="Sincronizado da pasta Enviados do Gmail">
+                        <Mail className="h-2.5 w-2.5" /> Gmail
+                      </span>
+                    ) : null}
                     {(m.attachments || []).length > 0 ? <Paperclip className="h-3.5 w-3.5 text-slate-400" title="Com anexo" /> : null}
                   </div>
                   <p className="truncate text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
