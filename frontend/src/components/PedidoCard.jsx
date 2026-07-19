@@ -29,9 +29,9 @@ export default function PedidoCard({ note, onOpen, actions }) {
       transition={{ duration: 0.22 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note.id)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200"}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200 hover:border-slate-300"}`}
     >
-      <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
+      <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
       <div className="pl-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -51,12 +51,12 @@ export default function PedidoCard({ note, onOpen, actions }) {
             </p>
           </div>
           <div className="flex shrink-0 items-center">
-            <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 hover:text-amber-400">
-              <Star className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
+            <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90">
+              <Star key={note.favorite} className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400 animate-pop" : ""}`} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button data-testid={`note-menu-${note.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <button data-testid={`note-menu-${note.id}`} onClick={(e) => e.stopPropagation()} className="rounded-lg p-1 text-slate-400 transition-all duration-150 hover:scale-110 hover:bg-slate-100 hover:text-slate-700 active:scale-90">
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>

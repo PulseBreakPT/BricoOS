@@ -329,7 +329,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : (
         <div className="mt-3 space-y-2">
           {displayItems.map((m) => (
-            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-colors ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
+            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
               <button onClick={() => openItem(m)} className="flex w-full items-start gap-3 text-left">
                 {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
                 <div className="min-w-0 flex-1">
@@ -533,7 +533,7 @@ function SentTab({ search }) {
       ) : (
         <div className="mt-3 space-y-2">
           {items.map((m) => (
-            <div key={m.id} data-testid={`sent-email-${m.id}`} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div key={m.id} data-testid={`sent-email-${m.id}`} className="rounded-xl border border-slate-200 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
               <button onClick={() => setExpanded((cur) => (cur === m.id ? null : m.id))} className="flex w-full items-start gap-3 text-left">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -632,7 +632,7 @@ function ThreadsTab({ search }) {
       ) : (
         <div className="mt-3 space-y-2">
           {filtered.map((t) => (
-            <div key={t.key} data-testid={`thread-${t.key}`} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div key={t.key} data-testid={`thread-${t.key}`} className="rounded-xl border border-slate-200 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
               <button onClick={() => openThread(t)} className="flex w-full items-start gap-3 text-left">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -722,7 +722,7 @@ function ScheduledTab({ search }) {
       ) : (
         <div className="mt-3 space-y-2">
           {filtered.map((s) => (
-            <div key={s.id} data-testid={`scheduled-${s.id}`} className="flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+            <div key={s.id} data-testid={`scheduled-${s.id}`} className="flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-slate-900">{s.to_label || s.to}</p>
                 <p className="truncate text-xs text-slate-500">{s.subject || "(sem assunto)"}</p>

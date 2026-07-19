@@ -65,7 +65,7 @@ function SupplierEmailAlert() {
                   key={m.id}
                   data-testid={`email-alert-${m.id}`}
                   onClick={() => openItem(m)}
-                  className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-left text-white transition-colors hover:bg-white/25"
+                  className="flex w-full min-w-0 items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-left text-white transition-all duration-150 hover:translate-x-1 hover:bg-white/25 active:scale-[0.98]"
                 >
                   {m.reply_kind === "client" ? <User className="h-4 w-4 shrink-0" title="Cliente" /> : null}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">
@@ -104,9 +104,9 @@ const NAV = [
 ];
 
 const Brand = () => (
-  <div className="flex items-center gap-3">
-    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-slate-300/40">
-      <Hammer className="h-5 w-5" strokeWidth={2.4} />
+  <div className="group flex items-center gap-3">
+    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-slate-300/40 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
+      <Hammer className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" strokeWidth={2.4} />
     </div>
     <div className="leading-tight">
       <p className="font-heading text-lg font-extrabold tracking-tight text-slate-900">Brico Assistente</p>
@@ -135,14 +135,14 @@ export default function Layout() {
                 end={item.end}
                 data-testid={item.testid}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors duration-200 ${
+                  `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-md shadow-slate-300/50"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      : "text-slate-600 hover:translate-x-1 hover:bg-slate-100 hover:text-slate-900"
                   }`
                 }
               >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                <Icon className="h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-110" strokeWidth={2.2} />
                 {item.label}
               </NavLink>
             );
@@ -163,7 +163,7 @@ export default function Layout() {
             to="/catalogo-tecnico"
             aria-label="Abrir catálogo técnico"
             title="Catálogo técnico"
-            className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${location.pathname.startsWith("/catalogo-tecnico") ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600"}`}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 active:scale-90 ${location.pathname.startsWith("/catalogo-tecnico") ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"}`}
           >
             <BookOpenCheck className="h-[18px] w-[18px]" />
           </Link>
@@ -172,7 +172,7 @@ export default function Layout() {
       </header>
 
       <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">
-        <div className="mx-auto w-full max-w-6xl 2xl:max-w-[1600px]">
+        <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-page-enter 2xl:max-w-[1600px]">
           <SupplierEmailAlert />
           <Outlet />
         </div>
@@ -191,9 +191,9 @@ export default function Layout() {
                 to={item.to}
                 end={item.end}
                 data-testid={`${item.testid}-mobile`}
-                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1"
+                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 active:scale-90 transition-transform duration-150"
               >
-                <span className={`flex h-8 w-full max-w-[60px] items-center justify-center rounded-lg transition-colors duration-200 ${isActive ? "bg-primary text-primary-foreground" : "text-slate-500"}`}>
+                <span className={`flex h-8 w-full max-w-[60px] items-center justify-center rounded-lg transition-all duration-200 ${isActive ? "bg-primary text-primary-foreground scale-110" : "text-slate-500"}`}>
                   <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />
                 </span>
                 <span className={`w-full truncate text-center text-[9px] font-semibold leading-tight tracking-tight ${isActive ? "text-slate-900" : "text-slate-500"}`}>{item.label}</span>

@@ -52,7 +52,7 @@ function RankingCard({ model, selected, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition sm:min-w-[13rem] ${selected ? "border-amber-300 bg-white/10 ring-1 ring-amber-300" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}
+      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[13rem] ${selected ? "border-amber-300 bg-white/10 ring-1 ring-amber-300" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}
     >
       <div className="flex items-start gap-3">
         <OverallBadge overall={overall} compact />

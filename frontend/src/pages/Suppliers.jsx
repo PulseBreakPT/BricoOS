@@ -168,9 +168,9 @@ export default function Suppliers() {
             <div
               key={s.id}
               data-testid={`supplier-card-${s.id}`}
-              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg sm:p-5"
             >
-              <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: c.accent }} />
+              <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
               <div className="flex items-start justify-between gap-3 pl-2">
                 <div className="min-w-0">
                   <h3 className="font-heading text-base font-extrabold tracking-tight text-slate-900">{s.name}</h3>
