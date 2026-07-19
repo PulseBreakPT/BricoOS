@@ -51,8 +51,8 @@ export default function PedidoCard({ note, onOpen, actions }) {
             </p>
           </div>
           <div className="flex shrink-0 items-center">
-            <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 hover:text-amber-400">
-              <Star className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
+            <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 hover:text-red-500">
+              <Star className={`h-4 w-4 ${note.favorite ? "fill-red-500 text-red-500" : ""}`} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -106,7 +106,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500"><Clock className="h-3 w-3" /> Enviado há {note.days_since_supplier}d</span>
           ) : null}
           {note.pending_client_send ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700"><MailCheck className="h-3 w-3" /> Pronto p/ enviar</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-2.5 py-1 text-[11px] font-bold text-white"><MailCheck className="h-3 w-3" /> Pronto p/ enviar</span>
           ) : null}
           {note.client_no_answer_count > 0 ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600"><PhoneMissed className="h-3 w-3" /> Cliente s/ resposta {note.client_no_answer_count}×</span>

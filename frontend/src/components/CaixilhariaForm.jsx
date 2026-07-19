@@ -57,11 +57,11 @@ function MiniTitle({ title, first = false }) {
 function OverallBadge({ overall, selected = false }) {
   if (!overall) return null;
   const medalTone = overall.medal === "Ouro"
-    ? "bg-amber-300 text-amber-950"
+    ? "bg-white text-slate-950"
     : overall.medal === "Prata"
       ? "bg-slate-300 text-slate-800"
       : overall.medal === "Bronze"
-        ? "bg-orange-300 text-orange-950"
+        ? "bg-slate-500 text-white"
         : selected ? "bg-white/25 text-white" : "bg-slate-900/10 text-slate-700";
   return (
     <span className={`ml-1.5 inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-black tabular-nums ${medalTone}`}>
@@ -215,7 +215,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
       {catalog.catalog_meta ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-blue-300">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
               <BookOpenCheck className="h-4 w-4" />
             </span>
             <div className="min-w-0">
@@ -227,7 +227,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
             href="/catalogo-tecnico"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-red-300 hover:text-red-700"
           >
             <span className="hidden sm:inline">Comparar modelos</span>
             <span className="sm:hidden">Modelos</span>
@@ -237,7 +237,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
       ) : null}
 
       {hasComparisons ? (
-        <p className="mt-4 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2.5 text-xs text-blue-700">
+        <p className="mt-4 flex items-start gap-1.5 rounded-lg bg-neutral-100 p-2.5 text-xs text-neutral-800">
           <GitCompare className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           Pedido comparativo: o email pede um preço separado para cada opção.
         </p>
@@ -256,14 +256,14 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
           <section
             key={line.id}
             data-testid={`caix-line-${lineIndex}`}
-            className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors ${expandedLineId === line.id ? "border-blue-300 ring-1 ring-blue-100" : "border-slate-200"}`}
+            className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors ${expandedLineId === line.id ? "border-red-300 ring-1 ring-red-100" : "border-slate-200"}`}
           >
             {/* Cabeçalho do elemento */}
             <div className={`flex items-center gap-1 bg-slate-50/80 px-2 py-1.5 sm:gap-2 sm:px-3 ${expandedLineId === line.id ? "border-b border-slate-100" : ""}`}>
               <button
                 type="button"
                 onClick={() => setExpandedLineId(expandedLineId === line.id ? "" : line.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 aria-expanded={expandedLineId === line.id}
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-extrabold text-white">{lineIndex + 1}</span>
@@ -341,8 +341,8 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               </div>
 
               {["janela", "porta"].includes(line.produto) && line.largura_mm && line.altura_mm ? (
-                <div className="mt-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3">
-                  <p className="text-xs font-semibold text-blue-800">Incluir rede mosquiteira ou portada com as mesmas medidas?</p>
+                <div className="mt-3 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-3">
+                  <p className="text-xs font-semibold text-neutral-800">Incluir rede mosquiteira ou portada com as mesmas medidas?</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {[["rede_mosquiteira", "Rede mosquiteira", "rede"], ["portada", "Portada", "portada"]].map(([product, label, slug]) => {
                       const added = hasCompanion(line, product);
@@ -355,7 +355,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                           size="sm"
                           disabled={added}
                           onClick={() => addCompanionLine(lineIndex, product)}
-                          className={`h-8 rounded-lg text-xs ${added ? "border-emerald-300 bg-emerald-50 text-emerald-700 disabled:opacity-100" : ""}`}
+                          className={`h-8 rounded-lg text-xs ${added ? "border-neutral-400 bg-neutral-900 text-white disabled:opacity-100" : ""}`}
                         >
                           {added ? <Check className="mr-1 h-3.5 w-3.5" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
                           {label}{added ? " adicionada" : ""}
@@ -404,7 +404,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               <MiniTitle title="Material e modelo" />
               <div className="mt-1 flex items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-400">As medidas acima aplicam-se a todas as opções deste elemento.</p>
-                {line.opcoes.length > 1 ? <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">COMPARAÇÃO</span> : null}
+                {line.opcoes.length > 1 ? <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">COMPARAÇÃO</span> : null}
               </div>
 
               <div className="mt-2 space-y-3">
@@ -429,7 +429,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                   <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar outra opção
                 </Button>
                 {["janela", "porta"].includes(line.produto) ? (
-                  <Button type="button" variant="outline" size="sm" onClick={() => addOption(lineIndex, true)} className="h-9 rounded-xl border-blue-200 text-xs text-blue-700 hover:bg-blue-50">
+                  <Button type="button" variant="outline" size="sm" onClick={() => addOption(lineIndex, true)} className="h-9 rounded-xl border-red-200 text-xs text-red-700 hover:bg-red-50">
                     <GitCompare className="mr-1 h-3.5 w-3.5" /> Comparar PVC / alumínio
                   </Button>
                 ) : null}
@@ -440,7 +440,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               <div className="mt-2.5 space-y-1.5">
                 <Textarea value={line.observacoes} onChange={(event) => updateLine(lineIndex, { observacoes: event.target.value })} rows={2} placeholder="Só deste elemento — ex.: manter o desenho atual, soleira baixa..." />
               </div>
-              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
+              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-neutral-900 text-xs font-bold text-neutral-900 hover:bg-neutral-100">
                 <Check className="mr-1.5 h-4 w-4" /> Concluir este elemento
               </Button>
             </div> : null}
@@ -480,7 +480,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
   const isNet = option.familia === "redes";
 
   return (
-    <div data-testid={`caix-line-${lineIndex}-option-${optionIndex}`} className={`rounded-xl border p-3 ${line.opcoes.length > 1 ? "border-blue-200 bg-blue-50/30" : "border-slate-200 bg-slate-50/50"}`}>
+    <div data-testid={`caix-line-${lineIndex}-option-${optionIndex}`} className={`rounded-xl border p-3 ${line.opcoes.length > 1 ? "border-red-200 bg-red-50/30" : "border-slate-200 bg-slate-50/50"}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-extrabold uppercase tracking-wide text-slate-700">Opção {optionLetter(optionIndex)}</p>
         <button type="button" onClick={onRemove} disabled={line.opcoes.length === 1} className="rounded-lg p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-25">
@@ -540,7 +540,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   key={key}
                   type="button"
                   onClick={() => onSet("sistema", key)}
-                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.sistema === key ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.sistema === key ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
                 >
                   {label}
                   <OverallBadge overall={overall} selected={option.sistema === key} />
@@ -549,13 +549,13 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
             })}
           </div>
           {!compatibleSystems.length ? (
-            <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
+            <p className="flex items-start gap-1.5 rounded-lg bg-red-50 p-2 text-xs text-red-700">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Não há modelos desta família compatíveis com o tipo de abertura escolhido.
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-amber-700">Escolha primeiro o material.</p>
+        <p className="mt-2 text-xs text-red-700">Escolha primeiro o material.</p>
       )}
 
       {selectedModel ? (
@@ -589,7 +589,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                 </div>
               </div>
               {catalog.vidros?.[option.material] ? (
-                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2 text-[11px] leading-relaxed text-blue-800">
+                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-neutral-100 p-2 text-[11px] leading-relaxed text-neutral-800">
                   <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
                   <span><strong>{catalog.vidros[option.material].benefit}</strong> {catalog.vidros[option.material].typical_use}</span>
                 </p>
@@ -633,23 +633,23 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
 
 function SelectedModelSummary({ model, analysisId, overall }) {
   return (
-    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+    <div className="mt-3 rounded-xl border border-neutral-300 bg-neutral-100 p-2.5">
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-black text-white">
           <Check className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-extrabold text-slate-900">
             {model.name}
             {overall ? (
-              <span className="ml-1.5 rounded-full bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-emerald-900">
+              <span className="ml-1.5 rounded-full bg-neutral-300 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-neutral-900">
                 {overall.score}{overall.medal ? ` · ${overall.medal}` : ""}
               </span>
             ) : null}
           </p>
           <p className="truncate text-[10px] text-slate-500">{model.category_label}</p>
         </div>
-        <a href={`/catalogo-tecnico?modelo=${encodeURIComponent(analysisId)}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-50">
+        <a href={`/catalogo-tecnico?modelo=${encodeURIComponent(analysisId)}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1.5 text-[10px] font-bold text-red-700 hover:bg-red-50">
           Ver ficha <ExternalLink className="h-3 w-3" />
         </a>
       </div>

@@ -58,8 +58,8 @@ const SEGMENTS = {
     shortTitle: "Banda Alumínios",
     subtitle: "Só caixilharia à medida e pedidos ao fornecedor BandAluminios.",
     icon: Frame,
-    accent: "text-orange-600",
-    iconAccent: "bg-orange-500 text-white",
+    accent: "text-red-600",
+    iconAccent: "bg-red-600 text-white",
     createMode: "band",
     empty: "Sem orçamentos Banda Alumínios. Crie um novo com o botão +.",
   },
@@ -77,10 +77,10 @@ function greeting() {
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
     slate: "bg-slate-100 text-slate-700",
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-neutral-900/[0.06] text-neutral-900",
+    amber: "bg-neutral-900/[0.06] text-neutral-900",
     red: "bg-red-50 text-red-700",
-    green: "bg-emerald-50 text-emerald-700",
+    green: "bg-neutral-900/[0.06] text-neutral-900",
   };
   const Tag = onClick ? "button" : "div";
   return (
@@ -360,7 +360,7 @@ export default function Notes() {
               onClick={() => changeSegment(key)}
               className={`flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-colors sm:text-sm ${
                 active
-                  ? `bg-white shadow-sm ${key === "band" ? "text-orange-600" : "text-slate-900"}`
+                  ? `bg-white shadow-sm ${key === "band" ? "text-red-600" : "text-slate-900"}`
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -406,19 +406,19 @@ export default function Notes() {
       {/* Prontos para enviar — email + PDF preparados automaticamente a partir
           do email do fornecedor; um clique abre o ecrã de confirmação */}
       {(today?.to_confirm || []).length > 0 ? (
-        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-emerald-900">
-            <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
-            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
+        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-neutral-300 bg-neutral-50 p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-neutral-900">
+            <MailCheck className="h-4 w-4 text-black" /> Prontos para enviar ao cliente
+            <span className="rounded-full bg-black px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
           </h2>
-          <p className="mt-0.5 text-xs text-emerald-800/80">Analisados e calculados automaticamente — só falta a sua confirmação.</p>
+          <p className="mt-0.5 text-xs text-neutral-600">Analisados e calculados automaticamente — só falta a sua confirmação.</p>
           <div className="mt-3 space-y-2">
             {today.to_confirm.map((n) => (
               <button
                 key={n.id}
                 data-testid={`to-confirm-${n.id}`}
                 onClick={() => setConfirmNote(n)}
-                className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-emerald-100/60"
+                className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-neutral-100"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold text-slate-900">{n.customer_name || "Sem nome"}</p>
@@ -427,7 +427,7 @@ export default function Notes() {
                     {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-bold text-white">
                   <Send className="h-3.5 w-3.5" /> Rever e enviar
                 </span>
               </button>
@@ -448,9 +448,9 @@ export default function Notes() {
               <button
                 key={a.id} data-testid={`attention-${a.id}`}
                 onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
-                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40"}`}
+                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-neutral-300 bg-neutral-50"}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-neutral-900/10 text-neutral-900"}`}>
                   <AlertTriangle className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">

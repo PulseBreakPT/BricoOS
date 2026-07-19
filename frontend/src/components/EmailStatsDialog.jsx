@@ -6,7 +6,7 @@ import api, { getErrorMessage } from "@/lib/api";
 
 const CATEGORY_LABELS = { orcamento: "Orçamento", reclamacao: "Reclamação", duvida: "Dúvida", urgente: "Urgente", outro: "Outro" };
 const PRIORITY_LABELS = { alta: "Alta", normal: "Normal", baixa: "Baixa" };
-const PRIORITY_COLORS = { alta: "bg-red-400", normal: "bg-slate-300", baixa: "bg-emerald-300" };
+const PRIORITY_COLORS = { alta: "bg-red-400", normal: "bg-slate-300", baixa: "bg-slate-200" };
 
 function Tile({ label, value }) {
   return (
@@ -17,7 +17,7 @@ function Tile({ label, value }) {
   );
 }
 
-function BarRow({ label, count, max, colorCls = "bg-blue-400" }) {
+function BarRow({ label, count, max, colorCls = "bg-neutral-800" }) {
   const pct = max ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
   return (
     <div className="flex items-center gap-2 text-xs">
@@ -88,14 +88,14 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
                   <div className="flex h-16 items-end gap-0.5">
                     {stats.daily.map((d) => (
                       <div key={d.date} title={`${d.date}: ${d.received} recebidos, ${d.sent} enviados`} className="flex flex-1 items-end gap-px">
-                        <div className="flex-1 rounded-t bg-blue-300" style={{ height: `${Math.max((d.received / maxDaily) * 100, d.received > 0 ? 6 : 0)}%` }} />
-                        <div className="flex-1 rounded-t bg-emerald-300" style={{ height: `${Math.max((d.sent / maxDaily) * 100, d.sent > 0 ? 6 : 0)}%` }} />
+                        <div className="flex-1 rounded-t bg-neutral-300" style={{ height: `${Math.max((d.received / maxDaily) * 100, d.received > 0 ? 6 : 0)}%` }} />
+                        <div className="flex-1 rounded-t bg-red-400" style={{ height: `${Math.max((d.sent / maxDaily) * 100, d.sent > 0 ? 6 : 0)}%` }} />
                       </div>
                     ))}
                   </div>
                   <div className="mt-1.5 flex gap-3 text-[11px] text-slate-400">
-                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-300" /> Recebidos</span>
-                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Enviados</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-neutral-300" /> Recebidos</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-400" /> Enviados</span>
                   </div>
                 </div>
               ) : null}
