@@ -53,7 +53,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
 
   const save = async () => {
     if (!form.title.trim()) {
-      toast.error("Escreva o título da tarefa.");
+      toast.error("Escreve o título da tarefa.");
       return;
     }
     setSaving(true);
@@ -153,7 +153,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
           </div>
         </div>
         {!form.due_date && form.repeat !== "none" ? (
-          <p className="text-xs text-amber-600">Defina uma data limite para poder repetir a tarefa.</p>
+          <p className="text-xs text-amber-600">Define uma data limite para poder repetir a tarefa.</p>
         ) : null}
 
         <div className="space-y-2">

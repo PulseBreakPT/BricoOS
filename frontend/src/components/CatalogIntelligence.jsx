@@ -156,7 +156,7 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
           </div>
         </div>
       ) : (
-        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{leftId === rightId ? "Escolha dois modelos diferentes." : MISSING}</p>
+        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{leftId === rightId ? "Escolhe dois modelos diferentes." : MISSING}</p>
       )}
       <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-500">
         <Scale className="mt-0.5 h-3 w-3 shrink-0" /> Só são comparados eixos com a mesma base de cálculo. “Δ pts” é a diferença na escala Brico2; a percentagem aparece apenas quando pode ser calculada sobre valores físicos equivalentes.

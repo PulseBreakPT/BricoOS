@@ -74,7 +74,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
   const save = async () => {
     if (!form.customer_name && !form.description) {
-      toast.error("Preencha o nome do cliente ou a descrição.");
+      toast.error("Preenche o nome do cliente ou a descrição.");
       return;
     }
     setSaving(true);
@@ -104,7 +104,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
   const addQuote = async () => {
     if (!newQuote.supplier_name || !newQuote.price) {
-      toast.error("Indique o fornecedor e o preço.");
+      toast.error("Indica o fornecedor e o preço.");
       return;
     }
     await api.post(`/notes/${note.id}/quotes`, {
@@ -131,7 +131,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
   const sendEmail = async () => {
     if (!emailSupplier) {
-      toast.error("Escolha um fornecedor.");
+      toast.error("Escolhe um fornecedor.");
       return;
     }
     setSending(true);
@@ -172,7 +172,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
             {isEdit ? "Editar nota" : "Nova nota de cliente"}
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-500">
-            {isEdit ? "Detalhes, medidas e orçamentos de fornecedores." : "Registe o pedido do cliente."}
+            {isEdit ? "Detalhes, medidas e orçamentos de fornecedores." : "Regista o pedido do cliente."}
           </DialogDescription>
         </DialogHeader>
 
@@ -332,7 +332,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   </SelectTrigger>
                   <SelectContent>
                     {suppliers.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-slate-400">Sem fornecedores. Adicione em "Fornecedores".</div>
+                      <div className="px-3 py-2 text-xs text-slate-400">Sem fornecedores. Adiciona em "Fornecedores".</div>
                     ) : (
                       suppliers.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
@@ -343,7 +343,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   </SelectContent>
                 </Select>
                 {selectedSupplier && !selectedSupplier.email ? (
-                  <p className="text-xs text-red-500">Este fornecedor não tem email. Adicione em "Fornecedores".</p>
+                  <p className="text-xs text-red-500">Este fornecedor não tem email. Adiciona em "Fornecedores".</p>
                 ) : null}
               </div>
 
@@ -392,7 +392,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
               <div className="mt-3 space-y-2">
                 {quotes.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">
-                    Ainda sem orçamentos. Adicione os preços recebidos abaixo.
+                    Ainda sem orçamentos. Adiciona os preços recebidos abaixo.
                   </p>
                 ) : (
                   quotes.map((q) => {

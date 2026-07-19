@@ -100,7 +100,7 @@ export default function CommandPalette({ open, onOpenChange }) {
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {q.trim().length < 2 ? (
-            <p className="p-4 text-center text-xs text-slate-400">Escreva pelo menos 2 caracteres…</p>
+            <p className="p-4 text-center text-xs text-slate-400">Escreve pelo menos 2 caracteres…</p>
           ) : !hasResults && !loading ? (
             <p className="p-4 text-center text-xs text-slate-400">Sem resultados para "{q}".</p>
           ) : (

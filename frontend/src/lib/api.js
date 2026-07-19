@@ -27,9 +27,9 @@ api.interceptors.response.use(
 );
 
 // Extrai uma mensagem de erro legível de qualquer erro axios (rede, timeout, validação, API).
-export function getErrorMessage(e, fallback = "Ocorreu um erro. Tente novamente.") {
+export function getErrorMessage(e, fallback = "Ocorreu um erro. Tenta novamente.") {
   if (e?.code === "ECONNABORTED") return "O servidor demorou demasiado a responder.";
-  if (e?.message === "Network Error") return "Sem ligação ao servidor. Verifique a internet.";
+  if (e?.message === "Network Error") return "Sem ligação ao servidor. Verifica a internet.";
   const detail = e?.response?.data?.detail;
   if (typeof detail === "string" && detail) return detail;
   // Erros de validação FastAPI (422) chegam como lista de objetos.

@@ -261,7 +261,7 @@ export default function Notes() {
     if (getNextActionMode(note) !== "status") {
       openNote(note.id, "orcamentos");
       toast.message(getNextActionCta(note), {
-        description: "Abra a ação indicada para o estado só mudar depois de a registar.",
+        description: "Abre a ação indicada para o estado só mudar depois de a registar.",
       });
       return;
     }
@@ -295,7 +295,7 @@ export default function Notes() {
   const duplicate = async (note) => {
     try {
       const { data } = await api.post(`/notes/${note.id}/duplicate`);
-      toast.success("Pedido duplicado — altere apenas o necessário");
+      toast.success("Pedido duplicado — altera apenas o necessário");
       reloadAll();
       openNote(data.id);
     } catch (e) { toast.error(getErrorMessage(e)); }
@@ -309,7 +309,7 @@ export default function Notes() {
   };
   const sendReminder = async (note) => {
     if (!note.supplier_id) {
-      toast.message("Escolha o fornecedor no separador Orçamentos.");
+      toast.message("Escolhe o fornecedor no separador Orçamentos.");
       openNote(note.id);
       return;
     }
@@ -324,7 +324,7 @@ export default function Notes() {
       toast.success("Lembrete enviado ao fornecedor");
       reloadAll();
     } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível enviar. Verifique o Gmail."));
+      toast.error(getErrorMessage(e, "Não foi possível enviar. Verifica o Gmail."));
       openNote(note.id);
     }
   };
@@ -394,7 +394,7 @@ export default function Notes() {
           <SegIcon className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-col">
-          <p className="kicker">{greeting()}, chefe</p>
+          <p className="kicker">{greeting()}, Tiago</p>
           <h1 data-testid="segment-title" className={`mt-0.5 font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
             {seg.title}
           </h1>
@@ -402,7 +402,7 @@ export default function Notes() {
             {!today
               ? seg.subtitle
               : counts.waiting_me
-                ? `${counts.waiting_me} pedido${counts.waiting_me === 1 ? "" : "s"} à espera da sua ação nesta área.`
+                ? `${counts.waiting_me} pedido${counts.waiting_me === 1 ? "" : "s"} à espera da tua ação nesta área.`
                 : seg.subtitle}
           </p>
         </div>
@@ -429,7 +429,7 @@ export default function Notes() {
             <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
             <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
           </h2>
-          <p className="mt-0.5 text-xs text-emerald-800/80">Analisados e calculados automaticamente — só falta a sua confirmação.</p>
+          <p className="mt-0.5 text-xs text-emerald-800/80">Analisados e calculados automaticamente — só falta a tua confirmação.</p>
           <div className="mt-3 space-y-2">
             {today.to_confirm.map((n) => (
               <button

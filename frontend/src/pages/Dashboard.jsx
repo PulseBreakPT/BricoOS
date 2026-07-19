@@ -233,7 +233,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="mt-3">
-                <p className="text-sm text-slate-500">Ligue o Gmail da loja para enviar pedidos de orçamento automaticamente.</p>
+                <p className="text-sm text-slate-500">Liga o Gmail da loja para enviar pedidos de orçamento automaticamente.</p>
                 {gmail.configured ? (
                   <Button data-testid="connect-gmail-btn" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-3 w-full rounded-xl"><Link2 className="mr-2 h-4 w-4" /> Ligar Gmail</Button>
                 ) : (

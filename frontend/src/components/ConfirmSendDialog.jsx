@@ -72,7 +72,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
             Confirmar envio ao cliente
           </DialogTitle>
           <p className="text-xs text-slate-500">
-            {note.customer_name || "Cliente"} · preparado automaticamente — reveja e confirme. Nada é enviado sem a sua confirmação.
+            {note.customer_name || "Cliente"} · preparado automaticamente — revê e confirma. Nada é enviado sem a tua confirmação.
           </p>
         </DialogHeader>
 
@@ -93,7 +93,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               <span className="block text-xs text-slate-500">
                 {pending.total != null ? `${Number(pending.total).toFixed(2)} € c/ IVA` : ""}
                 {pending.eff_margin_pct != null ? ` · margem final ${Number(pending.eff_margin_pct).toFixed(1)}%` : ""}
-                {" · toque para rever o PDF"}
+                {" · toca para rever o PDF"}
               </span>
             </span>
           </a>
@@ -108,8 +108,8 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
             {pending.subject_needs_review ? (
               <p data-testid="subject-review-warning" className="text-xs text-amber-700">
                 {(pending.obra_candidates || []).length > 1
-                  ? `O PDF tem vários números de obra possíveis (${pending.obra_candidates.join(", ")}) — confirme o assunto antes de enviar.`
-                  : "Não foi possível ler o número da obra no PDF — confirme o assunto antes de enviar."}
+                  ? `O PDF tem vários números de obra possíveis (${pending.obra_candidates.join(", ")}) — confirma o assunto antes de enviar.`
+                  : "Não foi possível ler o número da obra no PDF — confirma o assunto antes de enviar."}
               </p>
             ) : (
               pending.obra ? <p className="text-[11px] text-slate-400">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
@@ -135,7 +135,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               <ShieldCheck className="h-3.5 w-3.5" /> Envio só com confirmação
             </p>
           </div>
-          {!to.trim() ? <p className="mt-1.5 text-xs text-amber-600">Falta o email do cliente — preencha «Para» ou adicione-o nos Detalhes do pedido.</p> : null}
+          {!to.trim() ? <p className="mt-1.5 text-xs text-amber-600">Falta o email do cliente — preenche «Para» ou adiciona-o nos Detalhes do pedido.</p> : null}
         </div>
       </DialogContent>
     </Dialog>

@@ -1061,7 +1061,7 @@ export default function Emails() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); if (smartOn) setSmartQuery(null); }}
             onKeyDown={(e) => { if (e.key === "Enter" && smartOn && tab === "inbox") { e.preventDefault(); runSmartSearch(); } }}
-            placeholder={smartOn && tab === "inbox" ? 'Pergunte em linguagem natural e prima Enter — ex.: "emails do fornecedor X esta semana"' : "Procurar por remetente, destinatário ou assunto..."}
+            placeholder={smartOn && tab === "inbox" ? 'Pergunta em linguagem natural e prime Enter — ex.: "emails do fornecedor X esta semana"' : "Procurar por remetente, destinatário ou assunto..."}
             className="h-11 rounded-xl pl-10"
           />
         </div>

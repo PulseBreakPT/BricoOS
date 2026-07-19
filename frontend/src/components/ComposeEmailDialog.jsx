@@ -115,7 +115,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
             {forward ? "Reencaminhar email" : "Novo email"}
           </DialogTitle>
           <p className="text-xs text-slate-500">
-            {forward ? `Assunto original: ${forward.subject || "(sem assunto)"}` : "Escreva livremente — não fica associado a nenhum pedido."}
+            {forward ? `Assunto original: ${forward.subject || "(sem assunto)"}` : "Escreve livremente — não fica associado a nenhum pedido."}
           </p>
         </DialogHeader>
 
@@ -164,7 +164,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={forward ? 5 : 9}
-              placeholder={forward ? "Adicione uma nota antes da mensagem reencaminhada..." : undefined}
+              placeholder={forward ? "Adiciona uma nota antes da mensagem reencaminhada..." : undefined}
             />
           </div>
 
