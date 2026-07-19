@@ -5,7 +5,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
   BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
-  MoreHorizontal,
+  MoreHorizontal, ListChecks,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -23,6 +23,7 @@ import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
 import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
 import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
+import TaskDialog from "@/components/TaskDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -129,6 +130,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [labelDraft, setLabelDraft] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [taskDialogFor, setTaskDialogFor] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -267,16 +269,18 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     }
   };
 
-  const remind = async (m) => {
-    setBusyId(m.id);
-    try {
-      await api.post(`/emails/${m.id}/remind`, { days: 3 });
-      toast.success("Lembrete criado — em Tarefas daqui a 3 dias");
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível criar o lembrete"));
-    } finally {
-      setBusyId(null);
-    }
+  const openTaskDialog = (m) => {
+    const who = m.supplier_name || m.from_name || m.from_email;
+    const dueDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    setTaskDialogFor({
+      title: `Seguir email de ${who}: ${m.subject || "(sem assunto)"}`.slice(0, 200),
+      category: "construcao",
+      priority: "media",
+      due_date: dueDate,
+      repeat: "none",
+      subtasks: [],
+      note_id: m.note_id || "",
+    });
   };
 
   return (
@@ -404,8 +408,8 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                     <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Reencaminhar">
                       <Forward className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Reencaminhar</span>
                     </Button>
-                    <Button data-testid={`inbox-remind-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => remind(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Lembrar-me">
-                      {busyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1.5" /> : <BellRing className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Lembrar-me</span>
+                    <Button data-testid={`inbox-task-${m.id}`} size="sm" variant="outline" onClick={() => openTaskDialog(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Criar tarefa a partir deste email">
+                      <ListChecks className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Criar tarefa</span>
                     </Button>
                     <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title={m.archived ? "Restaurar" : "Arquivar"}>
                       {m.archived ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
@@ -475,6 +479,12 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         </div>
       )}
       <AttachmentPreviewDialog open={!!previewAttachment} onOpenChange={(v) => !v && setPreviewAttachment(null)} attachment={previewAttachment} />
+      <TaskDialog
+        open={!!taskDialogFor}
+        onOpenChange={(v) => !v && setTaskDialogFor(null)}
+        task={taskDialogFor}
+        onSaved={() => setTaskDialogFor(null)}
+      />
     </div>
   );
 }
