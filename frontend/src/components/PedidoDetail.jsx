@@ -29,6 +29,7 @@ import {
 } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
+import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -116,6 +117,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [deletingPhotoId, setDeletingPhotoId] = useState(null);
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
   const photoInputRef = useRef(null);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   // Assistente de criação por etapas: escolha do tipo → passos
   const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
@@ -1349,15 +1351,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           {(m.attachments || []).length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {m.attachments.map((a) => (
-                                <a
+                                <button
                                   key={a.id}
-                                  href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                                  type="button"
+                                  onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename })}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700"
                                 >
                                   <FileText className="h-3.5 w-3.5" /> {a.filename}
-                                </a>
+                                </button>
                               ))}
                             </div>
                           ) : null}
@@ -1801,6 +1802,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AttachmentPreviewDialog
+        open={!!previewAttachment}
+        onOpenChange={(v) => !v && setPreviewAttachment(null)}
+        attachment={previewAttachment}
+      />
     </Dialog>
   );
 }

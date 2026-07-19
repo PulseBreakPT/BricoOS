@@ -5,7 +5,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
   BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
-  MoreHorizontal,
+  MoreHorizontal, ListChecks,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
@@ -22,6 +23,8 @@ import ComposeEmailDialog from "@/components/ComposeEmailDialog";
 import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
 import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
+import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
+import TaskDialog from "@/components/TaskDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -127,6 +130,12 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [labelEditId, setLabelEditId] = useState(null);
   const [labelDraft, setLabelDraft] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [taskDialogFor, setTaskDialogFor] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkLabelOpen, setBulkLabelOpen] = useState(false);
+  const [bulkLabel, setBulkLabel] = useState("");
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -265,22 +274,90 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     }
   };
 
-  const remind = async (m) => {
-    setBusyId(m.id);
+  const openTaskDialog = (m) => {
+    const who = m.supplier_name || m.from_name || m.from_email;
+    const dueDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    setTaskDialogFor({
+      title: `Seguir email de ${who}: ${m.subject || "(sem assunto)"}`.slice(0, 200),
+      category: "construcao",
+      priority: "media",
+      due_date: dueDate,
+      repeat: "none",
+      subtasks: [],
+      note_id: m.note_id || "",
+    });
+  };
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === displayItems.length ? new Set() : new Set(displayItems.map((m) => m.id))));
+  };
+
+  const bulkArchive = async () => {
+    setBulkBusy(true);
     try {
-      await api.post(`/emails/${m.id}/remind`, { days: 3 });
-      toast.success("Lembrete criado — em Tarefas daqui a 3 dias");
+      await api.post("/emails/bulk-archive", { ids: [...selected], archived: !archivedView });
+      toast.success(archivedView ? "Emails restaurados para a caixa de entrada" : "Emails arquivados");
+      clearSelection();
+      load({ silent: true });
     } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível criar o lembrete"));
+      toast.error(getErrorMessage(e, "Não foi possível arquivar os emails selecionados"));
     } finally {
-      setBusyId(null);
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkMarkSeen = async () => {
+    setBulkBusy(true);
+    try {
+      await api.post("/emails/bulk-seen", { ids: [...selected] });
+      toast.success("Emails marcados como vistos");
+      clearSelection();
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível marcar como vistos"));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkApplyLabel = async () => {
+    if (!bulkLabel.trim()) return;
+    setBulkBusy(true);
+    try {
+      await api.post("/emails/bulk-label", { ids: [...selected], label: bulkLabel.trim() });
+      toast.success("Etiqueta aplicada aos emails selecionados");
+      setBulkLabel("");
+      setBulkLabelOpen(false);
+      clearSelection();
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível aplicar a etiqueta"));
+    } finally {
+      setBulkBusy(false);
     }
   };
 
   return (
     <div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : archivedView ? "no arquivo" : "na caixa de entrada"}</p>
+        <div className="flex items-center gap-2">
+          {displayItems.length > 0 ? (
+            <Checkbox
+              data-testid="inbox-select-all"
+              checked={selected.size > 0 && selected.size === displayItems.length}
+              onCheckedChange={toggleSelectAll}
+            />
+          ) : null}
+          <p className="text-sm text-slate-500">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : archivedView ? "no arquivo" : "na caixa de entrada"}</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {!smartQuery ? (
             <Button data-testid="emails-toggle-archived" size="sm" variant={archivedView ? "default" : "outline"} onClick={() => setArchivedView((v) => !v)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
@@ -306,6 +383,40 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               {l}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {selected.size > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-white">
+          <span className="text-xs font-bold">{selected.size} selecionado{selected.size === 1 ? "" : "s"}</span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Button data-testid="bulk-seen" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+              <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar visto</span>
+            </Button>
+            <Button data-testid="bulk-archive" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkArchive} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+              {archivedView ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">{archivedView ? "Restaurar" : "Arquivar"}</span>
+            </Button>
+            <Button data-testid="bulk-label-toggle" size="sm" variant="outline" disabled={bulkBusy} onClick={() => setBulkLabelOpen((v) => !v)} className="h-8 rounded-lg border-white/20 bg-white/10 px-2.5 text-xs text-white hover:bg-white/20 hover:text-white">
+              <Tag className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Etiqueta</span>
+            </Button>
+            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2 text-xs text-white hover:bg-white/10 hover:text-white">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {bulkLabelOpen ? (
+            <div className="mt-1 flex w-full items-center gap-2">
+              <Input
+                data-testid="bulk-label-input"
+                value={bulkLabel}
+                onChange={(e) => setBulkLabel(e.target.value)}
+                placeholder="nome da etiqueta"
+                className="h-8 max-w-xs text-xs text-slate-900"
+              />
+              <Button data-testid="bulk-label-apply" size="sm" disabled={bulkBusy || !bulkLabel.trim()} onClick={bulkApplyLabel} className="h-8 rounded-lg text-xs">
+                Aplicar
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -336,7 +447,14 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : (
         <div className="mt-3 space-y-2">
           {displayItems.map((m) => (
-            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`rounded-xl border p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
+            <div key={m.id} data-testid={`inbox-email-${m.id}`} className={`flex items-start gap-2 rounded-xl border p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${m.seen ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50/40"}`}>
+              <Checkbox
+                data-testid={`inbox-select-${m.id}`}
+                checked={selected.has(m.id)}
+                onCheckedChange={() => toggleSelect(m.id)}
+                className="mt-2.5 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
               <button onClick={() => openItem(m)} className="flex w-full items-start gap-3 text-left">
                 {!m.seen ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" /> : <span className="mt-1.5 h-2 w-2 shrink-0" />}
                 <div className="min-w-0 flex-1">
@@ -363,10 +481,11 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                   {(m.attachments || []).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a) => (
-                        <a key={a.id} href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)} target="_blank" rel="noreferrer"
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                        <button key={a.id} type="button"
+                          onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename })}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
                           <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   ) : null}
@@ -401,8 +520,8 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                     <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Reencaminhar">
                       <Forward className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Reencaminhar</span>
                     </Button>
-                    <Button data-testid={`inbox-remind-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => remind(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Lembrar-me">
-                      {busyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1.5" /> : <BellRing className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Lembrar-me</span>
+                    <Button data-testid={`inbox-task-${m.id}`} size="sm" variant="outline" onClick={() => openTaskDialog(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Criar tarefa a partir deste email">
+                      <ListChecks className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Criar tarefa</span>
                     </Button>
                     <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title={m.archived ? "Restaurar" : "Arquivar"}>
                       {m.archived ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
@@ -467,10 +586,18 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </div>
           ))}
         </div>
       )}
+      <AttachmentPreviewDialog open={!!previewAttachment} onOpenChange={(v) => !v && setPreviewAttachment(null)} attachment={previewAttachment} />
+      <TaskDialog
+        open={!!taskDialogFor}
+        onOpenChange={(v) => !v && setTaskDialogFor(null)}
+        task={taskDialogFor}
+        onSaved={() => setTaskDialogFor(null)}
+      />
     </div>
   );
 }
@@ -484,6 +611,7 @@ function SentTab({ search }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -564,10 +692,11 @@ function SentTab({ search }) {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a, i) => (
                         m.note_id && m.pdf_file_id ? (
-                          <a key={i} href={withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`)} target="_blank" rel="noreferrer"
-                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                          <button key={i} type="button"
+                            onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`), filename: a.filename })}
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
                             <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
-                          </a>
+                          </button>
                         ) : (
                           <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-500">
                             <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
@@ -588,6 +717,7 @@ function SentTab({ search }) {
           ))}
         </div>
       )}
+      <AttachmentPreviewDialog open={!!previewAttachment} onOpenChange={(v) => !v && setPreviewAttachment(null)} attachment={previewAttachment} />
     </div>
   );
 }
