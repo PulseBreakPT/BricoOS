@@ -108,8 +108,8 @@ const Brand = () => (
       <Hammer className="h-5 w-5" strokeWidth={2.4} />
     </div>
     <div className="leading-tight">
-      <p className="font-heading text-lg font-extrabold tracking-tight text-slate-900">Bricomarché</p>
-      <p className="text-xs font-medium text-slate-500">Faro · Assistente</p>
+      <p className="font-heading text-lg font-extrabold tracking-tight text-slate-900">Brico Assistente</p>
+      <p className="text-xs font-medium text-slate-500">Gestão de pedidos</p>
     </div>
   </div>
 );
