@@ -2722,6 +2722,46 @@ async def list_email_labels():
     return {"items": sorted(l for l in labels if l)}
 
 
+class BulkIdsIn(BaseModel):
+    ids: List[str] = []
+
+
+class BulkArchiveIn(BulkIdsIn):
+    archived: bool = True
+
+
+class BulkLabelIn(BulkIdsIn):
+    label: str
+
+
+@api_router.post("/emails/bulk-archive")
+async def bulk_archive_emails(payload: BulkArchiveIn):
+    if not payload.ids:
+        return {"ok": True, "modified": 0}
+    r = await db.received_emails.update_many({"id": {"$in": payload.ids}}, {"$set": {"archived": payload.archived}})
+    return {"ok": True, "modified": r.modified_count}
+
+
+@api_router.post("/emails/bulk-seen")
+async def bulk_mark_emails_seen(payload: BulkIdsIn):
+    if not payload.ids:
+        return {"ok": True, "modified": 0}
+    r = await db.received_emails.update_many({"id": {"$in": payload.ids}}, {"$set": {"seen": True}})
+    return {"ok": True, "modified": r.modified_count}
+
+
+@api_router.post("/emails/bulk-label")
+async def bulk_add_email_label(payload: BulkLabelIn):
+    label = (payload.label or "").strip()
+    if not label or not payload.ids:
+        return {"ok": True, "modified": 0}
+    docs = await db.received_emails.find({"id": {"$in": payload.ids}}, {"_id": 0, "id": 1, "labels": 1}).to_list(len(payload.ids))
+    for d in docs:
+        labels = sorted({*(d.get("labels") or []), label})[:10]
+        await db.received_emails.update_one({"id": d["id"]}, {"$set": {"labels": labels}})
+    return {"ok": True, "modified": len(docs)}
+
+
 # ---------- Secção "Emails": caixa completa, enviados e rascunhos ----------
 # Ao contrário do painel de cada pedido (que só mostra o que lhe pertence),
 # esta secção mostra TUDO — incluindo emails sem qualquer pedido associado.
