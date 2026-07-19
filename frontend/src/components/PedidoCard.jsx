@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import {
   Star, Ruler, Phone, AlertTriangle, ArrowRight, Tag, MoreVertical, Send,
   PhoneCall, PhoneMissed, CheckCircle2, Copy, ArchiveRestore, Clock, CalendarClock,
-  MailCheck,
+  MailCheck, Camera,
 } from "lucide-react";
 import { getCategory } from "@/lib/categories";
 import {
@@ -94,6 +94,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {note.measurements ? <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-700"><Ruler className="h-3 w-3" /> {note.measurements}</span> : null}
+          {note.photo_count > 0 ? <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"><Camera className="h-3 w-3" /> {note.photo_count}</span> : null}
           {(note.labels || []).slice(0, 2).map((l) => <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] font-semibold text-slate-600"><Tag className="h-2.5 w-2.5" /> {l}</span>)}
         </div>
 

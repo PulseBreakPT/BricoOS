@@ -1156,6 +1156,13 @@ async def list_notes(
                 bucket.append(a)
         for d in page:
             d["recent_activities"] = recent.get(d["id"], [])
+        photo_counts = await db.note_files.aggregate([
+            {"$match": {"note_id": {"$in": ids}, "kind": "photo"}},
+            {"$group": {"_id": "$note_id", "count": {"$sum": 1}}},
+        ]).to_list(len(ids))
+        counts_by_id = {c["_id"]: c["count"] for c in photo_counts}
+        for d in page:
+            d["photo_count"] = counts_by_id.get(d["id"], 0)
     return {"items": page, "total": len(docs)}
 
 
@@ -1193,6 +1200,7 @@ async def get_note(note_id: str):
     doc = await db.notes.find_one({"id": note_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    doc["photo_count"] = await db.note_files.count_documents({"note_id": note_id, "kind": "photo"})
     return enrich_note(doc)
 
 
@@ -1401,6 +1409,7 @@ async def delete_note(note_id: str):
     await db.activities.delete_many({"note_id": note_id})
     await db.tasks.delete_many({"note_id": note_id})
     await db.quote_requests.delete_many({"note_id": note_id})
+    await db.note_files.delete_many({"note_id": note_id})
     return {"ok": True}
 
 
@@ -1740,6 +1749,8 @@ async def add_quote(note_id: str, payload: QuoteIn):
 BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
 MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
 MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
+MAX_PHOTO_BYTES = 10 * 1024 * 1024
+MAX_PHOTOS_PER_NOTE = 30
 
 
 class SupplierQuoteItemIn(BaseModel):
@@ -1925,8 +1936,72 @@ async def download_note_file(note_id: str, file_id: str):
     f = await db.note_files.find_one({"id": file_id, "note_id": note_id}, {"_id": 0})
     if not f:
         raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
-    return Response(content=base64.b64decode(f["content_b64"]), media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "documento.pdf")}"'})
+    content_type = f.get("content_type") or "application/pdf"
+    # Fotos abrem embutidas (galeria, pré-visualização); PDFs mantêm o
+    # comportamento antigo de download direto.
+    disposition = "inline" if f.get("kind") == "photo" else "attachment"
+    return Response(content=base64.b64decode(f["content_b64"]), media_type=content_type,
+                    headers={"Content-Disposition": f'{disposition}; filename="{f.get("filename", "documento")}"'})
+
+
+# ---------- Fotos do pedido (Pedidos Gerais e Banda Alumínios) ----------
+def _note_photo_meta(f):
+    return {
+        "id": f["id"], "filename": f.get("filename") or "foto.jpg",
+        "content_type": f.get("content_type") or "image/jpeg",
+        "size": f.get("size") or 0, "created_at": f.get("created_at"),
+    }
+
+
+@api_router.get("/notes/{note_id}/photos")
+async def list_note_photos(note_id: str):
+    docs = await db.note_files.find(
+        {"note_id": note_id, "kind": "photo"},
+        {"_id": 0, "content_b64": 0},
+    ).sort("created_at", 1).to_list(MAX_PHOTOS_PER_NOTE)
+    return [_note_photo_meta(f) for f in docs]
+
+
+@api_router.post("/notes/{note_id}/photos")
+async def upload_note_photos(note_id: str, files: List[UploadFile] = File(...)):
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    existing = await db.note_files.count_documents({"note_id": note_id, "kind": "photo"})
+    if existing + len(files) > MAX_PHOTOS_PER_NOTE:
+        raise HTTPException(status_code=400, detail=f"Máximo de {MAX_PHOTOS_PER_NOTE} fotos por pedido.")
+    saved = []
+    for file in files:
+        if not (file.content_type or "").startswith("image/"):
+            raise HTTPException(status_code=400, detail=f'"{file.filename}" não é uma imagem.')
+        data = await file.read()
+        if not data:
+            continue
+        if len(data) > MAX_PHOTO_BYTES:
+            raise HTTPException(status_code=400, detail=f'"{file.filename}" é demasiado grande (máx. 10 MB).')
+        doc = {
+            "id": str(uuid.uuid4()), "note_id": note_id, "kind": "photo",
+            "filename": file.filename or "foto.jpg", "content_type": file.content_type,
+            "size": len(data), "content_b64": base64.b64encode(data).decode(),
+            "created_at": now_iso(),
+        }
+        await db.note_files.insert_one(doc)
+        saved.append(_note_photo_meta(doc))
+    if saved:
+        await log_activity(note_id, "photo_added",
+                           f"{len(saved)} foto{'s' if len(saved) != 1 else ''} adicionada{'s' if len(saved) != 1 else ''}")
+        await db.notes.update_one({"id": note_id}, {"$set": {"updated_at": now_iso()}})
+    return saved
+
+
+@api_router.delete("/notes/{note_id}/photos/{photo_id}")
+async def delete_note_photo(note_id: str, photo_id: str):
+    f = await db.note_files.find_one({"id": photo_id, "note_id": note_id, "kind": "photo"}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="Foto não encontrada")
+    await db.note_files.delete_one({"id": photo_id, "note_id": note_id})
+    await log_activity(note_id, "photo_removed", f'Foto removida ({f.get("filename", "foto")})')
+    return {"ok": True}
 
 
 @api_router.post("/notes/{note_id}/quotes/{quote_id}/approve")
