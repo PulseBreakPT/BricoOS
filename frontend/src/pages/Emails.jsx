@@ -22,6 +22,7 @@ import ComposeEmailDialog from "@/components/ComposeEmailDialog";
 import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
 import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
+import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -127,6 +128,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [labelEditId, setLabelEditId] = useState(null);
   const [labelDraft, setLabelDraft] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -363,10 +365,11 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                   {(m.attachments || []).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a) => (
-                        <a key={a.id} href={withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`)} target="_blank" rel="noreferrer"
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                        <button key={a.id} type="button"
+                          onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename })}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
                           <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   ) : null}
@@ -471,6 +474,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
           ))}
         </div>
       )}
+      <AttachmentPreviewDialog open={!!previewAttachment} onOpenChange={(v) => !v && setPreviewAttachment(null)} attachment={previewAttachment} />
     </div>
   );
 }
@@ -484,6 +488,7 @@ function SentTab({ search }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(async (opts = {}) => {
@@ -564,10 +569,11 @@ function SentTab({ search }) {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.attachments.map((a, i) => (
                         m.note_id && m.pdf_file_id ? (
-                          <a key={i} href={withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`)} target="_blank" rel="noreferrer"
-                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                          <button key={i} type="button"
+                            onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/notes/${m.note_id}/files/${m.pdf_file_id}`), filename: a.filename })}
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700">
                             <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
-                          </a>
+                          </button>
                         ) : (
                           <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-500">
                             <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[55vw] truncate sm:max-w-[220px]">{a.filename}</span>
@@ -588,6 +594,7 @@ function SentTab({ search }) {
           ))}
         </div>
       )}
+      <AttachmentPreviewDialog open={!!previewAttachment} onOpenChange={(v) => !v && setPreviewAttachment(null)} attachment={previewAttachment} />
     </div>
   );
 }
