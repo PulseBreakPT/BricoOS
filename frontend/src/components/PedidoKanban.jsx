@@ -1,12 +1,11 @@
 import { MoreVertical, Phone, AlertTriangle } from "lucide-react";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg } from "@/lib/pedido";
-import { getCategory } from "@/lib/categories";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { CategoryBadge } from "@/components/CategoryBadge";
 
 function KanbanCard({ note, onOpen, onMove }) {
-  const c = getCategory(note.category);
   const pr = getPriorityCfg(note.priority);
   return (
     <div
@@ -14,8 +13,6 @@ function KanbanCard({ note, onOpen, onMove }) {
       onClick={() => onOpen(note.id)}
       className="group relative cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md"
     >
-      <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: c.accent }} />
-      <div className="pl-2">
         <div className="flex items-start justify-between gap-1.5">
           <p className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">{note.customer_name || "Sem nome"}</p>
           <DropdownMenu>
@@ -42,6 +39,7 @@ function KanbanCard({ note, onOpen, onMove }) {
         </div>
         {note.description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{note.description}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <CategoryBadge category={note.category} />
           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: pr.bg, color: pr.text }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pr.dot }} />{pr.label}
           </span>
@@ -60,7 +58,6 @@ function KanbanCard({ note, onOpen, onMove }) {
             <Phone className="h-3 w-3" /> {note.phone}
           </a>
         ) : null}
-      </div>
     </div>
   );
 }

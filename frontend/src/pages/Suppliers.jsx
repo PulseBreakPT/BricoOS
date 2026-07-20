@@ -181,8 +181,7 @@ export default function Suppliers() {
               className="group relative animate-fade-up overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 sm:p-5"
               style={{ "--stagger-i": Math.min(idx, 8) }}
             >
-              <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ background: `linear-gradient(180deg, ${c.accent}, ${c.accent}66)` }} />
-              <div className="flex items-start justify-between gap-3 pl-2">
+              <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <span
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-heading text-sm font-extrabold shadow-sm transition-transform duration-200 group-hover:scale-110"
@@ -204,7 +203,7 @@ export default function Suppliers() {
                   </button>
                 </div>
               </div>
-              <div className="mt-3 space-y-1.5 pl-2 text-sm">
+              <div className="mt-3 space-y-1.5 text-sm">
                 <p className="flex items-center justify-between gap-2 text-slate-600">
                   <span className="flex min-w-0 items-center gap-2">
                     <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -240,7 +239,7 @@ export default function Suppliers() {
                 {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
               </div>
               {(s.open_notes > 0 || s.quotes_given > 0) ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2 pl-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   {s.open_notes > 0 ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
                       <ClipboardList className="h-3 w-3" /> {s.open_notes} pedido{s.open_notes === 1 ? "" : "s"} em aberto
