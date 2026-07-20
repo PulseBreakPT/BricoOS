@@ -4,16 +4,15 @@ import {
   PhoneCall, PhoneMissed, CheckCircle2, Copy, ArchiveRestore, Clock, CalendarClock,
   MailCheck, Camera,
 } from "lucide-react";
-import { getCategory } from "@/lib/categories";
 import {
   formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg, timeAgo,
 } from "@/lib/pedido";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { CategoryBadge } from "@/components/CategoryBadge";
 
 export default function PedidoCard({ note, onOpen, actions }) {
-  const c = getCategory(note.category);
   const st = getStatusCfg(note.status);
   const pr = getPriorityCfg(note.priority);
   const archived = note.archived;
@@ -31,11 +30,6 @@ export default function PedidoCard({ note, onOpen, actions }) {
       onClick={() => onOpen(note.id)}
       className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     >
-      <span
-        className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2"
-        style={{ background: `linear-gradient(180deg, ${c.accent}, ${c.accent}66)` }}
-      />
-      <div className="pl-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -96,6 +90,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
         <p className="mt-2 line-clamp-2 text-sm text-slate-600">{note.description}</p>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <CategoryBadge category={note.category} />
           {note.measurements ? <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-700"><Ruler className="h-3 w-3" /> {note.measurements}</span> : null}
           {note.photo_count > 0 ? <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"><Camera className="h-3 w-3" /> {note.photo_count}</span> : null}
           {(note.labels || []).slice(0, 2).map((l) => <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] font-semibold text-slate-600"><Tag className="h-2.5 w-2.5" /> {l}</span>)}
@@ -143,7 +138,6 @@ export default function PedidoCard({ note, onOpen, actions }) {
             </button>
           </div>
         ) : null}
-      </div>
     </motion.div>
   );
 }
