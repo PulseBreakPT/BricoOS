@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowLeft, BookOpenCheck, ExternalLink, Loader2, RefreshCw,
+  AlertTriangle, ArrowLeft, BookOpenCheck, ExternalLink, RefreshCw,
   Ruler, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import CatalogIntelligence from "@/components/CatalogIntelligence";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -80,7 +81,7 @@ export default function Catalog() {
       {loading ? (
         <div className="flex min-h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
           <div className="text-center text-slate-500">
-            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+            <Spinner className="mx-auto h-6 w-6" />
             <p className="mt-2 text-xs font-bold">A recalcular o catálogo…</p>
           </div>
         </div>

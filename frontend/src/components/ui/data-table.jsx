@@ -10,6 +10,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import {
   Table,
   TableBody,
@@ -89,22 +90,24 @@ function DataTable({
           <span className="mr-auto text-sm text-muted-foreground">
             Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronLeft className="h-4 w-4" /> Anterior
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Seguinte <ChevronRight className="h-4 w-4" />
-          </Button>
+          <ButtonGroup>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronLeft className="h-4 w-4" /> Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Seguinte <ChevronRight className="h-4 w-4" />
+            </Button>
+          </ButtonGroup>
         </div>
       ) : null}
     </div>

@@ -10,10 +10,17 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription,
+} from "@/components/ui/attachment";
+import { Message, MessageGroup, MessageAvatar, MessageContent } from "@/components/ui/message";
+import { Empty, EmptyDescription } from "@/components/ui/empty";
 import { toast } from "sonner";
 import {
-  Trash2, Send, Copy, Mail, Plus, Loader2, AlertCircle, CheckCircle2,
+  Trash2, Send, Copy, Mail, Plus, AlertCircle, CheckCircle2,
   Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
   Check, AlertTriangle, Cloud, Frame,
@@ -755,7 +762,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   : (form.phone
                     ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
                     : "Sem telefone")}
-                {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> a guardar…</span> : null}
+                {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
                 {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
@@ -815,7 +822,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {editMode ? (
                 <>
                   <Button data-testid="detail-save" size="sm" onClick={saveDetails} disabled={saving} className="col-span-2 h-9 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 sm:col-span-1 sm:w-auto sm:shrink-0">
-                    {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />} Guardar
+                    {saving ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Check className="mr-1.5 h-3.5 w-3.5" />} Guardar
                   </Button>
                   <Button data-testid="detail-cancel-edit" size="sm" variant="outline" onClick={cancelEdit} disabled={saving} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
                     <X className="mr-1.5 h-3.5 w-3.5" /> Cancelar
@@ -985,7 +992,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {/* Passo 2 (BandAluminios) — Caixilharia */}
                 {createMode === "band" && createStep === 1 ? (
                   !caixCatalog ? (
-                    <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
+                    <div className="flex justify-center py-10"><Spinner className="h-6 w-6 text-slate-400" /></div>
                   ) : (
                     <>
                       <CaixilhariaForm catalog={caixCatalog} spec={caixSpec} onChange={setCaixSpec} />
@@ -1008,11 +1015,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </Button>
                   ) : createMode === "band" ? (
                     <Button data-testid="wizard-create-band" onClick={createBandPedido} disabled={creating || !caixCatalog} className="flex-1 rounded-xl">
-                      {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Criar pedido à medida
+                      {creating ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido à medida
                     </Button>
                   ) : (
                     <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl">
-                      {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Criar pedido
+                      {saving ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido
                     </Button>
                   )}
                 </div>
@@ -1242,7 +1249,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {editMode ? (
                 <div className="mt-6 flex gap-2">
                   <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700">
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                    {saving ? <Spinner className="mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
                     Guardar
                   </Button>
                   <Button data-testid="cancel-note-btn" variant="outline" onClick={cancelEdit} disabled={saving} className="rounded-xl">
@@ -1281,16 +1288,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 )}
                 <div className="mt-4 space-y-1.5">
                   <Label>Fornecedor</Label>
-                  <Select value={emailSupplier} onValueChange={(v) => { setEmailSupplier(v); loadTemplate(v, isReminder); }}>
-                    <SelectTrigger data-testid="select-email-supplier"><SelectValue placeholder="Escolher fornecedor..." /></SelectTrigger>
-                    <SelectContent>
-                      {suppliers.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-slate-400">Sem fornecedores.</div>
-                      ) : suppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}{s.email ? ` · ${s.email}` : " · (sem email)"}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    data-testid="select-email-supplier"
+                    value={emailSupplier}
+                    onChange={(v) => { setEmailSupplier(v); loadTemplate(v, isReminder); }}
+                    options={suppliers.map((s) => ({ value: s.id, label: `${s.name}${s.email ? ` · ${s.email}` : " · (sem email)"}` }))}
+                    placeholder="Escolher fornecedor..."
+                    searchPlaceholder="Procurar fornecedor..."
+                    emptyText="Sem fornecedores."
+                  />
                   {selectedSupplier && !selectedSupplier.email ? (
                     <p className="text-xs text-red-500">Este fornecedor não tem email.</p>
                   ) : null}
@@ -1308,7 +1314,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button data-testid="send-email-btn" onClick={sendEmail} disabled={sending || !gmailStatus?.connected} className="rounded-xl">
-                    {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} {isReminder ? "Enviar lembrete" : "Enviar por Gmail"}
+                    {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />} {isReminder ? "Enviar lembrete" : "Enviar por Gmail"}
                   </Button>
                   <Button data-testid="copy-email-btn" variant="outline" onClick={copyEmail} className="rounded-xl">
                     <Copy className="mr-2 h-4 w-4" /> Copiar email
@@ -1325,7 +1331,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </h4>
                     {gmailStatus?.method === "smtp" ? (
                       <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-8 shrink-0 rounded-lg text-xs">
-                        {syncingEmails ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Verificar agora
+                        {syncingEmails ? <Spinner className="mr-1 h-3.5 w-3.5" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Verificar agora
                       </Button>
                     ) : null}
                   </div>
@@ -1423,22 +1429,27 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   onClick={() => supplierPdfInputRef.current?.click()}
                   className="mt-3 rounded-xl"
                 >
-                  {importingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                  {importingPdf ? <Spinner className="mr-2 h-4 w-4" /> : <FileUp className="mr-2 h-4 w-4" />}
                   {sq ? "Substituir PDF do fornecedor" : "Importar PDF do fornecedor"}
                 </Button>
 
                 {sq ? (
                   <div className="mt-4">
-                    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-                      <p>
-                        <span className="font-bold text-slate-900">{sq.quote_number}</span>
-                        {sq.date ? ` · ${sq.date}` : ""}{sq.obra ? ` · Obra ${sq.obra}` : ""} · {sq.items.length} linha(s)
-                        {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — a margem é ajustável linha a linha; o coeficiente e o preço final recalculam-se sozinhos com a fórmula exata da loja.
-                      </p>
-                    </div>
+                    <Attachment className="w-full max-w-full" size="sm">
+                      <AttachmentMedia>
+                        <FileText />
+                      </AttachmentMedia>
+                      <AttachmentContent>
+                        <AttachmentTitle>{sq.quote_number}</AttachmentTitle>
+                        <AttachmentDescription>
+                          {sq.date ? `${sq.date} · ` : ""}{sq.obra ? `Obra ${sq.obra} · ` : ""}{sq.items.length} linha(s)
+                          {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
+                        </AttachmentDescription>
+                      </AttachmentContent>
+                    </Attachment>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — a margem é ajustável linha a linha; o coeficiente e o preço final recalculam-se sozinhos com a fórmula exata da loja.
+                    </p>
 
                     <div className="mt-3 space-y-3">
                       {sq.items.map((i) => (
@@ -1527,7 +1538,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           onClick={generateClientPdf}
                           className="rounded-lg"
                         >
-                          {generatingPdf ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
+                          {generatingPdf ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <FileText className="mr-1.5 h-3.5 w-3.5" />}
                           Gerar PDF para o cliente
                         </Button>
                       </div>
@@ -1546,7 +1557,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       </div>
                       <p className="mt-1 text-xs text-slate-600">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
                     </div>
-                    {clientTemplateLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" /> : null}
+                    {clientTemplateLoading ? <Spinner className="h-4 w-4 shrink-0 text-blue-500" /> : null}
                   </div>
 
                   {!form.email ? (
@@ -1568,7 +1579,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {gmailStatus?.connected ? (
                       <Button data-testid="send-client-email" onClick={sendClientEmail} disabled={!form.email || !clientEmailData.body || sendingClient || clientTemplateLoading} className="rounded-xl bg-blue-700 hover:bg-blue-800">
-                        {sendingClient ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Enviar por email
+                        {sendingClient ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />} Enviar por email
                       </Button>
                     ) : null}
                     <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-white" : "bg-blue-700 hover:bg-blue-800"}`}>
@@ -1614,7 +1625,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     onClick={() => photoInputRef.current?.click()}
                     className="rounded-xl"
                   >
-                    {uploadingPhotos ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-1.5 h-4 w-4" />}
+                    {uploadingPhotos ? <Spinner className="mr-1.5 h-4 w-4" /> : <ImagePlus className="mr-1.5 h-4 w-4" />}
                     Adicionar fotos
                   </Button>
                 </div>
@@ -1652,7 +1663,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           disabled={deletingPhotoId === p.id}
                           className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-red-600 active:scale-90 group-hover:opacity-100"
                         >
-                          {deletingPhotoId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          {deletingPhotoId === p.id ? <Spinner className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     ))}
@@ -1688,7 +1699,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       disabled={!!loggingEvent}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${QUICK_LOG_TONES[tone]}`}
                     >
-                      {loggingEvent === event ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
+                      {loggingEvent === event ? <Spinner className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                       {label}
                     </button>
                   ))}
@@ -1698,27 +1709,31 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <Input data-testid="comment-input" value={comment} onChange={(e) => setComment(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addComment()} placeholder="Adicionar nota / comentário..." />
                 <Button data-testid="add-comment-btn" onClick={addComment} className="rounded-xl"><MessageSquare className="h-4 w-4" /></Button>
               </div>
-              <div className="mt-5 space-y-0">
-                {activities.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-400">Sem atividade registada.</p>
-                ) : activities.map((a, i) => {
-                  const Icon = ACT_ICONS[a.type] || Sparkles;
-                  return (
-                    <div key={a.id} data-testid={`activity-${a.id}`} className="relative flex gap-3 pb-5">
-                      {i < activities.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-slate-200" /> : null}
-                      <div className="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-sm text-slate-800">{a.message}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          {a.author} · {formatDateTime(a.created_at)} <span className="text-slate-300">({timeAgo(a.created_at)})</span>
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              {activities.length === 0 ? (
+                <Empty className="border-0 py-8">
+                  <EmptyDescription>Sem atividade registada.</EmptyDescription>
+                </Empty>
+              ) : (
+                <MessageGroup className="mt-5 gap-0">
+                  {activities.map((a, i) => {
+                    const Icon = ACT_ICONS[a.type] || Sparkles;
+                    return (
+                      <Message key={a.id} data-testid={`activity-${a.id}`} className="pb-5">
+                        {i < activities.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-slate-200" /> : null}
+                        <MessageAvatar className="z-10 h-8 w-8 min-w-8 self-start bg-slate-100 text-slate-600">
+                          <Icon className="h-4 w-4" />
+                        </MessageAvatar>
+                        <MessageContent className="gap-0.5 pt-0.5">
+                          <p className="text-sm text-slate-800">{a.message}</p>
+                          <p className="text-xs text-slate-400">
+                            {a.author} · {formatDateTime(a.created_at)} <span className="text-slate-300">({timeAgo(a.created_at)})</span>
+                          </p>
+                        </MessageContent>
+                      </Message>
+                    );
+                  })}
+                </MessageGroup>
+              )}
             </TabsContent>
 
             {/* TAREFAS / LEMBRETES */}
@@ -1795,7 +1810,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     className="rounded-xl"
                     data-testid="photo-lightbox-delete"
                   >
-                    {deletingPhotoId === lightboxPhoto.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
+                    {deletingPhotoId === lightboxPhoto.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />}
                     Remover
                   </Button>
                 </div>

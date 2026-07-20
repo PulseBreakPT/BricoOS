@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles } from "lucide-react";
+import { Kbd } from "@/components/ui/kbd";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import api from "@/lib/api";
@@ -175,7 +176,7 @@ export default function Layout() {
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1">Pesquisar tudo…</span>
-          <span className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-400">⌘K</span>
+          <Kbd className="h-auto shrink-0 rounded-md border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-400">⌘K</Kbd>
         </button>
         <nav className="mt-5 flex flex-1 flex-col gap-4 overflow-y-auto">
           {NAV_GROUPS.map((group) => (
@@ -223,7 +224,7 @@ export default function Layout() {
           <div className="relative mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
             {TIPS.map((tip) => (
               <span key={tip.k} className="flex items-center gap-1 text-[10px] text-slate-400">
-                <kbd className="rounded border border-slate-200 bg-white px-1 font-mono text-[9px] font-bold text-slate-600 shadow-sm">{tip.k}</kbd>
+                <Kbd className="h-auto rounded border-slate-200 bg-white px-1 py-0 font-mono text-[9px] font-bold text-slate-600 shadow-sm">{tip.k}</Kbd>
                 {tip.t}
               </span>
             ))}

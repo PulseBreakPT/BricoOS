@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Loader2, Receipt, ClipboardList } from "lucide-react";
+import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +14,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia,
+} from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import PhoneInput from "@/components/PhoneInput";
 import { toast } from "sonner";
@@ -255,19 +259,25 @@ export default function Suppliers() {
       </div>
 
       {suppliers.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
-          <div className="relative">
-            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-            <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
-              <Truck className="h-7 w-7" />
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+          <EmptyMedia>
+            <div className="relative">
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
+                <Truck className="h-7 w-7" />
+              </div>
             </div>
-          </div>
-          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Ainda sem fornecedores</p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">Adiciona o primeiro contacto para começar a pedir orçamentos num clique.</p>
-          <button onClick={openNew} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
-            <Plus className="h-4 w-4" strokeWidth={2.6} /> Adicionar fornecedor
-          </button>
-        </div>
+          </EmptyMedia>
+          <EmptyHeader className="max-w-xs gap-1">
+            <EmptyTitle className="font-heading font-extrabold text-slate-900">Ainda sem fornecedores</EmptyTitle>
+            <EmptyDescription className="text-slate-500">Adiciona o primeiro contacto para começar a pedir orçamentos num clique.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+              <Plus className="h-4 w-4" strokeWidth={2.6} /> Adicionar fornecedor
+            </button>
+          </EmptyContent>
+        </Empty>
       ) : null}
 
       {/* Portal para o <body> — mesmo motivo do botão + dos Pedidos: fica fora
@@ -369,7 +379,7 @@ export default function Suppliers() {
               <Textarea data-testid="supplier-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2} placeholder="O que fornece..." />
             </div>
             <Button data-testid="save-supplier-btn" onClick={save} disabled={saving} className="w-full rounded-xl">
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
               {editing ? "Guardar" : "Adicionar"}
             </Button>
           </div>

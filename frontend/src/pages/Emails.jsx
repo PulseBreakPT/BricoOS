@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Mail, Inbox, Send, FileClock, Search, Loader2, FileText, RefreshCw,
+  Mail, Inbox, Send, FileClock, Search, FileText, RefreshCw,
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
   BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
@@ -12,7 +12,10 @@ import { withDeviceToken } from "@/lib/deviceAuth";
 import { timeAgo, formatDateTime } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
+import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -102,15 +105,17 @@ function CategoryBadge({ category }) {
 
 function EmptyState({ icon: Icon, text }) {
   return (
-    <div className="mt-4 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-14 text-center">
-      <div className="relative">
-        <div className="absolute inset-0 animate-float-slow rounded-2xl bg-slate-200/60 blur-lg" />
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-          <Icon className="h-6 w-6" />
+    <Empty className="mt-4 rounded-2xl border-2 border-dashed border-slate-200 bg-white/60 py-14">
+      <EmptyMedia>
+        <div className="relative">
+          <div className="absolute inset-0 animate-float-slow rounded-2xl bg-slate-200/60 blur-lg" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <Icon className="h-6 w-6" />
+          </div>
         </div>
-      </div>
-      <p className="mt-4 text-sm font-semibold text-slate-500">{text}</p>
-    </div>
+      </EmptyMedia>
+      <EmptyDescription className="text-sm font-semibold text-slate-500">{text}</EmptyDescription>
+    </Empty>
   );
 }
 
@@ -374,7 +379,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
             <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar tudo como visto</span>
           </Button>
           <Button data-testid="emails-sync" size="sm" variant="outline" disabled={syncing} onClick={sync} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
-            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Verificar agora</span>
+            {syncing ? <Spinner className="h-3.5 w-3.5 sm:mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Verificar agora</span>
           </Button>
         </div>
       </div>
@@ -446,7 +451,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : null}
 
       {displayLoading ? (
-        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
       ) : displayItems.length === 0 ? (
         <EmptyState icon={smartQuery ? Sparkles : Inbox} text={smartQuery ? "Sem resultados para esta pesquisa." : "Sem emails na caixa de entrada."} />
       ) : (
@@ -507,7 +512,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         onClick={() => createNoteFrom(m)}
                         className="h-8 rounded-lg text-xs"
                       >
-                        {creatingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+                        {creatingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
                         Criar pedido<span className="hidden sm:inline"> a partir deste email</span>
                       </Button>
                     ) : null}
@@ -569,7 +574,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           onClick={() => sendReply(m)}
                           className="h-8 rounded-lg text-xs"
                         >
-                          {sendingReply ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
+                          {sendingReply ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
                           Enviar<span className="hidden sm:inline"> resposta</span>
                         </Button>
                         <Button
@@ -580,7 +585,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           onClick={() => suggestReply(m)}
                           className="h-8 rounded-lg border-violet-200 text-xs text-violet-700 hover:bg-violet-50"
                         >
-                          {suggestingId === m.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wand2 className="mr-1.5 h-3.5 w-3.5" />}
+                          {suggestingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Wand2 className="mr-1.5 h-3.5 w-3.5" />}
                           Sugerir<span className="hidden sm:inline"> com IA</span>
                         </Button>
                         <Button size="sm" variant="ghost" disabled={sendingReply} onClick={() => setReplyingId(null)} className="h-8 rounded-lg text-xs">
@@ -667,7 +672,7 @@ function SentTab({ search }) {
       </div>
 
       {loading ? (
-        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
       ) : items.length === 0 ? (
         <EmptyState icon={awaitingOnly ? BellRing : Send} text={awaitingOnly ? "Tudo respondido — sem emails à espera." : "Sem emails enviados."} />
       ) : (
@@ -773,7 +778,7 @@ function ThreadsTab({ search }) {
     <div>
       <p className="mt-3 text-sm text-slate-500">{filtered.length} conversa{filtered.length === 1 ? "" : "s"}</p>
       {loading ? (
-        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
       ) : filtered.length === 0 ? (
         <EmptyState icon={MessagesSquare} text="Sem conversas ainda." />
       ) : (
@@ -793,7 +798,7 @@ function ThreadsTab({ search }) {
               {openKey === t.key ? (
                 <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
                   {loadingThread ? (
-                    <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+                    <div className="flex justify-center py-4"><Spinner className="h-4 w-4 text-slate-400" /></div>
                   ) : messages.length === 0 ? (
                     <p className="py-2 text-center text-xs text-slate-400">Sem mensagens.</p>
                   ) : messages.map((m, i) => (
@@ -863,7 +868,7 @@ function ScheduledTab({ search }) {
     <div>
       <p className="mt-3 text-sm text-slate-500">{filtered.length} email{filtered.length === 1 ? "" : "s"} agendado{filtered.length === 1 ? "" : "s"}</p>
       {loading ? (
-        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
       ) : filtered.length === 0 ? (
         <EmptyState icon={Clock} text="Sem envios agendados." />
       ) : (
@@ -879,7 +884,7 @@ function ScheduledTab({ search }) {
                 {s.error ? <p className="mt-0.5 text-[11px] text-red-600">Falhou: {s.error}</p> : null}
               </div>
               <Button size="sm" variant="outline" disabled={cancelingId === s.id} onClick={() => cancel(s)} className="h-8 shrink-0 rounded-lg border-red-200 text-xs text-red-600 hover:bg-red-50">
-                {cancelingId === s.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Cancelar
+                {cancelingId === s.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Cancelar
               </Button>
             </div>
           ))}
@@ -924,7 +929,7 @@ function DraftsTab({ search }) {
       <p className="mt-3 text-sm text-slate-500">{filtered.length} rascunho{filtered.length === 1 ? "" : "s"} por confirmar</p>
 
       {loading ? (
-        <div className="mt-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
       ) : filtered.length === 0 ? (
         <EmptyState icon={FileClock} text="Sem rascunhos por enviar." />
       ) : (
@@ -1054,17 +1059,18 @@ export default function Emails() {
       <EmailStatsDialog open={statsOpen} onOpenChange={setStatsOpen} />
 
       <div className="mt-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
+        <InputGroup className="h-11 flex-1 rounded-xl">
+          <InputGroupAddon>
+            <Search className="h-4 w-4 text-slate-400" />
+          </InputGroupAddon>
+          <InputGroupInput
             data-testid="emails-search"
             value={search}
             onChange={(e) => { setSearch(e.target.value); if (smartOn) setSmartQuery(null); }}
             onKeyDown={(e) => { if (e.key === "Enter" && smartOn && tab === "inbox") { e.preventDefault(); runSmartSearch(); } }}
             placeholder={smartOn && tab === "inbox" ? 'Pergunta em linguagem natural e prime Enter — ex.: "emails do fornecedor X esta semana"' : "Procurar por remetente, destinatário ou assunto..."}
-            className="h-11 rounded-xl pl-10"
           />
-        </div>
+        </InputGroup>
         {tab === "inbox" ? (
           <Button
             data-testid="emails-smart-toggle"

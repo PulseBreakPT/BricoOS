@@ -4,6 +4,8 @@ import {
   CheckCircle2, Database, ExternalLink, FileSearch, GitCompare, Medal,
   Scale, Sparkles, Trophy,
 } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 const MISSING = "Dados não encontrados em fontes oficiais.";
 
@@ -170,9 +172,15 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
 
 function ModelSelect({ value, models, onChange }) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500">
-      {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-    </select>
+    <Combobox
+      value={value}
+      onChange={onChange}
+      options={models.map((model) => ({ value: model.id, label: model.name }))}
+      placeholder="Escolher modelo..."
+      searchPlaceholder="Procurar modelo..."
+      emptyText="Sem modelos."
+      className="rounded-xl px-2 py-2.5 text-xs font-bold text-slate-700"
+    />
   );
 }
 
@@ -390,9 +398,9 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
             <div className="order-1 space-y-3 xl:order-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-3 xl:hidden">
                 <label htmlFor="catalog-model-mobile" className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Modelo em análise</label>
-                <select id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-blue-500">
-                  {models.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.overall.score ?? "N/D"}</option>)}
-                </select>
+                <NativeSelect id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus-visible:border-blue-500 focus-visible:ring-blue-500/50">
+                  {models.map((model) => <NativeSelectOption key={model.id} value={model.id}>{model.name} · {model.overall.score ?? "N/D"}</NativeSelectOption>)}
+                </NativeSelect>
               </div>
               <ModelAnalysis model={selected} />
             </div>

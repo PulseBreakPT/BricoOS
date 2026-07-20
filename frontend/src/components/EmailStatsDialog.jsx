@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, BarChart3 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -59,7 +60,7 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading || !stats ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
           ) : (
             <div className="space-y-5">
               <div className="grid grid-cols-3 gap-2">

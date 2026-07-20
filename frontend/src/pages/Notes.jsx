@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import {
-  Plus, Search, SlidersHorizontal, Inbox, Loader2, Focus, X, ArrowLeft, ArrowRight,
+  Plus, Search, SlidersHorizontal, Inbox, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
   PhoneMissed, TrendingUp, Frame, Store, MailCheck, KanbanSquare, LayoutGrid,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import {
@@ -18,9 +19,13 @@ import PedidoKanban from "@/components/PedidoKanban";
 import PedidoDetail from "@/components/PedidoDetail";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia,
+} from "@/components/ui/empty";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -489,10 +494,12 @@ export default function Notes() {
 
       <div className="mt-4 flex flex-col gap-3 sm:mt-6">
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo..." className="h-11 rounded-xl pl-10" />
-          </div>
+          <InputGroup className="h-11 flex-1 rounded-xl">
+            <InputGroupAddon>
+              <Search className="h-4 w-4 text-slate-400" />
+            </InputGroupAddon>
+            <InputGroupInput ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo..." />
+          </InputGroup>
           <Button data-testid="focus-mode-btn" variant={focusMode ? "default" : "outline"} onClick={() => { setFocusMode((v) => !v); setKanbanView(false); }} className="h-11 shrink-0 rounded-xl" title="Modo de foco (F)">
             <Focus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Foco</span>
           </Button>
@@ -586,7 +593,7 @@ export default function Notes() {
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
           <span className="font-mono text-sm tabular-nums text-slate-900">{total}</span> pedido{total === 1 ? "" : "s"}
         </p>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" /> : null}
+        {loading ? <Spinner className="h-4 w-4 text-slate-400" /> : null}
       </div>
 
       {/* FOCUS MODE — trata um pedido de cada vez */}
@@ -620,19 +627,25 @@ export default function Notes() {
       )}
 
       {!loading && items.length === 0 && !focusMode && !kanbanView ? (
-        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
-          <div className="relative">
-            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-            <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg ${seg.iconAccent}`}>
-              <SegIcon className="h-7 w-7" />
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+          <EmptyMedia>
+            <div className="relative">
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+              <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg ${seg.iconAccent}`}>
+                <SegIcon className="h-7 w-7" />
+              </div>
             </div>
-          </div>
-          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Sem pedidos nesta área</p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">{seg.empty}</p>
-          <button onClick={openNew} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
-            <Plus className="h-4 w-4" strokeWidth={2.6} /> Criar o primeiro pedido
-          </button>
-        </div>
+          </EmptyMedia>
+          <EmptyHeader className="max-w-xs gap-1">
+            <EmptyTitle className="font-heading font-extrabold text-slate-900">Sem pedidos nesta área</EmptyTitle>
+            <EmptyDescription className="text-slate-500">{seg.empty}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+              <Plus className="h-4 w-4" strokeWidth={2.6} /> Criar o primeiro pedido
+            </button>
+          </EmptyContent>
+        </Empty>
       ) : null}
 
       {/* Portal para o <body>: o botão + fica fora do wrapper com a animação

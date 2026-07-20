@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, ClipboardList, Mail, Truck, ListChecks, Loader2 } from "lucide-react";
+import { Search, ClipboardList, Mail, Truck, ListChecks } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
@@ -96,7 +97,7 @@ export default function CommandPalette({ open, onOpenChange }) {
             placeholder="Pesquisar pedidos, emails, fornecedores, tarefas…"
             className="h-9 border-0 px-0 shadow-none focus-visible:ring-0"
           />
-          {loading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" /> : null}
+          {loading ? <Spinner className="h-4 w-4 shrink-0 text-slate-400" /> : null}
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {q.trim().length < 2 ? (
