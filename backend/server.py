@@ -8,6 +8,7 @@ import hashlib
 import secrets
 import os
 import re
+import unicodedata
 import difflib
 import json as _json
 import logging
@@ -2617,10 +2618,25 @@ def _clean_subject(subject):
     return s.lower()
 
 
+def _strip_accents(s):
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c))
+
+
+def _subject_looks_like_quote(subject):
+    """Um email só é associado automaticamente a um pedido se o assunto tiver
+    'ORC' (ex.: referências como "ORC2026_7864") ou 'Orçamento' — associar só
+    pelo remetente (fornecedor/cliente conhecido) juntava correspondência sem
+    relação nenhuma ao pedido errado que estava à espera dele."""
+    return "orc" in _strip_accents(subject).lower()
+
+
 async def _match_note_for_reply(from_email, subject):
     """Associa a resposta ao pedido: primeiro pelo assunto (Re: do email que
     enviámos), depois pelo remetente (fornecedor conhecido, incluindo os
-    emails dos contactos adicionais)."""
+    emails dos contactos adicionais). Só corre se o assunto parecer um
+    orçamento — ver _subject_looks_like_quote."""
+    if not _subject_looks_like_quote(subject):
+        return None, None, None
     clean = _clean_subject(subject)
     if clean:
         reqs = await db.quote_requests.find(
@@ -2667,7 +2683,10 @@ async def _match_client_reply(from_email, subject):
     cliente respondesse a um orçamento, o email ficava na caixa sem qualquer
     ligação ao pedido. Tenta primeiro pelo assunto (Re: do email que
     enviámos ao cliente, registado em sent_emails), depois pelo endereço do
-    cliente gravado no próprio pedido (o mais recentemente atualizado)."""
+    cliente gravado no próprio pedido (o mais recentemente atualizado). Só
+    corre se o assunto parecer um orçamento — ver _subject_looks_like_quote."""
+    if not _subject_looks_like_quote(subject):
+        return None
     clean = _clean_subject(subject)
     if clean:
         sent = await db.sent_emails.find(
@@ -3240,6 +3259,26 @@ async def link_email_to_note(email_id: str, payload: LinkNoteIn):
                        f"Email associado manualmente ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",
                        {"from": e.get("from_email"), "uid": e.get("uid")})
     return enrich_note(await db.notes.find_one({"id": payload.note_id}, {"_id": 0}))
+
+
+@api_router.post("/emails/{email_id}/unlink-note")
+async def unlink_email_from_note(email_id: str):
+    """Remove a associação de um email a um pedido — para desfazer um
+    matching automático (ou manual) errado. O email volta a aparecer como
+    "Sem pedido associado", podendo ser associado de novo a outro pedido."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    note_id = e.get("note_id")
+    if not note_id:
+        raise HTTPException(status_code=400, detail="Este email não está associado a nenhum pedido.")
+    await db.received_emails.update_one({"id": email_id}, {"$set": {
+        "note_id": "", "supplier_id": "", "supplier_name": "", "matched": False, "reply_kind": ""}})
+    await db.email_attachments.update_many({"email_id": email_id}, {"$set": {"note_id": ""}})
+    await log_activity(note_id, "email_received",
+                       f"Associação ao email removida ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",
+                       {"from": e.get("from_email"), "uid": e.get("uid")})
+    return {"ok": True}
 
 
 @api_router.get("/emails/{email_id}/attachments/{attachment_id}")
