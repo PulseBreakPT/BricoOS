@@ -4279,6 +4279,46 @@ async def seed_notas_telemovel():
     logger.info("Seed de notas do telemóvel aplicado: 7 pedidos + 1 tarefa.")
 
 
+async def seed_pedidos_whatsapp():
+    """Importa uma vez os pedidos anotados no telemóvel/WhatsApp (20 jul 2026).
+    O marcador em db.migrations garante que nunca duplica, mesmo com vários
+    restarts ou redeploys."""
+    marker_id = "seed_pedidos_whatsapp_2026_07_20"
+    if await db.migrations.find_one({"id": marker_id}):
+        return
+
+    pedidos = [
+        {"customer_name": "André", "phone": "+351932065397",
+         "description": "Canalização móvel Blake 80, furar tampo e ligação à água e montagem",
+         "category": "construcao"},
+        {"customer_name": "Carla Anico",
+         "description": "Chapa espelho Recuperador de calor Elio 700",
+         "category": "construcao"},
+        {"customer_name": "João Santos e Encarnação Santos", "phone": "+351916379056",
+         "description": "Móvel à medida conforme desenho do cliente",
+         "details": "Ver desenho com as dimensões (foto no grupo Faro // Cozinhas do WhatsApp) "
+                    "— confirmar as medidas antes de orçamentar. Pedido à parte do acompanhamento "
+                    "de casas de banho que o Pedro já tem com estes clientes (orçamento O0707264).",
+         "category": "construcao"},
+    ]
+    base = {"phone": "", "email": "", "details": "", "measurements": "", "quantity": "", "color": "",
+            "reference": "", "status": "novo", "priority": "media", "labels": [],
+            "supplier_id": "", "sla_days": DEFAULT_SLA_DAYS, "reminder_interval_days": 3,
+            "favorite": False, "created_by": AUTHOR, "archived": False,
+            "last_supplier_sent_at": "", "last_client_contact_at": "", "last_client_reply_at": "",
+            "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
+            "client_no_answer_count": 0, "supplier_no_answer_count": 0,
+            "last_client_attempt_at": "", "last_supplier_attempt_at": ""}
+    for p in pedidos:
+        doc = {**base, **p, "id": str(uuid.uuid4()),
+               "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()}
+        await db.notes.insert_one(dict(doc))
+        await log_activity(doc["id"], "created", f"Pedido criado para {doc['customer_name']}")
+
+    await db.migrations.insert_one({"id": marker_id, "applied_at": now_iso()})
+    logger.info("Seed de pedidos do WhatsApp (20 jul) aplicado: 3 pedidos.")
+
+
 async def ensure_indexes():
     for f in ["status", "priority", "category", "created_at", "supplier_id", "favorite", "archived"]:
         try:
@@ -4351,6 +4391,7 @@ async def on_startup():
         await ensure_indexes()
         await migrate()
         await seed_notas_telemovel()
+        await seed_pedidos_whatsapp()
         await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
