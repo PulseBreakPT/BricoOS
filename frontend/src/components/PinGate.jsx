@@ -15,21 +15,10 @@ const IDLE_LIMIT_MS = 8 * 60 * 1000;
 // Últimos segundos do contador em que o aviso fica vermelho, a chamar a atenção.
 const IDLE_WARNING_MS = 30 * 1000;
 
-// Letras por tecla, como nos telefones — detalhe tátil que dá densidade
-// premium ao teclado sem ocupar espaço.
-const KEY_LETTERS = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
-
-// Ambiente do ecrã de PIN — fundo claro premium com brilho vermelho da marca,
-// grelha de pontos subtil e halos suaves. Puramente decorativo.
+// Fundo do ecrã de PIN — a mesma grelha de pontos técnica usada no resto da
+// app, sem gradientes nem halos: um cofre não precisa de brilhos.
 function Ambient() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-dot-grid opacity-80" />
-      <div className="absolute left-1/2 top-[-180px] h-[480px] w-[640px] -translate-x-1/2 rounded-full bg-red-200/40 blur-3xl" />
-      <div className="absolute bottom-[-160px] right-[-120px] h-[420px] w-[420px] rounded-full bg-blue-100/50 blur-3xl" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(248,250,252,0.9)_100%)]" />
-    </div>
-  );
+  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid opacity-70" />;
 }
 
 // Relógio ao vivo — hora em destaque no topo do cofre. Atualiza ao minuto.
@@ -80,7 +69,7 @@ function IdleCountdown({ msLeft, onExtend }) {
 function BrandMark({ locked }) {
   return (
     <div className="flex flex-col items-center">
-      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-colors duration-300 ${locked ? "border border-red-200 bg-red-50" : "bg-gradient-to-br from-red-600 to-red-700 animate-glow-breathe"}`}>
+      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-colors duration-300 ${locked ? "border border-red-200 bg-red-50" : "bg-gradient-to-br from-red-600 to-red-700 shadow-md shadow-black/15"}`}>
         {locked ? <TimerReset className="h-7 w-7 text-red-500" /> : <Hammer className="h-7 w-7" strokeWidth={2.3} />}
       </span>
       <h1 className="mt-4 font-heading text-lg font-black uppercase tracking-[0.28em] text-slate-900">
@@ -296,8 +285,8 @@ export default function PinGate({ children }) {
     return (
       <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-10">
         <Ambient />
-        <div className="card-elevated relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200 bg-white/90 p-8 backdrop-blur-xl animate-scale-in">
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-700 text-white shadow-[0_0_40px_-6px_rgba(220,38,38,0.55)] animate-in zoom-in-50 duration-300">
+        <div className="card-elevated relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200 bg-white p-8 animate-scale-in">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-700 text-white shadow-md shadow-black/15 animate-in zoom-in-50 duration-300">
             <Check className="h-8 w-8" strokeWidth={2.5} />
           </span>
           <p className="mt-5 font-heading text-xl font-extrabold tracking-tight text-slate-900">Acesso confirmado</p>
@@ -315,7 +304,7 @@ export default function PinGate({ children }) {
   const ss = String(lockSeconds % 60).padStart(2, "0");
   const ringPct = lockTotal > 0 ? Math.max(0, Math.min(100, (lockSeconds / lockTotal) * 100)) : 0;
 
-  const keyBase = "group relative h-16 select-none rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm transition-all duration-150 active:scale-95 active:bg-slate-100 disabled:opacity-25 sm:hover:border-slate-300 sm:hover:bg-slate-50 sm:hover:shadow-md";
+  const keyBase = "group relative flex h-16 select-none items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm transition-all duration-150 active:scale-95 active:bg-slate-100 disabled:opacity-25 sm:hover:border-slate-300 sm:hover:bg-slate-50 sm:hover:shadow-md";
 
   return (
     <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-8">
@@ -339,7 +328,7 @@ export default function PinGate({ children }) {
         {locked ? (
           <div data-testid="pin-countdown" className="mt-7 flex animate-fade-up flex-col items-center" style={{ "--stagger-i": 3 }}>
             <div
-              className="relative flex h-36 w-36 items-center justify-center rounded-full shadow-[0_18px_50px_-16px_rgba(220,38,38,0.45)]"
+              className="relative flex h-36 w-36 items-center justify-center rounded-full"
               style={{ background: `conic-gradient(#dc2626 ${ringPct}%, rgba(15,23,42,0.08) ${ringPct}%)` }}
             >
               <div className="flex h-[124px] w-[124px] flex-col items-center justify-center rounded-full bg-white shadow-inner">
@@ -361,10 +350,10 @@ export default function PinGate({ children }) {
                     key={i}
                     className={`h-3.5 w-3.5 rounded-full transition-colors duration-150 ${
                       flash
-                        ? "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
+                        ? "bg-red-500"
                         : filled
-                          ? "animate-dot-fill bg-red-600 shadow-[0_0_14px_rgba(220,38,38,0.55)]"
-                          : "border border-slate-300 bg-white shadow-sm"
+                          ? "animate-dot-fill bg-red-600"
+                          : "border border-slate-300 bg-white"
                     }`}
                   />
                 );
@@ -386,10 +375,7 @@ export default function PinGate({ children }) {
                   disabled={locked || checkingPin}
                   className={keyBase}
                 >
-                  <span className="block text-2xl font-semibold leading-none">{d}</span>
-                  <span className="mt-0.5 block h-3 font-mono text-[9px] font-semibold uppercase tracking-[0.25em] text-slate-300">
-                    {KEY_LETTERS[d] || ""}
-                  </span>
+                  <span className="text-2xl font-semibold leading-none">{d}</span>
                 </button>
               ))}
               <button
@@ -408,8 +394,7 @@ export default function PinGate({ children }) {
                 disabled={locked || checkingPin}
                 className={keyBase}
               >
-                <span className="block text-2xl font-semibold leading-none">0</span>
-                <span className="mt-0.5 block h-3" />
+                <span className="text-2xl font-semibold leading-none">0</span>
               </button>
               <button
                 type="button"
@@ -426,7 +411,7 @@ export default function PinGate({ children }) {
 
         <p className="mt-7 flex animate-fade-up items-center gap-1.5 text-[11px] font-medium text-slate-400" style={{ "--stagger-i": 5 }}>
           {checkingPin ? <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {checkingPin ? "A verificar o PIN…" : "Dispositivo verificado uma única vez neste navegador"}
+          {checkingPin ? "A verificar o PIN…" : "Este dispositivo fica confiado enquanto estiver em uso"}
         </p>
       </div>
     </div>

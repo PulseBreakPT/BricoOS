@@ -236,15 +236,6 @@ button, a, [role="button"], [role="tab"] {
     animation: scale-in 0.3s cubic-bezier(.21, .61, .35, 1) both;
 }
 
-/* Respiração de brilho vermelho — realce da marca no ecrã de PIN. */
-@keyframes glow-breathe {
-    0%, 100% { box-shadow: 0 0 24px -6px rgba(220, 38, 38, 0.55), 0 0 0 1px rgba(220, 38, 38, 0.35) inset; }
-    50% { box-shadow: 0 0 42px -4px rgba(220, 38, 38, 0.8), 0 0 0 1px rgba(220, 38, 38, 0.5) inset; }
-}
-.animate-glow-breathe {
-    animation: glow-breathe 3.2s ease-in-out infinite;
-}
-
 /* Brilho a atravessar — skeletons e superfícies em carregamento. */
 @keyframes shimmer {
     from { background-position: 200% 0; }
