@@ -1353,7 +1353,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                             <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
                             <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
                           </summary>
-                          <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+                          {m.body_html ? (
+                            <div
+                              className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-white p-3 font-sans text-xs text-slate-700 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500"
+                              dangerouslySetInnerHTML={{ __html: m.body_html }}
+                            />
+                          ) : (
+                            <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+                          )}
                           {(m.attachments || []).length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {m.attachments.map((a) => (
