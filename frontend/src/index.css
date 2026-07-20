@@ -54,6 +54,17 @@ button, a, [role="button"], [role="tab"] {
         --input: 0 0% 89%;
         --ring: 0 84% 45%;
         --radius: 0.75rem;
+
+        /* Barra lateral (componente shadcn "sidebar") — mesma paleta preto/
+           branco/vermelho dos restantes tokens, não a zinc/azul de origem. */
+        --sidebar: 0 0% 100%;
+        --sidebar-foreground: 0 0% 5%;
+        --sidebar-primary: 0 0% 5%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 0 86% 96%;
+        --sidebar-accent-foreground: 0 74% 32%;
+        --sidebar-border: 0 0% 89%;
+        --sidebar-ring: 0 84% 45%;
     }
 }
 
