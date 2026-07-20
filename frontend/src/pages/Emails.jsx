@@ -373,15 +373,15 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         <div className="flex flex-wrap gap-2">
           {!smartQuery ? (
             <Button data-testid="emails-toggle-archived" size="sm" variant={archivedView ? "default" : "outline"} onClick={() => setArchivedView((v) => !v)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
-              {archivedView ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
-              <span className="hidden sm:inline">{archivedView ? "Ver caixa de entrada" : "Ver arquivo"}</span>
+              {archivedView ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
+              {archivedView ? "Caixa de entrada" : "Arquivo"}
             </Button>
           ) : null}
           <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
-            <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar tudo como visto</span>
+            <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar vistos
           </Button>
           <Button data-testid="emails-sync" size="sm" variant="outline" disabled={syncing} onClick={sync} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
-            {syncing ? <Spinner className="h-3.5 w-3.5 sm:mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">Verificar agora</span>
+            {syncing ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />} Verificar
           </Button>
         </div>
       </div>
@@ -403,16 +403,16 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
           <span className="text-xs font-bold text-slate-900"><span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span> selecionado{selected.size === 1 ? "" : "s"}</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <Button data-testid="bulk-seen" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
-              <CheckCheck className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Marcar visto</span>
+              <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar visto
             </Button>
             <Button data-testid="bulk-archive" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkArchive} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
-              {archivedView ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />} <span className="hidden sm:inline">{archivedView ? "Restaurar" : "Arquivar"}</span>
+              {archivedView ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />} {archivedView ? "Restaurar" : "Arquivar"}
             </Button>
             <Button data-testid="bulk-label-toggle" size="sm" variant="outline" disabled={bulkBusy} onClick={() => setBulkLabelOpen((v) => !v)} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
-              <Tag className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Etiqueta</span>
+              <Tag className="mr-1.5 h-3.5 w-3.5" /> Etiqueta
             </Button>
-            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
-              <X className="h-3.5 w-3.5" />
+            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+              <X className="mr-1.5 h-3.5 w-3.5" /> Cancelar
             </Button>
           </div>
           {bulkLabelOpen ? (
@@ -543,19 +543,19 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         <Reply className="mr-1.5 h-3.5 w-3.5" /> Responder
                       </Button>
                     ) : null}
-                    <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Reencaminhar">
-                      <Forward className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Reencaminhar</span>
+                    <Button data-testid={`inbox-forward-${m.id}`} size="sm" variant="outline" onClick={() => onForward(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+                      <Forward className="mr-1.5 h-3.5 w-3.5" /> Reencaminhar
                     </Button>
-                    <Button data-testid={`inbox-task-${m.id}`} size="sm" variant="outline" onClick={() => openTaskDialog(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Criar tarefa a partir deste email">
-                      <ListChecks className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Criar tarefa</span>
+                    <Button data-testid={`inbox-task-${m.id}`} size="sm" variant="outline" onClick={() => openTaskDialog(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+                      <ListChecks className="mr-1.5 h-3.5 w-3.5" /> Criar tarefa
                     </Button>
-                    <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title={m.archived ? "Restaurar" : "Arquivar"}>
-                      {m.archived ? <ArchiveRestore className="h-3.5 w-3.5 sm:mr-1.5" /> : <Archive className="h-3.5 w-3.5 sm:mr-1.5" />}
-                      <span className="hidden sm:inline">{m.archived ? "Restaurar" : "Arquivar"}</span>
+                    <Button data-testid={`inbox-archive-${m.id}`} size="sm" variant="outline" disabled={busyId === m.id} onClick={() => toggleArchive(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+                      {m.archived ? <ArchiveRestore className="mr-1.5 h-3.5 w-3.5" /> : <Archive className="mr-1.5 h-3.5 w-3.5" />}
+                      {m.archived ? "Restaurar" : "Arquivar"}
                     </Button>
                     {labelEditId !== m.id ? (
-                      <Button data-testid={`inbox-labels-${m.id}`} size="sm" variant="outline" onClick={() => startEditLabels(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3" title="Etiquetas">
-                        <Tag className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Etiquetas</span>
+                      <Button data-testid={`inbox-labels-${m.id}`} size="sm" variant="outline" onClick={() => startEditLabels(m)} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+                        <Tag className="mr-1.5 h-3.5 w-3.5" /> Etiquetas
                       </Button>
                     ) : null}
                   </div>
@@ -979,8 +979,8 @@ export default function Emails() {
         <div className="mt-2 flex shrink-0 gap-2 sm:mt-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button data-testid="emails-more-btn" variant="outline" className="h-10 shrink-0 rounded-xl px-3" aria-label="Mais ações">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button data-testid="emails-more-btn" variant="outline" className="h-10 shrink-0 rounded-xl px-3">
+                <MoreHorizontal className="mr-1.5 h-4 w-4" /> Mais
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1033,17 +1033,17 @@ export default function Emails() {
             className={`h-11 shrink-0 rounded-xl px-3 ${smartOn ? "bg-violet-600 hover:bg-violet-700" : "text-violet-700"}`}
             title="Pesquisa inteligente com IA"
           >
-            <Sparkles className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pesquisa IA</span>
+            <Sparkles className="mr-1.5 h-4 w-4" /> Pesquisa IA
           </Button>
         ) : null}
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
         <TabsList className="card-elevated grid h-11 w-full grid-cols-4 rounded-xl border border-slate-200 bg-white p-1 text-slate-500 [&_[data-state=active]]:bg-slate-900 [&_[data-state=active]]:text-white [&_[data-state=active]]:shadow-md [&_[data-state=active]]:shadow-slate-400/30">
-          <TabsTrigger value="inbox" data-testid="emails-tab-inbox" className="rounded-lg font-bold"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
-          <TabsTrigger value="sent" data-testid="emails-tab-sent" className="rounded-lg font-bold"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
-          <TabsTrigger value="threads" data-testid="emails-tab-threads" className="rounded-lg font-bold"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>
-          <TabsTrigger value="drafts" data-testid="emails-tab-drafts" className="rounded-lg font-bold"><FileClock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Rascunhos</span></TabsTrigger>
+          <TabsTrigger value="inbox" data-testid="emails-tab-inbox" className="rounded-lg font-bold"><Inbox className="mr-1 h-3.5 w-3.5 sm:mr-1.5" /> <span className="text-[10px] sm:text-xs">Recebidos</span></TabsTrigger>
+          <TabsTrigger value="sent" data-testid="emails-tab-sent" className="rounded-lg font-bold"><Send className="mr-1 h-3.5 w-3.5 sm:mr-1.5" /> <span className="text-[10px] sm:text-xs">Enviados</span></TabsTrigger>
+          <TabsTrigger value="threads" data-testid="emails-tab-threads" className="rounded-lg font-bold"><MessagesSquare className="mr-1 h-3.5 w-3.5 sm:mr-1.5" /> <span className="text-[10px] sm:text-xs">Conversas</span></TabsTrigger>
+          <TabsTrigger value="drafts" data-testid="emails-tab-drafts" className="rounded-lg font-bold"><FileClock className="mr-1 h-3.5 w-3.5 sm:mr-1.5" /> <span className="text-[10px] sm:text-xs">Rascunhos</span></TabsTrigger>
         </TabsList>
         <TabsContent value="inbox" className="focus-visible:outline-none">
           <InboxTab search={debounced} smartQuery={smartOn ? smartQuery : null} onClearSmart={() => setSmartQuery(null)} onForward={openForward} />

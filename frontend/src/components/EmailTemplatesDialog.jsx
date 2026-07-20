@@ -108,8 +108,8 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
                         <p className="truncate text-xs text-slate-500">{t.subject}</p>
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(t)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => remove(t)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs" onClick={() => startEdit(t)}><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button>
+                        <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs text-red-600 hover:bg-red-50" onClick={() => remove(t)}><Trash2 className="mr-1 h-3.5 w-3.5" /> Eliminar</Button>
                       </div>
                     </div>
                   ))}

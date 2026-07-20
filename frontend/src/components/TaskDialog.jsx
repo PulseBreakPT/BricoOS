@@ -164,7 +164,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
               <div key={s.id || idx} data-testid={`task-dialog-subtask-${idx}`} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5">
                 <Checkbox checked={s.done} onCheckedChange={() => toggleSubtask(idx)} className="h-4 w-4" />
                 <span className={`flex-1 text-sm ${s.done ? "text-slate-400 line-through" : "text-slate-700"}`}>{s.title}</span>
-                <button onClick={() => removeSubtask(idx)} className="text-slate-300 hover:text-red-500">
+                <button onClick={() => removeSubtask(idx)} aria-label={`Remover subtarefa ${s.title}`} title="Remover subtarefa" className="text-slate-300 hover:text-red-500">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -180,7 +180,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
               className="h-9"
             />
             <Button type="button" variant="outline" onClick={addSubtask} className="h-9 shrink-0 px-3">
-              <Plus className="h-4 w-4" />
+              <Plus className="mr-1 h-4 w-4" /> Adicionar
             </Button>
           </div>
         </div>
@@ -197,7 +197,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
               onClick={remove}
               className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="mr-1.5 h-4 w-4" /> Eliminar
             </Button>
           ) : null}
         </div>
