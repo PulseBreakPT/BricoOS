@@ -11,10 +11,10 @@ import api, { getErrorMessage } from "@/lib/api";
 
 const FIELD_LABELS = { subject: "Assunto", body: "Corpo", from_email: "Remetente", category: "Categoria (IA)" };
 const OP_LABELS = { contains: "contém", equals: "é igual a" };
-const ACTION_LABELS = { archive: "Arquivar", label: "Adicionar etiqueta", priority: "Definir prioridade" };
+const ACTION_LABELS = { priority: "Definir prioridade" };
 const SELECT_CLS = "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500";
 
-const EMPTY = { name: "", enabled: true, conditions: [{ field: "subject", op: "contains", value: "" }], actions: [{ type: "archive", value: "" }] };
+const EMPTY = { name: "", enabled: true, conditions: [{ field: "subject", op: "contains", value: "" }], actions: [{ type: "priority", value: "" }] };
 
 // Regras automáticas — aplicadas a cada email recebido logo após a
 // classificação por IA (ver _apply_rules no backend). "Se TODAS as
@@ -42,7 +42,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
   const removeCondition = (i) => setForm((f) => ({ ...f, conditions: f.conditions.filter((_, idx) => idx !== i) }));
 
   const setAction = (i, patch) => setForm((f) => ({ ...f, actions: f.actions.map((a, idx) => (idx === i ? { ...a, ...patch } : a)) }));
-  const addAction = () => setForm((f) => ({ ...f, actions: [...f.actions, { type: "archive", value: "" }] }));
+  const addAction = () => setForm((f) => ({ ...f, actions: [...f.actions, { type: "priority", value: "" }] }));
   const removeAction = (i) => setForm((f) => ({ ...f, actions: f.actions.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
@@ -96,7 +96,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Nome</Label>
-                <Input data-testid="rule-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="ex.: Arquivar newsletters" autoFocus />
+                <Input data-testid="rule-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="ex.: Prioridade alta para reclamações" autoFocus />
               </div>
 
               <div>
@@ -127,31 +127,18 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
               </div>
 
               <div>
-                <Label>Então (todas as ações)</Label>
+                <Label>Então (define a prioridade)</Label>
                 <div className="mt-1.5 space-y-2">
                   {form.actions.map((a, i) => (
-                    <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
-                      <select value={a.type} onChange={(e) => setAction(i, { type: e.target.value, value: "" })} className={`${SELECT_CLS} w-full sm:w-auto`}>
-                        {Object.entries(ACTION_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    <div key={i} className="flex items-center gap-1.5">
+                      <select value={a.value} onChange={(e) => setAction(i, { type: "priority", value: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
+                        <option value="">escolher...</option>
+                        <option value="alta">alta</option>
+                        <option value="normal">normal</option>
+                        <option value="baixa">baixa</option>
                       </select>
-                      {a.type !== "archive" ? (
-                        <div className="flex items-center gap-1.5">
-                          {a.type === "label" ? (
-                            <Input value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} placeholder="nome da etiqueta" className="h-8 flex-1 text-xs" />
-                          ) : (
-                            <select value={a.value} onChange={(e) => setAction(i, { value: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
-                              <option value="">escolher...</option>
-                              <option value="alta">alta</option>
-                              <option value="normal">normal</option>
-                              <option value="baixa">baixa</option>
-                            </select>
-                          )}
-                          {form.actions.length > 1 ? (
-                            <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
-                          ) : null}
-                        </div>
-                      ) : form.actions.length > 1 ? (
-                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="self-end text-slate-400 hover:text-red-600 sm:self-auto"><X className="h-4 w-4" /></button>
+                      {form.actions.length > 1 ? (
+                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
                       ) : null}
                     </div>
                   ))}
@@ -185,7 +172,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-slate-900">{r.name}</p>
                           <p className="mt-0.5 text-[11px] text-slate-500">
-                            {r.conditions.length} condição(ões) · {r.actions.map((a) => ACTION_LABELS[a.type]).join(", ")}
+                            {r.conditions.length} condição(ões) · {r.actions.map((a) => ACTION_LABELS[a.type] || a.type).join(", ")}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">

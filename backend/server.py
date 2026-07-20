@@ -18,6 +18,7 @@ import smtplib
 import warnings
 import mimetypes
 import email as email_lib
+import nh3
 from email import encoders as email_encoders
 from email.header import decode_header
 from email.mime.base import MIMEBase
@@ -122,7 +123,7 @@ EMAIL_PRIORITY_RANK = {"alta": 0, "normal": 1, "baixa": 2}
 EMAIL_CATEGORIES = ["orcamento", "reclamacao", "duvida", "urgente", "outro"]
 EMAIL_RULE_FIELDS = ["subject", "body", "from_email", "category"]
 EMAIL_RULE_OPS = ["contains", "equals"]
-EMAIL_RULE_ACTION_TYPES = ["archive", "label", "priority"]
+EMAIL_RULE_ACTION_TYPES = ["priority"]
 STATUSES = [
     "novo", "pendente", "em_preparacao", "enviado_fornecedor", "aguarda_fornecedor",
     "orcamento_recebido", "aguarda_cliente", "aprovado", "rejeitado", "encomendado",
@@ -2343,9 +2344,10 @@ def _decode_mime_header(value):
 # Alguns clientes de email (Outlook em particular) geram a alternativa em
 # texto simples a partir do HTML sem limpar as referências às imagens
 # embutidas nem os "smart tags" de telefone — sobra lixo como
-# "[cid:image001.gif@...]" e "<tel:219+265+110>" à vista do utilizador.
+# "[cid:image001.gif@...]" e "<tel:219+265+110>" (por vezes com aspas
+# angulares "‹›" em vez de "<>", em citações aninhadas) à vista do utilizador.
 _CID_ARTIFACT_RE = re.compile(r"\[?cid:[^\]\s]+\]?", re.IGNORECASE)
-_TEL_ARTIFACT_RE = re.compile(r"<\s*tel:[^>]*>", re.IGNORECASE)
+_TEL_ARTIFACT_RE = re.compile(r"[<‹]\s*(?:tel:)?[+\d][\d+\-\s]{5,}\s*[>›]", re.IGNORECASE)
 _STYLE_SCRIPT_RE = re.compile(r"<(style|script)[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
 _BLOCK_BREAK_RE = re.compile(r"<(br|/p|/div|/tr|/table|/h[1-6]|/li)\b[^>]*>", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -2415,6 +2417,64 @@ def _email_text_body(msg):
     return _clean_email_artifacts(text)
 
 
+# Corpo formatado para apresentação: preferimos sempre a versão HTML do email
+# quando existe (negrito, listas, parágrafos, ligações), reduzida a um
+# conjunto seguro de tags via nh3 — nunca se renderiza HTML de terceiros sem
+# passar por aqui. Sem HTML (só texto simples), reconstrói-se o mínimo de
+# formatação a partir de convenções comuns (linhas em branco = parágrafo,
+# *palavra* = negrito, URLs clicáveis).
+_EMAIL_HTML_TAGS = {
+    "p", "br", "b", "strong", "i", "em", "u", "s", "ul", "ol", "li",
+    "a", "blockquote", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6",
+    "hr", "table", "tbody", "thead", "tr", "td", "th",
+}
+_EMAIL_HTML_ATTRS = {"a": {"href"}}
+_URL_RE = re.compile(r"(https?://[^\s<]+)")
+_BOLD_MARK_RE = re.compile(r"\*([^\n*]{1,200}?)\*")
+
+
+def _sanitize_email_html(html_body):
+    if not html_body:
+        return ""
+    cleaned = nh3.clean(
+        html_body, tags=_EMAIL_HTML_TAGS, attributes=_EMAIL_HTML_ATTRS,
+        url_schemes={"http", "https", "mailto", "tel"}, link_rel="noopener noreferrer nofollow")
+    cleaned = _CID_ARTIFACT_RE.sub("", cleaned)
+    cleaned = _TEL_ARTIFACT_RE.sub("", cleaned)
+    return cleaned.strip()
+
+
+def _plain_to_safe_html(text):
+    if not text:
+        return ""
+    escaped = html_escape(text)
+    escaped = _BOLD_MARK_RE.sub(r"<strong>\1</strong>", escaped)
+    escaped = _URL_RE.sub(r'<a href="\1">\1</a>', escaped)
+    paragraphs = [p.replace("\n", "<br>") for p in escaped.split("\n\n")]
+    return "".join(f"<p>{p}</p>" for p in paragraphs if p.strip())
+
+
+def _email_body_html(msg, plain_fallback):
+    if msg.is_multipart():
+        html_body = None
+        for part in msg.walk():
+            disposition = str(part.get("Content-Disposition") or "")
+            if "attachment" in disposition:
+                continue
+            if part.get_content_type() == "text/html" and html_body is None:
+                payload = part.get_payload(decode=True)
+                if payload is not None:
+                    html_body = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        if html_body:
+            return _sanitize_email_html(html_body)
+        return _plain_to_safe_html(plain_fallback)
+    if msg.get_content_type() == "text/html":
+        payload = msg.get_payload(decode=True)
+        if payload is not None:
+            return _sanitize_email_html(payload.decode(msg.get_content_charset() or "utf-8", errors="replace"))
+    return _plain_to_safe_html(plain_fallback)
+
+
 def _email_pdf_attachments(msg):
     """Extrai anexos PDF (máx. 5, até MAX_SUPPLIER_PDF_BYTES cada)."""
     out = []
@@ -2450,12 +2510,14 @@ def _imap_fetch_since(last_uid):
                 continue
             msg = email_lib.message_from_bytes(raw)
             display_name, addr = parseaddr(_decode_mime_header(msg.get("From") or ""))
+            body = _email_text_body(msg)[:20000].strip()
             messages.append({
                 "uid": uid,
                 "from_email": (addr or "").lower(),
                 "from_name": display_name.strip(),
                 "subject": _decode_mime_header(msg.get("Subject")),
-                "body": _email_text_body(msg)[:20000].strip(),
+                "body": body,
+                "body_html": _email_body_html(msg, body)[:40000].strip(),
                 "attachments": _email_pdf_attachments(msg),
             })
         return messages
@@ -2526,13 +2588,15 @@ def _imap_fetch_sent_since(last_uid):
                     sent_at = parsedate_to_datetime(date_hdr).astimezone(timezone.utc).isoformat()
             except Exception:
                 pass
+            body = _email_text_body(msg)[:20000].strip()
             messages.append({
                 "uid": uid,
                 "message_id": (msg.get("Message-ID") or "").strip(),
                 "to_email": (addr or "").lower(),
                 "to_name": display_name.strip(),
                 "subject": _decode_mime_header(msg.get("Subject")),
-                "body": _email_text_body(msg)[:20000].strip(),
+                "body": body,
+                "body_html": _email_body_html(msg, body)[:40000].strip(),
                 "sent_at": sent_at,
             })
         return messages
@@ -2673,9 +2737,9 @@ async def poll_supplier_replies():
             "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
             "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
+            "body_html": m.get("body_html") or "",
             "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
             **classification,
-            "archived": rules_result["archived"], "labels": rules_result["labels"],
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -2756,7 +2820,8 @@ async def poll_sent_folder():
                 to_label = m.get("to_name") or ""
         await db.sent_emails.insert_one({
             "id": str(uuid.uuid4()), "to": m["to_email"], "to_label": to_label,
-            "subject": m["subject"], "body": m["body"], "note_id": note_id or "",
+            "subject": m["subject"], "body": m["body"], "body_html": m.get("body_html") or "",
+            "note_id": note_id or "",
             "kind": kind or "other", "pdf_file_id": "", "attachments": [],
             "message_id": m["message_id"], "source": "gmail", "sent_at": m["sent_at"]})
         added += 1
@@ -2817,54 +2882,8 @@ async def mark_all_emails_seen():
     return {"ok": True, "marked": r.modified_count}
 
 
-@api_router.post("/emails/{email_id}/archive")
-async def toggle_email_archive(email_id: str):
-    """Arquiva/desarquiva um email — sai da caixa de entrada sem ser apagado."""
-    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0, "archived": 1})
-    if not e:
-        raise HTTPException(status_code=404, detail="Email não encontrado")
-    new_archived = not e.get("archived", False)
-    await db.received_emails.update_one({"id": email_id}, {"$set": {"archived": new_archived}})
-    return {"ok": True, "archived": new_archived}
-
-
-class LabelsIn(BaseModel):
-    labels: List[str] = []
-
-
-@api_router.post("/emails/{email_id}/labels")
-async def set_email_labels(email_id: str, payload: LabelsIn):
-    labels = sorted({(l or "").strip() for l in payload.labels if (l or "").strip()})[:10]
-    r = await db.received_emails.update_one({"id": email_id}, {"$set": {"labels": labels}})
-    if r.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Email não encontrado")
-    return {"ok": True, "labels": labels}
-
-
-@api_router.get("/emails/labels")
-async def list_email_labels():
-    labels = await db.received_emails.distinct("labels")
-    return {"items": sorted(l for l in labels if l)}
-
-
 class BulkIdsIn(BaseModel):
     ids: List[str] = []
-
-
-class BulkArchiveIn(BulkIdsIn):
-    archived: bool = True
-
-
-class BulkLabelIn(BulkIdsIn):
-    label: str
-
-
-@api_router.post("/emails/bulk-archive")
-async def bulk_archive_emails(payload: BulkArchiveIn):
-    if not payload.ids:
-        return {"ok": True, "modified": 0}
-    r = await db.received_emails.update_many({"id": {"$in": payload.ids}}, {"$set": {"archived": payload.archived}})
-    return {"ok": True, "modified": r.modified_count}
 
 
 @api_router.post("/emails/bulk-seen")
@@ -2873,18 +2892,6 @@ async def bulk_mark_emails_seen(payload: BulkIdsIn):
         return {"ok": True, "modified": 0}
     r = await db.received_emails.update_many({"id": {"$in": payload.ids}}, {"$set": {"seen": True}})
     return {"ok": True, "modified": r.modified_count}
-
-
-@api_router.post("/emails/bulk-label")
-async def bulk_add_email_label(payload: BulkLabelIn):
-    label = (payload.label or "").strip()
-    if not label or not payload.ids:
-        return {"ok": True, "modified": 0}
-    docs = await db.received_emails.find({"id": {"$in": payload.ids}}, {"_id": 0, "id": 1, "labels": 1}).to_list(len(payload.ids))
-    for d in docs:
-        labels = sorted({*(d.get("labels") or []), label})[:10]
-        await db.received_emails.update_one({"id": d["id"]}, {"$set": {"labels": labels}})
-    return {"ok": True, "modified": len(docs)}
 
 
 # ---------- Secção "Emails": caixa completa, enviados e rascunhos ----------
@@ -2900,13 +2907,10 @@ def _email_search_clause(search, fields):
 
 @api_router.get("/emails/inbox")
 async def emails_inbox(search: Optional[str] = None, matched: Optional[bool] = None,
-                       sort: str = "priority", archived: bool = False, label: Optional[str] = None,
-                       skip: int = 0, limit: int = 50):
-    q = {"archived": archived}
+                       sort: str = "priority", skip: int = 0, limit: int = 50):
+    q = {}
     if matched is not None:
         q["matched"] = matched
-    if label:
-        q["labels"] = label
     rx = _email_search_clause(search, ["from_email", "subject", "supplier_name", "body"])
     if rx:
         q.update(rx)
@@ -4093,7 +4097,7 @@ async def _apply_rules(subject, body, from_email, category):
     """Aplica as regras automáticas (definidas pelo utilizador em
     /email-rules) a um email recebido, logo após a classificação por IA.
     Cada regra corresponde se TODAS as suas condições corresponderem."""
-    result = {"archived": False, "labels": [], "priority_override": None}
+    result = {"priority_override": None}
     fields = {"subject": subject or "", "body": body or "", "from_email": from_email or "", "category": category or ""}
     rules = await db.email_rules.find({"enabled": True}, {"_id": 0}).to_list(200)
     for rule in rules:
@@ -4101,13 +4105,7 @@ async def _apply_rules(subject, body, from_email, category):
         if not conditions or not all(_rule_condition_matches(c, fields) for c in conditions):
             continue
         for action in (rule.get("actions") or []):
-            t = action.get("type")
-            if t == "archive":
-                result["archived"] = True
-            elif t == "label" and action.get("value"):
-                if action["value"] not in result["labels"]:
-                    result["labels"].append(action["value"])
-            elif t == "priority" and action.get("value") in EMAIL_PRIORITIES:
+            if action.get("type") == "priority" and action.get("value") in EMAIL_PRIORITIES:
                 result["priority_override"] = action["value"]
     return result
 
