@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Pencil, Trash2, FileStack } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Plus, Pencil, Trash2, FileStack } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -84,7 +85,7 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
               </div>
               <div className="flex gap-2">
                 <Button data-testid="template-save-btn" onClick={save} disabled={saving} className="rounded-xl">
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Guardar
+                  {saving ? <Spinner className="mr-2 h-4 w-4" /> : null} Guardar
                 </Button>
                 <Button variant="ghost" onClick={() => setEditing(null)} disabled={saving}>Cancelar</Button>
               </div>
@@ -95,7 +96,7 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Novo modelo
               </Button>
               {loading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+                <div className="flex justify-center py-8"><Spinner className="h-5 w-5 text-slate-400" /></div>
               ) : items.length === 0 ? (
                 <p className="py-8 text-center text-sm text-slate-400">Sem modelos guardados.</p>
               ) : (

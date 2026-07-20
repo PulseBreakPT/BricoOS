@@ -3,8 +3,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
-import { Trash2, Loader2, AlertTriangle, Building2 } from "lucide-react";
+import { Trash2, AlertTriangle, Building2 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog, normalizeCaixilhariaSpec,
@@ -92,7 +93,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
 
         <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-3 sm:px-6 sm:py-5">
           {!catalog ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-6 w-6 text-slate-400" /></div>
           ) : (
             <>
               <CaixilhariaForm catalog={catalog} spec={spec} onChange={setSpec} />
@@ -110,7 +111,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
                   <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Associado ao pedido</span>
                 ) : (
                   <Button data-testid="caix-add-supplier" size="sm" variant="outline" onClick={addBandSupplier} disabled={addingSupplier} className="h-8 shrink-0 rounded-lg text-xs">
-                    {addingSupplier ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                    {addingSupplier ? <Spinner className="mr-1 h-3.5 w-3.5" /> : null}
                     {bandSupplier ? "Associar a este pedido" : "Adicionar aos fornecedores"}
                   </Button>
                 )}
@@ -131,7 +132,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
           </div>
           <div className="flex items-center gap-2">
             <Button data-testid="caix-save" onClick={save} disabled={saving || !catalog} className="flex-1 rounded-xl">
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
               <span className="sm:hidden">Guardar</span>
               <span className="hidden sm:inline">{hasSpec ? "Guardar alterações" : "Guardar especificação"}</span>
             </Button>

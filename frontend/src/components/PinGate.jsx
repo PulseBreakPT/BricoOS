@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Delete, Hammer, Loader2, Lock, ShieldCheck, TimerReset } from "lucide-react";
+import { Check, Delete, Hammer, Lock, ShieldCheck, TimerReset } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
 
@@ -276,7 +277,7 @@ export default function PinGate({ children }) {
     return (
       <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-50">
         <Ambient />
-        <Loader2 className="relative h-8 w-8 animate-spin text-slate-300" />
+        <Spinner className="relative h-8 w-8 text-slate-300" />
       </div>
     );
   }
@@ -410,7 +411,7 @@ export default function PinGate({ children }) {
         )}
 
         <p className="mt-7 flex animate-fade-up items-center gap-1.5 text-[11px] font-medium text-slate-400" style={{ "--stagger-i": 5 }}>
-          {checkingPin ? <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          {checkingPin ? <Spinner className="h-3.5 w-3.5 text-red-500" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           {checkingPin ? "A verificar o PIN…" : "Este dispositivo fica confiado enquanto estiver em uso"}
         </p>
       </div>

@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import {
-  Trash2, Send, Copy, Mail, Plus, Trophy, Loader2, AlertCircle, CheckCircle2,
+  Trash2, Send, Copy, Mail, Plus, Trophy, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import api, { API } from "@/lib/api";
 import { CATEGORY_LIST, STATUS } from "@/lib/categories";
@@ -271,7 +273,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
             <div className="mt-7 flex items-center gap-3">
               <Button data-testid="save-note-btn" onClick={save} disabled={saving} className="flex-1 rounded-xl">
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
                 {isEdit ? "Guardar alterações" : "Criar nota"}
               </Button>
               {isEdit ? (
@@ -326,22 +328,15 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
               <div className="mt-4 space-y-1.5">
                 <Label>Fornecedor</Label>
-                <Select value={emailSupplier} onValueChange={setEmailSupplier}>
-                  <SelectTrigger data-testid="select-email-supplier">
-                    <SelectValue placeholder="Escolher fornecedor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-slate-400">Sem fornecedores. Adiciona em "Fornecedores".</div>
-                    ) : (
-                      suppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}{s.email ? ` · ${s.email}` : " · (sem email)"}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  data-testid="select-email-supplier"
+                  value={emailSupplier}
+                  onChange={setEmailSupplier}
+                  options={suppliers.map((s) => ({ value: s.id, label: `${s.name}${s.email ? ` · ${s.email}` : " · (sem email)"}` }))}
+                  placeholder="Escolher fornecedor..."
+                  searchPlaceholder="Procurar fornecedor..."
+                  emptyText='Sem fornecedores. Adiciona em "Fornecedores".'
+                />
                 {selectedSupplier && !selectedSupplier.email ? (
                   <p className="text-xs text-red-500">Este fornecedor não tem email. Adiciona em "Fornecedores".</p>
                 ) : null}
@@ -373,7 +368,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   disabled={sending || !gmailStatus?.connected}
                   className="rounded-xl"
                 >
-                  {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                  {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
                   Enviar por Gmail
                 </Button>
                 <Button data-testid="copy-email-btn" variant="outline" onClick={copyEmail} className="rounded-xl">

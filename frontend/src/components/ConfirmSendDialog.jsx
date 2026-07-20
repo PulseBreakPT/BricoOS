@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { FileText, Send, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -124,11 +125,11 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
         <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <Button data-testid="confirm-send-btn" onClick={send} disabled={sending || discarding || !to.trim()} className="rounded-xl">
-              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
               Confirmar e enviar
             </Button>
             <Button data-testid="confirm-send-discard" variant="outline" onClick={discard} disabled={sending || discarding} className="rounded-xl border-red-200 text-red-600 hover:bg-red-50">
-              {discarding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {discarding ? <Spinner className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Descartar
             </Button>
             <p className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">

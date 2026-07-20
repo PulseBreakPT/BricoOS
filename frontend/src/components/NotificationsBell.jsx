@@ -4,6 +4,8 @@ import { Bell, Clock, AlarmClockOff, Zap, X } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
+import { Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@/components/ui/item";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import api from "@/lib/api";
 
 const KIND_ICON = {
@@ -73,31 +75,37 @@ export default function NotificationsBell({ variant = "sidebar" }) {
         </SheetHeader>
         <div className="mt-5 space-y-2.5">
           {data.items.length === 0 ? (
-            <div className="mt-16 flex flex-col items-center text-center text-slate-400">
-              <div className="flex h-16 w-16 animate-in items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 zoom-in-50 duration-500">
-                <Bell className="h-7 w-7" />
-              </div>
-              <p className="mt-4 font-heading text-base font-extrabold text-slate-700">Tudo em dia</p>
-              <p className="text-sm">Nenhum pedido esquecido ou atrasado.</p>
-            </div>
+            <Empty className="mt-16 text-slate-400">
+              <EmptyMedia>
+                <div className="flex h-16 w-16 animate-in items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 zoom-in-50 duration-500">
+                  <Bell className="h-7 w-7" />
+                </div>
+              </EmptyMedia>
+              <EmptyHeader className="gap-1">
+                <EmptyTitle className="font-heading font-extrabold text-slate-700">Tudo em dia</EmptyTitle>
+                <EmptyDescription className="text-sm text-slate-400">Nenhum pedido esquecido ou atrasado.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : data.items.map((n) => {
             const Icon = KIND_ICON[n.kind] || Bell;
             const sev = SEV[n.severity] || SEV.low;
             return (
-              <button
+              <Item
                 key={n.id}
-                data-testid={`notification-${n.id}`}
-                onClick={() => go(n)}
-                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${sev.ring}`}
+                asChild
+                size="sm"
+                className={`items-start rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${sev.ring}`}
               >
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sev.icon}`}>
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-900">{n.title}</p>
-                  <p className="text-xs text-slate-600">{n.message}</p>
-                </div>
-              </button>
+                <button data-testid={`notification-${n.id}`} onClick={() => go(n)}>
+                  <ItemMedia variant="icon" className={`size-9 rounded-lg ${sev.icon}`}>
+                    <Icon className="h-4 w-4" />
+                  </ItemMedia>
+                  <ItemContent className="gap-0">
+                    <ItemTitle className="truncate text-sm text-slate-900">{n.title}</ItemTitle>
+                    <ItemDescription className="line-clamp-none text-xs text-slate-600">{n.message}</ItemDescription>
+                  </ItemContent>
+                </button>
+              </Item>
             );
           })}
         </div>

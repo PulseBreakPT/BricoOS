@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Pie, PieChart, Cell } from "recharts";
 import {
   ClipboardList, Clock, AlertTriangle, Timer, Mail, ArrowRight, CheckCircle2,
   Link2, Zap, Trophy,
@@ -7,6 +8,7 @@ import {
 import api, { API } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER } from "@/lib/pedido";
 import { Button } from "@/components/ui/button";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 // Contagem animada — os números "sobem" até ao valor real quando os dados
 // chegam. Só anima valores numéricos; strings (ex.: "3h") passam direto.
@@ -81,6 +83,17 @@ export default function Dashboard() {
   const pipeline = stats ? STATUS_ORDER.filter((s) => (stats.by_status[s] || 0) > 0) : [];
   const pipelineTotal = pipeline.reduce((acc, s) => acc + (stats?.by_status?.[s] || 0), 0);
 
+  // Dados do donut "Pipeline por estado" — mesma cor de marca de cada
+  // estado (getStatusCfg) usada em toda a app, agora também no gráfico.
+  const pieData = useMemo(
+    () => pipeline.map((s) => ({ status: s, label: getStatusCfg(s).label, count: stats?.by_status?.[s] || 0, fill: getStatusCfg(s).dot })),
+    [pipeline, stats]
+  );
+  const pieConfig = useMemo(
+    () => Object.fromEntries(pipeline.map((s) => [s, { label: getStatusCfg(s).label, color: getStatusCfg(s).dot }])),
+    [pipeline]
+  );
+
   return (
     <div>
       <div className="flex flex-col gap-1">
@@ -143,22 +156,21 @@ export default function Dashboard() {
               <p className="mt-4 text-sm text-slate-400">Sem dados.</p>
             ) : (
               <>
-                {/* Barra empilhada — proporção de cada estado num relance */}
-                <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                  {pipeline.map((s) => {
-                    const cfg = getStatusCfg(s);
-                    const pct = (stats.by_status[s] / pipelineTotal) * 100;
-                    return (
-                      <div
-                        key={s}
-                        title={`${cfg.label}: ${stats.by_status[s]}`}
-                        className="h-full transition-all duration-700 first:rounded-l-full last:rounded-r-full"
-                        style={{ width: `${pct}%`, backgroundColor: cfg.dot }}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                {/* Donut — proporção de cada estado, com tooltip ao passar o rato/tocar */}
+                <ChartContainer config={pieConfig} className="mx-auto aspect-square max-h-[200px]">
+                  <PieChart>
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent nameKey="status" hideLabel />}
+                    />
+                    <Pie data={pieData} dataKey="count" nameKey="status" innerRadius="55%" outerRadius="90%" strokeWidth={2} stroke="#fff">
+                      {pieData.map((entry) => (
+                        <Cell key={entry.status} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ChartContainer>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {pipeline.map((s) => {
                     const cfg = getStatusCfg(s);
                     return (

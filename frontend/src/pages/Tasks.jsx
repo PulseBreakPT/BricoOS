@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
 import { toast } from "sonner";
@@ -262,16 +263,20 @@ export default function Tasks() {
       ) : null}
 
       {filtered.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14 text-center">
-          <div className="relative">
-            <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-            <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
-              <ListChecks className="h-7 w-7" />
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+          <EmptyMedia>
+            <div className="relative">
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
+                <ListChecks className="h-7 w-7" />
+              </div>
             </div>
-          </div>
-          <p className="mt-5 font-heading text-lg font-extrabold tracking-tight text-slate-900">Nada por fazer aqui</p>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</p>
-        </div>
+          </EmptyMedia>
+          <EmptyHeader className="max-w-xs gap-1">
+            <EmptyTitle className="font-heading font-extrabold text-slate-900">Nada por fazer aqui</EmptyTitle>
+            <EmptyDescription className="text-slate-500">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       <TaskDialog open={dialogOpen} onOpenChange={setDialogOpen} task={editingTask} onSaved={load} />

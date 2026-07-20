@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Loader2, Send, Paperclip, FileText, X, Clock } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Send, Paperclip, FileText, X, Clock } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -223,7 +224,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
             disabled={sending || !canSend}
             className="rounded-xl"
           >
-            {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : scheduleOn && !forward ? <Clock className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+            {sending ? <Spinner className="mr-2 h-4 w-4" /> : scheduleOn && !forward ? <Clock className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
             {forward ? "Reencaminhar" : scheduleOn ? "Agendar envio" : "Enviar"}
           </Button>
         </div>

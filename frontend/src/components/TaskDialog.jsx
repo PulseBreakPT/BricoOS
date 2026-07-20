@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
-import { Trash2, Plus, Loader2, Repeat } from "lucide-react";
+import { Trash2, Plus, Repeat } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
 import { TASK_PRIORITIES, TASK_REPEATS } from "@/lib/taskMeta";
@@ -186,7 +187,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
 
         <div className="flex items-center gap-3 pt-2">
           <Button data-testid="task-dialog-save" onClick={save} disabled={saving} className="flex-1 rounded-xl">
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
             {isEdit ? "Guardar alterações" : "Criar tarefa"}
           </Button>
           {isEdit ? (
