@@ -2500,13 +2500,21 @@ def _email_pdf_attachments(msg):
 # do anterior. O resumo em si (build_digest) é extração determinística —
 # sem IA, sem chamadas de rede — ver correio_semanal.py.
 CORREIO_SEMANAL_SENDER = "pdv11880@mousquetaires.com"
-_CORREIO_SEMANAL_RE = re.compile(r"correio[\s_-]*semanal", re.IGNORECASE)
+# O boletim chama-se a si próprio "Correio Semanal" (é assim que o PDF e os
+# seus anexos se chamam), mas quem o reencaminha por email nem sempre usa
+# essas palavras no assunto — ex.: "FW: Correio da Semana Edição nº655
+# (Semana 29)". Por isso aceita as duas formas ("semanal" ou "da semana") e
+# verifica tanto o assunto como os nomes dos anexos, para não depender de
+# quem reencaminha escrever sempre da mesma forma.
+_CORREIO_SEMANAL_RE = re.compile(r"correio[\s_-]*(semanal|da[\s_-]*semana)", re.IGNORECASE)
 
 
-def _looks_like_correio_semanal(from_email, subject):
+def _looks_like_correio_semanal(from_email, subject, attachment_filenames=None):
     if (from_email or "").strip().lower() != CORREIO_SEMANAL_SENDER:
         return False
-    return bool(_CORREIO_SEMANAL_RE.search(_strip_accents(subject or "")))
+    if _CORREIO_SEMANAL_RE.search(_strip_accents(subject or "")):
+        return True
+    return any(_CORREIO_SEMANAL_RE.search(_strip_accents(name or "")) for name in (attachment_filenames or []))
 
 
 async def _summarize_correio_semanal(subject, pdf_bytes_list):
@@ -2780,7 +2788,8 @@ async def poll_supplier_replies():
             classification["priority"] = rules_result["priority_override"]
             classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         correio_semanal_summary = ""
-        if _looks_like_correio_semanal(m["from_email"], m["subject"]) and m.get("attachments"):
+        att_filenames = [att["filename"] for att in m.get("attachments", [])]
+        if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
             pdf_bytes_list = [att["data"] for att in m["attachments"]]
             correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
         await db.received_emails.insert_one({
@@ -4534,10 +4543,11 @@ async def _backfill_correio_semanal_summaries():
             {"_id": 0, "id": 1, "subject": 1},
         ).to_list(200)
         for d in docs:
-            if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject")):
-                continue
             atts = await db.email_attachments.find({"email_id": d["id"]}, {"_id": 0}).to_list(10)
             if not atts:
+                continue
+            att_filenames = [a.get("filename") for a in atts]
+            if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject"), att_filenames):
                 continue
             pdf_bytes_list = [base64.b64decode(a["content_b64"]) for a in atts]
             summary = await _summarize_correio_semanal(d.get("subject"), pdf_bytes_list)
