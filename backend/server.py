@@ -20,7 +20,6 @@ import warnings
 import mimetypes
 import email as email_lib
 import nh3
-import fitz  # PyMuPDF
 from email import encoders as email_encoders
 from email.header import decode_header
 from email.mime.base import MIMEBase
@@ -55,6 +54,7 @@ try:
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
+    import correio_semanal
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -76,6 +76,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
+    from . import correio_semanal
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -2496,9 +2497,9 @@ def _email_pdf_attachments(msg):
 # Boletim interno semanal, sempre em PDF, sempre do mesmo remetente — mas o
 # conteúdo (secções, datas-limite, MEAs, promoções) muda todas as semanas,
 # por isso o resumo tem de reler o PDF de cada semana, nunca assumir nada
-# do anterior.
+# do anterior. O resumo em si (build_digest) é extração determinística —
+# sem IA, sem chamadas de rede — ver correio_semanal.py.
 CORREIO_SEMANAL_SENDER = "pdv11880@mousquetaires.com"
-CORREIO_SEMANAL_MAX_CHARS = 120000
 _CORREIO_SEMANAL_RE = re.compile(r"correio[\s_-]*semanal", re.IGNORECASE)
 
 
@@ -2508,54 +2509,12 @@ def _looks_like_correio_semanal(from_email, subject):
     return bool(_CORREIO_SEMANAL_RE.search(_strip_accents(subject or "")))
 
 
-def _extract_pdf_text(pdf_bytes, max_chars=CORREIO_SEMANAL_MAX_CHARS):
+async def _summarize_correio_semanal(subject, pdf_bytes_list):
+    """Resumo exaustivo do Correio Semanal — extração determinística
+    (build_digest), corre em thread por ser só CPU (um PDF de 60+ páginas
+    demora o suficiente para não bloquear o event loop)."""
     try:
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    except Exception:
-        return ""
-    try:
-        text = "\n".join(page.get_text() for page in doc)
-    except Exception:
-        return ""
-    return text[:max_chars]
-
-
-async def _summarize_correio_semanal(subject, pdf_texts):
-    """Resumo exaustivo do Correio Semanal — o boletim tem dezenas de
-    secções (Atualidades, Mea's, Direção Comercial da Oferta, Tabelas de
-    Preço, Oportunidades Comerciais, os vários Departamentos, Marketing/
-    Comércio, Não Servidos, etc.) e o objetivo é não deixar nada de fora,
-    não só destacar o que parece mais importante."""
-    if not ai_available():
-        return ""
-    full_text = "\n\n=== PRÓXIMO DOCUMENTO ===\n\n".join(t for t in pdf_texts if t).strip()
-    if not full_text:
-        return ""
-    system = (
-        "És o assistente de uma loja Bricomarché em Portugal. Resumes o "
-        "\"Correio Semanal\" interno dos Mosqueteiros para quem gere a loja e não "
-        "tem tempo de ler o PDF inteiro. Escreves em português de Portugal, sem "
-        "markdown decorativo (sem #, sem **) — só texto corrido organizado por "
-        "secção, fácil de ler num telemóvel."
-    )
-    prompt = (
-        "Faz um resumo COMPLETO deste Correio Semanal — não saltes nenhuma secção do "
-        "índice nem nenhuma informação prática, mesmo que pareça menor. Para cada secção "
-        "com conteúdo, resume o essencial num parágrafo ou lista curta. Não esqueças de "
-        "incluir, sempre que existirem no documento:\n"
-        "- TODAS as datas-limite de resposta e a que se referem (MEA nº, folheto, campanha).\n"
-        "- TODOS os números de MEA e de folheto mencionados.\n"
-        "- Ações concretas a fazer na loja (encomendar, responder, afixar, confirmar stock).\n"
-        "- Alterações de preços, tabelas de preço, promoções e datas de campanhas.\n"
-        "- Artigos não servidos / problemas de stock e o que fazer a esse respeito.\n"
-        "- Prazos de encerramento ou indisponibilidade de fornecedores (férias, cross-docking).\n"
-        "Organiza por secção, usando o título da secção seguido de dois pontos como cabeçalho "
-        "(ex.: \"Atualidades:\"). Sê exaustivo mas direto em cada ponto — factos, não prosa.\n\n"
-        f"Assunto do email: {subject or '(sem assunto)'}\n\n"
-        f"Texto extraído do(s) PDF(s):\n\"\"\"{full_text}\"\"\""
-    )
-    try:
-        return (await ai_complete(system, prompt, session=f"correio-semanal-{uuid.uuid4()}")).strip()
+        return await asyncio.to_thread(correio_semanal.build_digest, pdf_bytes_list, subject)
     except Exception as e:
         logger.error(f"Resumo do Correio Semanal falhou: {e}")
         return ""
@@ -2822,8 +2781,8 @@ async def poll_supplier_replies():
             classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         correio_semanal_summary = ""
         if _looks_like_correio_semanal(m["from_email"], m["subject"]) and m.get("attachments"):
-            pdf_texts = [_extract_pdf_text(att["data"]) for att in m["attachments"]]
-            correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_texts)
+            pdf_bytes_list = [att["data"] for att in m["attachments"]]
+            correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -4563,23 +4522,25 @@ async def _imap_poll_loop():
 
 
 async def _backfill_correio_semanal_summaries():
-    """Resume Correios Semanais já guardados antes desta funcionalidade
-    existir (ou que ficaram sem resumo porque a IA estava indisponível na
-    altura). Corre uma vez no arranque, em segundo plano — nunca bloqueia o
-    arranque do servidor à espera de chamadas à IA."""
+    """Regenera o resumo de todos os Correios Semanais já guardados — cobre
+    tanto os que ainda não tinham resumo (funcionalidade nova) como os que
+    tinham um resumo gerado por IA de uma versão anterior, substituído aqui
+    pelo resumo determinístico. Sem custo de API nem limite de taxa (é só
+    processamento local), por isso corre sempre, sem condição. Corre uma vez
+    no arranque, em segundo plano — nunca bloqueia o arranque do servidor."""
     try:
         docs = await db.received_emails.find(
-            {"from_email": CORREIO_SEMANAL_SENDER, "correio_semanal_summary": {"$in": ["", None]}},
+            {"from_email": CORREIO_SEMANAL_SENDER},
             {"_id": 0, "id": 1, "subject": 1},
-        ).to_list(100)
+        ).to_list(200)
         for d in docs:
             if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject")):
                 continue
             atts = await db.email_attachments.find({"email_id": d["id"]}, {"_id": 0}).to_list(10)
             if not atts:
                 continue
-            pdf_texts = [_extract_pdf_text(base64.b64decode(a["content_b64"])) for a in atts]
-            summary = await _summarize_correio_semanal(d.get("subject"), pdf_texts)
+            pdf_bytes_list = [base64.b64decode(a["content_b64"]) for a in atts]
+            summary = await _summarize_correio_semanal(d.get("subject"), pdf_bytes_list)
             if summary:
                 await db.received_emails.update_one({"id": d["id"]}, {"$set": {
                     "correio_semanal_summary": summary, "correio_semanal_summary_at": now_iso()}})
@@ -4601,10 +4562,9 @@ async def on_startup():
         task = asyncio.create_task(_imap_poll_loop())
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
-    if ai_available():
-        backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
-        _background_tasks.add(backfill_task)
-        backfill_task.add_done_callback(_background_tasks.discard)
+    backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
+    _background_tasks.add(backfill_task)
+    backfill_task.add_done_callback(_background_tasks.discard)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------
