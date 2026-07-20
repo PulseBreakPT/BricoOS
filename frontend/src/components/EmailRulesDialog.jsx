@@ -115,7 +115,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                       <div className="flex items-center gap-1.5">
                         <Input value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} placeholder="valor" className="h-8 flex-1 text-xs" />
                         {form.conditions.length > 1 ? (
-                          <button type="button" onClick={() => removeCondition(i)} className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => removeCondition(i)} aria-label="Remover condição" title="Remover condição" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
                         ) : null}
                       </div>
                     </div>
@@ -147,11 +147,11 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                             </select>
                           )}
                           {form.actions.length > 1 ? (
-                            <button type="button" onClick={() => removeAction(i)} className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
                           ) : null}
                         </div>
                       ) : form.actions.length > 1 ? (
-                        <button type="button" onClick={() => removeAction(i)} className="self-end text-slate-400 hover:text-red-600 sm:self-auto"><X className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="self-end text-slate-400 hover:text-red-600 sm:self-auto"><X className="h-4 w-4" /></button>
                       ) : null}
                     </div>
                   ))}
@@ -189,9 +189,9 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          <Switch checked={r.enabled} onCheckedChange={() => toggleEnabled(r)} />
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => remove(r)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          <Switch checked={r.enabled} onCheckedChange={() => toggleEnabled(r)} aria-label={r.enabled ? "Desativar regra" : "Ativar regra"} />
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(r)} aria-label="Editar regra" title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => remove(r)} aria-label="Eliminar regra" title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
                     </div>
