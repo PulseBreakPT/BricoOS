@@ -5,7 +5,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X,
   BellRing, Forward, BarChart3, FileStack, MessagesSquare,
-  MoreHorizontal, ListChecks, Link2,
+  MoreHorizontal, ListChecks, Link2, Unlink2,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -145,6 +145,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [syncing, setSyncing] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [creatingId, setCreatingId] = useState(null);
+  const [unlinkingId, setUnlinkingId] = useState(null);
   const [replyingId, setReplyingId] = useState(null);
   const [replyBody, setReplyBody] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
@@ -205,6 +206,19 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       toast.error(getErrorMessage(e, "Não foi possível criar o pedido"));
     } finally {
       setCreatingId(null);
+    }
+  };
+
+  const unlinkNote = async (m) => {
+    setUnlinkingId(m.id);
+    try {
+      await api.post(`/emails/${m.id}/unlink-note`);
+      toast.success("Associação ao pedido removida");
+      load({ silent: true });
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível remover a associação"));
+    } finally {
+      setUnlinkingId(null);
     }
   };
 
@@ -410,9 +424,22 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {m.note_id ? (
-                      <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
-                        Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
+                      <>
+                        <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
+                          Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                        <Button
+                          data-testid={`inbox-unlink-note-${m.id}`}
+                          size="sm"
+                          variant="outline"
+                          disabled={unlinkingId === m.id}
+                          onClick={() => unlinkNote(m)}
+                          className="h-8 rounded-lg border-red-200 text-xs text-red-600 hover:bg-red-50"
+                        >
+                          {unlinkingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Unlink2 className="mr-1.5 h-3.5 w-3.5" />}
+                          Desassociar
+                        </Button>
+                      </>
                     ) : (
                       <>
                         {!m.matched ? (
