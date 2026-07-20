@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
-import { timeAgo, formatDateTime } from "@/lib/pedido";
+import { timeAgo, formatDateTime, getStatusCfg } from "@/lib/pedido";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
@@ -212,8 +212,9 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const unlinkNote = async (m) => {
     setUnlinkingId(m.id);
     try {
-      await api.post(`/emails/${m.id}/unlink-note`);
-      toast.success("Associação ao pedido removida");
+      const { data } = await api.post(`/emails/${m.id}/unlink-note`);
+      const base = "Associação ao pedido removida";
+      toast.success(data.status_changed ? `${base} — estado voltou a "${getStatusCfg(data.status).label}"` : base);
       load({ silent: true });
     } catch (e) {
       toast.error(getErrorMessage(e, "Não foi possível remover a associação"));
