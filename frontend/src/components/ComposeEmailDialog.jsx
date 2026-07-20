@@ -6,10 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Send, Paperclip, FileText, X, Clock } from "lucide-react";
+import { Send, Paperclip, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -36,13 +35,11 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
   const [contacts, setContacts] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [scheduleOn, setScheduleOn] = useState(false);
-  const [scheduleAt, setScheduleAt] = useState("");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!open) {
-      setTo(""); setSubject(""); setBody(""); setAttachments([]); setScheduleOn(false); setScheduleAt("");
+      setTo(""); setSubject(""); setBody(""); setAttachments([]);
       return;
     }
     if (forward) setSubject(forward.subject || "");
@@ -93,9 +90,8 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
           to: to.trim(), subject: subject.trim(), body, to_label: label,
           attachments: attachments.map((a) => ({ filename: a.filename, data_b64: a.data_b64 })),
         };
-        if (scheduleOn && scheduleAt) payload.scheduled_at = new Date(scheduleAt).toISOString().replace("Z", "+00:00");
-        const { data } = await api.post("/emails/compose", payload);
-        toast.success(data.scheduled ? `Email agendado para ${to.trim()}` : `Email enviado a ${to.trim()}`);
+        await api.post("/emails/compose", payload);
+        toast.success(`Email enviado a ${to.trim()}`);
       }
       onOpenChange(false);
       onSent && onSent();
@@ -106,7 +102,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
     }
   };
 
-  const canSend = !!to.trim() && (forward || (!!subject.trim() && !!body.trim() && (!scheduleOn || !!scheduleAt)));
+  const canSend = !!to.trim() && (forward || (!!subject.trim() && !!body.trim()));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,20 +195,6 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
                   </div>
                 ) : null}
               </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <Switch data-testid="compose-schedule-toggle" checked={scheduleOn} onCheckedChange={setScheduleOn} id="compose-schedule" />
-                <Label htmlFor="compose-schedule" className="cursor-pointer text-sm font-normal">Agendar envio</Label>
-              </div>
-              {scheduleOn ? (
-                <Input
-                  data-testid="compose-schedule-at"
-                  type="datetime-local"
-                  value={scheduleAt}
-                  onChange={(e) => setScheduleAt(e.target.value)}
-                  className="mt-2"
-                />
-              ) : null}
             </>
           )}
         </div>
@@ -224,8 +206,8 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
             disabled={sending || !canSend}
             className="rounded-xl"
           >
-            {sending ? <Spinner className="mr-2 h-4 w-4" /> : scheduleOn && !forward ? <Clock className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-            {forward ? "Reencaminhar" : scheduleOn ? "Agendar envio" : "Enviar"}
+            {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+            {forward ? "Reencaminhar" : "Enviar"}
           </Button>
         </div>
       </DialogContent>
