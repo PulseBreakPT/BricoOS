@@ -3241,7 +3241,11 @@ async def link_email_to_note(email_id: str, payload: LinkNoteIn):
     """Associa um email recebido a um pedido já existente — para quando um
     fornecedor (ex.: BandAluminios) responde fora do fluxo automático (outro
     assunto, o pedido já não estava à espera de fornecedor, etc.) e o
-    matching por assunto/remetente não encontrou o pedido certo sozinho."""
+    matching por assunto/remetente não encontrou o pedido certo sozinho.
+    Tal como no matching automático, uma resposta de fornecedor associada
+    a um pedido que ainda estava à espera avança o estado para "Orçamento
+    recebido" — a associação manual deve ter o mesmo efeito que teria tido
+    se o matching automático a tivesse encontrado."""
     e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
     if not e:
         raise HTTPException(status_code=404, detail="Email não encontrado")
@@ -3258,27 +3262,55 @@ async def link_email_to_note(email_id: str, payload: LinkNoteIn):
     await log_activity(payload.note_id, "email_received",
                        f"Email associado manualmente ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",
                        {"from": e.get("from_email"), "uid": e.get("uid")})
-    return enrich_note(await db.notes.find_one({"id": payload.note_id}, {"_id": 0}))
+    status_changed = False
+    if reply_kind == "supplier" and n.get("status") in WAITING_SUPPLIER:
+        await db.notes.update_one({"id": payload.note_id}, {"$set": {
+            "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
+        await log_activity(payload.note_id, "status_change",
+                           "Estado alterado para Orçamento recebido (email associado manualmente)",
+                           {"to": "orcamento_recebido"})
+        status_changed = True
+    elif reply_kind == "client":
+        await db.notes.update_one({"id": payload.note_id}, {"$set": {
+            "last_client_reply_at": now_iso(), "client_no_answer_count": 0, "updated_at": now_iso()}})
+    note = enrich_note(await db.notes.find_one({"id": payload.note_id}, {"_id": 0}))
+    return {**note, "status_changed": status_changed}
 
 
 @api_router.post("/emails/{email_id}/unlink-note")
 async def unlink_email_from_note(email_id: str):
     """Remove a associação de um email a um pedido — para desfazer um
     matching automático (ou manual) errado. O email volta a aparecer como
-    "Sem pedido associado", podendo ser associado de novo a outro pedido."""
+    "Sem pedido associado", podendo ser associado de novo a outro pedido.
+    Coerente com a associação: se o estado ainda estiver exatamente em
+    "Orçamento recebido" (ninguém avançou o pedido entretanto), volta a
+    "À espera do fornecedor" — o mesmo estado que tinha antes deste email
+    ter sido associado."""
     e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
     if not e:
         raise HTTPException(status_code=404, detail="Email não encontrado")
     note_id = e.get("note_id")
     if not note_id:
         raise HTTPException(status_code=400, detail="Este email não está associado a nenhum pedido.")
+    reply_kind = e.get("reply_kind")
     await db.received_emails.update_one({"id": email_id}, {"$set": {
         "note_id": "", "supplier_id": "", "supplier_name": "", "matched": False, "reply_kind": ""}})
     await db.email_attachments.update_many({"email_id": email_id}, {"$set": {"note_id": ""}})
     await log_activity(note_id, "email_received",
                        f"Associação ao email removida ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",
                        {"from": e.get("from_email"), "uid": e.get("uid")})
-    return {"ok": True}
+    status_changed = False
+    new_status = None
+    if reply_kind == "supplier":
+        n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
+        if n and n.get("status") == "orcamento_recebido":
+            await db.notes.update_one({"id": note_id}, {"$set": {
+                "status": "aguarda_fornecedor", "status_updated_at": now_iso(), "updated_at": now_iso()}})
+            await log_activity(note_id, "status_change",
+                               "Estado voltou a À espera do fornecedor (associação ao email removida)",
+                               {"to": "aguarda_fornecedor"})
+            status_changed, new_status = True, "aguarda_fornecedor"
+    return {"ok": True, "note_id": note_id, "status_changed": status_changed, "status": new_status}
 
 
 @api_router.get("/emails/{email_id}/attachments/{attachment_id}")

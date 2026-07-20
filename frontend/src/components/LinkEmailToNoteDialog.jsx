@@ -56,7 +56,8 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
     setLinkingId(note.id);
     try {
       const { data } = await api.post(`/emails/${email.id}/link-note`, { note_id: note.id });
-      toast.success(`Email associado ao pedido de ${note.customer_name || "cliente"}`);
+      const base = `Email associado ao pedido de ${note.customer_name || "cliente"}`;
+      toast.success(data.status_changed ? `${base} — estado passou a "${getStatusCfg(data.status).label}"` : base);
       onLinked?.(data);
       onOpenChange(false);
     } catch (e) {
