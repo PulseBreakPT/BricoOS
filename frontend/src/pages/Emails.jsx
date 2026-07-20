@@ -411,6 +411,14 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               </button>
               {expanded === m.id ? (
                 <div className="mt-3 border-t border-slate-100 pt-3">
+                  {m.correio_semanal_summary ? (
+                    <div className="mb-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-violet-700">
+                        <Sparkles className="h-3.5 w-3.5" /> Resumo automático do Correio Semanal
+                      </p>
+                      <p className="max-h-96 overflow-y-auto whitespace-pre-wrap text-xs text-violet-900">{m.correio_semanal_summary}</p>
+                    </div>
+                  ) : null}
                   <EmailBody html={m.body_html} text={m.body} />
                   {(m.attachments || []).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
