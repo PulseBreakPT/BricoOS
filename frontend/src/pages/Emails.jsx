@@ -5,7 +5,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
   BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
-  MoreHorizontal, ListChecks,
+  MoreHorizontal, ListChecks, Link2,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -28,6 +28,7 @@ import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
 import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import TaskDialog from "@/components/TaskDialog";
+import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 30;
@@ -142,6 +143,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [busyId, setBusyId] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [taskDialogFor, setTaskDialogFor] = useState(null);
+  const [linkDialogFor, setLinkDialogFor] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkLabelOpen, setBulkLabelOpen] = useState(false);
@@ -504,18 +506,32 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       <button onClick={() => navigate(`/?open=${m.note_id}&tab=${m.reply_kind === "client" ? "cronologia" : "orcamentos"}`)} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
                         Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
                       </button>
-                    ) : !m.matched ? (
-                      <Button
-                        data-testid={`inbox-create-note-${m.id}`}
-                        size="sm"
-                        disabled={creatingId === m.id}
-                        onClick={() => createNoteFrom(m)}
-                        className="h-8 rounded-lg text-xs"
-                      >
-                        {creatingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
-                        Criar pedido<span className="hidden sm:inline"> a partir deste email</span>
-                      </Button>
-                    ) : null}
+                    ) : (
+                      <>
+                        {!m.matched ? (
+                          <Button
+                            data-testid={`inbox-create-note-${m.id}`}
+                            size="sm"
+                            disabled={creatingId === m.id}
+                            onClick={() => createNoteFrom(m)}
+                            className="h-8 rounded-lg text-xs"
+                          >
+                            {creatingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+                            Criar pedido<span className="hidden sm:inline"> a partir deste email</span>
+                          </Button>
+                        ) : null}
+                        <Button
+                          data-testid={`inbox-link-note-${m.id}`}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setLinkDialogFor(m)}
+                          className="h-8 rounded-lg text-xs"
+                        >
+                          <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                          Associar a pedido<span className="hidden sm:inline"> existente</span>
+                        </Button>
+                      </>
+                    )}
                     {replyingId !== m.id ? (
                       <Button
                         data-testid={`inbox-reply-${m.id}`}
@@ -607,6 +623,11 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         onOpenChange={(v) => !v && setTaskDialogFor(null)}
         task={taskDialogFor}
         onSaved={() => setTaskDialogFor(null)}
+      />
+      <LinkEmailToNoteDialog
+        email={linkDialogFor}
+        onOpenChange={(v) => !v && setLinkDialogFor(null)}
+        onLinked={() => { setLinkDialogFor(null); load({ silent: true }); }}
       />
     </div>
   );

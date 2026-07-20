@@ -24,7 +24,7 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.utils import parseaddr, make_msgid, parsedate_to_datetime
-from html import escape as html_escape
+from html import escape as html_escape, unescape as html_unescape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing import List, Optional
@@ -2339,25 +2339,80 @@ def _decode_mime_header(value):
     return "".join(out).strip()
 
 
+
+# Alguns clientes de email (Outlook em particular) geram a alternativa em
+# texto simples a partir do HTML sem limpar as referências às imagens
+# embutidas nem os "smart tags" de telefone — sobra lixo como
+# "[cid:image001.gif@...]" e "<tel:219+265+110>" à vista do utilizador.
+_CID_ARTIFACT_RE = re.compile(r"\[?cid:[^\]\s]+\]?", re.IGNORECASE)
+_TEL_ARTIFACT_RE = re.compile(r"<\s*tel:[^>]*>", re.IGNORECASE)
+_STYLE_SCRIPT_RE = re.compile(r"<(style|script)[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
+_BLOCK_BREAK_RE = re.compile(r"<(br|/p|/div|/tr|/table|/h[1-6]|/li)\b[^>]*>", re.IGNORECASE)
+_TAG_RE = re.compile(r"<[^>]+>")
+_BLANK_LINES_RE = re.compile(r"[ \t]+\n")
+_MULTI_BLANK_RE = re.compile(r"\n{3,}")
+
+
+def _clean_email_artifacts(text):
+    if not text:
+        return text
+    text = _CID_ARTIFACT_RE.sub("", text)
+    text = _TEL_ARTIFACT_RE.sub("", text)
+    text = _MULTI_BLANK_RE.sub("\n\n", text)
+    return text.strip()
+
+
+def _html_to_text(html_body):
+    """Conversão de HTML para texto simples, boa o suficiente para o corpo de
+    um email: remove <style>/<script> por inteiro, transforma quebras de
+    bloco em novas linhas, descodifica entidades (&nbsp;, &amp;, ...) e tira
+    o resto das tags — em vez de trocar cada tag por um espaço, que juntava
+    tudo numa parede de texto ilegível."""
+    text = _STYLE_SCRIPT_RE.sub("", html_body)
+    text = _BLOCK_BREAK_RE.sub("\n", text)
+    text = _TAG_RE.sub("", text)
+    text = html_unescape(text)
+    text = _CID_ARTIFACT_RE.sub("", text)
+    lines = [_BLANK_LINES_RE.sub("\n", line).strip() for line in text.splitlines()]
+    text = "\n".join(lines)
+    text = _MULTI_BLANK_RE.sub("\n\n", text)
+    return text.strip()
+
+
 def _email_text_body(msg):
     if msg.is_multipart():
+        plain, html_body = None, None
         for part in msg.walk():
             disposition = str(part.get("Content-Disposition") or "")
-            if part.get_content_type() == "text/plain" and "attachment" not in disposition:
+            if "attachment" in disposition:
+                continue
+            ctype = part.get_content_type()
+            if ctype == "text/plain" and plain is None:
                 payload = part.get_payload(decode=True)
                 if payload is not None:
-                    return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
+                    plain = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+            elif ctype == "text/html" and html_body is None:
                 payload = part.get_payload(decode=True)
                 if payload is not None:
-                    html = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-                    return re.sub(r"<[^>]+>", " ", html)
+                    html_body = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        # A alternativa em texto simples só é usada se estiver limpa — quando
+        # tem marcadores MIME por rebocar (cid:/tel:), o HTML dá um resultado
+        # mais legível.
+        has_artifacts = plain and (_CID_ARTIFACT_RE.search(plain) or _TEL_ARTIFACT_RE.search(plain))
+        if plain and not has_artifacts:
+            return _clean_email_artifacts(plain)
+        if html_body:
+            return _html_to_text(html_body)
+        if plain:
+            return _clean_email_artifacts(plain)
         return ""
     payload = msg.get_payload(decode=True)
     if payload is None:
         return str(msg.get_payload() or "")
-    return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
+    text = payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
+    if msg.get_content_type() == "text/html":
+        return _html_to_text(text)
+    return _clean_email_artifacts(text)
 
 
 def _email_pdf_attachments(msg):
@@ -3181,6 +3236,35 @@ async def create_note_from_email(email_id: str):
                        f"Pedido criado a partir de um email recebido de {e.get('from_email')}",
                        {"from": e.get("from_email"), "uid": e.get("uid")})
     return enrich_note(await db.notes.find_one({"id": note["id"]}, {"_id": 0}))
+
+
+class LinkNoteIn(BaseModel):
+    note_id: str
+
+
+@api_router.post("/emails/{email_id}/link-note")
+async def link_email_to_note(email_id: str, payload: LinkNoteIn):
+    """Associa um email recebido a um pedido já existente — para quando um
+    fornecedor (ex.: BandAluminios) responde fora do fluxo automático (outro
+    assunto, o pedido já não estava à espera de fornecedor, etc.) e o
+    matching por assunto/remetente não encontrou o pedido certo sozinho."""
+    e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+    if not e:
+        raise HTTPException(status_code=404, detail="Email não encontrado")
+    if e.get("note_id"):
+        raise HTTPException(status_code=400, detail="Este email já está associado a um pedido.")
+    n = await db.notes.find_one({"id": payload.note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    from_email = (e.get("from_email") or "").lower()
+    reply_kind = "client" if n.get("email") and n["email"].lower() == from_email else "supplier"
+    await db.received_emails.update_one({"id": email_id}, {"$set": {
+        "note_id": payload.note_id, "matched": True, "reply_kind": reply_kind}})
+    await db.email_attachments.update_many({"email_id": email_id}, {"$set": {"note_id": payload.note_id}})
+    await log_activity(payload.note_id, "email_received",
+                       f"Email associado manualmente ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",
+                       {"from": e.get("from_email"), "uid": e.get("uid")})
+    return enrich_note(await db.notes.find_one({"id": payload.note_id}, {"_id": 0}))
 
 
 @api_router.get("/emails/{email_id}/attachments/{attachment_id}")
