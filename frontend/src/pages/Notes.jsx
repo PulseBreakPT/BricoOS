@@ -83,7 +83,7 @@ function greeting() {
 // na lista ao clicar — o resumo e a lista são o mesmo painel, não duas páginas.
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
-    slate: { tile: "bg-violet-100 text-violet-700", value: "text-violet-700" },
+    slate: { tile: "bg-slate-100 text-slate-700", value: "text-slate-700" },
     blue: { tile: "bg-blue-100 text-blue-700", value: "text-blue-700" },
     amber: { tile: "bg-amber-100 text-amber-700", value: "text-amber-700" },
     red: { tile: "bg-red-100 text-red-700", value: "text-red-700" },
