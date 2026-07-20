@@ -4,7 +4,7 @@ import {
   Mail, Inbox, Send, FileClock, Search, FileText, RefreshCw,
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X, Archive, ArchiveRestore, Tag,
-  BellRing, Forward, Clock, BarChart3, FileStack, MessagesSquare, Trash2,
+  BellRing, Forward, BarChart3, FileStack, MessagesSquare,
   MoreHorizontal, ListChecks, Link2,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
@@ -847,74 +847,6 @@ function ThreadsTab({ search }) {
   );
 }
 
-// Agendados — emails compostos com envio marcado para uma data/hora futura.
-function ScheduledTab({ search }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [cancelingId, setCancelingId] = useState(null);
-
-  const load = useCallback(async (opts = {}) => {
-    if (!opts.silent) setLoading(true);
-    try {
-      const { data } = await api.get("/emails/scheduled");
-      setItems(data);
-    } catch (e) {
-      if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os emails agendados"));
-    } finally {
-      if (!opts.silent) setLoading(false);
-    }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
-
-  const cancel = async (s) => {
-    if (!window.confirm("Cancelar este envio agendado?")) return;
-    setCancelingId(s.id);
-    try {
-      await api.delete(`/emails/scheduled/${s.id}`);
-      toast.success("Envio agendado cancelado");
-      load();
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível cancelar"));
-    } finally {
-      setCancelingId(null);
-    }
-  };
-
-  const filtered = search
-    ? items.filter((s) => `${s.to} ${s.to_label} ${s.subject}`.toLowerCase().includes(search.toLowerCase()))
-    : items;
-
-  return (
-    <div>
-      <p className="mt-3 text-sm text-slate-500">{filtered.length} email{filtered.length === 1 ? "" : "s"} agendado{filtered.length === 1 ? "" : "s"}</p>
-      {loading ? (
-        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Clock} text="Sem envios agendados." />
-      ) : (
-        <div className="mt-3 space-y-2">
-          {filtered.map((s) => (
-            <div key={s.id} data-testid={`scheduled-${s.id}`} className="flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-slate-900">{s.to_label || s.to}</p>
-                <p className="truncate text-xs text-slate-500">{s.subject || "(sem assunto)"}</p>
-                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-blue-600">
-                  <Clock className="h-3 w-3" /> {formatDateTime(s.scheduled_at)}
-                </p>
-                {s.error ? <p className="mt-0.5 text-[11px] text-red-600">Falhou: {s.error}</p> : null}
-              </div>
-              <Button size="sm" variant="outline" disabled={cancelingId === s.id} onClick={() => cancel(s)} className="h-8 shrink-0 rounded-lg border-red-200 text-xs text-red-600 hover:bg-red-50">
-                {cancelingId === s.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Trash2 className="mr-1.5 h-3.5 w-3.5" />} Cancelar
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Rascunhos — orçamentos preparados (automática ou manualmente) que ainda
 // aguardam confirmação. Reutiliza o mesmo ecrã de confirmação da ficha do pedido.
 function DraftsTab({ search }) {
@@ -1107,11 +1039,10 @@ export default function Emails() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="mt-4">
-        <TabsList className="card-elevated grid h-11 w-full grid-cols-5 rounded-xl border border-slate-200 bg-white p-1 text-slate-500 [&_[data-state=active]]:bg-slate-900 [&_[data-state=active]]:text-white [&_[data-state=active]]:shadow-md [&_[data-state=active]]:shadow-slate-400/30">
+        <TabsList className="card-elevated grid h-11 w-full grid-cols-4 rounded-xl border border-slate-200 bg-white p-1 text-slate-500 [&_[data-state=active]]:bg-slate-900 [&_[data-state=active]]:text-white [&_[data-state=active]]:shadow-md [&_[data-state=active]]:shadow-slate-400/30">
           <TabsTrigger value="inbox" data-testid="emails-tab-inbox" className="rounded-lg font-bold"><Inbox className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Recebidos</span></TabsTrigger>
           <TabsTrigger value="sent" data-testid="emails-tab-sent" className="rounded-lg font-bold"><Send className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Enviados</span></TabsTrigger>
           <TabsTrigger value="threads" data-testid="emails-tab-threads" className="rounded-lg font-bold"><MessagesSquare className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Conversas</span></TabsTrigger>
-          <TabsTrigger value="scheduled" data-testid="emails-tab-scheduled" className="rounded-lg font-bold"><Clock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Agendados</span></TabsTrigger>
           <TabsTrigger value="drafts" data-testid="emails-tab-drafts" className="rounded-lg font-bold"><FileClock className="h-3.5 w-3.5 sm:mr-1.5" /> <span className="hidden sm:inline">Rascunhos</span></TabsTrigger>
         </TabsList>
         <TabsContent value="inbox" className="focus-visible:outline-none">
@@ -1119,7 +1050,6 @@ export default function Emails() {
         </TabsContent>
         <TabsContent value="sent" className="focus-visible:outline-none"><SentTab key={sentKey} search={debounced} /></TabsContent>
         <TabsContent value="threads" className="focus-visible:outline-none"><ThreadsTab search={debounced} /></TabsContent>
-        <TabsContent value="scheduled" className="focus-visible:outline-none"><ScheduledTab search={debounced} /></TabsContent>
         <TabsContent value="drafts" className="focus-visible:outline-none"><DraftsTab search={debounced} /></TabsContent>
       </Tabs>
     </div>

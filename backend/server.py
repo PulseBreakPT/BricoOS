@@ -3003,7 +3003,6 @@ class ComposeEmailIn(BaseModel):
     body: str
     to_label: str = ""
     attachments: List[AttachmentIn] = []
-    scheduled_at: Optional[str] = None
 
     @field_validator("to")
     @classmethod
@@ -3017,40 +3016,12 @@ class ComposeEmailIn(BaseModel):
 @api_router.post("/emails/compose")
 async def compose_email(payload: ComposeEmailIn):
     """Novo email livre, sem pedido associado — usado pelo botão 'Novo email'
-    na secção Emails. Com scheduled_at no futuro, fica em fila em vez de
-    sair de imediato (ver _scheduled_email_loop)."""
+    na secção Emails."""
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
     attachments = _decode_attachments(payload.attachments)
-    if payload.scheduled_at:
-        when = parse_dt(payload.scheduled_at)
-        if not when:
-            raise HTTPException(status_code=400, detail="Data/hora de agendamento inválida.")
-        if when <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=400, detail="A data de agendamento tem de ser no futuro.")
-        doc = {
-            "id": str(uuid.uuid4()), "to": payload.to, "to_label": payload.to_label.strip(),
-            "subject": payload.subject, "body": payload.body,
-            "attachments": [{"filename": a["filename"], "content_b64": base64.b64encode(a["data"]).decode()} for a in attachments],
-            "scheduled_at": payload.scheduled_at, "sent": False, "error": "", "created_at": now_iso()}
-        await db.scheduled_emails.insert_one(dict(doc))
-        return {"ok": True, "scheduled": True, "scheduled_at": payload.scheduled_at}
     await _send_email(payload.to, payload.subject, payload.body, attachments=attachments, to_label=payload.to_label.strip())
     return {"ok": True, "to": payload.to}
-
-
-@api_router.get("/emails/scheduled")
-async def list_scheduled_emails():
-    return await db.scheduled_emails.find({"sent": False}, {"_id": 0, "attachments.content_b64": 0}) \
-        .sort("scheduled_at", 1).to_list(500)
-
-
-@api_router.delete("/emails/scheduled/{scheduled_id}")
-async def cancel_scheduled_email(scheduled_id: str):
-    r = await db.scheduled_emails.delete_one({"id": scheduled_id, "sent": False})
-    if r.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Email agendado não encontrado (ou já foi enviado).")
-    return {"ok": True}
 
 
 class QuickReplyIn(BaseModel):
@@ -4446,29 +4417,6 @@ async def _imap_poll_loop():
         await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
 
 
-async def _scheduled_email_loop():
-    """Envia os emails agendados (compose com scheduled_at) assim que chega
-    a hora marcada. Verificação a cada minuto."""
-    await asyncio.sleep(15)
-    while True:
-        try:
-            now = datetime.now(timezone.utc)
-            due = await db.scheduled_emails.find(
-                {"sent": False, "scheduled_at": {"$lte": now.isoformat()}}, {"_id": 0}).to_list(50)
-            for s in due:
-                attachments = [{"filename": a["filename"], "data": base64.b64decode(a["content_b64"])}
-                               for a in s.get("attachments", [])]
-                try:
-                    await _send_email(s["to"], s["subject"], s["body"], attachments=attachments, to_label=s.get("to_label") or "")
-                    await db.scheduled_emails.update_one({"id": s["id"]}, {"$set": {"sent": True, "sent_at": now_iso()}})
-                except Exception as e:
-                    logger.error(f"Envio agendado falhou ({s['id']}): {e}")
-                    await db.scheduled_emails.update_one({"id": s["id"]}, {"$set": {"error": str(e)}})
-        except Exception as e:
-            logger.error(f"Verificação de emails agendados falhou: {e}")
-        await asyncio.sleep(60)
-
-
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -4483,9 +4431,6 @@ async def on_startup():
         task = asyncio.create_task(_imap_poll_loop())
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
-    sched_task = asyncio.create_task(_scheduled_email_loop())
-    _background_tasks.add(sched_task)
-    sched_task.add_done_callback(_background_tasks.discard)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------
