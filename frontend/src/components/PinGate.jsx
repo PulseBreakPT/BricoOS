@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Delete, Hammer, Lock, ShieldCheck, TimerReset } from "lucide-react";
+import { Check, Delete, Hammer, ShieldCheck, TimerReset } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
@@ -8,13 +8,6 @@ const PIN_LENGTH = 6;
 // Pequena pausa antes de revelar a app: dá tempo ao "check" de sucesso ser
 // visto, sem se tornar um atraso percetível a abrir a app.
 const SUCCESS_DELAY_MS = 650;
-
-// Tempo até a app se voltar a trancar sozinha — protege quem mostra o
-// telemóvel a um cliente e é interrompido a meio. A contagem corre sempre,
-// sem pausar com o uso normal da app; só um toque no contador a reinicia.
-const IDLE_LIMIT_MS = 8 * 60 * 1000;
-// Últimos segundos do contador em que o aviso fica vermelho, a chamar a atenção.
-const IDLE_WARNING_MS = 30 * 1000;
 
 // Fundo do ecrã de PIN — a face grafite da máquina desligada: grelha de
 // pontos técnica e um halo de sinal muito ténue vindo de cima, como uma
@@ -42,34 +35,6 @@ function LiveClock() {
       <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-white sm:text-5xl">{time}</p>
       <p className="mt-1 text-xs font-semibold capitalize tracking-wide text-[color:var(--chrome-muted)]">{date}</p>
     </div>
-  );
-}
-
-// Contador fixo e discreto — mostra quanto tempo falta até a app se trancar
-// sozinha. Um toque reinicia a contagem sem precisar de mexer no resto do
-// ecrã. Fica no canto inferior esquerdo em ecrãs pequenos (o cabeçalho e o
-// botão "+" de novo pedido já ocupam os outros cantos) e sobe para o topo
-// direito a partir do "lg", onde o layout de secretária deixa esse canto livre.
-function IdleCountdown({ msLeft, onExtend }) {
-  const totalSeconds = Math.max(0, Math.ceil(msLeft / 1000));
-  const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
-  const ss = String(totalSeconds % 60).padStart(2, "0");
-  const warning = msLeft <= IDLE_WARNING_MS;
-  return (
-    <button
-      type="button"
-      data-testid="idle-countdown"
-      onClick={onExtend}
-      title="Toca para manter a sessão ativa"
-      className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 z-50 flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-[0_8px_24px_-8px_rgba(16,17,20,0.5)] backdrop-blur transition-colors lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 ${
-        warning
-          ? "animate-pulse border-red-500/50 bg-[#2a1214]/95 text-red-400"
-          : "border-white/10 bg-[color:var(--chrome)]/92 text-[color:var(--chrome-muted)]"
-      }`}
-    >
-      <Lock className="h-3 w-3" />
-      {mm}:{ss}
-    </button>
   );
 }
 
@@ -102,9 +67,7 @@ export default function PinGate({ children }) {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
-  const [idleMsLeft, setIdleMsLeft] = useState(IDLE_LIMIT_MS);
   const timerRef = useRef(null);
-  const lastActivityRef = useRef(Date.now());
 
   // Ponto único de bloqueio: usado tanto por um 401 vindo do servidor como
   // pelo temporizador de inatividade abaixo. Limpa sempre o token local, para
@@ -177,35 +140,6 @@ export default function PinGate({ children }) {
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
-  // Trava automaticamente ao fim de IDLE_LIMIT_MS — protege quem larga o
-  // telemóvel destrancado ou o mostra a um cliente e é interrompido a meio.
-  // A contagem corre sempre, sem pausar com o uso normal da app: só reinicia
-  // com um toque explícito no contador (ver extendIdleSession).
-  useEffect(() => {
-    if (status !== "ok") return undefined;
-    lastActivityRef.current = Date.now();
-    setIdleMsLeft(IDLE_LIMIT_MS);
-
-    const tick = () => {
-      const left = IDLE_LIMIT_MS - (Date.now() - lastActivityRef.current);
-      if (left <= 0) lockDevice("Sessão trancada por inatividade — introduz o PIN para continuar.");
-      else setIdleMsLeft(left);
-    };
-    const idleInterval = setInterval(tick, 1000);
-    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(idleInterval);
-    };
-  }, [status, lockDevice]);
-
-  const extendIdleSession = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    setIdleMsLeft(IDLE_LIMIT_MS);
-  }, []);
-
   const submit = useCallback(async (candidate) => {
     setCheckingPin(true);
     setError("");
@@ -272,12 +206,7 @@ export default function PinGate({ children }) {
   }, [status, press, backspace, clearAll]);
 
   if (status === "ok") {
-    return (
-      <>
-        {children}
-        <IdleCountdown msLeft={idleMsLeft} onExtend={extendIdleSession} />
-      </>
-    );
+    return children;
   }
 
   if (status === "checking") {
