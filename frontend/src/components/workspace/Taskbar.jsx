@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { X, LayoutGrid, Mail, ClipboardList, RefreshCw } from "lucide-react";
+import { X, LayoutGrid, Mail, ClipboardList, RefreshCw, Grid2x2 } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
@@ -38,7 +38,7 @@ function StatusCluster() {
 // Barra fixa em baixo, só desktop — lançador de "aplicações" à esquerda,
 // painéis abertos (incluindo minimizados) à direita, tal como a barra de
 // tarefas de um sistema operativo.
-export default function Taskbar() {
+export default function Taskbar({ onOpenMissionControl }) {
   const { panels, activeId, activeContext, openPanel, focusPanel, closePanel } = useWorkspace();
   const location = useLocation();
 
@@ -50,6 +50,16 @@ export default function Taskbar() {
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
         <LayoutGrid className="h-4 w-4" />
       </span>
+
+      <button
+        data-testid="taskbar-mission-control"
+        onClick={onOpenMissionControl}
+        disabled={panels.length === 0}
+        title="Mission Control — ver todas as janelas (F3)"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <Grid2x2 className="h-4 w-4" />
+      </button>
 
       <div className="flex shrink-0 items-center gap-1 border-r border-slate-200 pr-2">
         {PANEL_ORDER.map((type) => {

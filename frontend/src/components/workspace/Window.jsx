@@ -1,10 +1,12 @@
 import { useCallback, useRef, useState } from "react";
-import { X, Minus, Maximize2, Minimize2 } from "lucide-react";
+import { X, Minus, Maximize2, Minimize2, PanelLeft, PanelRight } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 
 const MIN_W = 420;
 const MIN_H = 320;
+const SNAP_GAP = 8;
+const SNAP_TASKBAR_RESERVE = 84;
 
 // Janela flutuante do desktop — arrastar pela barra de título, redimensionar
 // pelo canto inferior direito. A posição/tamanho só é confirmada no
@@ -16,6 +18,18 @@ export default function Window({ panel, zIndex }) {
   const dragRef = useRef(null);
   const resizeRef = useRef(null);
   const [transient, setTransient] = useState(null);
+
+  // Ancorar a metade do ecrã (split screen) — sai do maximizado primeiro se
+  // preciso, para o novo tamanho não ficar escondido por baixo dele.
+  const snapTo = useCallback((side) => {
+    if (panel.maximized) toggleMaximize(panel.id);
+    const w = Math.max(MIN_W, Math.round(window.innerWidth / 2) - SNAP_GAP * 1.5);
+    const h = Math.max(MIN_H, window.innerHeight - SNAP_TASKBAR_RESERVE - SNAP_GAP * 2);
+    const x = side === "left" ? SNAP_GAP : window.innerWidth - w - SNAP_GAP;
+    movePanel(panel.id, x, SNAP_GAP);
+    resizePanel(panel.id, w, h);
+    focusPanel(panel.id);
+  }, [panel.id, panel.maximized, toggleMaximize, movePanel, resizePanel, focusPanel]);
 
   const meta = PANEL_TYPES[panel.type];
   const Icon = meta?.icon;
@@ -42,12 +56,19 @@ export default function Window({ panel, zIndex }) {
   const endDrag = useCallback((e) => {
     if (!dragRef.current) return;
     dragRef.current = null;
+    // Largar perto de uma margem lateral ancora a janela a essa metade do
+    // ecrã (gesto normal de sistema operativo) — largar em qualquer outro
+    // ponto só confirma a posição do arrasto, como já era.
+    const nearLeftEdge = e.clientX <= 24;
+    const nearRightEdge = e.clientX >= window.innerWidth - 24;
     setTransient((t) => {
       if (t) movePanel(panel.id, t.x, t.y);
       return null;
     });
+    if (nearLeftEdge) snapTo("left");
+    else if (nearRightEdge) snapTo("right");
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* já libertado */ }
-  }, [panel.id, movePanel]);
+  }, [panel.id, movePanel, snapTo]);
 
   const onResizePointerDown = useCallback((e) => {
     e.stopPropagation();
@@ -102,6 +123,12 @@ export default function Window({ panel, zIndex }) {
       >
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" /> : null}
         <p className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{meta.title}</p>
+        <button data-window-btn data-testid={`window-snap-left-${panel.type}`} onClick={() => snapTo("left")} title="Ancorar à esquerda (ecrã dividido)" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+          <PanelLeft className="h-3.5 w-3.5" />
+        </button>
+        <button data-window-btn data-testid={`window-snap-right-${panel.type}`} onClick={() => snapTo("right")} title="Ancorar à direita (ecrã dividido)" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+          <PanelRight className="h-3.5 w-3.5" />
+        </button>
         <button data-window-btn data-testid={`window-minimize-${panel.type}`} onClick={() => toggleMinimize(panel.id)} title="Minimizar" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
           <Minus className="h-3.5 w-3.5" />
         </button>
