@@ -10,7 +10,14 @@ import MissionControl from "@/components/workspace/MissionControl";
 // substituir. Área vazia é "click-through" (pointer-events-none), só as
 // janelas em si capturam interação. O estado do Mission Control vive na
 // sidebar (Layout.jsx), que é onde fica o botão para o abrir.
-export default function DesktopWorkspace({ missionControlOpen, onMissionControlOpenChange }) {
+export default function DesktopWorkspace({
+  missionControlOpen,
+  onMissionControlOpenChange,
+  onOpenLauncher,
+  onShowDesktop,
+  onOpenRoute,
+  primaryWindow,
+}) {
   const { panels, zOrder } = useWorkspace();
 
   // F3 (ou Ctrl/Cmd+Seta para cima, o atalho clássico do Mission Control no
@@ -18,7 +25,9 @@ export default function DesktopWorkspace({ missionControlOpen, onMissionControlO
   // quem está a escrever num campo.
   useEffect(() => {
     const onKey = (e) => {
-      const typing = ["INPUT", "TEXTAREA"].includes(e.target?.tagName) || e.target?.isContentEditable;
+      const typing =
+        ["INPUT", "TEXTAREA"].includes(e.target?.tagName) ||
+        e.target?.isContentEditable;
       if (typing) return;
       if (e.key === "F3" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
         e.preventDefault();
@@ -31,19 +40,29 @@ export default function DesktopWorkspace({ missionControlOpen, onMissionControlO
 
   return (
     <>
-      {/* z-45: acima da sidebar/taskbar (z-40) — senão uma janela
-          posicionada por cima dessa zona fica pintada por baixo delas,
-          mesmo com o seu próprio z-index interno mais alto (o z-index de
-          cada Window só conta dentro deste wrapper). Fica abaixo dos
-          diálogos/sheets (z-50) e do Mission Control (z-[70]) de propósito
-          — esses têm sempre de ficar por cima de qualquer janela. */}
+      {/* Camada de janelas acima da aplicação principal e abaixo da barra
+          global/dock. Diálogos, lançador e Mission Control ficam acima de
+          toda a área de trabalho. */}
       <div className="pointer-events-none fixed inset-0 z-[45]">
         {panels.map((panel) => (
-          <Window key={panel.id} panel={panel} zIndex={40 + Math.max(0, zOrder.indexOf(panel.id))} />
+          <Window
+            key={panel.id}
+            panel={panel}
+            zIndex={40 + Math.max(0, zOrder.indexOf(panel.id))}
+          />
         ))}
       </div>
-      <Taskbar />
-      <MissionControl open={missionControlOpen} onClose={() => onMissionControlOpenChange(false)} />
+      <Taskbar
+        onOpenLauncher={onOpenLauncher}
+        onOpenMissionControl={() => onMissionControlOpenChange(true)}
+        onShowDesktop={onShowDesktop}
+        onOpenRoute={onOpenRoute}
+      />
+      <MissionControl
+        open={missionControlOpen}
+        onClose={() => onMissionControlOpenChange(false)}
+        primaryWindow={primaryWindow}
+      />
     </>
   );
 }
