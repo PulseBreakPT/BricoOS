@@ -1,5 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
-import { SIDEBAR_WIDTH, WORKSPACE_GAP } from "@/lib/workspaceLayout";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from "react";
+import {
+  SIDEBAR_WIDTH,
+  SYSTEM_BAR_HEIGHT,
+  WORKSPACE_GAP,
+} from "@/lib/workspaceLayout";
 
 const STORAGE_KEY = "brico_workspace_v1";
 const DEFAULT_W = 880;
@@ -30,7 +42,10 @@ function cascadePosition(count) {
   const step = count % 6;
   // Começa depois da sidebar (256px) — nunca em cima dela, senão a janela
   // nasce parcialmente escondida.
-  return { x: SIDEBAR_WIDTH + WORKSPACE_GAP * 2 + step * 32, y: 56 + step * 28 };
+  return {
+    x: SIDEBAR_WIDTH + WORKSPACE_GAP * 2 + step * 32,
+    y: SYSTEM_BAR_HEIGHT + WORKSPACE_GAP * 2 + step * 28,
+  };
 }
 
 function reducer(state, action) {
@@ -48,8 +63,13 @@ function reducer(state, action) {
         if (existing) {
           return {
             ...state,
-            panels: state.panels.map((p) => (p.id === existing.id ? { ...p, minimized: false } : p)),
-            zOrder: [...state.zOrder.filter((id) => id !== existing.id), existing.id],
+            panels: state.panels.map((p) =>
+              p.id === existing.id ? { ...p, minimized: false } : p,
+            ),
+            zOrder: [
+              ...state.zOrder.filter((id) => id !== existing.id),
+              existing.id,
+            ],
             activeId: existing.id,
           };
         }
@@ -58,8 +78,13 @@ function reducer(state, action) {
       const panel = {
         id: `${action.panelType}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
         type: action.panelType,
-        x, y, w: DEFAULT_W, h: DEFAULT_H,
-        minimized: false, maximized: false, prevRect: null,
+        x,
+        y,
+        w: DEFAULT_W,
+        h: DEFAULT_H,
+        minimized: false,
+        maximized: false,
+        prevRect: null,
       };
       return {
         ...state,
@@ -75,14 +100,19 @@ function reducer(state, action) {
         ...state,
         panels,
         zOrder,
-        activeId: state.activeId === action.id ? (zOrder[zOrder.length - 1] || null) : state.activeId,
+        activeId:
+          state.activeId === action.id
+            ? zOrder[zOrder.length - 1] || null
+            : state.activeId,
       };
     }
     case "FOCUS_PANEL": {
       if (!state.panels.some((p) => p.id === action.id)) return state;
       return {
         ...state,
-        panels: state.panels.map((p) => (p.id === action.id ? { ...p, minimized: false } : p)),
+        panels: state.panels.map((p) =>
+          p.id === action.id ? { ...p, minimized: false } : p,
+        ),
         zOrder: [...state.zOrder.filter((id) => id !== action.id), action.id],
         activeId: action.id,
       };
@@ -90,50 +120,93 @@ function reducer(state, action) {
     case "MOVE_PANEL":
       return {
         ...state,
-        panels: state.panels.map((p) => (p.id === action.id ? { ...p, x: action.x, y: action.y } : p)),
+        panels: state.panels.map((p) =>
+          p.id === action.id ? { ...p, x: action.x, y: action.y } : p,
+        ),
       };
     case "RESIZE_PANEL":
       return {
         ...state,
-        panels: state.panels.map((p) => (p.id === action.id ? { ...p, w: action.w, h: action.h } : p)),
+        panels: state.panels.map((p) =>
+          p.id === action.id ? { ...p, w: action.w, h: action.h } : p,
+        ),
       };
     case "TOGGLE_MINIMIZE":
       return {
         ...state,
-        panels: state.panels.map((p) => (p.id === action.id ? { ...p, minimized: !p.minimized } : p)),
+        panels: state.panels.map((p) =>
+          p.id === action.id ? { ...p, minimized: !p.minimized } : p,
+        ),
       };
     case "TOGGLE_MAXIMIZE":
       return {
         ...state,
         panels: state.panels.map((p) => {
           if (p.id !== action.id) return p;
-          if (p.maximized) return { ...p, maximized: false, ...(p.prevRect || {}), prevRect: null };
-          return { ...p, maximized: true, prevRect: { x: p.x, y: p.y, w: p.w, h: p.h } };
+          if (p.maximized)
+            return {
+              ...p,
+              maximized: false,
+              ...(p.prevRect || {}),
+              prevRect: null,
+            };
+          return {
+            ...p,
+            maximized: true,
+            prevRect: { x: p.x, y: p.y, w: p.w, h: p.h },
+          };
         }),
+      };
+    case "SHOW_DESKTOP":
+      return {
+        ...state,
+        panels: state.panels.map((p) => ({ ...p, minimized: true })),
+        activeId: null,
       };
     case "SET_ACTIVE_CONTEXT":
       return { ...state, activeContext: action.context };
     case "NOTIFY_CHANGED":
       return {
         ...state,
-        changeBumps: { ...state.changeBumps, [action.scope]: (state.changeBumps[action.scope] || 0) + 1 },
+        changeBumps: {
+          ...state.changeBumps,
+          [action.scope]: (state.changeBumps[action.scope] || 0) + 1,
+        },
       };
     // Áreas de trabalho guardadas: uma fotografia dos painéis abertos agora
     // (posição, tamanho, estado), para voltar a essa disposição mais tarde
     // com um clique — ex.: "Orçamentos" com Pedidos + PDF ancorados lado a
     // lado, "Emails" só com a caixa de entrada maximizada.
     case "SAVE_WORKSPACE": {
-      const snapshot = { id: action.id || `ws-${Date.now().toString(36)}`, name: action.name,
-        panels: state.panels, zOrder: state.zOrder };
-      return { ...state, workspaces: [...state.workspaces.filter((w) => w.id !== snapshot.id), snapshot] };
+      const snapshot = {
+        id: action.id || `ws-${Date.now().toString(36)}`,
+        name: action.name,
+        panels: state.panels,
+        zOrder: state.zOrder,
+      };
+      return {
+        ...state,
+        workspaces: [
+          ...state.workspaces.filter((w) => w.id !== snapshot.id),
+          snapshot,
+        ],
+      };
     }
     case "LOAD_WORKSPACE": {
       const ws = state.workspaces.find((w) => w.id === action.id);
       if (!ws) return state;
-      return { ...state, panels: ws.panels, zOrder: ws.zOrder, activeId: ws.zOrder[ws.zOrder.length - 1] || null };
+      return {
+        ...state,
+        panels: ws.panels,
+        zOrder: ws.zOrder,
+        activeId: ws.zOrder[ws.zOrder.length - 1] || null,
+      };
     }
     case "DELETE_WORKSPACE":
-      return { ...state, workspaces: state.workspaces.filter((w) => w.id !== action.id) };
+      return {
+        ...state,
+        workspaces: state.workspaces.filter((w) => w.id !== action.id),
+      };
     default:
       return state;
   }
@@ -162,42 +235,116 @@ export function WorkspaceProvider({ children }) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          panels: state.panels, zOrder: state.zOrder, activeContext: state.activeContext,
-          workspaces: state.workspaces,
-        }));
-      } catch { /* quota cheia ou modo privado — a app continua a funcionar sem persistir */ }
+        window.localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            panels: state.panels,
+            zOrder: state.zOrder,
+            activeContext: state.activeContext,
+            workspaces: state.workspaces,
+          }),
+        );
+      } catch {
+        /* quota cheia ou modo privado — a app continua a funcionar sem persistir */
+      }
     }, 250);
     return () => clearTimeout(saveTimer.current);
   }, [state.panels, state.zOrder, state.activeContext, state.workspaces]);
 
-  const openPanel = useCallback((panelType, opts) => dispatch({ type: "OPEN_PANEL", panelType, forceNew: !!opts?.forceNew }), []);
-  const closePanel = useCallback((id) => dispatch({ type: "CLOSE_PANEL", id }), []);
-  const focusPanel = useCallback((id) => dispatch({ type: "FOCUS_PANEL", id }), []);
-  const movePanel = useCallback((id, x, y) => dispatch({ type: "MOVE_PANEL", id, x, y }), []);
-  const resizePanel = useCallback((id, w, h) => dispatch({ type: "RESIZE_PANEL", id, w, h }), []);
-  const toggleMinimize = useCallback((id) => dispatch({ type: "TOGGLE_MINIMIZE", id }), []);
-  const toggleMaximize = useCallback((id) => dispatch({ type: "TOGGLE_MAXIMIZE", id }), []);
-  const setActiveContext = useCallback((context) => dispatch({ type: "SET_ACTIVE_CONTEXT", context }), []);
-  const notifyChanged = useCallback((scope) => dispatch({ type: "NOTIFY_CHANGED", scope }), []);
-  const saveWorkspace = useCallback((name, id) => dispatch({ type: "SAVE_WORKSPACE", name, id }), []);
-  const loadWorkspace = useCallback((id) => dispatch({ type: "LOAD_WORKSPACE", id }), []);
-  const deleteWorkspace = useCallback((id) => dispatch({ type: "DELETE_WORKSPACE", id }), []);
+  const openPanel = useCallback(
+    (panelType, opts) =>
+      dispatch({ type: "OPEN_PANEL", panelType, forceNew: !!opts?.forceNew }),
+    [],
+  );
+  const closePanel = useCallback(
+    (id) => dispatch({ type: "CLOSE_PANEL", id }),
+    [],
+  );
+  const focusPanel = useCallback(
+    (id) => dispatch({ type: "FOCUS_PANEL", id }),
+    [],
+  );
+  const movePanel = useCallback(
+    (id, x, y) => dispatch({ type: "MOVE_PANEL", id, x, y }),
+    [],
+  );
+  const resizePanel = useCallback(
+    (id, w, h) => dispatch({ type: "RESIZE_PANEL", id, w, h }),
+    [],
+  );
+  const toggleMinimize = useCallback(
+    (id) => dispatch({ type: "TOGGLE_MINIMIZE", id }),
+    [],
+  );
+  const toggleMaximize = useCallback(
+    (id) => dispatch({ type: "TOGGLE_MAXIMIZE", id }),
+    [],
+  );
+  const showDesktop = useCallback(() => dispatch({ type: "SHOW_DESKTOP" }), []);
+  const setActiveContext = useCallback(
+    (context) => dispatch({ type: "SET_ACTIVE_CONTEXT", context }),
+    [],
+  );
+  const notifyChanged = useCallback(
+    (scope) => dispatch({ type: "NOTIFY_CHANGED", scope }),
+    [],
+  );
+  const saveWorkspace = useCallback(
+    (name, id) => dispatch({ type: "SAVE_WORKSPACE", name, id }),
+    [],
+  );
+  const loadWorkspace = useCallback(
+    (id) => dispatch({ type: "LOAD_WORKSPACE", id }),
+    [],
+  );
+  const deleteWorkspace = useCallback(
+    (id) => dispatch({ type: "DELETE_WORKSPACE", id }),
+    [],
+  );
 
-  const value = useMemo(() => ({
-    ...state,
-    openPanel, closePanel, focusPanel, movePanel, resizePanel,
-    toggleMinimize, toggleMaximize, setActiveContext, notifyChanged,
-    saveWorkspace, loadWorkspace, deleteWorkspace,
-  }), [state, openPanel, closePanel, focusPanel, movePanel, resizePanel,
-      toggleMinimize, toggleMaximize, setActiveContext, notifyChanged,
-      saveWorkspace, loadWorkspace, deleteWorkspace]);
+  const value = useMemo(
+    () => ({
+      ...state,
+      openPanel,
+      closePanel,
+      focusPanel,
+      movePanel,
+      resizePanel,
+      toggleMinimize,
+      toggleMaximize,
+      showDesktop,
+      setActiveContext,
+      notifyChanged,
+      saveWorkspace,
+      loadWorkspace,
+      deleteWorkspace,
+    }),
+    [
+      state,
+      openPanel,
+      closePanel,
+      focusPanel,
+      movePanel,
+      resizePanel,
+      toggleMinimize,
+      toggleMaximize,
+      showDesktop,
+      setActiveContext,
+      notifyChanged,
+      saveWorkspace,
+      loadWorkspace,
+      deleteWorkspace,
+    ],
+  );
 
-  return <WorkspaceCtx.Provider value={value}>{children}</WorkspaceCtx.Provider>;
+  return (
+    <WorkspaceCtx.Provider value={value}>{children}</WorkspaceCtx.Provider>
+  );
 }
 
 export function useWorkspace() {
   const ctx = useContext(WorkspaceCtx);
-  if (!ctx) throw new Error("useWorkspace deve ser usado dentro de WorkspaceProvider");
+  if (!ctx)
+    throw new Error("useWorkspace deve ser usado dentro de WorkspaceProvider");
   return ctx;
 }
