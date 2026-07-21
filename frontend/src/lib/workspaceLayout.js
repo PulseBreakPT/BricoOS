@@ -8,6 +8,6 @@
 // SIDEBAR_WIDTH fica exportada como zero para os módulos mais antigos que
 // ainda importam a constante continuarem compatíveis.
 export const SIDEBAR_WIDTH = 0;
-export const SYSTEM_BAR_HEIGHT = 48;
+export const SYSTEM_BAR_HEIGHT = 60;
 export const TASKBAR_RESERVE = 88;
 export const WORKSPACE_GAP = 12;

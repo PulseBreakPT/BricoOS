@@ -44,7 +44,11 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
               variant === "dock" ? "h-[18px] w-[18px]" : "h-3.5 w-3.5 shrink-0"
             }
           />
-          {variant === "dock" ? null : "Áreas de trabalho"}
+          {variant === "dock"
+            ? null
+            : variant === "menubar"
+              ? "Espaços"
+              : "Áreas de trabalho"}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
