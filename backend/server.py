@@ -1665,6 +1665,42 @@ async def system_status():
             "last_sync": state.get("checked_at") or "", "now": now_iso()}
 
 
+@api_router.get("/system/health")
+async def system_health():
+    """Painel de Saúde — visão geral do estado da app e das automações
+    (equivalente a um gestor de tarefas), para responder a "está tudo a
+    funcionar?" sem abrir nada. Só contagens/leituras baratas."""
+    since_today = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00")
+    pedidos_ativos = await db.notes.count_documents(
+        {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}})
+    pedidos_esquecidos = await db.notes.count_documents(
+        {"archived": {"$ne": True}, "status": {"$in": list(FORGOTTEN_STATUSES)}})
+    emails_nao_vistos = await db.received_emails.count_documents({"seen": {"$ne": True}})
+    emails_hoje = await db.received_emails.count_documents({"received_at": {"$gte": since_today}})
+    tarefas_pendentes = await db.tasks.count_documents({"done": {"$ne": True}})
+    rascunhos = await db.notes.count_documents({"pending_client_send": {"$exists": True, "$ne": None}})
+    anexos_totais = await db.email_attachments.count_documents({})
+    inbox_state = await db.imap_state.find_one({"id": "inbox"}, {"_id": 0, "checked_at": 1}) or {}
+    sent_state = await db.imap_state.find_one({"id": "sent"}, {"_id": 0, "checked_at": 1}) or {}
+    return {
+        "pedidos_ativos": pedidos_ativos,
+        "pedidos_esquecidos": pedidos_esquecidos,
+        "emails_nao_vistos": emails_nao_vistos,
+        "emails_hoje": emails_hoje,
+        "tarefas_pendentes": tarefas_pendentes,
+        "rascunhos": rascunhos,
+        "anexos_totais": anexos_totais,
+        "automacao": {
+            "imap_configurado": SMTP_CONFIGURED,
+            "imap_intervalo_min": IMAP_POLL_MINUTES,
+            "ultima_verificacao_receb": inbox_state.get("checked_at") or "",
+            "ultima_verificacao_env": sent_state.get("checked_at") or "",
+            "ia_configurada": ai_available(),
+        },
+        "now": now_iso(),
+    }
+
+
 @api_router.get("/activity/global")
 async def global_activity(limit: int = 40):
     """Centro de Atividade — linha do tempo única de tudo o que acontece na
