@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
+import { haptics } from "@/lib/haptics";
 
 const KIND_META = {
   pedido: { icon: ClipboardList, label: "Pedido", restorePath: (id) => `/trash/notes/${id}/restore`, purgePath: (id) => `/trash/notes/${id}` },
@@ -47,6 +48,7 @@ export default function TrashPanel({ open, onOpenChange, onRestored }) {
   };
 
   const purge = async (item) => {
+    haptics.warning();
     if (!window.confirm(`Eliminar definitivamente "${item.label}"? Isto não pode ser desfeito.`)) return;
     setBusyId(`${item.kind}-${item.id}`);
     try {

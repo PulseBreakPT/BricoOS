@@ -1,4 +1,5 @@
 import "@/App.css";
+import "@/lib/hapticToasts";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import PinGate from "@/components/PinGate";

@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import QuickPeekTrigger from "@/components/QuickPeek";
+import { haptics } from "@/lib/haptics";
 
 // Barra fixa em baixo, só desktop — mostra só os separadores das janelas
 // abertas (incluindo minimizadas), como o alternador de janelas de um
@@ -47,7 +48,7 @@ export default function Taskbar() {
           >
             <button
               data-testid={`taskbar-panel-${p.id}`}
-              onClick={() => focusPanel(p.id)}
+              onClick={() => { haptics.tap(); focusPanel(p.id); }}
               className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
                 isActive ? "bg-white text-[color:var(--chrome-deep)] shadow-[0_8px_20px_-8px_rgba(0,0,0,0.8)]" : p.minimized ? "border border-dashed border-white/20 text-[color:var(--chrome-faint)] hover:text-[color:var(--chrome-muted)]" : "bg-white/[0.08] text-[color:var(--chrome-muted)] hover:bg-white/[0.14] hover:text-white"
               }`}
@@ -58,7 +59,7 @@ export default function Taskbar() {
                 role="button"
                 tabIndex={-1}
                 data-testid={`taskbar-close-${p.id}`}
-                onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}
+                onClick={(e) => { e.stopPropagation(); haptics.tap(); closePanel(p.id); }}
                 className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100"
               >
                 <X className="h-3 w-3" />

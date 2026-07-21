@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { useFavorites } from "@/context/FavoritesContext";
+import { haptics } from "@/lib/haptics";
 
 // Botão de fixar/desafixar, igual em qualquer sítio da app — fornecedor,
 // email, ficheiro ou tarefa. item: { kind, id, label, sublabel, to, external }.
@@ -11,7 +12,7 @@ export default function FavoriteToggle({ item, className = "", size = "h-4 w-4" 
       type="button"
       data-testid={`favorite-toggle-${item.kind}-${item.id}`}
       title={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-      onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleFavorite(item); }}
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); haptics.selection(); toggleFavorite(item); }}
       className={`shrink-0 rounded-lg p-1.5 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90 ${className}`}
     >
       <Star className={`${size} ${fav ? "fill-amber-400 text-amber-400" : ""}`} />
