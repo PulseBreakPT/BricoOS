@@ -3,6 +3,7 @@ import { Check, Delete, Hammer, ShieldCheck, TimerReset } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
+import { haptics } from "@/lib/haptics";
 
 const PIN_LENGTH = 6;
 // Pequena pausa antes de revelar a app: dá tempo ao "check" de sucesso ser
@@ -150,6 +151,7 @@ export default function PinGate({ children }) {
         setPin("");
         setLockMessage("");
         setStatus("success");
+        haptics.success();
         setTimeout(() => setStatus("ok"), SUCCESS_DELAY_MS);
         return;
       }
@@ -159,13 +161,16 @@ export default function PinGate({ children }) {
       if (data.locked) {
         applyServerState(data);
         setError("Demasiadas tentativas. Aguarda para tentar novamente.");
+        haptics.warning();
       } else {
         setAttemptsLeft(data.attempts_left ?? 0);
         setError(`PIN incorreto. Resta${data.attempts_left === 1 ? "" : "m"} ${data.attempts_left} tentativa${data.attempts_left === 1 ? "" : "s"}.`);
+        haptics.error();
       }
     } catch {
       setPin("");
       setError("Não foi possível verificar o PIN. Tenta novamente.");
+      haptics.error();
     } finally {
       setCheckingPin(false);
     }
@@ -173,6 +178,7 @@ export default function PinGate({ children }) {
 
   const press = useCallback((digit) => {
     if (checkingPin || lockSeconds > 0) return;
+    haptics.tap();
     setError("");
     setPin((p) => {
       if (p.length >= PIN_LENGTH) return p;
@@ -184,11 +190,13 @@ export default function PinGate({ children }) {
 
   const backspace = useCallback(() => {
     if (checkingPin || lockSeconds > 0) return;
+    haptics.tap();
     setPin((p) => p.slice(0, -1));
   }, [checkingPin, lockSeconds]);
 
   const clearAll = useCallback(() => {
     if (checkingPin || lockSeconds > 0) return;
+    haptics.tap();
     setPin("");
   }, [checkingPin, lockSeconds]);
 

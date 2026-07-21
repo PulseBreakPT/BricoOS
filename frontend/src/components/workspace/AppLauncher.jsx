@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
 import DockIcon from "@/components/workspace/DockIcon";
+import { haptics } from "@/lib/haptics";
 
 const DOCK_ORDER_KEY = "brico_dock_order_v1";
 
@@ -32,6 +33,7 @@ export default function AppLauncher() {
 
   const dropOnType = (targetType) => {
     if (!dragType || dragType === targetType) { setDragType(null); return; }
+    haptics.impact();
     setDockOrder((prev) => {
       const next = prev.filter((t) => t !== dragType);
       const targetIndex = next.indexOf(targetType);

@@ -18,6 +18,7 @@ import CommandPalette from "@/components/workspace/CommandPalette";
 import AppLauncher from "@/components/workspace/AppLauncher";
 import WorkspaceMenu from "@/components/workspace/WorkspaceMenu";
 import StatusCluster from "@/components/workspace/StatusCluster";
+import { haptics } from "@/lib/haptics";
 
 // Aviso global, impossível de ignorar mas elegante: aparece em TODAS as
 // páginas sempre que chega um email associado a um pedido — de um fornecedor
@@ -247,7 +248,7 @@ function SidebarContent({
                       key={item.to}
                       to={item.to}
                       end={item.end}
-                      onClick={onNavigate}
+                      onClick={() => { haptics.tap(); onNavigate?.(); }}
                       data-testid={item.testid}
                       className={({ isActive }) =>
                         `group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${

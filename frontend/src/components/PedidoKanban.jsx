@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import QuickPeekTrigger from "@/components/QuickPeek";
+import { haptics } from "@/lib/haptics";
 
 function KanbanPeekContent({ note, cfg }) {
   const last = (note.recent_activities || [])[0];
@@ -47,7 +48,7 @@ function KanbanCard({ note, onOpen, onMove }) {
               {STATUS_ORDER.filter((s) => s !== note.status).map((s) => {
                 const cfg = getStatusCfg(s);
                 return (
-                  <DropdownMenuItem key={s} data-testid={`kanban-move-${note.id}-${s}`} onClick={() => onMove(note, s)}>
+                  <DropdownMenuItem key={s} data-testid={`kanban-move-${note.id}-${s}`} onClick={() => { haptics.selection(); onMove(note, s); }}>
                     <span className="mr-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cfg.dot }} /> {cfg.label}
                   </DropdownMenuItem>
                 );

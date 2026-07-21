@@ -3,6 +3,7 @@ import { Focus, SquarePlus } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { haptics } from "@/lib/haptics";
 
 const LONGPRESS_DELAY = 500;
 
@@ -26,12 +27,14 @@ export default function DockIcon({
     longPressedRef.current = false;
     timerRef.current = setTimeout(() => {
       longPressedRef.current = true;
+      haptics.tap();
       setMenuOpen(true);
     }, LONGPRESS_DELAY);
   };
 
   const onClick = () => {
     if (longPressedRef.current) { longPressedRef.current = false; return; }
+    haptics.tap();
     onOpen();
   };
 
