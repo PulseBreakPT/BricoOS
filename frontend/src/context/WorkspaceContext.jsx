@@ -39,18 +39,24 @@ function reducer(state, action) {
       return { ...state, ...action.payload, changeBumps: {} };
     }
     case "OPEN_PANEL": {
-      const existing = state.panels.find((p) => p.type === action.panelType);
-      if (existing) {
-        return {
-          ...state,
-          panels: state.panels.map((p) => (p.id === existing.id ? { ...p, minimized: false } : p)),
-          zOrder: [...state.zOrder.filter((id) => id !== existing.id), existing.id],
-          activeId: existing.id,
-        };
+      // Por omissão continua a focar a instância já aberta desse tipo (como
+      // sempre foi); forceNew abre sempre uma nova janela em paralelo — ex.:
+      // "Nova janela" no menu de clique longo do Dock — para comparar dois
+      // pedidos, dois emails, etc., lado a lado.
+      if (!action.forceNew) {
+        const existing = state.panels.find((p) => p.type === action.panelType);
+        if (existing) {
+          return {
+            ...state,
+            panels: state.panels.map((p) => (p.id === existing.id ? { ...p, minimized: false } : p)),
+            zOrder: [...state.zOrder.filter((id) => id !== existing.id), existing.id],
+            activeId: existing.id,
+          };
+        }
       }
       const { x, y } = cascadePosition(state.panels.length);
       const panel = {
-        id: `${action.panelType}-${Date.now().toString(36)}`,
+        id: `${action.panelType}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
         type: action.panelType,
         x, y, w: DEFAULT_W, h: DEFAULT_H,
         minimized: false, maximized: false, prevRect: null,
@@ -165,7 +171,7 @@ export function WorkspaceProvider({ children }) {
     return () => clearTimeout(saveTimer.current);
   }, [state.panels, state.zOrder, state.activeContext, state.workspaces]);
 
-  const openPanel = useCallback((panelType) => dispatch({ type: "OPEN_PANEL", panelType }), []);
+  const openPanel = useCallback((panelType, opts) => dispatch({ type: "OPEN_PANEL", panelType, forceNew: !!opts?.forceNew }), []);
   const closePanel = useCallback((id) => dispatch({ type: "CLOSE_PANEL", id }), []);
   const focusPanel = useCallback((id) => dispatch({ type: "FOCUS_PANEL", id }), []);
   const movePanel = useCallback((id, x, y) => dispatch({ type: "MOVE_PANEL", id, x, y }), []);

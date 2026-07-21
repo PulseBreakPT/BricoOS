@@ -22,6 +22,12 @@ export default function MissionControl({ open, onClose }) {
   if (!open) return null;
 
   const ordered = [...panels].sort((a, b) => zOrder.indexOf(b.id) - zOrder.indexOf(a.id));
+  // Com janelas multi-instância (a mesma App aberta mais que uma vez), o
+  // título por si só deixa de identificar cada cartão — acrescenta "#2",
+  // "#3"... só quando há mesmo mais que uma instância do mesmo tipo.
+  const typeCounts = {};
+  panels.forEach((p) => { typeCounts[p.type] = (typeCounts[p.type] || 0) + 1; });
+  const typeSeen = {};
 
   return (
     <div
@@ -41,16 +47,18 @@ export default function MissionControl({ open, onClose }) {
             if (!meta) return null;
             const Icon = meta.icon;
             const isActive = activeId === p.id && !p.minimized;
+            typeSeen[p.type] = (typeSeen[p.type] || 0) + 1;
+            const label = typeCounts[p.type] > 1 ? `${meta.title} #${typeSeen[p.type]}` : meta.title;
             return (
               <div key={p.id} className="group relative w-60">
                 <button
-                  data-testid={`mission-control-card-${p.type}`}
+                  data-testid={`mission-control-card-${p.id}`}
                   onClick={(e) => { e.stopPropagation(); focusPanel(p.id); onClose(); }}
                   className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-2xl transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.03] ${isActive ? "border-white/80 ring-2 ring-white/60" : "border-white/10"}`}
                 >
                   <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
                     <Icon className="h-4 w-4 shrink-0 text-slate-500" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{meta.title}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{label}</span>
                     {p.minimized ? <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">Minimizada</span> : null}
                   </div>
                   <div className="flex h-28 items-center justify-center bg-slate-100/80 text-slate-300">
@@ -58,7 +66,7 @@ export default function MissionControl({ open, onClose }) {
                   </div>
                 </button>
                 <button
-                  data-testid={`mission-control-close-${p.type}`}
+                  data-testid={`mission-control-close-${p.id}`}
                   onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}
                   title="Fechar"
                   className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"

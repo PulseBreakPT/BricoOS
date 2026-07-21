@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
+import FavoritesPanel from "@/components/FavoritesPanel";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { SystemStatusProvider, useSystemStatus } from "@/context/SystemStatusContext";
+import { FavoritesProvider } from "@/context/FavoritesContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
@@ -170,6 +172,7 @@ function LayoutInner() {
   const isDesktop = useIsDesktop();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const { status } = useSystemStatus();
 
   // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
@@ -191,6 +194,15 @@ function LayoutInner() {
         <div className="flex items-center justify-between px-1">
           <Brand />
           <div className="flex items-center gap-1">
+            <button
+              data-testid="sidebar-favorites-btn"
+              onClick={() => setFavoritesOpen(true)}
+              aria-label="Favoritos"
+              title="Favoritos"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-amber-500"
+            >
+              <Star className="h-[18px] w-[18px]" />
+            </button>
             <button
               data-testid="sidebar-activity-btn"
               onClick={() => setActivityOpen(true)}
@@ -282,6 +294,15 @@ function LayoutInner() {
             <Search className="h-[18px] w-[18px]" />
           </button>
           <button
+            data-testid="mobile-favorites-btn"
+            onClick={() => setFavoritesOpen(true)}
+            aria-label="Favoritos"
+            title="Favoritos"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 active:scale-90 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+          >
+            <Star className="h-[18px] w-[18px]" />
+          </button>
+          <button
             data-testid="mobile-activity-btn"
             onClick={() => setActivityOpen(true)}
             aria-label="Centro de Atividade"
@@ -340,16 +361,19 @@ function LayoutInner() {
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
+      <FavoritesPanel open={favoritesOpen} onOpenChange={setFavoritesOpen} />
     </div>
   );
 }
 
 export default function Layout() {
   return (
-    <WorkspaceProvider>
-      <SystemStatusProvider>
-        <LayoutInner />
-      </SystemStatusProvider>
-    </WorkspaceProvider>
+    <FavoritesProvider>
+      <WorkspaceProvider>
+        <SystemStatusProvider>
+          <LayoutInner />
+        </SystemStatusProvider>
+      </WorkspaceProvider>
+    </FavoritesProvider>
   );
 }

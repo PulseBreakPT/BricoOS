@@ -11,6 +11,7 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
+import FavoriteToggle from "@/components/FavoriteToggle";
 import { toast } from "sonner";
 import {
   getTaskPriority, TASK_PRIORITIES, isOverdue, isToday, isNext7Days, formatDue, smartTaskSort, subtaskProgress,
@@ -141,6 +142,7 @@ export default function Tasks() {
             ) : null}
           </div>
         </button>
+        <FavoriteToggle item={{ kind: "tarefa", id: t.id, label: t.title, sublabel: t.due_date ? formatDue(t.due_date) : "", to: "/tarefas" }} />
         <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-slate-300 transition-all duration-150 hover:scale-110 hover:bg-red-50 hover:text-red-500 active:scale-90">
           <Trash2 className="h-4 w-4" />
         </button>

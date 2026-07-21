@@ -39,6 +39,7 @@ import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPreviewDialog";
 import EntityStackBar from "@/components/EntityStackBar";
+import FavoriteToggle from "@/components/FavoriteToggle";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -763,10 +764,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
               <Building2 className="h-5 w-5" />
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate font-heading text-base font-extrabold text-slate-900">{s.name}</p>
               <p className="text-xs text-slate-400">Fornecedor</p>
             </div>
+            <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
           </div>
           <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
             {s.email ? (

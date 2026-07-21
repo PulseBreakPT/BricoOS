@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { X, LayoutGrid, Mail, ClipboardList, RefreshCw, Grid2x2, LayoutTemplate, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/context/WorkspaceContext";
@@ -6,17 +7,44 @@ import { useSystemStatus } from "@/context/SystemStatusContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
 import { timeAgo } from "@/lib/pedido";
 import QuickPeekTrigger from "@/components/QuickPeek";
+import DockIcon from "@/components/workspace/DockIcon";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+
+const DOCK_ORDER_KEY = "brico_dock_order_v1";
+
+// Ordem dos ícones do Dock, guardada localmente — reconciliada com
+// PANEL_ORDER a cada carregamento: tipos novos (de uma futura versão da
+// app) entram no fim; tipos removidos desaparecem, sem partir nada.
+function loadDockOrder() {
+  let saved = [];
+  try { saved = JSON.parse(window.localStorage.getItem(DOCK_ORDER_KEY) || "[]"); } catch { saved = []; }
+  const known = saved.filter((t) => PANEL_ORDER.includes(t));
+  const missing = PANEL_ORDER.filter((t) => !known.includes(t));
+  return [...known, ...missing];
+}
+
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
 
 // Barra de estado ao estilo de um SO: ligação, contadores em tempo real e
 // há quanto tempo a caixa de entrada foi verificada — sempre visível, sem
 // abrir nada.
 function StatusCluster() {
   const { status, online } = useSystemStatus();
+  const now = useClock();
   return (
     <div data-testid="taskbar-status" className="hidden shrink-0 items-center gap-3 border-l border-slate-200 pl-3 text-[11px] font-semibold text-slate-500 md:flex">
+      <span data-testid="taskbar-clock" className="font-mono text-slate-700" title={now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}>
+        {now.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+      </span>
       <span className="flex items-center gap-1.5" title={online ? "Ligado ao servidor" : "Sem ligação ao servidor"}>
         <span className={`h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-red-500 animate-pulse"}`} />
         {online ? "Ligado" : "Sem ligação"}
@@ -106,6 +134,23 @@ function WorkspaceMenu() {
 export default function Taskbar({ onOpenMissionControl }) {
   const { panels, activeId, activeContext, openPanel, focusPanel, closePanel } = useWorkspace();
   const location = useLocation();
+  const [dockOrder, setDockOrder] = useState(loadDockOrder);
+  const [dragType, setDragType] = useState(null);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(DOCK_ORDER_KEY, JSON.stringify(dockOrder)); } catch { /* quota cheia ou modo privado */ }
+  }, [dockOrder]);
+
+  const dropOnType = (targetType) => {
+    if (!dragType || dragType === targetType) { setDragType(null); return; }
+    setDockOrder((prev) => {
+      const next = prev.filter((t) => t !== dragType);
+      const targetIndex = next.indexOf(targetType);
+      next.splice(targetIndex, 0, dragType);
+      return next;
+    });
+    setDragType(null);
+  };
 
   return (
     <div
@@ -129,22 +174,24 @@ export default function Taskbar({ onOpenMissionControl }) {
       <WorkspaceMenu />
 
       <div className="flex shrink-0 items-center gap-1 border-r border-slate-200 pr-2">
-        {PANEL_ORDER.map((type) => {
+        {dockOrder.map((type) => {
           const meta = PANEL_TYPES[type];
-          const Icon = meta.icon;
-          const isOpen = panels.some((p) => p.type === type);
+          if (!meta) return null;
+          const count = panels.filter((p) => p.type === type).length;
           const isCurrentRoute = routeMatchesPanelType(location.pathname, type);
           return (
-            <button
+            <DockIcon
               key={type}
-              data-testid={`taskbar-launch-${type}`}
-              disabled={isCurrentRoute}
-              title={isCurrentRoute ? `${meta.title} já é a página atual` : `Abrir ${meta.title}`}
-              onClick={() => openPanel(type)}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${isOpen ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
+              type={type}
+              meta={meta}
+              isOpen={count > 0}
+              count={count}
+              isCurrentRoute={isCurrentRoute}
+              onOpen={() => openPanel(type)}
+              onOpenNew={() => openPanel(type, { forceNew: true })}
+              onDragStartType={setDragType}
+              onDropOnType={dropOnType}
+            />
           );
         })}
       </div>
@@ -157,6 +204,8 @@ export default function Taskbar({ onOpenMissionControl }) {
           if (!meta) return null;
           const Icon = meta.icon;
           const isActive = activeId === p.id && !p.minimized;
+          const sameType = panels.filter((o) => o.type === p.type);
+          const label = sameType.length > 1 ? `${meta.title} #${sameType.indexOf(p) + 1}` : meta.title;
           return (
             <QuickPeekTrigger
               key={p.id}
@@ -168,7 +217,7 @@ export default function Taskbar({ onOpenMissionControl }) {
                     <Icon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-900">{meta.title}</p>
+                    <p className="truncate text-xs font-bold text-slate-900">{label}</p>
                     <p className="text-[11px] text-slate-400">
                       {p.minimized ? "Minimizada" : p.maximized ? "Maximizada" : "Em janela flutuante"}
                       {isActive ? " · ativa" : ""}
@@ -178,18 +227,18 @@ export default function Taskbar({ onOpenMissionControl }) {
               )}
             >
               <button
-                data-testid={`taskbar-panel-${p.type}`}
+                data-testid={`taskbar-panel-${p.id}`}
                 onClick={() => focusPanel(p.id)}
                 className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
                   isActive ? "bg-slate-900 text-white" : p.minimized ? "border border-dashed border-slate-300 text-slate-400" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {meta.title}
+                {label}
                 <span
                   role="button"
                   tabIndex={-1}
-                  data-testid={`taskbar-close-${p.type}`}
+                  data-testid={`taskbar-close-${p.id}`}
                   onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}
                   className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100"
                 >

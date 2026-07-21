@@ -11,6 +11,37 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import QuickPeekTrigger from "@/components/QuickPeek";
+
+// Conteúdo do Quick Peek de um pedido — tudo já vem no objeto da lista
+// (sem pedido extra ao servidor): estado, resumo, última alteração e
+// próxima ação, para consultar sem abrir a ficha completa.
+function PedidoPeekContent({ note, st }) {
+  const last = (note.recent_activities || [])[0];
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />{st.label}
+        </span>
+        {note.is_overdue ? <span className="text-[11px] font-bold text-red-600">Parado há {note.waiting_days}d</span> : null}
+      </div>
+      {note.description ? <p className="line-clamp-3 text-xs text-slate-600">{note.description}</p> : null}
+      {last ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Última alteração</p>
+          <p className="mt-0.5 text-xs text-slate-600">{last.message} <span className="text-slate-400">· {timeAgo(last.created_at)}</span></p>
+        </div>
+      ) : null}
+      {note.next_action ? (
+        <div className="rounded-lg bg-slate-50 p-2">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Próxima ação</p>
+          <p className="mt-0.5 text-xs font-semibold text-slate-700">{note.next_action}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function PedidoCard({ note, onOpen, actions }) {
   const st = getStatusCfg(note.status);
@@ -31,7 +62,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
       className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     >
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
+          <QuickPeekTrigger as="div" className="min-w-0 flex-1" renderPeek={() => <PedidoPeekContent note={note} st={st} />}>
             <div className="flex items-center gap-2">
               <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-slate-900">{note.customer_name || "Sem nome"}</h3>
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: pr.bg, color: pr.text }}>
@@ -46,7 +77,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium text-slate-400">
               <span className="inline-flex items-center gap-1"><CalendarClock className="h-3 w-3" /> {formatDateTime(note.created_at)}</span>
             </p>
-          </div>
+          </QuickPeekTrigger>
           <div className="flex shrink-0 items-center">
             <button data-testid={`note-fav-${note.id}`} onClick={stop(actions.toggleFav)} className="rounded-lg p-1 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90">
               <Star key={note.favorite} className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400 animate-pop" : ""}`} />
