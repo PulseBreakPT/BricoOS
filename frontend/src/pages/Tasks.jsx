@@ -44,6 +44,8 @@ export default function Tasks() {
   const [addPriority, setAddPriority] = useState("nenhuma");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -81,14 +83,46 @@ export default function Tasks() {
   const remove = async (id) => {
     try {
       await api.delete(`/tasks/${id}`);
+      toast.success("Tarefa movida para a lixeira", { description: "Podes restaurá-la na Lixeira." });
       load();
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao eliminar a tarefa"));
+      toast.error(getErrorMessage(e, "Erro ao mover para a lixeira"));
     }
   };
 
   const openEdit = (t) => { setEditingTask(t); setDialogOpen(true); };
   const openNew = () => { setEditingTask(null); setDialogOpen(true); };
+
+  // ---- Seleção em grupo — ações sobre várias tarefas de uma vez (lógica base 21) ----
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const bulkComplete = async () => {
+    setBulkBusy(true);
+    // /toggle inverte o estado — só chama para as que ainda não estão
+    // concluídas, senão desmarcava por engano as que já o estavam.
+    const ids = tasks.filter((t) => selected.has(t.id) && !t.done).map((t) => t.id);
+    await Promise.allSettled(ids.map((id) => api.patch(`/tasks/${id}/toggle`)));
+    toast.success(`${ids.length} tarefa(s) concluída(s)`);
+    clearSelection();
+    load();
+    setBulkBusy(false);
+  };
+  const bulkTrash = async () => {
+    const ids = [...selected];
+    if (!window.confirm(`Mover ${ids.length} tarefa(s) para a lixeira? Podes restaurá-las depois, na Lixeira.`)) return;
+    setBulkBusy(true);
+    await Promise.allSettled(ids.map((id) => api.delete(`/tasks/${id}`)));
+    toast.success(`${ids.length} tarefa(s) movida(s) para a lixeira`);
+    clearSelection();
+    load();
+    setBulkBusy(false);
+  };
 
   const filtered = useMemo(() => tasks
     .filter((t) => category === "todos" || t.category === category)
@@ -108,8 +142,14 @@ export default function Tasks() {
     return (
       <div
         data-testid={`task-row-${t.id}`}
-        className="group flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 card-elevated-hover"
+        className={`group flex items-center gap-3 rounded-xl border bg-white p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 card-elevated-hover ${selected.has(t.id) ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200/90"}`}
       >
+        <Checkbox
+          data-testid={`task-select-${t.id}`}
+          checked={selected.has(t.id)}
+          onCheckedChange={() => toggleSelect(t.id)}
+          className="h-4 w-4 rounded-md"
+        />
         <Checkbox
           data-testid={`task-toggle-${t.id}`}
           checked={t.done}
@@ -140,6 +180,9 @@ export default function Tasks() {
                 {progress.done}/{progress.total}
               </span>
             ) : null}
+            {(t.labels || []).slice(0, 3).map((l) => (
+              <span key={l} className="rounded-full bg-slate-900/5 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{l}</span>
+            ))}
           </div>
         </button>
         <FavoriteToggle item={{ kind: "tarefa", id: t.id, label: t.title, sublabel: t.due_date ? formatDue(t.due_date) : "", to: "/tarefas" }} />
@@ -250,6 +293,26 @@ export default function Tasks() {
           );
         })}
       </div>
+
+      {selected.size > 0 ? (
+        <div className="card-elevated mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <span className="text-xs font-bold text-slate-900">
+            <span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span>
+            selecionada{selected.size === 1 ? "" : "s"}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Button data-testid="task-bulk-complete" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkComplete} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+              Concluir
+            </Button>
+            <Button data-testid="task-bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-red-50 px-2.5 text-xs text-red-700 hover:bg-red-100">
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Mover para a lixeira
+            </Button>
+            <Button data-testid="task-bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+              Limpar
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-5 space-y-2">
         {pending.map((t) => <Row key={t.id} t={t} />)}

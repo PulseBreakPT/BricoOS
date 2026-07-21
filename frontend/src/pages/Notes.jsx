@@ -5,9 +5,10 @@ import { AnimatePresence } from "framer-motion";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
-  PhoneMissed, TrendingUp, Frame, Store, MailCheck, KanbanSquare, LayoutGrid,
+  PhoneMissed, TrendingUp, Frame, Store, MailCheck, KanbanSquare, LayoutGrid, Trash2,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { Checkbox } from "@/components/ui/checkbox";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import {
@@ -114,6 +115,8 @@ export default function Notes() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [gmailStatus, setGmailStatus] = useState({ connected: false, configured: false });
   const [labels, setLabels] = useState([]);
@@ -343,6 +346,44 @@ export default function Notes() {
     }
   };
   const actions = { toggleFav, advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus };
+
+  // ---- Seleção em grupo — ações sobre vários pedidos de uma vez (lógica base 21) ----
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === items.length ? new Set() : new Set(items.map((n) => n.id))));
+  };
+  const bulkResolve = async () => {
+    setBulkBusy(true);
+    const ids = [...selected];
+    const results = await Promise.allSettled(ids.map((id) => api.post(`/notes/${id}/resolve`)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    toast[failed ? "warning" : "success"](
+      failed ? `${ids.length - failed} resolvido(s), ${failed} falhou(aram)` : `${ids.length} pedido(s) resolvido(s)`
+    );
+    clearSelection();
+    reloadAll();
+    setBulkBusy(false);
+  };
+  const bulkTrash = async () => {
+    const ids = [...selected];
+    if (!window.confirm(`Mover ${ids.length} pedido(s) para a lixeira? Podes restaurá-los depois, na Lixeira.`)) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map((id) => api.delete(`/notes/${id}`)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    toast[failed ? "warning" : "success"](
+      failed ? `${ids.length - failed} movido(s), ${failed} falhou(aram)` : `${ids.length} pedido(s) movido(s) para a lixeira`
+    );
+    clearSelection();
+    reloadAll();
+    setBulkBusy(false);
+  };
 
   // ---- Keyboard shortcuts ----
   useEffect(() => {
@@ -599,11 +640,41 @@ export default function Notes() {
       </div>
 
       <div className="mt-5 flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-          <span className="font-mono text-sm tabular-nums text-slate-900">{total}</span> pedido{total === 1 ? "" : "s"}
-        </p>
+        <div className="flex items-center gap-2.5">
+          {!focusMode && !kanbanView && items.length > 0 ? (
+            <Checkbox
+              data-testid="notes-select-all"
+              checked={selected.size > 0 && selected.size === items.length}
+              onCheckedChange={toggleSelectAll}
+            />
+          ) : null}
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+            <span className="font-mono text-sm tabular-nums text-slate-900">{total}</span> pedido{total === 1 ? "" : "s"}
+          </p>
+        </div>
         {loading ? <Spinner className="h-4 w-4 text-slate-400" /> : null}
       </div>
+
+      {/* Seleção em grupo — ações sobre vários pedidos de uma vez */}
+      {selected.size > 0 ? (
+        <div className="card-elevated mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <span className="text-xs font-bold text-slate-900">
+            <span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span>
+            selecionado{selected.size === 1 ? "" : "s"}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Button data-testid="bulk-resolve" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkResolve} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
+            </Button>
+            <Button data-testid="bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-red-50 px-2.5 text-xs text-red-700 hover:bg-red-100">
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Mover para a lixeira
+            </Button>
+            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+              <X className="mr-1.5 h-3.5 w-3.5" /> Limpar
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* FOCUS MODE — trata um pedido de cada vez */}
       {focusMode ? (
@@ -629,7 +700,10 @@ export default function Notes() {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {items.map((note) => (
-              <PedidoCard key={note.id} note={note} onOpen={openNote} actions={actions} />
+              <PedidoCard
+                key={note.id} note={note} onOpen={openNote} actions={actions}
+                selected={selected.has(note.id)} onToggleSelect={() => toggleSelect(note.id)}
+              />
             ))}
           </AnimatePresence>
         </div>

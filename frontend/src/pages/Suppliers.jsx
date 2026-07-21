@@ -20,9 +20,11 @@ import {
 import { CategoryBadge } from "@/components/CategoryBadge";
 import PhoneInput from "@/components/PhoneInput";
 import FavoriteToggle from "@/components/FavoriteToggle";
+import LabelEditor from "@/components/LabelEditor";
+import AttachmentManager from "@/components/AttachmentManager";
 import { toast } from "sonner";
 
-const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", contacts: [] };
+const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", labels: [], contacts: [] };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Formato internacional (com indicativo) do PhoneInput → link de WhatsApp.
@@ -128,10 +130,10 @@ export default function Suppliers() {
   };
 
   const remove = async (s) => {
-    if (!window.confirm(`Eliminar o fornecedor "${s.name}"? Esta ação não pode ser anulada.`)) return;
+    if (!window.confirm(`Mover o fornecedor "${s.name}" para a lixeira? Podes restaurá-lo depois, na Lixeira.`)) return;
     try {
       await api.delete(`/suppliers/${s.id}`);
-      toast.success("Fornecedor eliminado");
+      toast.success("Fornecedor movido para a lixeira");
       load();
     } catch (e) {
       // 409: fornecedor associado a pedidos em aberto — o backend descreve
@@ -139,10 +141,10 @@ export default function Suppliers() {
       // e desassocia esses pedidos (ficam sem fornecedor, mas não são apagados).
       if (e?.response?.status === 409) {
         const detail = getErrorMessage(e);
-        if (window.confirm(`${detail}\n\nEliminar mesmo assim?`)) {
+        if (window.confirm(`${detail}\n\nMover para a lixeira mesmo assim?`)) {
           try {
             await api.delete(`/suppliers/${s.id}`, { params: { force: true } });
-            toast.success("Fornecedor eliminado e pedidos desassociados");
+            toast.success("Fornecedor movido para a lixeira e pedidos desassociados");
             load();
           } catch (e2) {
             toast.error(getErrorMessage(e2, "Erro ao eliminar"));
@@ -239,6 +241,13 @@ export default function Suppliers() {
                   </p>
                 ))}
                 {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
+                {(s.labels || []).length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {s.labels.slice(0, 4).map((l) => (
+                      <span key={l} className="inline-flex items-center rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{l}</span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               {(s.open_notes > 0 || s.quotes_given > 0) ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -379,6 +388,16 @@ export default function Suppliers() {
               <Label>Notas</Label>
               <Textarea data-testid="supplier-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2} placeholder="O que fornece..." />
             </div>
+            <div className="space-y-1.5">
+              <Label>Etiquetas</Label>
+              <LabelEditor testIdPrefix="supplier-label" labels={form.labels || []} onChange={(labels) => set("labels", labels)} />
+            </div>
+            {editing ? (
+              <div className="space-y-1.5">
+                <Label>Anexos</Label>
+                <AttachmentManager ownerKind="supplier" ownerId={editing.id} />
+              </div>
+            ) : null}
             <Button data-testid="save-supplier-btn" onClick={save} disabled={saving} className="w-full rounded-xl">
               {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
               {editing ? "Guardar" : "Adicionar"}
