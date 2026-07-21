@@ -1650,6 +1650,54 @@ async def global_search(q: str = ""):
     return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails}
 
 
+@api_router.get("/system/status")
+async def system_status():
+    """Contadores em tempo real para o dock e a barra de estado — só
+    contagens baratas, chamado pela app a cada 45s e ao voltar à janela."""
+    pedidos = await db.notes.count_documents(
+        {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}})
+    emails = await db.received_emails.count_documents({"seen": {"$ne": True}})
+    tarefas = await db.tasks.count_documents({"done": {"$ne": True}})
+    rascunhos = await db.notes.count_documents({"pending_client_send": {"$exists": True, "$ne": None}})
+    state = await db.imap_state.find_one({"id": "inbox"}, {"_id": 0, "checked_at": 1}) or {}
+    return {"pedidos_ativos": pedidos, "emails_nao_vistos": emails,
+            "tarefas_pendentes": tarefas, "rascunhos": rascunhos,
+            "last_sync": state.get("checked_at") or "", "now": now_iso()}
+
+
+@api_router.get("/activity/global")
+async def global_activity(limit: int = 40):
+    """Centro de Atividade — linha do tempo única de tudo o que acontece na
+    app, juntando a cronologia de todos os pedidos (activities) com os
+    emails recebidos sem pedido associado (que não entram na cronologia de
+    nenhum pedido e ficariam de fora)."""
+    limit = min(max(limit, 1), 100)
+    acts = await db.activities.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    note_ids = list({a.get("note_id") for a in acts if a.get("note_id")})
+    names = {}
+    if note_ids:
+        async for n in db.notes.find({"id": {"$in": note_ids}}, {"_id": 0, "id": 1, "customer_name": 1}):
+            names[n["id"]] = n.get("customer_name") or ""
+    events = [{
+        "at": a.get("created_at") or "", "kind": a.get("type") or "updated",
+        "message": a.get("message") or "", "note_id": a.get("note_id") or "",
+        "note_label": names.get(a.get("note_id"), ""),
+    } for a in acts]
+    unmatched = await db.received_emails.find(
+        {"note_id": ""},
+        {"_id": 0, "id": 1, "subject": 1, "from_name": 1, "from_email": 1,
+         "supplier_name": 1, "received_at": 1},
+    ).sort("received_at", -1).limit(limit).to_list(limit)
+    for m in unmatched:
+        who = m.get("supplier_name") or m.get("from_name") or m.get("from_email") or "?"
+        events.append({
+            "at": m.get("received_at") or "", "kind": "email_received",
+            "message": f"Email de {who}: {m.get('subject') or '(sem assunto)'}",
+            "note_id": "", "note_label": ""})
+    events.sort(key=lambda e: e["at"], reverse=True)
+    return {"items": events[:limit]}
+
+
 class AiAskIn(BaseModel):
     question: str
     note_id: str = ""
