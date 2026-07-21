@@ -16,6 +16,7 @@ import {
   getNextActionCta, getNextActionMode,
 } from "@/lib/pedido";
 import PedidoCard from "@/components/PedidoCard";
+import { PedidoCardSkeleton } from "@/components/LoadingSkeletons";
 import PedidoKanban from "@/components/PedidoKanban";
 import PedidoDetail from "@/components/PedidoDetail";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
@@ -698,6 +699,11 @@ export default function Notes() {
         <PedidoKanban items={items} onOpen={openNote} onMove={changeStatus} />
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* Primeiro carregamento: esqueletos com a silhueta dos cartões
+              reais — a grelha nasce estável, sem salto quando os dados chegam. */}
+          {loading && items.length === 0
+            ? Array.from({ length: 6 }).map((_, i) => <PedidoCardSkeleton key={`sk-${i}`} index={i} />)
+            : null}
           <AnimatePresence mode="popLayout">
             {items.map((note) => (
               <PedidoCard
@@ -737,7 +743,7 @@ export default function Notes() {
           ancestral com transform/filter — e mantém-se visível em qualquer
           scroll, seja qual for a altura da lista. */}
       {createPortal(
-        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_-8px_rgba(220,38,38,0.45)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
+        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
           <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
         </button>,
         document.body,

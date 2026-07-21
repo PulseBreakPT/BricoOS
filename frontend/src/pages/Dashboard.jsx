@@ -94,6 +94,11 @@ const StatCard = ({ icon: Icon, label, value, accent, testid, danger, index = 0 
     className={`group relative animate-fade-up overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     style={{ "--stagger-i": index }}
   >
+    {/* Barra de sinal — mesma linguagem dos alertas: margem vermelha =
+        este número exige intervenção. */}
+    {danger && value > 0 ? (
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-red-500 via-red-600 to-red-700" />
+    ) : null}
     <div
       aria-hidden="true"
       className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-[0.07] blur-2xl transition-opacity duration-300 group-hover:opacity-[0.16]"
