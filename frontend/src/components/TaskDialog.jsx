@@ -15,9 +15,11 @@ import { Trash2, Plus, Repeat } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST } from "@/lib/categories";
 import { TASK_PRIORITIES, TASK_REPEATS } from "@/lib/taskMeta";
+import LabelEditor from "@/components/LabelEditor";
+import AttachmentManager from "@/components/AttachmentManager";
 
 const emptyForm = {
-  title: "", category: "construcao", priority: "nenhuma", due_date: "", repeat: "none", subtasks: [],
+  title: "", category: "construcao", priority: "nenhuma", due_date: "", repeat: "none", subtasks: [], labels: [],
 };
 
 export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
@@ -78,11 +80,11 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   const remove = async () => {
     try {
       await api.delete(`/tasks/${task.id}`);
-      toast.success("Tarefa eliminada");
+      toast.success("Tarefa movida para a lixeira", { description: "Podes restaurá-la na Lixeira." });
       onSaved();
       onOpenChange(false);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao eliminar a tarefa"));
+      toast.error(getErrorMessage(e, "Erro ao mover para a lixeira"));
     }
   };
 
@@ -184,6 +186,18 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
             </Button>
           </div>
         </div>
+
+        <div className="space-y-1.5">
+          <Label>Etiquetas</Label>
+          <LabelEditor testIdPrefix="task-label" labels={form.labels || []} onChange={(labels) => set("labels", labels)} />
+        </div>
+
+        {isEdit ? (
+          <div className="space-y-1.5">
+            <Label>Anexos</Label>
+            <AttachmentManager ownerKind="task" ownerId={task.id} />
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-3 pt-2">
           <Button data-testid="task-dialog-save" onClick={save} disabled={saving} className="flex-1 rounded-xl">

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star, Trash2 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
 import FavoritesPanel from "@/components/FavoritesPanel";
+import TrashPanel from "@/components/TrashPanel";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
@@ -173,6 +174,7 @@ function LayoutInner() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const { status } = useSystemStatus();
 
   // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
@@ -211,6 +213,15 @@ function LayoutInner() {
               className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
             >
               <Activity className="h-[18px] w-[18px]" />
+            </button>
+            <button
+              data-testid="sidebar-trash-btn"
+              onClick={() => setTrashOpen(true)}
+              aria-label="Lixeira"
+              title="Lixeira"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              <Trash2 className="h-[18px] w-[18px]" />
             </button>
             <NotificationsBell variant="sidebar" />
           </div>
@@ -362,6 +373,7 @@ function LayoutInner() {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
       <FavoritesPanel open={favoritesOpen} onOpenChange={setFavoritesOpen} />
+      <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
     </div>
   );
 }

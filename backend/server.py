@@ -739,6 +739,7 @@ class SupplierIn(BaseModel):
     phone: str = ""
     category: str = ""
     notes: str = ""
+    labels: List[str] = []
     contacts: List[SupplierContact] = []
 
     @field_validator("name")
@@ -776,6 +777,7 @@ class TaskIn(BaseModel):
     due_date: str = ""
     repeat: str = "none"
     subtasks: List[SubtaskItem] = []
+    labels: List[str] = []
     note_id: str = ""
 
     @field_validator("priority")
@@ -797,6 +799,7 @@ class TaskPatch(BaseModel):
     due_date: Optional[str] = None
     repeat: Optional[str] = None
     subtasks: Optional[List[SubtaskItem]] = None
+    labels: Optional[List[str]] = None
 
     @field_validator("priority")
     @classmethod
@@ -1408,10 +1411,81 @@ async def suggest_supplier(note_id: str):
 
 @api_router.delete("/notes/{note_id}")
 async def delete_note(note_id: str):
+    """Move para a lixeira em vez de apagar — "nada se perde" (lógica base
+    6): o pedido some das listas normais mas pode ser restaurado por
+    inteiro. Só uma eliminação a partir da própria lixeira é definitiva
+    (ver purge_note). As tarefas do pedido vão com ele; orçamentos,
+    cronologia, pedidos de cotação e ficheiros ficam tal como estavam nas
+    suas coleções — só voltam a ficar "vivos" quando o pedido for
+    restaurado, porque nenhum outro sítio os lista sem passar pelo pedido."""
+    doc = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    doc["deleted_at"] = now_iso()
+    await db.notes_trash.insert_one(dict(doc))
     await db.notes.delete_one({"id": note_id})
+    note_tasks_docs = await db.tasks.find({"note_id": note_id}, {"_id": 0}).to_list(500)
+    if note_tasks_docs:
+        for t in note_tasks_docs:
+            t["deleted_at"] = now_iso()
+        await db.tasks_trash.insert_many(note_tasks_docs)
+        await db.tasks.delete_many({"note_id": note_id})
+    return {"ok": True}
+
+
+@api_router.get("/trash")
+async def list_trash():
+    """Lixeira unificada — pedidos, tarefas e fornecedores movidos para
+    aqui, todos no mesmo sítio (lógica base 24: tudo pode ser restaurado)."""
+    notes = await db.notes_trash.find({}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+    tasks = await db.tasks_trash.find({"note_id": {"$in": ["", None]}}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+    suppliers = await db.suppliers_trash.find({}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+    items = (
+        [{"kind": "pedido", "id": n["id"], "label": n.get("customer_name") or "Sem nome",
+          "sublabel": n.get("description") or "", "deleted_at": n.get("deleted_at") or ""} for n in notes]
+        + [{"kind": "tarefa", "id": t["id"], "label": t.get("title") or "Tarefa",
+            "sublabel": t.get("due_date") or "", "deleted_at": t.get("deleted_at") or ""} for t in tasks]
+        + [{"kind": "fornecedor", "id": s["id"], "label": s.get("name") or "Fornecedor",
+            "sublabel": s.get("email") or "", "deleted_at": s.get("deleted_at") or ""} for s in suppliers]
+    )
+    items.sort(key=lambda x: x["deleted_at"], reverse=True)
+    return {"items": items}
+
+
+@api_router.get("/trash/notes")
+async def list_trashed_notes():
+    return await db.notes_trash.find({}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+
+
+@api_router.post("/trash/notes/{note_id}/restore")
+async def restore_note(note_id: str):
+    doc = await db.notes_trash.find_one({"id": note_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado na lixeira")
+    doc.pop("deleted_at", None)
+    await db.notes.insert_one(dict(doc))
+    await db.notes_trash.delete_one({"id": note_id})
+    trashed_tasks = await db.tasks_trash.find({"note_id": note_id}, {"_id": 0}).to_list(500)
+    if trashed_tasks:
+        for t in trashed_tasks:
+            t.pop("deleted_at", None)
+        await db.tasks.insert_many(trashed_tasks)
+        await db.tasks_trash.delete_many({"note_id": note_id})
+    await log_activity(note_id, "updated", "Pedido restaurado da lixeira")
+    return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
+
+
+@api_router.delete("/trash/notes/{note_id}")
+async def purge_note(note_id: str):
+    """Eliminação definitiva a partir da lixeira — a única forma de apagar
+    um pedido para sempre; o DELETE normal nunca apaga dados, só move para
+    aqui."""
+    res = await db.notes_trash.delete_one({"id": note_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado na lixeira")
+    await db.tasks_trash.delete_many({"note_id": note_id})
     await db.quotes.delete_many({"note_id": note_id})
     await db.activities.delete_many({"note_id": note_id})
-    await db.tasks.delete_many({"note_id": note_id})
     await db.quote_requests.delete_many({"note_id": note_id})
     await db.note_files.delete_many({"note_id": note_id})
     return {"ok": True}
@@ -1512,8 +1586,128 @@ async def delete_supplier(supplier_id: str, force: bool = False):
                    "Confirme novamente para desassociar e eliminar na mesma.")
     if open_notes:
         await db.notes.update_many({"supplier_id": supplier_id}, {"$set": {"supplier_id": ""}})
+    doc = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    if doc:
+        doc["deleted_at"] = now_iso()
+        await db.suppliers_trash.insert_one(dict(doc))
     await db.suppliers.delete_one({"id": supplier_id})
     return {"ok": True, "unlinked_notes": len(open_notes)}
+
+
+@api_router.get("/trash/suppliers")
+async def list_trashed_suppliers():
+    return await db.suppliers_trash.find({}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+
+
+@api_router.post("/trash/suppliers/{supplier_id}/restore")
+async def restore_supplier(supplier_id: str):
+    doc = await db.suppliers_trash.find_one({"id": supplier_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado na lixeira")
+    if await _supplier_name_taken(doc.get("name", "")):
+        raise HTTPException(status_code=409, detail=f'Já existe um fornecedor chamado "{doc.get("name")}" — renomeia um dos dois antes de restaurar.')
+    doc.pop("deleted_at", None)
+    await db.suppliers.insert_one(dict(doc))
+    await db.suppliers_trash.delete_one({"id": supplier_id})
+    return doc
+
+
+@api_router.delete("/trash/suppliers/{supplier_id}")
+async def purge_supplier(supplier_id: str):
+    res = await db.suppliers_trash.delete_one({"id": supplier_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado na lixeira")
+    await db.attachments.delete_many({"owner_kind": "supplier", "owner_id": supplier_id})
+    return {"ok": True}
+
+
+# ---------- Anexos genéricos (fornecedor / tarefa) ----------
+# Mesmo padrão dos anexos do pedido (note_files), numa coleção partilhada —
+# "tudo pode ter anexos" (lógica base 15), não só pedidos e emails.
+GENERIC_ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024
+
+
+def _attachment_meta(f):
+    return {
+        "id": f["id"], "owner_kind": f.get("owner_kind"), "owner_id": f.get("owner_id"),
+        "filename": f.get("filename") or "ficheiro", "content_type": f.get("content_type") or "application/octet-stream",
+        "size": f.get("size") or 0, "created_at": f.get("created_at"),
+    }
+
+
+async def _list_attachments(owner_kind: str, owner_id: str):
+    docs = await db.attachments.find(
+        {"owner_kind": owner_kind, "owner_id": owner_id}, {"_id": 0, "content_b64": 0},
+    ).sort("created_at", -1).to_list(200)
+    return [_attachment_meta(f) for f in docs]
+
+
+async def _upload_attachments(owner_kind: str, owner_id: str, files: List[UploadFile]):
+    saved = []
+    for file in files:
+        data = await file.read()
+        if not data:
+            continue
+        if len(data) > GENERIC_ATTACHMENT_MAX_BYTES:
+            raise HTTPException(status_code=400, detail=f'"{file.filename}" é demasiado grande (máx. 15 MB).')
+        doc = {
+            "id": str(uuid.uuid4()), "owner_kind": owner_kind, "owner_id": owner_id,
+            "filename": file.filename or "ficheiro", "content_type": file.content_type or "application/octet-stream",
+            "size": len(data), "content_b64": base64.b64encode(data).decode(), "created_at": now_iso(),
+        }
+        await db.attachments.insert_one(doc)
+        saved.append(_attachment_meta(doc))
+    return saved
+
+
+@api_router.get("/attachments/{file_id}")
+async def download_attachment(file_id: str):
+    f = await db.attachments.find_one({"id": file_id}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    return Response(
+        content=base64.b64decode(f["content_b64"]), media_type=f.get("content_type") or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "ficheiro")}"'})
+
+
+@api_router.get("/suppliers/{supplier_id}/files")
+async def list_supplier_files(supplier_id: str):
+    return await _list_attachments("supplier", supplier_id)
+
+
+@api_router.post("/suppliers/{supplier_id}/files")
+async def upload_supplier_files(supplier_id: str, files: List[UploadFile] = File(...)):
+    if not await db.suppliers.find_one({"id": supplier_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+    return await _upload_attachments("supplier", supplier_id, files)
+
+
+@api_router.delete("/suppliers/{supplier_id}/files/{file_id}")
+async def delete_supplier_file(supplier_id: str, file_id: str):
+    res = await db.attachments.delete_one({"id": file_id, "owner_kind": "supplier", "owner_id": supplier_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    return {"ok": True}
+
+
+@api_router.get("/tasks/{task_id}/files")
+async def list_task_files(task_id: str):
+    return await _list_attachments("task", task_id)
+
+
+@api_router.post("/tasks/{task_id}/files")
+async def upload_task_files(task_id: str, files: List[UploadFile] = File(...)):
+    if not await db.tasks.find_one({"id": task_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    return await _upload_attachments("task", task_id, files)
+
+
+@api_router.delete("/tasks/{task_id}/files/{file_id}")
+async def delete_task_file(task_id: str, file_id: str):
+    res = await db.attachments.delete_one({"id": file_id, "owner_kind": "task", "owner_id": task_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    return {"ok": True}
 
 
 # ---------- Tasks ----------
@@ -1612,7 +1806,38 @@ async def toggle_task(task_id: str):
 
 @api_router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str):
+    """Move para a lixeira em vez de apagar — ver delete_note para a mesma
+    lógica aplicada aos pedidos."""
+    doc = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    doc["deleted_at"] = now_iso()
+    await db.tasks_trash.insert_one(dict(doc))
     await db.tasks.delete_one({"id": task_id})
+    return {"ok": True}
+
+
+@api_router.get("/trash/tasks")
+async def list_trashed_tasks():
+    return await db.tasks_trash.find({}, {"_id": 0}).sort("deleted_at", -1).to_list(500)
+
+
+@api_router.post("/trash/tasks/{task_id}/restore")
+async def restore_task(task_id: str):
+    doc = await db.tasks_trash.find_one({"id": task_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada na lixeira")
+    doc.pop("deleted_at", None)
+    await db.tasks.insert_one(dict(doc))
+    await db.tasks_trash.delete_one({"id": task_id})
+    return await db.tasks.find_one({"id": task_id}, {"_id": 0})
+
+
+@api_router.delete("/trash/tasks/{task_id}")
+async def purge_task(task_id: str):
+    res = await db.tasks_trash.delete_one({"id": task_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada na lixeira")
     return {"ok": True}
 
 
@@ -1718,11 +1943,22 @@ async def list_downloads(limit: int = 60):
         {}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     email_files = await db.email_attachments.find(
         {}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    generic_files = await db.attachments.find(
+        {}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     note_ids = list({f.get("note_id") for f in note_files + email_files if f.get("note_id")})
     names = {}
     if note_ids:
         async for n in db.notes.find({"id": {"$in": note_ids}}, {"_id": 0, "id": 1, "customer_name": 1}):
             names[n["id"]] = n.get("customer_name") or ""
+    supplier_ids = [f["owner_id"] for f in generic_files if f.get("owner_kind") == "supplier"]
+    task_ids = [f["owner_id"] for f in generic_files if f.get("owner_kind") == "task"]
+    owner_names = {}
+    if supplier_ids:
+        async for s in db.suppliers.find({"id": {"$in": supplier_ids}}, {"_id": 0, "id": 1, "name": 1}):
+            owner_names[s["id"]] = s.get("name") or ""
+    if task_ids:
+        async for t in db.tasks.find({"id": {"$in": task_ids}}, {"_id": 0, "id": 1, "title": 1}):
+            owner_names[t["id"]] = t.get("title") or ""
     items = []
     for f in note_files:
         items.append({
@@ -1738,6 +1974,14 @@ async def list_downloads(limit: int = 60):
             "note_id": f.get("note_id") or "", "note_label": names.get(f.get("note_id"), ""),
             "filename": f.get("filename") or "ficheiro",
             "kind_label": "Anexo de email",
+            "created_at": f.get("created_at") or "",
+        })
+    for f in generic_files:
+        items.append({
+            "id": f["id"], "source": "attachment", "note_id": "",
+            "note_label": f'{"Fornecedor" if f.get("owner_kind") == "supplier" else "Tarefa"}: {owner_names.get(f.get("owner_id"), "")}',
+            "filename": f.get("filename") or "ficheiro",
+            "kind_label": "Anexo de fornecedor" if f.get("owner_kind") == "supplier" else "Anexo de tarefa",
             "created_at": f.get("created_at") or "",
         })
     items.sort(key=lambda x: x["created_at"], reverse=True)

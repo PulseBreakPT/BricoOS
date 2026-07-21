@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import QuickPeekTrigger from "@/components/QuickPeek";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Conteúdo do Quick Peek de um pedido — tudo já vem no objeto da lista
 // (sem pedido extra ao servidor): estado, resumo, última alteração e
@@ -43,7 +44,7 @@ function PedidoPeekContent({ note, st }) {
   );
 }
 
-export default function PedidoCard({ note, onOpen, actions }) {
+export default function PedidoCard({ note, onOpen, actions, selected = false, onToggleSelect }) {
   const st = getStatusCfg(note.status);
   const pr = getPriorityCfg(note.priority);
   const archived = note.archived;
@@ -59,8 +60,19 @@ export default function PedidoCard({ note, onOpen, actions }) {
       transition={{ duration: 0.22 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note.id)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
+      className={`group relative flex cursor-pointer items-start gap-2.5 overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${selected ? "border-slate-900 ring-2 ring-slate-900/10" : note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     >
+      {onToggleSelect ? (
+        <button
+          type="button"
+          data-testid={`note-select-${note.id}`}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+          className="mt-1 shrink-0"
+        >
+          <Checkbox checked={selected} className="h-4 w-4 rounded-md" />
+        </button>
+      ) : null}
+      <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <QuickPeekTrigger as="div" className="min-w-0 flex-1" renderPeek={() => <PedidoPeekContent note={note} st={st} />}>
             <div className="flex items-center gap-2">
@@ -169,6 +181,7 @@ export default function PedidoCard({ note, onOpen, actions }) {
             </button>
           </div>
         ) : null}
+      </div>
     </motion.div>
   );
 }

@@ -465,14 +465,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
   const remove = async () => {
     const who = note?.customer_name || "este pedido";
-    if (!window.confirm(`Eliminar o pedido de ${who}? Os orçamentos, histórico e lembretes associados também serão eliminados.`)) return;
+    if (!window.confirm(`Mover o pedido de ${who} para a lixeira? Orçamentos, histórico e lembretes ficam guardados — podes restaurar tudo depois, na Lixeira.`)) return;
     try {
       await api.delete(`/notes/${id}`);
-      toast.success("Pedido eliminado");
+      toast.success("Pedido movido para a lixeira");
       onChanged && onChanged();
       onOpenChange(false);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao eliminar o pedido"));
+      toast.error(getErrorMessage(e, "Erro ao mover para a lixeira"));
     }
   };
   const resolveNote = async () => {
