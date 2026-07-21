@@ -50,17 +50,17 @@ const PRESETS = [
 const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
 
 // As duas áreas do painel — completamente separadas, cada uma só com os seus
-// pedidos: «band» = Orçamentos Banda Alumínios; «geral» = Pedidos Gerais da Loja.
+// pedidos: «band» = Orçamentos Banda Alumínios; «geral» = Pedidos de Clientes.
 const SEGMENTS = {
   geral: {
-    title: "Pedidos Gerais da Loja",
-    shortTitle: "Pedidos Gerais",
+    title: "Pedidos de Clientes",
+    shortTitle: "Pedidos de Clientes",
     subtitle: "Todos os pedidos da loja exceto os da Banda Alumínios.",
     icon: Store,
-    accent: "text-blue-700",
-    iconAccent: "bg-blue-600 text-white",
+    accent: "text-slate-900",
+    iconAccent: "bg-slate-900 text-white",
     createMode: "normal",
-    empty: "Sem pedidos gerais. Crie um novo com o botão +.",
+    empty: "Sem pedidos de clientes. Crie um novo com o botão +.",
   },
   band: {
     title: "Orçamentos Banda Alumínios",
@@ -433,20 +433,20 @@ export default function Notes() {
               onClick={() => changeSegment(key)}
               className={`relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-all duration-200 sm:text-sm ${
                 active
-                  ? `shadow-sm ${key === "band" ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200" : "bg-blue-50 text-blue-700 ring-1 ring-blue-200"}`
+                  ? `shadow-sm ${key === "band" ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200" : "bg-slate-100 text-slate-900 ring-1 ring-slate-300"}`
                   : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
               }`}
             >
               <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />
               <span className="truncate">{cfg.shortTitle || cfg.title}</span>
-              {active ? <span className={`absolute -bottom-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full ${key === "band" ? "bg-orange-500" : "bg-blue-600"}`} /> : null}
+              {active ? <span className={`absolute -bottom-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full ${key === "band" ? "bg-orange-500" : "bg-slate-900"}`} /> : null}
             </button>
           );
         })}
       </div>
 
       <div className="mt-5 flex items-start gap-3.5">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-lg sm:h-13 sm:w-13 ${seg.iconAccent} ${segment === "band" ? "shadow-orange-300/50" : "shadow-blue-300/50"}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-lg sm:h-13 sm:w-13 ${seg.iconAccent} ${segment === "band" ? "shadow-orange-300/50" : "shadow-slate-400/50"}`}>
           <SegIcon className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-col">
