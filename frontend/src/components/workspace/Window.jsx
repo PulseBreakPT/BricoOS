@@ -2,11 +2,10 @@ import { useCallback, useRef, useState } from "react";
 import { X, Minus, Maximize2, Minimize2, PanelLeft, PanelRight } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
+import { SIDEBAR_WIDTH, TASKBAR_RESERVE, WORKSPACE_GAP } from "@/lib/workspaceLayout";
 
 const MIN_W = 420;
 const MIN_H = 320;
-const SNAP_GAP = 8;
-const SNAP_TASKBAR_RESERVE = 84;
 
 // Janela flutuante do desktop — arrastar pela barra de título, redimensionar
 // pelo canto inferior direito. A posição/tamanho só é confirmada no
@@ -20,13 +19,15 @@ export default function Window({ panel, zIndex }) {
   const [transient, setTransient] = useState(null);
 
   // Ancorar a metade do ecrã (split screen) — sai do maximizado primeiro se
-  // preciso, para o novo tamanho não ficar escondido por baixo dele.
+  // preciso, para o novo tamanho não ficar escondido por baixo dele. A
+  // metade "esquerda" começa depois da sidebar, nunca por baixo dela.
   const snapTo = useCallback((side) => {
     if (panel.maximized) toggleMaximize(panel.id);
-    const w = Math.max(MIN_W, Math.round(window.innerWidth / 2) - SNAP_GAP * 1.5);
-    const h = Math.max(MIN_H, window.innerHeight - SNAP_TASKBAR_RESERVE - SNAP_GAP * 2);
-    const x = side === "left" ? SNAP_GAP : window.innerWidth - w - SNAP_GAP;
-    movePanel(panel.id, x, SNAP_GAP);
+    const usableW = window.innerWidth - SIDEBAR_WIDTH;
+    const w = Math.max(MIN_W, Math.round(usableW / 2) - WORKSPACE_GAP * 1.5);
+    const h = Math.max(MIN_H, window.innerHeight - TASKBAR_RESERVE - WORKSPACE_GAP * 2);
+    const x = side === "left" ? SIDEBAR_WIDTH + WORKSPACE_GAP : window.innerWidth - w - WORKSPACE_GAP;
+    movePanel(panel.id, x, WORKSPACE_GAP);
     resizePanel(panel.id, w, h);
     focusPanel(panel.id);
   }, [panel.id, panel.maximized, toggleMaximize, movePanel, resizePanel, focusPanel]);
@@ -48,7 +49,9 @@ export default function Window({ panel, zIndex }) {
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
-    const nx = Math.max(0, dragRef.current.origX + dx);
+    // Nunca deixa arrastar a janela para debaixo da sidebar — ficaria
+    // parcialmente escondida mesmo com o z-index mais alto.
+    const nx = Math.max(SIDEBAR_WIDTH, dragRef.current.origX + dx);
     const ny = Math.max(0, dragRef.current.origY + dy);
     setTransient((t) => ({ w: panel.w, h: panel.h, ...t, x: nx, y: ny }));
   }, [panel.w, panel.h]);
@@ -58,8 +61,9 @@ export default function Window({ panel, zIndex }) {
     dragRef.current = null;
     // Largar perto de uma margem lateral ancora a janela a essa metade do
     // ecrã (gesto normal de sistema operativo) — largar em qualquer outro
-    // ponto só confirma a posição do arrasto, como já era.
-    const nearLeftEdge = e.clientX <= 24;
+    // ponto só confirma a posição do arrasto, como já era. A margem
+    // esquerda "útil" começa depois da sidebar, não no canto do ecrã.
+    const nearLeftEdge = e.clientX <= SIDEBAR_WIDTH + 24;
     const nearRightEdge = e.clientX >= window.innerWidth - 24;
     setTransient((t) => {
       if (t) movePanel(panel.id, t.x, t.y);
@@ -99,7 +103,7 @@ export default function Window({ panel, zIndex }) {
 
   const isActive = activeId === panel.id;
   const style = panel.maximized
-    ? { left: 12, top: 12, right: 12, bottom: 84, zIndex }
+    ? { left: SIDEBAR_WIDTH + WORKSPACE_GAP, top: 12, right: 12, bottom: TASKBAR_RESERVE, zIndex }
     : {
       left: transient?.x ?? panel.x, top: transient?.y ?? panel.y,
       width: transient?.w ?? panel.w, height: transient?.h ?? panel.h, zIndex,

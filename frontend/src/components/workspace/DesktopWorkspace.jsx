@@ -31,7 +31,13 @@ export default function DesktopWorkspace() {
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-0 z-30">
+      {/* z-45: acima da sidebar/taskbar (z-40) — senão uma janela
+          posicionada por cima dessa zona fica pintada por baixo delas,
+          mesmo com o seu próprio z-index interno mais alto (o z-index de
+          cada Window só conta dentro deste wrapper). Fica abaixo dos
+          diálogos/sheets (z-50) e do Mission Control (z-[70]) de propósito
+          — esses têm sempre de ficar por cima de qualquer janela. */}
+      <div className="pointer-events-none fixed inset-0 z-[45]">
         {panels.map((panel) => (
           <Window key={panel.id} panel={panel} zIndex={40 + Math.max(0, zOrder.indexOf(panel.id))} />
         ))}

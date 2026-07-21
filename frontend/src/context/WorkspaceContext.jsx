@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { SIDEBAR_WIDTH, WORKSPACE_GAP } from "@/lib/workspaceLayout";
 
 const STORAGE_KEY = "brico_workspace_v1";
 const DEFAULT_W = 880;
@@ -27,7 +28,9 @@ const initialState = {
 
 function cascadePosition(count) {
   const step = count % 6;
-  return { x: 72 + step * 32, y: 56 + step * 28 };
+  // Começa depois da sidebar (256px) — nunca em cima dela, senão a janela
+  // nasce parcialmente escondida.
+  return { x: SIDEBAR_WIDTH + WORKSPACE_GAP * 2 + step * 32, y: 56 + step * 28 };
 }
 
 function reducer(state, action) {
