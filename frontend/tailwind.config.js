@@ -7,6 +7,11 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // Breakpoint extra para ecrãs muito grandes (TV, monitores 4K) — o
+      // conteúdo ganha mais respiração em vez de esticar até às margens.
+      screens: {
+        '3xl': '1920px',
+      },
       fontFamily: {
         heading: ['"Cabinet Grotesk"', 'Manrope', 'sans-serif'],
         sans: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'],

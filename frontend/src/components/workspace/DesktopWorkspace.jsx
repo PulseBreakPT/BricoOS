@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import Window from "@/components/workspace/Window";
 import Taskbar from "@/components/workspace/Taskbar";
@@ -8,10 +8,10 @@ import MissionControl from "@/components/workspace/MissionControl";
 // só desktop. A página atual continua a funcionar por baixo tal como
 // sempre funcionou; painéis abertos aqui flutuam por cima, sem nunca a
 // substituir. Área vazia é "click-through" (pointer-events-none), só as
-// janelas em si capturam interação.
-export default function DesktopWorkspace() {
+// janelas em si capturam interação. O estado do Mission Control vive na
+// sidebar (Layout.jsx), que é onde fica o botão para o abrir.
+export default function DesktopWorkspace({ missionControlOpen, onMissionControlOpenChange }) {
   const { panels, zOrder } = useWorkspace();
-  const [missionControlOpen, setMissionControlOpen] = useState(false);
 
   // F3 (ou Ctrl/Cmd+Seta para cima, o atalho clássico do Mission Control no
   // Mac) abre/fecha de qualquer ponto da app — mas nunca a interromper
@@ -22,12 +22,12 @@ export default function DesktopWorkspace() {
       if (typing) return;
       if (e.key === "F3" || ((e.metaKey || e.ctrlKey) && e.key === "ArrowUp")) {
         e.preventDefault();
-        setMissionControlOpen((v) => !v);
+        onMissionControlOpenChange((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [onMissionControlOpenChange]);
 
   return (
     <>
@@ -42,8 +42,8 @@ export default function DesktopWorkspace() {
           <Window key={panel.id} panel={panel} zIndex={40 + Math.max(0, zOrder.indexOf(panel.id))} />
         ))}
       </div>
-      <Taskbar onOpenMissionControl={() => setMissionControlOpen(true)} />
-      <MissionControl open={missionControlOpen} onClose={() => setMissionControlOpen(false)} />
+      <Taskbar />
+      <MissionControl open={missionControlOpen} onClose={() => onMissionControlOpenChange(false)} />
     </>
   );
 }

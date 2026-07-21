@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star, Trash2 } from "lucide-react";
+import { NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star, Trash2, Menu, Grid2x2 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
@@ -15,6 +16,9 @@ import { FavoritesProvider } from "@/context/FavoritesContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
+import AppLauncher from "@/components/workspace/AppLauncher";
+import WorkspaceMenu from "@/components/workspace/WorkspaceMenu";
+import StatusCluster from "@/components/workspace/StatusCluster";
 
 // Aviso global, impossível de ignorar mas elegante: aparece em TODAS as
 // páginas sempre que chega um email associado a um pedido — de um fornecedor
@@ -110,7 +114,9 @@ function SupplierEmailAlert() {
 }
 
 // Navegação agrupada por intenção: primeiro o trabalho do dia-a-dia,
-// depois a organização e análise. Menos procura, mais fluxo.
+// depois a organização e análise. Menos procura, mais fluxo. Idêntica no
+// desktop (sidebar fixa) e no telemóvel (gaveta lateral) — um só menu, só
+// que apresentado de duas formas.
 const NAV_GROUPS = [
   {
     label: "Operação",
@@ -123,14 +129,12 @@ const NAV_GROUPS = [
   {
     label: "Organização",
     items: [
-      { to: "/catalogo-tecnico", label: "Catálogo técnico", icon: BookOpenCheck, testid: "nav-catalogo", mobile: false },
+      { to: "/catalogo-tecnico", label: "Catálogo técnico", icon: BookOpenCheck, testid: "nav-catalogo" },
       { to: "/tarefas", label: "Tarefas", icon: ListChecks, testid: "nav-tarefas" },
       { to: "/estatisticas", label: "Estatísticas", icon: BarChart3, testid: "nav-estatisticas" },
     ],
   },
 ];
-
-const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 const TIPS = [
   { k: "N", t: "novo pedido" },
@@ -177,78 +181,72 @@ const Brand = () => (
 // Botão utilitário do chrome — ícones do topo da sidebar e do header móvel.
 const chromeIconBtn = "flex items-center justify-center rounded-xl text-[color:var(--chrome-muted)] transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-90";
 
-function LayoutInner() {
-  const location = useLocation();
-  const isDesktop = useIsDesktop();
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [favoritesOpen, setFavoritesOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState(false);
+// Corpo único do menu lateral — usado tal e qual na sidebar fixa do
+// desktop e dentro da gaveta deslizante do telemóvel/tablet. `desktop`
+// liga as secções que só fazem sentido quando a Área de Trabalho (janelas
+// flutuantes) está disponível: lançador de apps, Mission Control e áreas
+// de trabalho guardadas — nada disto existe fora do "lg".
+function SidebarContent({
+  desktop = false, onNavigate,
+  onOpenFavorites, onOpenActivity, onOpenTrash, onOpenSearch, onOpenMissionControl,
+}) {
   const { status } = useSystemStatus();
 
-  // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
-  // escrever texto, para não interromper o utilizador).
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Painel de instrumento — o corpo grafite da máquina, sempre presente
-          à esquerda no desktop. As superfícies de trabalho (papel) vivem ao
-          lado; a sidebar nunca compete com o conteúdo, enquadra-o. */}
-      <aside className="os-chrome fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] px-4 py-6 lg:flex">
-        <div className="flex items-center justify-between px-1">
-          <Brand />
-          <div className="flex items-center gap-0.5">
-            <button
-              data-testid="sidebar-favorites-btn"
-              onClick={() => setFavoritesOpen(true)}
-              aria-label="Favoritos"
-              title="Favoritos"
-              className={`h-9 w-9 ${chromeIconBtn} hover:text-amber-400`}
-            >
-              <Star className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              data-testid="sidebar-activity-btn"
-              onClick={() => setActivityOpen(true)}
-              aria-label="Centro de Atividade"
-              title="Centro de Atividade"
-              className={`h-9 w-9 ${chromeIconBtn}`}
-            >
-              <Activity className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              data-testid="sidebar-trash-btn"
-              onClick={() => setTrashOpen(true)}
-              aria-label="Lixeira"
-              title="Lixeira"
-              className={`h-9 w-9 ${chromeIconBtn}`}
-            >
-              <Trash2 className="h-[18px] w-[18px]" />
-            </button>
-            <NotificationsBell variant="sidebar" />
-          </div>
+    <>
+      <div className="flex shrink-0 items-center justify-between px-1">
+        <Brand />
+        <div className="flex items-center gap-0.5">
+          <button
+            data-testid="sidebar-favorites-btn"
+            onClick={onOpenFavorites}
+            aria-label="Favoritos"
+            title="Favoritos"
+            className={`h-9 w-9 ${chromeIconBtn} hover:text-amber-400`}
+          >
+            <Star className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            data-testid="sidebar-activity-btn"
+            onClick={onOpenActivity}
+            aria-label="Centro de Atividade"
+            title="Centro de Atividade"
+            className={`h-9 w-9 ${chromeIconBtn}`}
+          >
+            <Activity className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            data-testid="sidebar-trash-btn"
+            onClick={onOpenTrash}
+            aria-label="Lixeira"
+            title="Lixeira"
+            className={`h-9 w-9 ${chromeIconBtn}`}
+          >
+            <Trash2 className="h-[18px] w-[18px]" />
+          </button>
+          <NotificationsBell variant="sidebar" />
         </div>
-        {/* Campo de pesquisa — rebaixado no chrome, como um visor embutido. */}
-        <button
-          data-testid="sidebar-search-btn"
-          onClick={() => setPaletteOpen(true)}
-          className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-left text-sm text-[color:var(--chrome-muted)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)] transition-all duration-200 hover:border-white/25 hover:text-white"
-        >
-          <Search className="h-4 w-4 shrink-0" />
-          <span className="flex-1">Pesquisar tudo…</span>
-          <Kbd className="h-auto shrink-0 rounded-md border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[color:var(--chrome-muted)]">⌘K</Kbd>
-        </button>
-        <nav className="scroll-chrome mt-6 flex flex-1 flex-col gap-5 overflow-y-auto">
+      </div>
+
+      {/* Campo de pesquisa — rebaixado no chrome, como um visor embutido. */}
+      <button
+        data-testid="sidebar-search-btn"
+        onClick={onOpenSearch}
+        className="mt-4 flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-left text-sm text-[color:var(--chrome-muted)] shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)] transition-all duration-200 hover:border-white/25 hover:text-white"
+      >
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="flex-1">Pesquisar tudo…</span>
+        <Kbd className="h-auto shrink-0 rounded-md border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[color:var(--chrome-muted)]">⌘K</Kbd>
+      </button>
+
+      {/* Máscara de desvanecimento no fundo — sinaliza que há mais para ver
+          por baixo (Mission Control, áreas de trabalho) sem cortar a meio
+          de forma abrupta quando o conteúdo não cabe todo de uma vez. */}
+      <div
+        className="scroll-chrome mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto"
+        style={{ maskImage: "linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)" }}
+      >
+        <nav className="flex flex-col gap-4">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
               <p className="engraved px-3 pb-2">{group.label}</p>
@@ -260,6 +258,7 @@ function LayoutInner() {
                       key={item.to}
                       to={item.to}
                       end={item.end}
+                      onClick={onNavigate}
                       data-testid={item.testid}
                       className={({ isActive }) =>
                         `group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
@@ -287,9 +286,35 @@ function LayoutInner() {
             </div>
           ))}
         </nav>
-        {/* Módulo fixo do rodapé — placa gravada com os atalhos essenciais. */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+
+        {desktop ? (
+          <div>
+            <p className="engraved px-3 pb-2">Aplicações</p>
+            <AppLauncher />
+          </div>
+        ) : null}
+
+        {desktop ? (
+          <div className="flex flex-col gap-2">
+            <button
+              data-testid="sidebar-mission-control"
+              onClick={onOpenMissionControl}
+              title="Mission Control — ver todas as janelas (F3)"
+              className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-bold text-[color:var(--chrome-muted)] transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
+            >
+              <Grid2x2 className="h-3.5 w-3.5 shrink-0" /> Mission Control
+              <Kbd className="ml-auto h-auto shrink-0 rounded border-white/10 bg-white/10 px-1 py-0 font-mono text-[9px] font-bold text-[color:var(--chrome-muted)]">F3</Kbd>
+            </button>
+            <WorkspaceMenu />
+          </div>
+        ) : null}
+      </div>
+
+      {desktop ? (
+        <div className="relative mt-3 shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-red-600/15 blur-2xl" />
+          <StatusCluster />
+          <div className="relative my-3 h-px bg-white/[0.08]" />
           <p className="relative flex items-center gap-1.5 text-xs font-extrabold text-white">
             <Sparkles className="h-3.5 w-3.5 text-red-500" /> Nunca esquecer
           </p>
@@ -305,11 +330,91 @@ function LayoutInner() {
             ))}
           </div>
         </div>
+      ) : null}
+    </>
+  );
+}
+
+function LayoutInner() {
+  const location = useLocation();
+  const isDesktop = useIsDesktop();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [missionControlOpen, setMissionControlOpen] = useState(false);
+
+  // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
+  // escrever texto, para não interromper o utilizador).
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Fecha a gaveta de navegação automaticamente ao passar para desktop —
+  // evita ficar "presa" aberta se a janela for redimensionada com ela ativa.
+  useEffect(() => {
+    if (isDesktop) setMobileNavOpen(false);
+  }, [isDesktop]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Painel de instrumento — o corpo grafite da máquina, sempre presente
+          à esquerda no desktop. As superfícies de trabalho (papel) vivem ao
+          lado; a sidebar nunca compete com o conteúdo, enquadra-o. Único
+          menu da app: em ecrãs pequenos vive na gaveta lateral abaixo, nunca
+          numa barra ao fundo. */}
+      <aside className="os-chrome fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] px-4 py-5 lg:flex">
+        <SidebarContent
+          desktop
+          onOpenFavorites={() => setFavoritesOpen(true)}
+          onOpenActivity={() => setActivityOpen(true)}
+          onOpenTrash={() => setTrashOpen(true)}
+          onOpenSearch={() => setPaletteOpen(true)}
+          onOpenMissionControl={() => setMissionControlOpen(true)}
+        />
       </aside>
 
-      {/* Header móvel — a mesma máquina, em formato de barra. */}
+      {/* Gaveta lateral do telemóvel/tablet — o mesmo menu do desktop, só
+          que deslizante e por cima de tudo. Substitui por completo a antiga
+          barra fixa ao fundo do ecrã. */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent
+          side="left"
+          className="os-chrome flex w-[85vw] max-w-xs flex-col gap-0 border-r border-white/[0.06] p-4 pr-9 pt-6 text-[color:var(--chrome-text)] sm:max-w-sm lg:hidden"
+        >
+          <SidebarContent
+            onNavigate={() => setMobileNavOpen(false)}
+            onOpenFavorites={() => { setMobileNavOpen(false); setFavoritesOpen(true); }}
+            onOpenActivity={() => { setMobileNavOpen(false); setActivityOpen(true); }}
+            onOpenTrash={() => { setMobileNavOpen(false); setTrashOpen(true); }}
+            onOpenSearch={() => { setMobileNavOpen(false); setPaletteOpen(true); }}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Header móvel — a mesma máquina, em formato de barra. Só abre o
+          menu; navegação em si vive na gaveta. */}
       <header className="os-chrome-flat sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2.5 sm:px-4 sm:py-3 lg:hidden">
-        <Brand />
+        <div className="flex min-w-0 items-center gap-1.5">
+          <button
+            data-testid="mobile-nav-btn"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Abrir menu"
+            title="Menu"
+            className={`h-10 w-10 shrink-0 ${chromeIconBtn}`}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <Brand />
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
             data-testid="mobile-search-btn"
@@ -320,72 +425,23 @@ function LayoutInner() {
           >
             <Search className="h-[18px] w-[18px]" />
           </button>
-          <button
-            data-testid="mobile-favorites-btn"
-            onClick={() => setFavoritesOpen(true)}
-            aria-label="Favoritos"
-            title="Favoritos"
-            className={`h-10 w-10 ${chromeIconBtn} hover:text-amber-400`}
-          >
-            <Star className="h-[18px] w-[18px]" />
-          </button>
-          <button
-            data-testid="mobile-activity-btn"
-            onClick={() => setActivityOpen(true)}
-            aria-label="Centro de Atividade"
-            title="Centro de Atividade"
-            className={`h-10 w-10 ${chromeIconBtn}`}
-          >
-            <Activity className="h-[18px] w-[18px]" />
-          </button>
-          <Link
-            to="/catalogo-tecnico"
-            aria-label="Abrir catálogo técnico"
-            title="Catálogo técnico"
-            className={`h-10 w-10 ${chromeIconBtn} ${location.pathname.startsWith("/catalogo-tecnico") ? "bg-white text-[color:var(--chrome-deep)] hover:bg-white hover:text-[color:var(--chrome-deep)]" : ""}`}
-          >
-            <BookOpenCheck className="h-[18px] w-[18px]" />
-          </Link>
           <NotificationsBell variant="mobile" />
         </div>
       </header>
 
-      <main className="px-4 pb-32 pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-20 lg:pt-10">
-        <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-page-enter 2xl:max-w-[1600px]">
+      <main className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-6 lg:ml-64 lg:px-10 lg:pb-16 lg:pt-10">
+        <div key={location.pathname} className="mx-auto w-full max-w-6xl animate-page-enter 2xl:max-w-[1600px] 3xl:max-w-[1900px]">
           <SupplierEmailAlert />
           <Outlet />
         </div>
       </main>
 
-      {isDesktop ? <DesktopWorkspace /> : null}
-
-      {/* Navegação inferior móvel — chrome grafite com a App ativa em
-          "folha branca", igual à sidebar do desktop. */}
-      <nav className="os-chrome-flat fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_40px_-12px_rgba(16,17,20,0.6)] lg:hidden">
-        <div className="mx-auto flex max-w-md items-stretch justify-around px-1 py-1.5">
-          {NAV.filter((item) => item.mobile !== false).map((item) => {
-            const Icon = item.icon;
-            const isActive = item.end
-              ? location.pathname === item.to
-              : location.pathname.startsWith(item.to);
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                data-testid={`${item.testid}-mobile`}
-                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-0.5 py-1 active:scale-90 transition-transform duration-150"
-              >
-                <span className={`relative flex h-8 w-full max-w-[60px] items-center justify-center rounded-lg transition-all duration-200 ${isActive ? "bg-white text-[color:var(--chrome-deep)] scale-110 shadow-[0_8px_20px_-8px_rgba(0,0,0,0.8)]" : "text-[color:var(--chrome-muted)]"}`}>
-                  <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />
-                  <NavBadge count={navBadge(status, item.to)} active />
-                </span>
-                <span className={`w-full truncate text-center text-[9px] font-semibold leading-tight tracking-tight ${isActive ? "text-white" : "text-[color:var(--chrome-faint)]"}`}>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </div>
-      </nav>
+      {isDesktop ? (
+        <DesktopWorkspace
+          missionControlOpen={missionControlOpen}
+          onMissionControlOpenChange={setMissionControlOpen}
+        />
+      ) : null}
 
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
