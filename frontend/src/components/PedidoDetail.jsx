@@ -26,7 +26,7 @@ import {
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
-  ArrowUpRight, Building2, FileWarning,
+  ArrowUpRight, Building2, FileWarning, Waypoints,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -40,6 +40,7 @@ import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPreviewDialog";
 import EntityStackBar from "@/components/EntityStackBar";
 import FavoriteToggle from "@/components/FavoriteToggle";
+import RelationGraph from "@/components/workspace/RelationGraph";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -134,6 +135,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // entidade relacionada; a EntityStackBar deixa voltar a qualquer nível
   // anterior sem perder onde se ficou no pedido.
   const [stack, setStack] = useState([]);
+  const [graphOpen, setGraphOpen] = useState(false);
   const pushFrame = (frame) => setStack((s) => [...s, { key: `${frame.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, ...frame }]);
   const popTo = (index) => setStack((s) => (index < 0 ? [] : s.slice(0, index + 1)));
 
@@ -214,6 +216,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setPhotos([]);
       setLightboxPhoto(null);
       setStack([]);
+      setGraphOpen(false);
       // Cada área abre logo o assistente certo: «band» na área Banda
       // Alumínios, «normal» na área geral da loja.
       setCreateMode(initialCreateMode || "choice");
@@ -950,6 +953,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
+              <Button data-testid="detail-graph" size="sm" variant="outline" onClick={() => setGraphOpen(true)} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
+                <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
+              </Button>
 
               {/* Visualização vs edição: os dados do pedido só ficam editáveis
                   depois de premir "Editar" — o estado/prioridade acima
@@ -2003,6 +2009,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         onOpenChange={(v) => !v && setPreviewAttachment(null)}
         attachment={previewAttachment}
       />
+
+      {graphOpen && note ? (
+        <RelationGraph rootKind="pedido" rootId={id} rootLabel={note.customer_name || "Pedido"} onClose={() => setGraphOpen(false)} />
+      ) : null}
     </Dialog>
   );
 }

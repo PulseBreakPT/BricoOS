@@ -1630,19 +1630,37 @@ GENERIC_ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024
 def _attachment_meta(f):
     return {
         "id": f["id"], "owner_kind": f.get("owner_kind"), "owner_id": f.get("owner_id"),
+        "group_id": f.get("group_id") or f["id"], "version": f.get("version") or 1,
         "filename": f.get("filename") or "ficheiro", "content_type": f.get("content_type") or "application/octet-stream",
         "size": f.get("size") or 0, "created_at": f.get("created_at"),
     }
 
 
 async def _list_attachments(owner_kind: str, owner_id: str):
+    """Lista só a versão mais recente de cada ficheiro — "nunca substituir
+    um ficheiro" (lógica base das versões): enviar de novo com o mesmo
+    group_id cria uma versão nova em vez de apagar a anterior; esta lista
+    mostra sempre a atual, com o histórico completo em
+    GET /attachments/{id}/versions."""
     docs = await db.attachments.find(
         {"owner_kind": owner_kind, "owner_id": owner_id}, {"_id": 0, "content_b64": 0},
-    ).sort("created_at", -1).to_list(200)
-    return [_attachment_meta(f) for f in docs]
+    ).sort("version", 1).to_list(1000)
+    latest_by_group = {}
+    counts = {}
+    for f in docs:
+        gid = f.get("group_id") or f["id"]
+        latest_by_group[gid] = f
+        counts[gid] = counts.get(gid, 0) + 1
+    items = sorted(latest_by_group.values(), key=lambda f: f.get("created_at") or "", reverse=True)
+    result = []
+    for f in items:
+        meta = _attachment_meta(f)
+        meta["version_count"] = counts.get(meta["group_id"], 1)
+        result.append(meta)
+    return result
 
 
-async def _upload_attachments(owner_kind: str, owner_id: str, files: List[UploadFile]):
+async def _upload_attachments(owner_kind: str, owner_id: str, files: List[UploadFile], group_id: Optional[str] = None):
     saved = []
     for file in files:
         data = await file.read()
@@ -1650,8 +1668,11 @@ async def _upload_attachments(owner_kind: str, owner_id: str, files: List[Upload
             continue
         if len(data) > GENERIC_ATTACHMENT_MAX_BYTES:
             raise HTTPException(status_code=400, detail=f'"{file.filename}" é demasiado grande (máx. 15 MB).')
+        new_id = str(uuid.uuid4())
+        gid = group_id or new_id
+        version = 1 + await db.attachments.count_documents({"group_id": gid}) if group_id else 1
         doc = {
-            "id": str(uuid.uuid4()), "owner_kind": owner_kind, "owner_id": owner_id,
+            "id": new_id, "owner_kind": owner_kind, "owner_id": owner_id, "group_id": gid, "version": version,
             "filename": file.filename or "ficheiro", "content_type": file.content_type or "application/octet-stream",
             "size": len(data), "content_b64": base64.b64encode(data).decode(), "created_at": now_iso(),
         }
@@ -1670,6 +1691,16 @@ async def download_attachment(file_id: str):
         headers={"Content-Disposition": f'attachment; filename="{f.get("filename", "ficheiro")}"'})
 
 
+@api_router.get("/attachments/{file_id}/versions")
+async def list_attachment_versions(file_id: str):
+    f = await db.attachments.find_one({"id": file_id}, {"_id": 0, "content_b64": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    gid = f.get("group_id") or file_id
+    docs = await db.attachments.find({"group_id": gid}, {"_id": 0, "content_b64": 0}).sort("version", 1).to_list(200)
+    return [_attachment_meta(d) for d in docs]
+
+
 @api_router.get("/suppliers/{supplier_id}/files")
 async def list_supplier_files(supplier_id: str):
     return await _list_attachments("supplier", supplier_id)
@@ -1680,6 +1711,15 @@ async def upload_supplier_files(supplier_id: str, files: List[UploadFile] = File
     if not await db.suppliers.find_one({"id": supplier_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
     return await _upload_attachments("supplier", supplier_id, files)
+
+
+@api_router.post("/suppliers/{supplier_id}/files/{file_id}/versions")
+async def upload_supplier_file_version(supplier_id: str, file_id: str, file: UploadFile = File(...)):
+    existing = await db.attachments.find_one({"id": file_id, "owner_kind": "supplier", "owner_id": supplier_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    saved = await _upload_attachments("supplier", supplier_id, [file], group_id=existing.get("group_id") or file_id)
+    return saved[0]
 
 
 @api_router.delete("/suppliers/{supplier_id}/files/{file_id}")
@@ -1700,6 +1740,15 @@ async def upload_task_files(task_id: str, files: List[UploadFile] = File(...)):
     if not await db.tasks.find_one({"id": task_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
     return await _upload_attachments("task", task_id, files)
+
+
+@api_router.post("/tasks/{task_id}/files/{file_id}/versions")
+async def upload_task_file_version(task_id: str, file_id: str, file: UploadFile = File(...)):
+    existing = await db.attachments.find_one({"id": file_id, "owner_kind": "task", "owner_id": task_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Ficheiro não encontrado")
+    saved = await _upload_attachments("task", task_id, [file], group_id=existing.get("group_id") or file_id)
+    return saved[0]
 
 
 @api_router.delete("/tasks/{task_id}/files/{file_id}")
@@ -2019,6 +2068,207 @@ async def global_activity(limit: int = 40):
             "note_id": "", "note_label": ""})
     events.sort(key=lambda e: e["at"], reverse=True)
     return {"items": events[:limit]}
+
+
+# ---------- Explorador Inteligente ----------
+# Não existe um sistema de ficheiros próprio — o Explorador é uma camada de
+# leitura por cima dos dados que já existem (pedidos, fornecedores, emails,
+# ficheiros), organizados em pastas virtuais e relações, em vez de uma
+# árvore física de diretorias.
+def _classify_filename(filename, content_type=""):
+    ext = (filename or "").lower().rsplit(".", 1)[-1] if "." in (filename or "") else ""
+    ct = (content_type or "").lower()
+    if ct == "application/pdf" or ext == "pdf":
+        return "pdf"
+    if ct.startswith("image/") or ext in ("png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"):
+        return "image"
+    if ext in ("xls", "xlsx", "csv") or "spreadsheet" in ct or ct == "text/csv":
+        return "excel"
+    return "other"
+
+
+def _client_key(note):
+    phone = normalize_phone_loose(note.get("phone") or "")
+    if phone:
+        return f"phone:{phone}"
+    name = (note.get("customer_name") or "").strip().lower()
+    return f"name:{name}" if name else None
+
+
+@api_router.get("/explorer/files")
+async def explorer_files(type: Optional[str] = None, scope: Optional[str] = None, limit: int = 200):
+    """Todos os ficheiros da loja num único sítio — PDFs, imagens, Excel —
+    venham eles de pedidos, emails ou fornecedores/tarefas, com a mesma
+    classificação e a mesma informação de relação (pedido/fornecedor).
+    PDFs de pedido (orçamento do fornecedor / orçamento ao cliente) que se
+    repetem ao longo do tempo aparecem numerados como versões — nunca se
+    apaga o anterior ao importar/gerar de novo, por isso o histórico já
+    existe nos dados, só falta mostrá-lo."""
+    limit = min(max(limit, 1), 500)
+    note_files = await db.note_files.find({}, {"_id": 0, "content_b64": 0}).sort("created_at", 1).to_list(5000)
+    email_files = await db.email_attachments.find({}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).to_list(5000)
+    generic_files = await db.attachments.find({}, {"_id": 0, "content_b64": 0}).sort("version", 1).to_list(5000)
+
+    note_ids = list({f.get("note_id") for f in note_files + email_files if f.get("note_id")})
+    notes_by_id = {}
+    if note_ids:
+        async for n in db.notes.find({"id": {"$in": note_ids}}, {"_id": 0, "id": 1, "customer_name": 1, "supplier_id": 1}):
+            notes_by_id[n["id"]] = n
+    supplier_ids = {n.get("supplier_id") for n in notes_by_id.values() if n.get("supplier_id")}
+    supplier_ids |= {f["owner_id"] for f in generic_files if f.get("owner_kind") == "supplier"}
+    suppliers_by_id = {}
+    if supplier_ids:
+        async for s in db.suppliers.find({"id": {"$in": list(supplier_ids)}}, {"_id": 0, "id": 1, "name": 1}):
+            suppliers_by_id[s["id"]] = s.get("name") or ""
+    task_ids = {f["owner_id"] for f in generic_files if f.get("owner_kind") == "task"}
+    tasks_by_id = {}
+    if task_ids:
+        async for t in db.tasks.find({"id": {"$in": list(task_ids)}}, {"_id": 0, "id": 1, "title": 1}):
+            tasks_by_id[t["id"]] = t.get("title") or ""
+
+    items = []
+    note_file_groups = {}
+    for f in note_files:
+        note_file_groups.setdefault((f.get("note_id"), f.get("kind")), []).append(f)
+    for (note_id, kind), docs in note_file_groups.items():
+        total = len(docs)
+        note = notes_by_id.get(note_id, {})
+        for i, f in enumerate(docs):
+            items.append({
+                "id": f["id"], "source": "note_file", "filename": f.get("filename") or "ficheiro",
+                "file_type": _classify_filename(f.get("filename"), f.get("content_type")),
+                "kind_label": _DOWNLOAD_KIND_LABELS.get(kind, "Ficheiro"),
+                "created_at": f.get("created_at") or "",
+                "note_id": note_id or "", "note_label": note.get("customer_name") or "",
+                "supplier_id": note.get("supplier_id") or "", "supplier_label": suppliers_by_id.get(note.get("supplier_id"), ""),
+                "version": i + 1, "version_count": total, "is_current": i == total - 1,
+            })
+    for f in email_files:
+        note = notes_by_id.get(f.get("note_id"), {})
+        items.append({
+            "id": f["id"], "source": "email_attachment", "filename": f.get("filename") or "ficheiro",
+            "file_type": _classify_filename(f.get("filename"), f.get("content_type")),
+            "kind_label": "Anexo de email", "created_at": f.get("created_at") or "",
+            "note_id": f.get("note_id") or "", "note_label": note.get("customer_name") or "",
+            "email_id": f.get("email_id") or "", "supplier_id": "", "supplier_label": "",
+            "version": 1, "version_count": 1, "is_current": True,
+        })
+    generic_groups = {}
+    for f in generic_files:
+        generic_groups.setdefault(f.get("group_id") or f["id"], []).append(f)
+    for group_id, docs in generic_groups.items():
+        latest = docs[-1]
+        owner_kind = latest.get("owner_kind")
+        owner_id = latest.get("owner_id")
+        items.append({
+            "id": latest["id"], "source": "attachment", "filename": latest.get("filename") or "ficheiro",
+            "file_type": _classify_filename(latest.get("filename"), latest.get("content_type")),
+            "kind_label": "Anexo de fornecedor" if owner_kind == "supplier" else "Anexo de tarefa",
+            "created_at": latest.get("created_at") or "",
+            "note_id": "", "note_label": "",
+            "supplier_id": owner_id if owner_kind == "supplier" else "",
+            "supplier_label": suppliers_by_id.get(owner_id, "") if owner_kind == "supplier" else "",
+            "task_id": owner_id if owner_kind == "task" else "",
+            "task_label": tasks_by_id.get(owner_id, "") if owner_kind == "task" else "",
+            "version": len(docs), "version_count": len(docs), "is_current": True,
+        })
+
+    if type and type != "all":
+        items = [i for i in items if i["file_type"] == type]
+    if scope:
+        if scope.startswith("note:"):
+            nid = scope.split(":", 1)[1]
+            items = [i for i in items if i.get("note_id") == nid]
+        elif scope.startswith("supplier:"):
+            sid = scope.split(":", 1)[1]
+            items = [i for i in items if i.get("supplier_id") == sid]
+        elif scope == "week":
+            since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            items = [i for i in items if i["created_at"] >= since]
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+    return {"items": items[:limit]}
+
+
+@api_router.get("/explorer/clients")
+async def explorer_clients():
+    """Agrupa pedidos por identidade de cliente (telefone, ou nome se não
+    houver telefone) — não existe uma coleção de clientes própria; é
+    calculada a partir dos pedidos existentes."""
+    notes = await db.notes.find(
+        {}, {"_id": 0, "id": 1, "customer_name": 1, "phone": 1, "email": 1, "created_at": 1, "updated_at": 1, "archived": 1},
+    ).to_list(5000)
+    groups = {}
+    for n in notes:
+        key = _client_key(n)
+        if not key:
+            continue
+        g = groups.setdefault(key, {
+            "key": key, "name": n.get("customer_name") or "Sem nome", "phone": n.get("phone") or "",
+            "email": n.get("email") or "", "pedidos_count": 0, "active_count": 0, "last_activity": "",
+        })
+        g["pedidos_count"] += 1
+        if not n.get("archived"):
+            g["active_count"] += 1
+        last = n.get("updated_at") or n.get("created_at") or ""
+        if last > g["last_activity"]:
+            g["last_activity"] = last
+        if n.get("phone") and not g["phone"]:
+            g["phone"] = n["phone"]
+        if n.get("email") and not g["email"]:
+            g["email"] = n["email"]
+    items = sorted(groups.values(), key=lambda g: g["last_activity"], reverse=True)
+    return {"items": items}
+
+
+@api_router.get("/explorer/clients/{key}")
+async def explorer_client_notes(key: str):
+    notes = await db.notes.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    now = datetime.now(timezone.utc)
+    matched = [enrich_note(n, now) for n in notes if _client_key(n) == key]
+    if not matched:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    return {"items": matched}
+
+
+@api_router.get("/explorer/related")
+async def explorer_related(kind: str, id: str):
+    """Relacionados de qualquer entidade, num único sítio genérico — a
+    mesma ideia do Sistema de Pilha do pedido, agora disponível para
+    qualquer nó do Explorador."""
+    if kind == "pedido":
+        note = await db.notes.find_one({"id": id}, {"_id": 0})
+        if not note:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado")
+        supplier = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0}) if note.get("supplier_id") else None
+        emails = await db.received_emails.find({"note_id": id}, {"_id": 0, "body": 0}).sort("received_at", -1).to_list(50)
+        files_resp = await explorer_files(scope=f"note:{id}", limit=100)
+        tasks = await db.tasks.find({"note_id": id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        key = _client_key(note)
+        return {
+            "cliente": {"key": key, "name": note.get("customer_name"), "phone": note.get("phone"), "email": note.get("email")} if key else None,
+            "fornecedor": supplier, "emails": emails, "ficheiros": files_resp["items"], "notas": tasks,
+        }
+    if kind == "fornecedor":
+        supplier = await db.suppliers.find_one({"id": id}, {"_id": 0})
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+        notes = await db.notes.find({"supplier_id": id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+        files_resp = await explorer_files(scope=f"supplier:{id}", limit=100)
+        return {"pedidos": notes, "ficheiros": files_resp["items"]}
+    if kind == "email":
+        email = await db.received_emails.find_one({"id": id}, {"_id": 0})
+        if not email:
+            raise HTTPException(status_code=404, detail="Email não encontrado")
+        note = await db.notes.find_one({"id": email["note_id"]}, {"_id": 0}) if email.get("note_id") else None
+        return {"pedido": note}
+    if kind == "tarefa":
+        task = await db.tasks.find_one({"id": id}, {"_id": 0})
+        if not task:
+            raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+        note = await db.notes.find_one({"id": task["note_id"]}, {"_id": 0}) if task.get("note_id") else None
+        files = await _list_attachments("task", id)
+        return {"pedido": note, "ficheiros": files}
+    raise HTTPException(status_code=400, detail="Tipo desconhecido")
 
 
 class AiAskIn(BaseModel):
