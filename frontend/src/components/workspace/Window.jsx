@@ -123,9 +123,11 @@ export default function Window({ panel, zIndex }) {
     <div
       data-testid={`window-${panel.type}`}
       onPointerDownCapture={() => focusPanel(panel.id)}
-      className={`pointer-events-auto absolute flex flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl ${isActive ? "border-slate-300 shadow-slate-400/30" : "border-slate-200 shadow-slate-300/20"}`}
+      className={`pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-2xl border bg-white ${isActive ? "elev-window-active border-black/25" : "elev-window border-black/10"}`}
       style={style}
     >
+      {/* Barra de título — a moldura grafite da máquina a segurar a folha
+          de trabalho. O LED indica qual das janelas está viva. */}
       <div
         data-testid={`window-titlebar-${panel.type}`}
         onPointerDown={onTitleBarPointerDown}
@@ -133,23 +135,24 @@ export default function Window({ panel, zIndex }) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onDoubleClick={() => toggleMaximize(panel.id)}
-        className={`flex shrink-0 cursor-grab items-center gap-2 border-b px-3 py-2 active:cursor-grabbing ${isActive ? "border-slate-200 bg-slate-50" : "border-slate-100 bg-slate-50/70"}`}
+        className={`os-chrome flex shrink-0 cursor-grab items-center gap-2 border-b border-black/40 px-3 py-2 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
       >
-        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" /> : null}
-        <p className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{meta.title}</p>
-        <button data-window-btn data-testid={`window-snap-left-${panel.type}`} onClick={() => snapTo("left")} title="Ancorar à esquerda — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <span className={`led ${isActive ? "led-ok" : ""}`} />
+        {Icon ? <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`} /> : null}
+        <p className={`min-w-0 flex-1 truncate text-xs font-bold ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}>{meta.title}</p>
+        <button data-window-btn data-testid={`window-snap-left-${panel.type}`} onClick={() => snapTo("left")} title="Ancorar à esquerda — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white">
           <PanelLeft className="h-3.5 w-3.5" />
         </button>
-        <button data-window-btn data-testid={`window-snap-right-${panel.type}`} onClick={() => snapTo("right")} title="Ancorar à direita — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <button data-window-btn data-testid={`window-snap-right-${panel.type}`} onClick={() => snapTo("right")} title="Ancorar à direita — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white">
           <PanelRight className="h-3.5 w-3.5" />
         </button>
-        <button data-window-btn data-testid={`window-minimize-${panel.type}`} onClick={() => toggleMinimize(panel.id)} title="Minimizar" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <button data-window-btn data-testid={`window-minimize-${panel.type}`} onClick={() => toggleMinimize(panel.id)} title="Minimizar" className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white">
           <Minus className="h-3.5 w-3.5" />
         </button>
-        <button data-window-btn data-testid={`window-maximize-${panel.type}`} onClick={() => toggleMaximize(panel.id)} title={panel.maximized ? "Restaurar" : "Maximizar"} className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <button data-window-btn data-testid={`window-maximize-${panel.type}`} onClick={() => toggleMaximize(panel.id)} title={panel.maximized ? "Restaurar" : "Maximizar"} className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white">
           {panel.maximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
         </button>
-        <button data-window-btn data-testid={`window-close-${panel.type}`} onClick={() => closePanel(panel.id)} title="Fechar" className="rounded-md p-1 text-slate-400 hover:bg-red-100 hover:text-red-600">
+        <button data-window-btn data-testid={`window-close-${panel.type}`} onClick={() => closePanel(panel.id)} title="Fechar" className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-red-600/25 hover:text-red-400">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -163,7 +166,7 @@ export default function Window({ panel, zIndex }) {
           onPointerMove={onResizePointerMove}
           onPointerUp={endResize}
           onPointerCancel={endResize}
-          className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize"
+          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize opacity-30 transition-opacity hover:opacity-70 [background:repeating-linear-gradient(135deg,transparent_0_3px,rgba(16,17,20,0.35)_3px,rgba(16,17,20,0.35)_4px)] [clip-path:polygon(100%_20%,100%_100%,20%_100%)]"
         />
       ) : null}
     </div>

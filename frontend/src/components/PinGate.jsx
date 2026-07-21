@@ -16,10 +16,16 @@ const IDLE_LIMIT_MS = 8 * 60 * 1000;
 // Últimos segundos do contador em que o aviso fica vermelho, a chamar a atenção.
 const IDLE_WARNING_MS = 30 * 1000;
 
-// Fundo do ecrã de PIN — a mesma grelha de pontos técnica usada no resto da
-// app, sem gradientes nem halos: um cofre não precisa de brilhos.
+// Fundo do ecrã de PIN — a face grafite da máquina desligada: grelha de
+// pontos técnica e um halo de sinal muito ténue vindo de cima, como uma
+// luz de standby.
 function Ambient() {
-  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid opacity-70" />;
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-0 bg-dot-grid-dark opacity-60" />
+      <div className="absolute left-1/2 top-[-25%] h-[440px] w-[440px] -translate-x-1/2 rounded-full bg-red-600/10 blur-3xl" />
+    </div>
+  );
 }
 
 // Relógio ao vivo — hora em destaque no topo do cofre. Atualiza ao minuto.
@@ -33,8 +39,8 @@ function LiveClock() {
   const date = now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div className="flex flex-col items-center">
-      <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-5xl">{time}</p>
-      <p className="mt-1 text-xs font-semibold capitalize tracking-wide text-slate-400">{date}</p>
+      <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-white sm:text-5xl">{time}</p>
+      <p className="mt-1 text-xs font-semibold capitalize tracking-wide text-[color:var(--chrome-muted)]">{date}</p>
     </div>
   );
 }
@@ -55,10 +61,10 @@ function IdleCountdown({ msLeft, onExtend }) {
       data-testid="idle-countdown"
       onClick={onExtend}
       title="Toca para manter a sessão ativa"
-      className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 z-50 flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-sm backdrop-blur transition-colors lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 ${
+      className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 z-50 flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold tabular-nums shadow-[0_8px_24px_-8px_rgba(16,17,20,0.5)] backdrop-blur transition-colors lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 ${
         warning
-          ? "animate-pulse border-red-300 bg-red-50 text-red-600"
-          : "border-slate-200 bg-white/90 text-slate-400"
+          ? "animate-pulse border-red-500/50 bg-[#2a1214]/95 text-red-400"
+          : "border-white/10 bg-[color:var(--chrome)]/92 text-[color:var(--chrome-muted)]"
       }`}
     >
       <Lock className="h-3 w-3" />
@@ -70,13 +76,14 @@ function IdleCountdown({ msLeft, onExtend }) {
 function BrandMark({ locked }) {
   return (
     <div className="flex flex-col items-center">
-      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-colors duration-300 ${locked ? "border border-red-200 bg-red-50" : "bg-gradient-to-br from-red-600 to-red-700 shadow-md shadow-black/15"}`}>
+      <span className={`relative flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-colors duration-300 ${locked ? "border border-red-500/30 bg-red-950/50" : "bg-gradient-to-br from-red-600 to-red-800 shadow-[0_14px_34px_-10px_rgba(217,38,38,0.6)] ring-1 ring-white/15"}`}>
         {locked ? <TimerReset className="h-7 w-7 text-red-500" /> : <Hammer className="h-7 w-7" strokeWidth={2.3} />}
+        {!locked ? <span className="led led-ok absolute -right-1 -top-1 ring-2 ring-[color:var(--chrome-deep)]" /> : null}
       </span>
-      <h1 className="mt-4 font-heading text-lg font-black uppercase tracking-[0.28em] text-slate-900">
-        Brico<span className="text-red-600">·</span>Assistente
+      <h1 className="mt-4 font-heading text-lg font-black uppercase tracking-[0.28em] text-white">
+        Brico<span className="text-red-500">·</span>Assistente
       </h1>
-      <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Acesso reservado</p>
+      <p className="engraved mt-1.5">Acesso reservado</p>
     </div>
   );
 }
@@ -275,25 +282,28 @@ export default function PinGate({ children }) {
 
   if (status === "checking") {
     return (
-      <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-50">
+      <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[color:var(--chrome-deep)]">
         <Ambient />
-        <Spinner className="relative h-8 w-8 text-slate-300" />
+        <Spinner className="relative h-8 w-8 text-white/25" />
       </div>
     );
   }
 
   if (status === "success") {
     return (
-      <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-10">
+      <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[color:var(--chrome-deep)] px-6 py-10">
         <Ambient />
-        <div className="card-elevated relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-slate-200 bg-white p-8 animate-scale-in">
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-700 text-white shadow-md shadow-black/15 animate-in zoom-in-50 duration-300">
+        {/* Momento de ignição — a máquina liga: check verde, barra de
+            arranque determinada, e a app entra logo a seguir. */}
+        <div className="relative flex w-full max-w-xs flex-col items-center rounded-[28px] border border-white/10 bg-white/[0.05] p-8 shadow-[0_40px_90px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.08)] animate-scale-in">
+          <span className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-[0_16px_40px_-12px_rgba(16,185,129,0.6)] animate-in zoom-in-50 duration-300">
             <Check className="h-8 w-8" strokeWidth={2.5} />
+            <span className="led led-ok absolute -right-1 -top-1 ring-2 ring-[color:var(--chrome-deep)]" />
           </span>
-          <p className="mt-5 font-heading text-xl font-extrabold tracking-tight text-slate-900">Acesso confirmado</p>
-          <p className="mt-1 text-sm text-slate-500">A preparar o teu painel…</p>
-          <div className="mt-5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full w-full origin-left animate-[fade-up_0.6s_ease-out] rounded-full bg-gradient-to-r from-red-600 to-red-400" />
+          <p className="mt-5 font-heading text-xl font-extrabold tracking-tight text-white">Acesso confirmado</p>
+          <p className="mt-1 text-sm text-[color:var(--chrome-muted)]">A preparar o teu painel…</p>
+          <div className="mt-5 h-1 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="animate-boot-bar h-full w-full rounded-full bg-gradient-to-r from-red-600 to-red-400" />
           </div>
         </div>
       </div>
@@ -305,10 +315,12 @@ export default function PinGate({ children }) {
   const ss = String(lockSeconds % 60).padStart(2, "0");
   const ringPct = lockTotal > 0 ? Math.max(0, Math.min(100, (lockSeconds / lockTotal) * 100)) : 0;
 
-  const keyBase = "group relative flex h-16 select-none items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm transition-all duration-150 active:scale-95 active:bg-slate-100 disabled:opacity-25 sm:hover:border-slate-300 sm:hover:bg-slate-50 sm:hover:shadow-md";
+  // Teclas físicas da máquina — rebaixadas no grafite, com curso curto ao
+  // toque (active:scale) e realce discreto no hover de rato.
+  const keyBase = "group relative flex h-16 select-none items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-150 active:scale-95 active:bg-white/[0.12] disabled:opacity-25 sm:hover:border-white/25 sm:hover:bg-white/[0.10]";
 
   return (
-    <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-slate-50 px-6 py-8">
+    <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[color:var(--chrome-deep)] px-6 py-8">
       <Ambient />
 
       <div className="relative flex w-full max-w-xs flex-col items-center">
@@ -320,7 +332,7 @@ export default function PinGate({ children }) {
           <BrandMark locked={locked} />
         </div>
 
-        <p className="mt-3 h-4 animate-fade-up text-center text-xs text-slate-500" style={{ "--stagger-i": 2 }}>
+        <p className="mt-3 h-4 animate-fade-up text-center text-xs text-[color:var(--chrome-muted)]" style={{ "--stagger-i": 2 }}>
           {locked
             ? "Acesso bloqueado por tentativas falhadas."
             : (lockMessage || "Introduz o PIN de 6 dígitos para verificar este dispositivo.")}
@@ -330,14 +342,14 @@ export default function PinGate({ children }) {
           <div data-testid="pin-countdown" className="mt-7 flex animate-fade-up flex-col items-center" style={{ "--stagger-i": 3 }}>
             <div
               className="relative flex h-36 w-36 items-center justify-center rounded-full"
-              style={{ background: `conic-gradient(#dc2626 ${ringPct}%, rgba(15,23,42,0.08) ${ringPct}%)` }}
+              style={{ background: `conic-gradient(#d92626 ${ringPct}%, rgba(255,255,255,0.08) ${ringPct}%)` }}
             >
-              <div className="flex h-[124px] w-[124px] flex-col items-center justify-center rounded-full bg-white shadow-inner">
-                <p className="font-mono text-3xl font-bold tabular-nums text-slate-900">{mm}:{ss}</p>
-                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">restante</p>
+              <div className="flex h-[124px] w-[124px] flex-col items-center justify-center rounded-full bg-[color:var(--chrome)] shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+                <p className="font-mono text-3xl font-bold tabular-nums text-white">{mm}:{ss}</p>
+                <p className="engraved mt-0.5">restante</p>
               </div>
             </div>
-            <p className="mt-5 max-w-[220px] text-center text-xs leading-relaxed text-slate-400">
+            <p className="mt-5 max-w-[220px] text-center text-xs leading-relaxed text-[color:var(--chrome-faint)]">
               Por segurança, o teclado volta a ficar disponível quando o tempo terminar.
             </p>
           </div>
@@ -351,17 +363,17 @@ export default function PinGate({ children }) {
                     key={i}
                     className={`h-3.5 w-3.5 rounded-full transition-colors duration-150 ${
                       flash
-                        ? "bg-red-500"
+                        ? "bg-red-500 shadow-[0_0_10px_rgba(217,38,38,0.7)]"
                         : filled
-                          ? "animate-dot-fill bg-red-600"
-                          : "border border-slate-300 bg-white"
+                          ? "animate-dot-fill bg-red-600 shadow-[0_0_10px_rgba(217,38,38,0.55)]"
+                          : "border border-white/25 bg-white/[0.06]"
                     }`}
                   />
                 );
               })}
             </div>
 
-            <p className={`mt-3 h-5 text-center text-xs font-semibold ${error ? "text-red-600" : "text-slate-400"}`}>
+            <p className={`mt-3 h-5 text-center text-xs font-semibold ${error ? "text-red-400" : "text-[color:var(--chrome-faint)]"}`}>
               {error || (attemptsLeft < 3 ? `${attemptsLeft} tentativa${attemptsLeft === 1 ? "" : "s"} restante${attemptsLeft === 1 ? "" : "s"}` : "")}
             </p>
 
@@ -384,7 +396,7 @@ export default function PinGate({ children }) {
                 data-testid="pin-clear"
                 onClick={clearAll}
                 disabled={locked || checkingPin || !pin.length}
-                className="h-16 rounded-2xl text-xs font-bold uppercase tracking-[0.14em] text-slate-400 transition-all duration-150 active:scale-95 active:bg-slate-200/70 disabled:opacity-20 sm:hover:bg-slate-100 sm:hover:text-slate-600"
+                className="h-16 rounded-2xl text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-white/10 disabled:opacity-20 sm:hover:bg-white/[0.06] sm:hover:text-[color:var(--chrome-muted)]"
               >
                 Limpar
               </button>
@@ -402,7 +414,7 @@ export default function PinGate({ children }) {
                 data-testid="pin-backspace"
                 onClick={backspace}
                 disabled={locked || checkingPin || !pin.length}
-                className="flex h-16 items-center justify-center rounded-2xl text-slate-400 transition-all duration-150 active:scale-95 active:bg-slate-200/70 disabled:opacity-20 sm:hover:bg-slate-100 sm:hover:text-slate-600"
+                className="flex h-16 items-center justify-center rounded-2xl text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-white/10 disabled:opacity-20 sm:hover:bg-white/[0.06] sm:hover:text-[color:var(--chrome-muted)]"
               >
                 <Delete className="h-6 w-6" />
               </button>
@@ -410,7 +422,7 @@ export default function PinGate({ children }) {
           </>
         )}
 
-        <p className="mt-7 flex animate-fade-up items-center gap-1.5 text-[11px] font-medium text-slate-400" style={{ "--stagger-i": 5 }}>
+        <p className="mt-7 flex animate-fade-up items-center gap-1.5 text-[11px] font-medium text-[color:var(--chrome-faint)]" style={{ "--stagger-i": 5 }}>
           {checkingPin ? <Spinner className="h-3.5 w-3.5 text-red-500" /> : <ShieldCheck className="h-3.5 w-3.5" />}
           {checkingPin ? "A verificar o PIN…" : "Este dispositivo fica confiado enquanto estiver em uso"}
         </p>

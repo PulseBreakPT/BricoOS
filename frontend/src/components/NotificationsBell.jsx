@@ -55,8 +55,8 @@ export default function NotificationsBell({ variant = "sidebar" }) {
           data-testid="notifications-bell"
           className={`group relative flex items-center justify-center rounded-xl transition-all duration-200 active:scale-90 ${
             variant === "sidebar"
-              ? "h-10 w-10 border border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-100 hover:shadow-md"
-              : "h-10 w-10 text-slate-600 hover:bg-slate-100"
+              ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"
+              : "h-10 w-10 text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"
           }`}
         >
           <Bell className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110 ${count > 0 ? "animate-shake" : ""}`} strokeWidth={2.2} />

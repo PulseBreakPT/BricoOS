@@ -33,16 +33,17 @@ export default function MissionControl({ open, onClose }) {
     <div
       data-testid="mission-control"
       onClick={onClose}
-      className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-slate-900/75 p-10 backdrop-blur-md animate-scale-in"
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-[color:var(--chrome-deep)]/85 p-10 backdrop-blur-md animate-scale-in"
     >
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-60" />
+      <p className="engraved relative !text-white/50">
         Mission Control — toca numa janela para voltar · Esc para fechar
       </p>
       {ordered.length === 0 ? (
-        <p className="text-sm text-white/50">Sem janelas abertas.</p>
+        <p className="relative text-sm text-white/50">Sem janelas abertas.</p>
       ) : (
-        <div className="flex max-w-5xl flex-wrap items-stretch justify-center gap-5">
-          {ordered.map((p) => {
+        <div className="relative flex max-w-5xl flex-wrap items-stretch justify-center gap-5">
+          {ordered.map((p, cardIndex) => {
             const meta = PANEL_TYPES[p.type];
             if (!meta) return null;
             const Icon = meta.icon;
@@ -50,18 +51,19 @@ export default function MissionControl({ open, onClose }) {
             typeSeen[p.type] = (typeSeen[p.type] || 0) + 1;
             const label = typeCounts[p.type] > 1 ? `${meta.title} #${typeSeen[p.type]}` : meta.title;
             return (
-              <div key={p.id} className="group relative w-60">
+              <div key={p.id} className="group relative w-60 animate-mission-in" style={{ "--stagger-i": cardIndex }}>
                 <button
                   data-testid={`mission-control-card-${p.id}`}
                   onClick={(e) => { e.stopPropagation(); focusPanel(p.id); onClose(); }}
-                  className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-2xl transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.03] ${isActive ? "border-white/80 ring-2 ring-white/60" : "border-white/10"}`}
+                  className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-2xl transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.03] ${isActive ? "border-red-500/70 ring-2 ring-red-500/50" : "border-white/10"}`}
                 >
-                  <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
-                    <Icon className="h-4 w-4 shrink-0 text-slate-500" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{label}</span>
-                    {p.minimized ? <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">Minimizada</span> : null}
+                  <div className="os-chrome flex items-center gap-2 border-b border-black/40 px-3 py-2">
+                    <span className={`led ${isActive ? "led-ok" : ""}`} />
+                    <Icon className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" />
+                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">{label}</span>
+                    {p.minimized ? <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--chrome-muted)]">Minimizada</span> : null}
                   </div>
-                  <div className="flex h-28 items-center justify-center bg-slate-100/80 text-slate-300">
+                  <div className="flex h-28 items-center justify-center bg-dot-grid bg-white text-slate-300">
                     <Icon className="h-9 w-9" strokeWidth={1.5} />
                   </div>
                 </button>

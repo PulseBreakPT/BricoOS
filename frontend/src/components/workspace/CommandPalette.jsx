@@ -23,7 +23,7 @@ function ResultGroup({ label, icon: Icon, children }) {
 
 function ResultRow({ testid, title, subtitle, onClick }) {
   return (
-    <button data-testid={testid} onClick={onClick} className="flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left hover:bg-slate-50">
+    <button data-testid={testid} onClick={onClick} className="flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left transition-all duration-150 hover:translate-x-0.5 hover:bg-muted">
       <span className="truncate text-sm font-semibold text-slate-900">{title}</span>
       {subtitle ? <span className="truncate text-xs text-slate-400">{subtitle}</span> : null}
     </button>
@@ -87,18 +87,19 @@ export default function CommandPalette({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="command-palette" className="top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden p-0 sm:rounded-2xl">
-        <div className="flex items-center gap-2 border-b border-slate-100 py-3 pl-4 pr-10">
-          <Search className="h-4 w-4 shrink-0 text-slate-400" />
+      <DialogContent data-testid="command-palette" className="elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-black/15 p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-white">
+        {/* Visor de comando — faixa grafite da máquina com o campo embutido. */}
+        <div className="os-chrome flex items-center gap-2.5 border-b border-black/40 py-3 pl-4 pr-10">
+          <Search className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" />
           <Input
             data-testid="command-palette-input"
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Pesquisar pedidos, emails, fornecedores, tarefas…"
-            className="h-9 border-0 px-0 shadow-none focus-visible:ring-0"
+            className="h-9 border-0 bg-transparent px-0 text-white shadow-none placeholder:text-[color:var(--chrome-faint)] focus-visible:ring-0"
           />
-          {loading ? <Spinner className="h-4 w-4 shrink-0 text-slate-400" /> : null}
+          {loading ? <Spinner className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" /> : <span className="led led-ok shrink-0" title="Pronto a pesquisar" />}
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {q.trim().length < 2 ? (
