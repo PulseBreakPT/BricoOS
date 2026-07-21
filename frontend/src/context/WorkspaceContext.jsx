@@ -22,6 +22,7 @@ const initialState = {
   activeId: null,
   activeContext: null, // { kind: "pedido", id, label }
   changeBumps: {}, // { notes: 3, emails: 1, ... } — para painéis relacionados saberem quando recarregar
+  workspaces: [], // { id, name, panels, zOrder } — disposições guardadas, ver SAVE/LOAD_WORKSPACE
 };
 
 function cascadePosition(count) {
@@ -108,6 +109,22 @@ function reducer(state, action) {
         ...state,
         changeBumps: { ...state.changeBumps, [action.scope]: (state.changeBumps[action.scope] || 0) + 1 },
       };
+    // Áreas de trabalho guardadas: uma fotografia dos painéis abertos agora
+    // (posição, tamanho, estado), para voltar a essa disposição mais tarde
+    // com um clique — ex.: "Orçamentos" com Pedidos + PDF ancorados lado a
+    // lado, "Emails" só com a caixa de entrada maximizada.
+    case "SAVE_WORKSPACE": {
+      const snapshot = { id: action.id || `ws-${Date.now().toString(36)}`, name: action.name,
+        panels: state.panels, zOrder: state.zOrder };
+      return { ...state, workspaces: [...state.workspaces.filter((w) => w.id !== snapshot.id), snapshot] };
+    }
+    case "LOAD_WORKSPACE": {
+      const ws = state.workspaces.find((w) => w.id === action.id);
+      if (!ws) return state;
+      return { ...state, panels: ws.panels, zOrder: ws.zOrder, activeId: ws.zOrder[ws.zOrder.length - 1] || null };
+    }
+    case "DELETE_WORKSPACE":
+      return { ...state, workspaces: state.workspaces.filter((w) => w.id !== action.id) };
     default:
       return state;
   }
@@ -124,6 +141,7 @@ export function WorkspaceProvider({ children }) {
       panels: persisted.panels || [],
       zOrder: persisted.zOrder || [],
       activeContext: persisted.activeContext || null,
+      workspaces: persisted.workspaces || [],
     };
   });
 
@@ -137,11 +155,12 @@ export function WorkspaceProvider({ children }) {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
           panels: state.panels, zOrder: state.zOrder, activeContext: state.activeContext,
+          workspaces: state.workspaces,
         }));
       } catch { /* quota cheia ou modo privado — a app continua a funcionar sem persistir */ }
     }, 250);
     return () => clearTimeout(saveTimer.current);
-  }, [state.panels, state.zOrder, state.activeContext]);
+  }, [state.panels, state.zOrder, state.activeContext, state.workspaces]);
 
   const openPanel = useCallback((panelType) => dispatch({ type: "OPEN_PANEL", panelType }), []);
   const closePanel = useCallback((id) => dispatch({ type: "CLOSE_PANEL", id }), []);
@@ -152,13 +171,18 @@ export function WorkspaceProvider({ children }) {
   const toggleMaximize = useCallback((id) => dispatch({ type: "TOGGLE_MAXIMIZE", id }), []);
   const setActiveContext = useCallback((context) => dispatch({ type: "SET_ACTIVE_CONTEXT", context }), []);
   const notifyChanged = useCallback((scope) => dispatch({ type: "NOTIFY_CHANGED", scope }), []);
+  const saveWorkspace = useCallback((name, id) => dispatch({ type: "SAVE_WORKSPACE", name, id }), []);
+  const loadWorkspace = useCallback((id) => dispatch({ type: "LOAD_WORKSPACE", id }), []);
+  const deleteWorkspace = useCallback((id) => dispatch({ type: "DELETE_WORKSPACE", id }), []);
 
   const value = useMemo(() => ({
     ...state,
     openPanel, closePanel, focusPanel, movePanel, resizePanel,
     toggleMinimize, toggleMaximize, setActiveContext, notifyChanged,
+    saveWorkspace, loadWorkspace, deleteWorkspace,
   }), [state, openPanel, closePanel, focusPanel, movePanel, resizePanel,
-      toggleMinimize, toggleMaximize, setActiveContext, notifyChanged]);
+      toggleMinimize, toggleMaximize, setActiveContext, notifyChanged,
+      saveWorkspace, loadWorkspace, deleteWorkspace]);
 
   return <WorkspaceCtx.Provider value={value}>{children}</WorkspaceCtx.Provider>;
 }

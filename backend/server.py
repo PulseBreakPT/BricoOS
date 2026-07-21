@@ -1701,6 +1701,49 @@ async def system_health():
     }
 
 
+_DOWNLOAD_KIND_LABELS = {
+    "supplier_pdf": "Orçamento do fornecedor", "client_pdf": "Orçamento ao cliente", "photo": "Foto",
+}
+
+
+@api_router.get("/system/downloads")
+async def list_downloads(limit: int = 60):
+    """Centro de Downloads — tudo o que entrou ou foi gerado (orçamentos de
+    fornecedor, orçamentos ao cliente, fotos, anexos de email), por ordem
+    cronológica, sem ter de percorrer pedido a pedido / email a email. Só
+    metadados — o conteúdo (content_b64) fica de fora, é pesado e só é
+    preciso ao descarregar de facto (endpoints já existentes)."""
+    limit = min(max(limit, 1), 200)
+    note_files = await db.note_files.find(
+        {}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    email_files = await db.email_attachments.find(
+        {}, {"_id": 0, "content_b64": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    note_ids = list({f.get("note_id") for f in note_files + email_files if f.get("note_id")})
+    names = {}
+    if note_ids:
+        async for n in db.notes.find({"id": {"$in": note_ids}}, {"_id": 0, "id": 1, "customer_name": 1}):
+            names[n["id"]] = n.get("customer_name") or ""
+    items = []
+    for f in note_files:
+        items.append({
+            "id": f["id"], "source": "note_file", "note_id": f.get("note_id") or "",
+            "note_label": names.get(f.get("note_id"), ""),
+            "filename": f.get("filename") or "ficheiro",
+            "kind_label": _DOWNLOAD_KIND_LABELS.get(f.get("kind"), "Ficheiro"),
+            "created_at": f.get("created_at") or "",
+        })
+    for f in email_files:
+        items.append({
+            "id": f["id"], "source": "email_attachment", "email_id": f.get("email_id") or "",
+            "note_id": f.get("note_id") or "", "note_label": names.get(f.get("note_id"), ""),
+            "filename": f.get("filename") or "ficheiro",
+            "kind_label": "Anexo de email",
+            "created_at": f.get("created_at") or "",
+        })
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+    return {"items": items[:limit]}
+
+
 @api_router.get("/activity/global")
 async def global_activity(limit: int = 40):
     """Centro de Atividade — linha do tempo única de tudo o que acontece na

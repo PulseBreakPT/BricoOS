@@ -1,4 +1,4 @@
-import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse } from "lucide-react";
+import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown } from "lucide-react";
 import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
@@ -9,6 +9,7 @@ import Calculator from "@/components/miniapps/Calculator";
 import Scratchpad from "@/components/miniapps/Scratchpad";
 import Stopwatch from "@/components/miniapps/Stopwatch";
 import HealthPanel from "@/components/HealthPanel";
+import DownloadsCenter from "@/components/DownloadsCenter";
 
 // Registo único de "aplicações" que podem abrir como painel na Área de
 // Trabalho — usado pelo lançador da barra lateral/taskbar, pelas janelas
@@ -24,6 +25,7 @@ export const PANEL_TYPES = {
   dashboard: { title: "Estatísticas", icon: BarChart3, Component: Dashboard },
   catalog: { title: "Catálogo técnico", icon: BookOpenCheck, Component: Catalog },
   health: { title: "Painel de Saúde", icon: HeartPulse, Component: HealthPanel },
+  downloads: { title: "Downloads", icon: FolderDown, Component: DownloadsCenter },
   calculator: { title: "Calculadora", icon: CalculatorIcon, Component: Calculator },
   scratchpad: { title: "Bloco de notas", icon: StickyNote, Component: Scratchpad },
   stopwatch: { title: "Cronómetro", icon: Timer, Component: Stopwatch },
@@ -31,7 +33,7 @@ export const PANEL_TYPES = {
 
 export const PANEL_ORDER = [
   "notes", "emails", "suppliers", "tasks", "dashboard", "catalog",
-  "health", "calculator", "scratchpad", "stopwatch",
+  "health", "downloads", "calculator", "scratchpad", "stopwatch",
 ];
 
 // Caminho da rota "normal" de cada tipo — usado para impedir abrir um
