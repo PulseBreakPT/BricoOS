@@ -27,6 +27,7 @@ import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
 import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import FavoriteToggle from "@/components/FavoriteToggle";
+import { ListSkeleton } from "@/components/LoadingSkeletons";
 import TaskDialog from "@/components/TaskDialog";
 import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
 import { toast } from "sonner";
@@ -381,7 +382,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       ) : null}
 
       {displayLoading ? (
-        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
+        <ListSkeleton rows={4} />
       ) : displayItems.length === 0 ? (
         <EmptyState icon={smartQuery ? Sparkles : Inbox} text={smartQuery ? "Sem resultados para esta pesquisa." : "Sem emails na caixa de entrada."} />
       ) : (
@@ -631,7 +632,7 @@ function SentTab({ search }) {
       </div>
 
       {loading ? (
-        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
+        <ListSkeleton rows={4} />
       ) : items.length === 0 ? (
         <EmptyState icon={awaitingOnly ? BellRing : Send} text={awaitingOnly ? "Tudo respondido — sem emails à espera." : "Sem emails enviados."} />
       ) : (
@@ -737,7 +738,7 @@ function ThreadsTab({ search }) {
     <div>
       <p className="mt-3 text-sm text-slate-500">{filtered.length} conversa{filtered.length === 1 ? "" : "s"}</p>
       {loading ? (
-        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
+        <ListSkeleton rows={4} />
       ) : filtered.length === 0 ? (
         <EmptyState icon={MessagesSquare} text="Sem conversas ainda." />
       ) : (
@@ -820,7 +821,7 @@ function DraftsTab({ search }) {
       <p className="mt-3 text-sm text-slate-500">{filtered.length} rascunho{filtered.length === 1 ? "" : "s"} por confirmar</p>
 
       {loading ? (
-        <div className="mt-10 flex justify-center"><Spinner className="h-5 w-5 text-slate-400" /></div>
+        <ListSkeleton rows={4} />
       ) : filtered.length === 0 ? (
         <EmptyState icon={FileClock} text="Sem rascunhos por enviar." />
       ) : (

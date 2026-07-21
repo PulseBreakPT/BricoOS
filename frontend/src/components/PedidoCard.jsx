@@ -62,6 +62,11 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
       onClick={() => onOpen(note.id)}
       className={`group relative flex cursor-pointer items-start gap-2.5 overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 active:scale-[0.99] sm:p-5 ${selected ? "border-slate-900 ring-2 ring-slate-900/10" : note.is_overdue ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
     >
+      {/* Barra de sinal — a mesma linguagem do alerta global: margem
+          vermelha = este pedido precisa de intervenção já. */}
+      {note.is_overdue && !archived ? (
+        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-red-500 via-red-600 to-red-700" />
+      ) : null}
       {onToggleSelect ? (
         <button
           type="button"

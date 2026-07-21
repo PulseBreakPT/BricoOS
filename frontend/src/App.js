@@ -38,7 +38,9 @@ function App() {
           </Routes>
         </BrowserRouter>
       </PinGate>
-      <Toaster position="top-center" richColors closeButton />
+      {/* Sem richColors: o estilo "voz do sistema" (chrome grafite) vem do
+          wrapper ui/sonner; os ícones de sucesso/erro mantêm a cor de LED. */}
+      <Toaster position="top-center" closeButton />
     </div>
   );
 }
