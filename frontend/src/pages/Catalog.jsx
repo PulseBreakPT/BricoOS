@@ -53,12 +53,12 @@ export default function Catalog() {
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
                 Rankings, classificações, normas e fontes ficam concentrados aqui, sem alongar o preenchimento do pedido.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
                   <ShieldCheck className="h-3 w-3" /> Apenas dados verificáveis
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-                  <Ruler className="h-3 w-3" /> {catalog?.aviso || "Vãos vistos por dentro"}
+                <span className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+                  <Ruler className="h-3 w-3 shrink-0" /> <span className="min-w-0">{catalog?.aviso || "Vãos vistos por dentro"}</span>
                 </span>
               </div>
             </div>
