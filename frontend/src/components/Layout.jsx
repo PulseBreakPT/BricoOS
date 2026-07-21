@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Trash2, Menu, Grid2x2 } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Activity, Trash2, Menu, Grid2x2 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import NotificationsBell from "@/components/NotificationsBell";
@@ -134,13 +134,6 @@ const NAV_GROUPS = [
       { to: "/estatisticas", label: "Estatísticas", icon: BarChart3, testid: "nav-estatisticas" },
     ],
   },
-];
-
-const TIPS = [
-  { k: "N", t: "novo pedido" },
-  { k: "/", t: "procurar na lista" },
-  { k: "F", t: "modo de foco" },
-  { k: "⌘K", t: "pesquisa global" },
 ];
 
 // Badge de atividade em tempo real por rota — o dock mostra o que está à
@@ -304,21 +297,6 @@ function SidebarContent({
         <div className="relative mt-3 shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-red-600/15 blur-2xl" />
           <StatusCluster />
-          <div className="relative my-3 h-px bg-white/[0.08]" />
-          <p className="relative flex items-center gap-1.5 text-xs font-extrabold text-white">
-            <Sparkles className="h-3.5 w-3.5 text-red-500" /> Nunca esquecer
-          </p>
-          <p className="relative mt-1.5 text-[11px] leading-relaxed text-[color:var(--chrome-muted)]">
-            Pedidos sem ação regressam ao topo até serem tratados.
-          </p>
-          <div className="relative mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
-            {TIPS.map((tip) => (
-              <span key={tip.k} className="flex items-center gap-1 text-[10px] text-[color:var(--chrome-faint)]">
-                <Kbd className="h-auto rounded border-white/10 bg-white/10 px-1 py-0 font-mono text-[9px] font-bold text-[color:var(--chrome-muted)]">{tip.k}</Kbd>
-                {tip.t}
-              </span>
-            ))}
-          </div>
         </div>
       ) : null}
     </>
