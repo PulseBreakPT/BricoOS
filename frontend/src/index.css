@@ -66,11 +66,11 @@ button, a, [role="button"], [role="tab"] {
         --ring: 0 72% 46%;
         --radius: 0.75rem;
 
-        /* --- Chrome da máquina (corpo grafite do sistema) ---------- */
-        --chrome-deep: #101114;
-        --chrome: #17181c;
-        --chrome-raised: #1f2126;
-        --chrome-overlay: #26282e;
+        /* --- Chrome da máquina (corpo preto do sistema) ------------- */
+        --chrome-deep: #000000;
+        --chrome: #0a0a0a;
+        --chrome-raised: #141414;
+        --chrome-overlay: #1c1c1c;
         --chrome-edge: rgba(255, 255, 255, 0.08);
         --chrome-hairline: rgba(255, 255, 255, 0.06);
         --chrome-text: #eceae6;
