@@ -26,6 +26,7 @@ import {
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
+  ArrowUpRight, Building2, FileWarning,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -36,7 +37,8 @@ import {
 } from "@/lib/pedido";
 import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
-import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
+import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPreviewDialog";
+import EntityStackBar from "@/components/EntityStackBar";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -126,6 +128,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const photoInputRef = useRef(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
 
+  // Navegação em pilha dentro do pedido — Pedido → Email → PDF → Fornecedor.
+  // Cada entrada empilhada substitui as abas normais pelo conteúdo dessa
+  // entidade relacionada; a EntityStackBar deixa voltar a qualquer nível
+  // anterior sem perder onde se ficou no pedido.
+  const [stack, setStack] = useState([]);
+  const pushFrame = (frame) => setStack((s) => [...s, { key: `${frame.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, ...frame }]);
+  const popTo = (index) => setStack((s) => (index < 0 ? [] : s.slice(0, index + 1)));
+
   // Assistente de criação por etapas: escolha do tipo → passos
   const [createMode, setCreateMode] = useState("choice"); // choice | normal | band
   const [createStep, setCreateStep] = useState(0);
@@ -202,6 +212,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setEditMode(false);
       setPhotos([]);
       setLightboxPhoto(null);
+      setStack([]);
       // Cada área abre logo o assistente certo: «band» na área Banda
       // Alumínios, «normal» na área geral da loja.
       setCreateMode(initialCreateMode || "choice");
@@ -739,6 +750,129 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const selectedSupplier = suppliers.find((s) => s.id === emailSupplier);
   const st = note ? getStatusCfg(note.status) : null;
 
+  // Conteúdo do nível de topo da pilha — email recebido, PDF em anexo ou
+  // ficha de fornecedor. Substitui as abas normais enquanto a pilha não
+  // está vazia; ver EntityStackBar para a navegação entre níveis.
+  const renderStackFrame = (frame) => {
+    if (!frame) return null;
+    if (frame.kind === "fornecedor") {
+      const s = frame.data;
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-heading text-base font-extrabold text-slate-900">{s.name}</p>
+              <p className="text-xs text-slate-400">Fornecedor</p>
+            </div>
+          </div>
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
+            {s.email ? (
+              <a href={`mailto:${s.email}`} className="flex items-center gap-2 font-mono text-xs text-slate-700 hover:underline">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {s.email}
+              </a>
+            ) : <p className="text-xs text-red-400">Sem email definido</p>}
+            {s.phone ? (
+              <a href={`tel:${s.phone}`} className="flex items-center gap-2 font-mono text-xs text-slate-700 hover:underline">
+                <PhoneCall className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {s.phone}
+              </a>
+            ) : null}
+          </div>
+          {(s.contacts || []).filter((c) => c.name || c.phone || c.email).length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contactos</p>
+              {s.contacts.filter((c) => c.name || c.phone || c.email).map((c, i) => (
+                <div key={i} className="rounded-xl border border-slate-200 bg-white p-2.5 text-xs">
+                  {c.name ? <span className="font-bold text-slate-900">{c.name}</span> : null}
+                  {c.phone ? <span className="ml-2 font-mono text-slate-500">{c.phone}</span> : null}
+                  {c.email ? <span className="ml-2 font-mono text-slate-500">{c.email}</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {s.notes ? <p className="text-xs text-slate-500">{s.notes}</p> : null}
+        </div>
+      );
+    }
+    if (frame.kind === "email") {
+      const m = frame.data;
+      const supplierOfEmail = m.supplier_id ? suppliers.find((s) => s.id === m.supplier_id) : null;
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</p>
+            <p className="text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
+            <p className="text-[11px] text-slate-400">{timeAgo(m.received_at)}</p>
+          </div>
+          {supplierOfEmail ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-lg text-xs"
+              onClick={() => pushFrame({ kind: "fornecedor", label: supplierOfEmail.name, data: supplierOfEmail })}
+            >
+              <Building2 className="mr-1.5 h-3.5 w-3.5" /> Ver fornecedor
+            </Button>
+          ) : null}
+          {m.body_html ? (
+            <div
+              className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 font-sans text-xs text-slate-700 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500"
+              dangerouslySetInnerHTML={{ __html: m.body_html }}
+            />
+          ) : (
+            <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+          )}
+          {(m.attachments || []).length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {m.attachments.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => pushFrame({
+                    kind: "pdf",
+                    label: a.filename,
+                    data: { url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename, contentType: a.content_type },
+                  })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700"
+                >
+                  <FileText className="h-3.5 w-3.5" /> {a.filename}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    if (frame.kind === "pdf") {
+      const a = frame.data;
+      const kind = previewKind(a.filename, a.contentType);
+      return (
+        <div className="flex h-full flex-col gap-3">
+          <a href={a.url} download={a.filename} target="_blank" rel="noreferrer" className="self-start">
+            <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs">
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Descarregar
+            </Button>
+          </a>
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-slate-100">
+            {kind === "image" ? (
+              <img src={a.url} alt={a.filename} className="mx-auto max-h-[65vh] w-auto object-contain" />
+            ) : kind === "pdf" ? (
+              <iframe title={a.filename} src={a.url} className="h-[65vh] w-full border-0 bg-white" />
+            ) : (
+              <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                <FileWarning className="h-6 w-6" />
+                Pré-visualização não disponível para este tipo de ficheiro.
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -1026,6 +1160,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               </>
             )}
           </div>
+        ) : stack.length > 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <EntityStackBar
+              rootLabel={form.customer_name || "Pedido"}
+              frames={stack}
+              onPopTo={popTo}
+              onClose={() => setStack([])}
+            />
+            <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+              {renderStackFrame(stack[stack.length - 1])}
+            </div>
+          </div>
         ) : (
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
@@ -1287,7 +1433,19 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </div>
                 )}
                 <div className="mt-4 space-y-1.5">
-                  <Label>Fornecedor</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Fornecedor</Label>
+                    {selectedSupplier ? (
+                      <button
+                        type="button"
+                        data-testid="open-supplier-frame"
+                        onClick={() => pushFrame({ kind: "fornecedor", label: selectedSupplier.name, data: selectedSupplier })}
+                        className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-900 hover:underline"
+                      >
+                        <Building2 className="h-3 w-3" /> Ver ficha
+                      </button>
+                    ) : null}
+                  </div>
                   <Combobox
                     data-testid="select-email-supplier"
                     value={emailSupplier}
@@ -1345,13 +1503,24 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <div className="mt-3 space-y-2">
                       {receivedEmails.map((m) => (
                         <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                          <summary className="cursor-pointer select-none">
-                            <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
-                            {m.reply_kind === "client" ? (
-                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cliente</span>
-                            ) : null}
-                            <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
-                            <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
+                          <summary className="flex cursor-pointer select-none items-center gap-1">
+                            <span className="min-w-0 flex-1">
+                              <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
+                              {m.reply_kind === "client" ? (
+                                <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cliente</span>
+                              ) : null}
+                              <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
+                              <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
+                            </span>
+                            <button
+                              type="button"
+                              data-testid={`open-email-frame-${m.id}`}
+                              title="Abrir em pilha"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); pushFrame({ kind: "email", label: m.subject || "Email", data: m }); }}
+                              className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                            >
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            </button>
                           </summary>
                           {m.body_html ? (
                             <div

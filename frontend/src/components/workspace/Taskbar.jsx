@@ -5,6 +5,7 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
 import { timeAgo } from "@/lib/pedido";
+import QuickPeekTrigger from "@/components/QuickPeek";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -157,26 +158,45 @@ export default function Taskbar({ onOpenMissionControl }) {
           const Icon = meta.icon;
           const isActive = activeId === p.id && !p.minimized;
           return (
-            <button
+            <QuickPeekTrigger
               key={p.id}
-              data-testid={`taskbar-panel-${p.type}`}
-              onClick={() => focusPanel(p.id)}
-              className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
-                isActive ? "bg-slate-900 text-white" : p.minimized ? "border border-dashed border-slate-300 text-slate-400" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              as="span"
+              className="shrink-0"
+              renderPeek={() => (
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-slate-900">{meta.title}</p>
+                    <p className="text-[11px] text-slate-400">
+                      {p.minimized ? "Minimizada" : p.maximized ? "Maximizada" : "Em janela flutuante"}
+                      {isActive ? " · ativa" : ""}
+                    </p>
+                  </div>
+                </div>
+              )}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {meta.title}
-              <span
-                role="button"
-                tabIndex={-1}
-                data-testid={`taskbar-close-${p.type}`}
-                onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}
-                className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100"
+              <button
+                data-testid={`taskbar-panel-${p.type}`}
+                onClick={() => focusPanel(p.id)}
+                className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                  isActive ? "bg-slate-900 text-white" : p.minimized ? "border border-dashed border-slate-300 text-slate-400" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
               >
-                <X className="h-3 w-3" />
-              </span>
-            </button>
+                <Icon className="h-3.5 w-3.5" />
+                {meta.title}
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  data-testid={`taskbar-close-${p.type}`}
+                  onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}
+                  className="ml-1 rounded p-0.5 opacity-60 hover:opacity-100"
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              </button>
+            </QuickPeekTrigger>
           );
         })}
       </div>
