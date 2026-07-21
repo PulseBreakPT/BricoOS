@@ -1,9 +1,13 @@
 import { useLocation } from "react-router-dom";
-import { X, LayoutGrid, Mail, ClipboardList, RefreshCw, Grid2x2 } from "lucide-react";
+import { X, LayoutGrid, Mail, ClipboardList, RefreshCw, Grid2x2, LayoutTemplate, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
 import { timeAgo } from "@/lib/pedido";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 // Barra de estado ao estilo de um SO: ligação, contadores em tempo real e
 // há quanto tempo a caixa de entrada foi verificada — sempre visível, sem
@@ -35,6 +39,66 @@ function StatusCluster() {
   );
 }
 
+// Áreas de trabalho guardadas — uma fotografia da disposição atual (que
+// painéis, onde, que tamanho) para voltar a ela com um clique. Ex.: uma
+// para "Orçamentos" (Pedidos + PDF lado a lado), outra só com a caixa de
+// entrada maximizada.
+function WorkspaceMenu() {
+  const { panels, workspaces, saveWorkspace, loadWorkspace, deleteWorkspace } = useWorkspace();
+
+  const handleSave = () => {
+    const name = window.prompt("Nome para esta área de trabalho:");
+    if (!name || !name.trim()) return;
+    saveWorkspace(name.trim());
+    toast.success(`Área de trabalho "${name.trim()}" guardada`);
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          data-testid="taskbar-workspaces"
+          title="Áreas de trabalho guardadas"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        >
+          <LayoutTemplate className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuItem data-testid="workspace-save" onClick={handleSave} disabled={panels.length === 0}>
+          <Save className="mr-2 h-4 w-4" /> Guardar disposição atual…
+        </DropdownMenuItem>
+        {workspaces.length > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            {workspaces.map((w) => (
+              <div key={w.id} data-testid={`workspace-item-${w.id}`} className="flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-slate-50">
+                <button
+                  data-testid={`workspace-load-${w.id}`}
+                  onClick={() => loadWorkspace(w.id)}
+                  className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-slate-700"
+                >
+                  {w.name} <span className="font-normal text-slate-400">({w.panels.length})</span>
+                </button>
+                <button
+                  data-testid={`workspace-delete-${w.id}`}
+                  title="Eliminar"
+                  onClick={(e) => { e.stopPropagation(); deleteWorkspace(w.id); }}
+                  className="shrink-0 rounded p-1 text-slate-300 hover:text-red-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </>
+        ) : (
+          <p className="px-2 py-2 text-xs text-slate-400">Sem áreas de trabalho guardadas.</p>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // Barra fixa em baixo, só desktop — lançador de "aplicações" à esquerda,
 // painéis abertos (incluindo minimizados) à direita, tal como a barra de
 // tarefas de um sistema operativo.
@@ -60,6 +124,8 @@ export default function Taskbar({ onOpenMissionControl }) {
       >
         <Grid2x2 className="h-4 w-4" />
       </button>
+
+      <WorkspaceMenu />
 
       <div className="flex shrink-0 items-center gap-1 border-r border-slate-200 pr-2">
         {PANEL_ORDER.map((type) => {
