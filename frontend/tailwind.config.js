@@ -51,6 +51,20 @@ module.exports = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        chrome: {
+          DEFAULT: 'var(--chrome)',
+          deep: 'var(--chrome-deep)',
+          raised: 'var(--chrome-raised)',
+          overlay: 'var(--chrome-overlay)',
+          edge: 'var(--chrome-edge)',
+          text: 'var(--chrome-text)',
+          muted: 'var(--chrome-muted)',
+          faint: 'var(--chrome-faint)'
+        },
+        signal: {
+          DEFAULT: 'var(--signal)',
+          strong: 'var(--signal-strong)'
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar))',
           foreground: 'hsl(var(--sidebar-foreground))',

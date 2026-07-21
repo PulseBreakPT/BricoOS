@@ -51,11 +51,13 @@ export default function DockIcon({
           onPointerLeave={clearTimer}
           onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
           onClick={onClick}
-          className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${isOpen ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
+          className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:translate-y-0 ${isOpen ? "bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]" : "text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"}`}
         >
           <Icon className="h-4 w-4" />
+          {/* LED de execução — a App está "ligada", como no dock do macOS. */}
+          {isOpen ? <span className="led led-ok absolute -bottom-[3px] left-1/2 h-[3px] w-[3px] -translate-x-1/2" /> : null}
           {count > 1 ? (
-            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-black text-white ring-2 ring-white">
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-black text-white ring-2 ring-[color:var(--chrome)] shadow-[0_0_8px_rgba(217,38,38,0.5)]">
               {count}
             </span>
           ) : null}

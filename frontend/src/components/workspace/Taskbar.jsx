@@ -41,12 +41,12 @@ function StatusCluster() {
   const { status, online } = useSystemStatus();
   const now = useClock();
   return (
-    <div data-testid="taskbar-status" className="hidden shrink-0 items-center gap-3 border-l border-slate-200 pl-3 text-[11px] font-semibold text-slate-500 md:flex">
-      <span data-testid="taskbar-clock" className="font-mono text-slate-700" title={now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}>
+    <div data-testid="taskbar-status" className="hidden shrink-0 items-center gap-3 border-l border-white/10 pl-3 text-[11px] font-semibold text-[color:var(--chrome-muted)] md:flex">
+      <span data-testid="taskbar-clock" className="font-mono tabular-nums text-white" title={now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}>
         {now.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
       </span>
       <span className="flex items-center gap-1.5" title={online ? "Ligado ao servidor" : "Sem ligação ao servidor"}>
-        <span className={`h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-red-500 animate-pulse"}`} />
+        <span className={`led ${online ? "led-ok" : "led-alert"}`} />
         {online ? "Ligado" : "Sem ligação"}
       </span>
       {status ? (
@@ -88,7 +88,7 @@ function WorkspaceMenu() {
         <button
           data-testid="taskbar-workspaces"
           title="Áreas de trabalho guardadas"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
         >
           <LayoutTemplate className="h-4 w-4" />
         </button>
@@ -155,9 +155,9 @@ export default function Taskbar({ onOpenMissionControl }) {
   return (
     <div
       data-testid="workspace-taskbar"
-      className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-slate-200 bg-white/90 px-3 py-2 backdrop-blur-xl"
+      className="os-chrome-flat fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-white/[0.06] px-3 py-2"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_6px_16px_-6px_rgba(217,38,38,0.55)] ring-1 ring-white/15">
         <LayoutGrid className="h-4 w-4" />
       </span>
 
@@ -166,14 +166,14 @@ export default function Taskbar({ onOpenMissionControl }) {
         onClick={onOpenMissionControl}
         disabled={panels.length === 0}
         title="Mission Control — ver todas as janelas (F3)"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
       >
         <Grid2x2 className="h-4 w-4" />
       </button>
 
       <WorkspaceMenu />
 
-      <div className="flex shrink-0 items-center gap-1 border-r border-slate-200 pr-2">
+      <div className="flex shrink-0 items-center gap-1 border-r border-white/10 pr-2">
         {dockOrder.map((type) => {
           const meta = PANEL_TYPES[type];
           if (!meta) return null;
@@ -198,7 +198,7 @@ export default function Taskbar({ onOpenMissionControl }) {
 
       <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
         {panels.length === 0 ? (
-          <span className="text-xs text-slate-400">Sem painéis abertos — escolhe uma aplicação à esquerda.</span>
+          <span className="text-xs text-[color:var(--chrome-faint)]">Sem painéis abertos — escolhe uma aplicação à esquerda.</span>
         ) : panels.map((p) => {
           const meta = PANEL_TYPES[p.type];
           if (!meta) return null;
@@ -230,7 +230,7 @@ export default function Taskbar({ onOpenMissionControl }) {
                 data-testid={`taskbar-panel-${p.id}`}
                 onClick={() => focusPanel(p.id)}
                 className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors ${
-                  isActive ? "bg-slate-900 text-white" : p.minimized ? "border border-dashed border-slate-300 text-slate-400" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  isActive ? "bg-white text-[color:var(--chrome-deep)] shadow-[0_8px_20px_-8px_rgba(0,0,0,0.8)]" : p.minimized ? "border border-dashed border-white/20 text-[color:var(--chrome-faint)] hover:text-[color:var(--chrome-muted)]" : "bg-white/[0.08] text-[color:var(--chrome-muted)] hover:bg-white/[0.14] hover:text-white"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -251,7 +251,7 @@ export default function Taskbar({ onOpenMissionControl }) {
       </div>
 
       {activeContext ? (
-        <span data-testid="workspace-active-context" className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-bold text-amber-800 sm:flex">
+        <span data-testid="workspace-active-context" className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/15 px-2.5 py-1.5 text-xs font-bold text-amber-300 sm:flex">
           {activeContext.label}
         </span>
       ) : null}
