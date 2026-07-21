@@ -54,7 +54,7 @@ function RankingCard({ model, selected, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-[11.5rem] flex-1 rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[13rem] ${selected ? "border-amber-400 bg-amber-50/70 shadow-md shadow-amber-200/50 ring-1 ring-amber-300" : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"}`}
+      className={`min-w-[13rem] flex-1 shrink-0 snap-start rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[14rem] ${selected ? "border-amber-400 bg-amber-50/70 shadow-md shadow-amber-200/50 ring-1 ring-amber-300" : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"}`}
     >
       <div className="flex items-start gap-3">
         <OverallBadge overall={overall} compact />
@@ -208,7 +208,7 @@ function FeatureAudit({ feature }) {
           </div>
         ) : null}
         {feature.standard ? (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="rounded-lg bg-slate-50 p-2"><strong className="text-slate-800">Norma</strong><br />{feature.standard}<br /><span className="text-slate-400">{feature.standard_status}</span></div>
             <div className="rounded-lg bg-slate-50 p-2"><strong className="text-slate-800">Escala / melhor classe</strong><br />{feature.official_scale}<br /><span className="text-slate-400">{feature.official_best}</span></div>
           </div>
@@ -275,7 +275,7 @@ function ModelAnalysis({ model }) {
         </div>
       ) : null}
 
-      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
         {Object.values(model.features).map((feature) => <FeatureAudit key={feature.key} feature={feature} />)}
       </div>
 
@@ -294,7 +294,7 @@ function ModelAnalysis({ model }) {
         </details>
       ) : null}
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
         <InsightList title="Pontos fortes / vantagens" icon={CheckCircle2} items={model.strengths} tone="emerald" />
         <InsightList title="Pontos fracos relativos" icon={BarChart3} items={model.relative_lows} tone="slate" />
         <InsightList title="Limitações documentais" icon={AlertTriangle} items={model.limitations} tone="amber" />
@@ -302,7 +302,7 @@ function ModelAnalysis({ model }) {
 
       <details className="mt-3 rounded-xl border border-slate-200 bg-white">
         <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-700">Casos de utilização e limites da recomendação</summary>
-        <div className="grid gap-2 border-t border-slate-100 p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 border-t border-slate-100 p-3 sm:grid-cols-2">
           {[...positiveUses, ...unresolvedUses].map((item) => (
             <div key={item.use} className={`rounded-lg p-2 text-[10px] ${item.status === "not_determined" ? "bg-slate-50 text-slate-500" : "bg-emerald-50 text-emerald-900"}`}>
               <p className="font-extrabold">{item.use}</p><p className="mt-0.5 leading-relaxed">{item.reason}</p>
@@ -362,7 +362,12 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
           </div>
         </div>
 
-        <div className="relative mt-4 flex gap-2 overflow-x-auto pb-1">
+        {/* Máscara no bordo direito — sinaliza que há mais cartões para ver
+            ao arrastar, em vez de cortar o último a meio sem aviso. */}
+        <div
+          className="relative mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1"
+          style={{ maskImage: "linear-gradient(to right, black calc(100% - 28px), transparent 100%)", WebkitMaskImage: "linear-gradient(to right, black calc(100% - 28px), transparent 100%)" }}
+        >
           {spotlight.map((model) => <RankingCard key={model.id} model={model} selected={selected.id === model.id} onSelect={() => setSelectedId(model.id)} />)}
         </div>
         <WinnerStrip winners={analysis.winners} />
@@ -374,8 +379,8 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
           <ArrowRight className="h-4 w-4 text-slate-400 transition group-open:rotate-90" />
         </summary>
         <div className="space-y-4 border-t border-slate-200 bg-slate-50 p-2 sm:p-4">
-          <div className="grid gap-4 xl:grid-cols-[22rem_1fr]">
-            <div className="order-2 space-y-3 xl:order-1">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[22rem_1fr]">
+            <div className="order-2 min-w-0 space-y-3 xl:order-1">
               <ComparisonPanel analysis={analysis} leftId={leftId} rightId={rightId} onLeft={setLeftId} onRight={setRightId} />
               <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 xl:block">
                 <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900"><Database className="h-4 w-4 text-blue-700" /> Todos os modelos</p>
@@ -395,7 +400,7 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
               </div>
               <MethodologyPanel methodology={analysis.methodology} models={models} />
             </div>
-            <div className="order-1 space-y-3 xl:order-2">
+            <div className="order-1 min-w-0 space-y-3 xl:order-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-3 xl:hidden">
                 <label htmlFor="catalog-model-mobile" className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Modelo em análise</label>
                 <NativeSelect id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus-visible:border-blue-500 focus-visible:ring-blue-500/50">
