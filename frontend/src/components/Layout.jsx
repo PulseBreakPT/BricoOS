@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
+import ActivityCenter from "@/components/ActivityCenter";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
+import { SystemStatusProvider, useSystemStatus } from "@/context/SystemStatusContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
@@ -130,6 +132,26 @@ const TIPS = [
   { k: "⌘K", t: "pesquisa global" },
 ];
 
+// Badge de atividade em tempo real por rota — o dock mostra o que está à
+// espera sem ser preciso abrir nada: pedidos ativos, emails por ver,
+// tarefas por fazer. Contagens vêm do polling único do SystemStatusContext.
+function navBadge(status, to) {
+  if (!status) return 0;
+  if (to === "/") return status.pedidos_ativos || 0;
+  if (to === "/emails") return status.emails_nao_vistos || 0;
+  if (to === "/tarefas") return status.tarefas_pendentes || 0;
+  return 0;
+}
+
+function NavBadge({ count, active }) {
+  if (!count) return null;
+  return (
+    <span className={`pointer-events-none absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[9px] font-black ring-2 ring-white ${active ? "bg-red-600 text-white" : "bg-slate-900 text-white"}`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 const Brand = () => (
   <div className="group flex items-center gap-3">
     <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg shadow-slate-400/30 ring-1 ring-black/5 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110">
@@ -143,10 +165,12 @@ const Brand = () => (
   </div>
 );
 
-export default function Layout() {
+function LayoutInner() {
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const { status } = useSystemStatus();
 
   // Pesquisa universal — Ctrl/Cmd+K em qualquer ponto da app (exceto a
   // escrever texto, para não interromper o utilizador).
@@ -162,12 +186,22 @@ export default function Layout() {
   }, []);
 
   return (
-    <WorkspaceProvider>
     <div className="min-h-screen bg-slate-50/80 text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200/80 bg-white/85 px-4 py-6 backdrop-blur-xl lg:flex">
         <div className="flex items-center justify-between px-1">
           <Brand />
-          <NotificationsBell variant="sidebar" />
+          <div className="flex items-center gap-1">
+            <button
+              data-testid="sidebar-activity-btn"
+              onClick={() => setActivityOpen(true)}
+              aria-label="Centro de Atividade"
+              title="Centro de Atividade"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              <Activity className="h-[18px] w-[18px]" />
+            </button>
+            <NotificationsBell variant="sidebar" />
+          </div>
         </div>
         <button
           data-testid="sidebar-search-btn"
@@ -202,7 +236,10 @@ export default function Layout() {
                       {({ isActive }) => (
                         <>
                           <span className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-red-600 transition-all duration-200 ${isActive ? "opacity-100" : "opacity-0"}`} />
-                          <Icon className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-red-400" : ""}`} strokeWidth={2.2} />
+                          <span className="relative">
+                            <Icon className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-red-400" : ""}`} strokeWidth={2.2} />
+                            <NavBadge count={navBadge(status, item.to)} active={!isActive} />
+                          </span>
                           {item.label}
                         </>
                       )}
@@ -244,6 +281,15 @@ export default function Layout() {
           >
             <Search className="h-[18px] w-[18px]" />
           </button>
+          <button
+            data-testid="mobile-activity-btn"
+            onClick={() => setActivityOpen(true)}
+            aria-label="Centro de Atividade"
+            title="Centro de Atividade"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 active:scale-90 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+          >
+            <Activity className="h-[18px] w-[18px]" />
+          </button>
           <Link
             to="/catalogo-tecnico"
             aria-label="Abrir catálogo técnico"
@@ -282,7 +328,7 @@ export default function Layout() {
               >
                 <span className={`relative flex h-8 w-full max-w-[60px] items-center justify-center rounded-lg transition-all duration-200 ${isActive ? "bg-slate-900 text-white scale-110 shadow-md shadow-slate-400/40" : "text-slate-500"}`}>
                   <Icon className="h-[19px] w-[19px]" strokeWidth={2.2} />
-                  {isActive ? <span className="absolute -top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500" /> : null}
+                  <NavBadge count={navBadge(status, item.to)} active />
                 </span>
                 <span className={`w-full truncate text-center text-[9px] font-semibold leading-tight tracking-tight ${isActive ? "text-slate-900" : "text-slate-500"}`}>{item.label}</span>
               </NavLink>
@@ -293,7 +339,17 @@ export default function Layout() {
 
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
     </div>
+  );
+}
+
+export default function Layout() {
+  return (
+    <WorkspaceProvider>
+      <SystemStatusProvider>
+        <LayoutInner />
+      </SystemStatusProvider>
     </WorkspaceProvider>
   );
 }

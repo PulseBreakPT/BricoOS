@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, ClipboardList, Mail, Truck, ListChecks } from "lucide-react";
+import { Search, ClipboardList, Mail, Truck, ListChecks, Plus, RefreshCw, BarChart3, FileClock, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -101,7 +102,40 @@ export default function CommandPalette({ open, onOpenChange }) {
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {q.trim().length < 2 ? (
-            <p className="p-4 text-center text-xs text-slate-400">Escreve pelo menos 2 caracteres…</p>
+            <ResultGroup label="Ações rápidas" icon={Zap}>
+              {[
+                { icon: Plus, label: "Novo pedido", run: () => { navigate("/?new=1"); onOpenChange(false); } },
+                { icon: Mail, label: "Abrir emails", run: () => { navigate("/emails"); onOpenChange(false); } },
+                {
+                  icon: RefreshCw, label: "Verificar caixa de entrada agora",
+                  run: async () => {
+                    onOpenChange(false);
+                    try {
+                      const { data } = await api.post("/emails/sync");
+                      const novos = (data.new_received || 0) + (data.new_sent || 0);
+                      toast.success(novos ? `Sincronizado: ${novos} novidade(s)` : "Caixa verificada — sem novidades");
+                    } catch {
+                      toast.error("Não foi possível verificar a caixa de entrada");
+                    }
+                  },
+                },
+                { icon: FileClock, label: "Rascunhos por confirmar", run: () => { navigate("/emails"); onOpenChange(false); } },
+                { icon: ListChecks, label: "Tarefas", run: () => { navigate("/tarefas"); onOpenChange(false); } },
+                { icon: BarChart3, label: "Estatísticas", run: () => { navigate("/estatisticas"); onOpenChange(false); } },
+              ].map((a) => {
+                const AIcon = a.icon;
+                return (
+                  <button
+                    key={a.label}
+                    data-testid={`palette-action-${a.label}`}
+                    onClick={a.run}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <AIcon className="h-4 w-4 shrink-0 text-slate-400" /> {a.label}
+                  </button>
+                );
+              })}
+            </ResultGroup>
           ) : !hasResults && !loading ? (
             <p className="p-4 text-center text-xs text-slate-400">Sem resultados para "{q}".</p>
           ) : (

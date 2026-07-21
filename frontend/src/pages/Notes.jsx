@@ -234,9 +234,18 @@ export default function Notes() {
       setDetailInitialTab(DETAIL_TABS.includes(openTab) ? openTab : "detalhes");
       setDetailOpen(true);
     }
-    // Ao limpar os parâmetros transitórios (gmail/open), a área ativa mantém-se no URL.
-    if (g || openId) navigate(params.get("area") === "band" ? "/?area=band" : "/", { replace: true });
-  }, [location.search, loadMeta, navigate]);
+    // "?new=1" — atalho da pesquisa global (⌘K) para criar um pedido a
+    // partir de qualquer página, sem depender do botão + desta.
+    const wantsNew = params.get("new");
+    if (wantsNew && !openId) {
+      setDetailNoteId(null);
+      setDetailInitialTab("detalhes");
+      setDetailCreateMode(SEGMENTS[segment].createMode);
+      setDetailOpen(true);
+    }
+    // Ao limpar os parâmetros transitórios (gmail/open/new), a área ativa mantém-se no URL.
+    if (g || openId || wantsNew) navigate(params.get("area") === "band" ? "/?area=band" : "/", { replace: true });
+  }, [location.search, loadMeta, navigate, segment]);
 
   const openNew = () => {
     setDetailNoteId(null);

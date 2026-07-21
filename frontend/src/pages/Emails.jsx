@@ -416,7 +416,19 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-blue-700">
                         <ListChecks className="h-3.5 w-3.5" /> Resumo do Correio Semanal
                       </p>
-                      <p className="max-h-96 overflow-y-auto whitespace-pre-wrap text-xs text-blue-900">{m.correio_semanal_summary}</p>
+                      {m.correio_semanal_summary.startsWith("<") ? (
+                        <div
+                          className={"max-h-96 overflow-y-auto text-xs text-slate-700 "
+                            + "[&_h3]:mb-2 [&_h3]:font-heading [&_h3]:text-sm [&_h3]:font-extrabold [&_h3]:tracking-tight [&_h3]:text-blue-900 "
+                            + "[&_h4]:mb-1 [&_h4]:mt-4 [&_h4]:border-b [&_h4]:border-blue-200 [&_h4]:pb-1 [&_h4]:text-[13px] [&_h4]:font-extrabold [&_h4]:text-blue-800 [&_h3+h4]:mt-0 "
+                            + "[&_ul]:mb-2 [&_ul]:space-y-1 [&_ul]:pl-1 [&_li]:rounded-md [&_li]:bg-white/70 [&_li]:px-2 [&_li]:py-1 "
+                            + "[&_p]:mb-1.5 [&_strong]:font-bold [&_strong]:text-blue-900 "
+                            + "[&_.csn-action]:mb-2 [&_.csn-action]:inline-flex [&_.csn-action]:rounded-full [&_.csn-action]:bg-amber-100 [&_.csn-action]:px-2 [&_.csn-action]:py-0.5 [&_.csn-action]:text-[10px] [&_.csn-action]:font-bold [&_.csn-action]:text-amber-800"}
+                          dangerouslySetInnerHTML={{ __html: m.correio_semanal_summary }}
+                        />
+                      ) : (
+                        <p className="max-h-96 overflow-y-auto whitespace-pre-wrap text-xs text-blue-900">{m.correio_semanal_summary}</p>
+                      )}
                     </div>
                   ) : null}
                   <EmailBody html={m.body_html} text={m.body} />

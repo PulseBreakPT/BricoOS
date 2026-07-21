@@ -7,10 +7,17 @@ só sem o ruído repetido do layout (rodapés, "CLICAR AQUI", etiquetas de
 secção duplicadas). O layout muda ligeiramente de semana para semana, por
 isso cada passo tem um fallback razoável em vez de assumir uma estrutura
 rígida.
+
+O resultado é HTML (títulos, negrito nas referências, lista de prazos) —
+não texto simples — para o resumo ser rápido de ler em vez de uma parede de
+texto. Todo o texto extraído do PDF passa por html.escape antes de entrar em
+qualquer tag; as únicas tags no output são as que este módulo escreve, nunca
+HTML vindo do PDF (que nem sequer tem HTML — é só texto).
 """
 
 import re
 from collections import Counter
+from html import escape as html_escape
 
 import fitz  # PyMuPDF
 
@@ -24,6 +31,12 @@ _FOLHETO_RE = re.compile(r"FOLHETO\s*N[ºo°]?\s*[\d/]+", re.IGNORECASE)
 _FACT_STARTS_RE = re.compile(
     r"^\s*(DATA LIMITE DE RESPOSTA|MEA\s*N[ºo°]?\s*[\d/]+|FOLHETO\s*N[ºo°]?\s*[\d/]+)",
     re.IGNORECASE)
+# Para pôr em negrito estas referências onde quer que apareçam (na lista de
+# prazos e dentro do texto de cada secção) — o que mais importa saltar à
+# vista numa leitura rápida.
+_INLINE_HIGHLIGHT_RE = re.compile(
+    r"(DATA LIMITE DE RESPOSTA[:_]?|MEA\s*N[ºo°]?\s*[\d/]+|FOLHETO\s*N[ºo°]?\s*[\d/]+)",
+    re.IGNORECASE)
 
 # Linhas de "mobília" do layout que se repetem em quase todas as páginas e
 # não têm informação própria — removidas do texto de cada secção.
@@ -32,6 +45,7 @@ _NOISE_LINE_RE = re.compile(
     r"CSN\s*N?[ºo°]?\s*\d+\s*[–-]\s*SEM\s*\d+/\d+|PARA INFORMA[ÇC][ÃA]O)\s*$",
     re.IGNORECASE)
 _ACTION_RE = re.compile(r"❑\s*(A ENCOMENDAR|A FAZER)", re.IGNORECASE)
+_FWD_PREFIX_RE = re.compile(r"^\s*(re|fw|fwd|enc)\s*:\s*", re.IGNORECASE)
 
 
 def _pages_text(pdf_bytes):
@@ -106,26 +120,47 @@ def _extract_facts(full_text):
 
 def _reflow(lines):
     """As páginas deste PDF vêm muitas vezes com uma palavra por linha
-    (colunas estreitas) — junta em parágrafos para ficar legível, sem
-    tirar nem alterar palavra nenhuma. Uma linha só em maiúsculas (título/
-    subtítulo) fica sempre na sua própria linha, nunca fundida com o texto
-    à volta."""
+    (colunas estreitas) — junta em parágrafos para ficar legível, sem tirar
+    nem alterar palavra nenhuma. Devolve uma lista de (é_título, texto).
+
+    Uma linha em maiúsculas é um título/subtítulo do próprio boletim — fica
+    sempre em destaque, nunca fundida com o texto corrido. Mas um título
+    longo vem muitas vezes partido em 2-3 linhas maiúsculas seguidas (a
+    largura da coluna) — essas juntam-se num único parágrafo de título, para
+    não aparecer partido a meio. Uma "etiqueta" de uma palavra só (ex.
+    "DIGITAL", "ATUALIDADES" — o departamento/categoria da página) fica
+    sempre isolada, nunca se funde com o título ao lado."""
     paragraphs = []
     buf = []
+    heading_buf = []
+
+    def flush_text():
+        if buf:
+            paragraphs.append((False, " ".join(buf)))
+            buf.clear()
+
+    def flush_heading():
+        if heading_buf:
+            paragraphs.append((True, " ".join(heading_buf)))
+            heading_buf.clear()
+
     for line in lines:
         if line.isupper() and len(line) > 3:
-            if buf:
-                paragraphs.append(" ".join(buf))
-                buf = []
-            paragraphs.append(line)
+            flush_text()
+            is_tag = " " not in line and len(line) <= 15
+            if is_tag:
+                flush_heading()
+                paragraphs.append((True, line))
+            else:
+                heading_buf.append(line)
             continue
+        flush_heading()
         buf.append(line)
         if re.search(r"[.!?:”’)]$", line):
-            paragraphs.append(" ".join(buf))
-            buf = []
-    if buf:
-        paragraphs.append(" ".join(buf))
-    return "\n".join(paragraphs)
+            flush_text()
+    flush_heading()
+    flush_text()
+    return paragraphs
 
 
 def _clean_page(text):
@@ -183,10 +218,29 @@ def _section_title(page_text, page_index, toc):
     return f"Página {page_index + 1}"
 
 
+def _highlight(escaped_text):
+    """Realça (negrito) as referências MEA/FOLHETO/DATA LIMITE dentro de um
+    texto já escapado — aplicado tanto na lista de prazos como no corpo de
+    cada secção, para as referências saltarem à vista sempre que aparecem,
+    não só no bloco dedicado."""
+    return _INLINE_HIGHLIGHT_RE.sub(lambda m: f"<strong>{m.group(0)}</strong>", escaped_text)
+
+
+def _clean_subject_title(subject):
+    s = (subject or "").strip()
+    while True:
+        m = _FWD_PREFIX_RE.match(s)
+        if not m:
+            break
+        s = s[m.end():].strip()
+    return s or "Correio Semanal"
+
+
 def build_digest(pdf_bytes_list, subject):
-    """Resumo completo do Correio Semanal, pronto a mostrar na app — texto
-    simples, sem markdown. Sem IA: só extração e limpeza determinística,
-    por isso o mesmo PDF produz sempre o mesmo resultado."""
+    """Resumo completo do Correio Semanal, em HTML — títulos, negrito nas
+    referências, lista de prazos — pronto a mostrar na app. Sem IA: só
+    extração e limpeza determinística, por isso o mesmo PDF produz sempre o
+    mesmo resultado."""
     all_pages = []
     for pdf_bytes in pdf_bytes_list:
         all_pages.extend(_pages_text(pdf_bytes))
@@ -197,27 +251,36 @@ def build_digest(pdf_bytes_list, subject):
     toc, toc_pages = _parse_toc(all_pages)
     facts = _extract_facts(full_text)
 
-    sections = []
+    html_parts = [f"<h3>{html_escape(_clean_subject_title(subject))}</h3>"]
+
+    if facts:
+        items = "".join(f"<li>{_highlight(html_escape(f))}</li>" for f in facts)
+        html_parts.append(f"<h4>Prazos e referências</h4><ul>{items}</ul>")
+
     seen_titles = set()
     for i, page_text in enumerate(all_pages):
         if i in toc_pages:
             continue
-        body, actions = _clean_page(page_text)
-        if len(body) < 30:
+        paragraphs, actions = _clean_page(page_text)
+        total_len = sum(len(p) for _, p in paragraphs)
+        if total_len < 30:
             continue
         title = _section_title(page_text, i, toc)
         if title in seen_titles:
             title = f"{title} (cont.)"
         else:
             seen_titles.add(title)
-        block = title + ":"
-        if actions:
-            block += f" [Ação: {', '.join(actions)}]"
-        block += "\n" + body
-        sections.append(block)
 
-    parts = [f"Resumo de: {subject}" if subject else "Resumo do Correio Semanal"]
-    if facts:
-        parts.append("Prazos e referências:\n" + "\n".join(f"- {f}" for f in facts))
-    parts.extend(sections)
-    return "\n\n".join(parts)
+        section_html = [f"<h4>{html_escape(title)}</h4>"]
+        if actions:
+            tags = ", ".join(html_escape(a) for a in actions)
+            section_html.append(f'<p class="csn-action">Ação: {tags}</p>')
+        for is_heading, para in paragraphs:
+            escaped = _highlight(html_escape(para))
+            if is_heading:
+                section_html.append(f"<p><strong>{escaped}</strong></p>")
+            else:
+                section_html.append(f"<p>{escaped}</p>")
+        html_parts.append("".join(section_html))
+
+    return "".join(html_parts)

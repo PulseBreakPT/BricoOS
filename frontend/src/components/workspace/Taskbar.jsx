@@ -1,7 +1,39 @@
 import { useLocation } from "react-router-dom";
-import { X, LayoutGrid } from "lucide-react";
+import { X, LayoutGrid, Mail, ClipboardList, RefreshCw } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useSystemStatus } from "@/context/SystemStatusContext";
 import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
+import { timeAgo } from "@/lib/pedido";
+
+// Barra de estado ao estilo de um SO: ligação, contadores em tempo real e
+// há quanto tempo a caixa de entrada foi verificada — sempre visível, sem
+// abrir nada.
+function StatusCluster() {
+  const { status, online } = useSystemStatus();
+  return (
+    <div data-testid="taskbar-status" className="hidden shrink-0 items-center gap-3 border-l border-slate-200 pl-3 text-[11px] font-semibold text-slate-500 md:flex">
+      <span className="flex items-center gap-1.5" title={online ? "Ligado ao servidor" : "Sem ligação ao servidor"}>
+        <span className={`h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-red-500 animate-pulse"}`} />
+        {online ? "Ligado" : "Sem ligação"}
+      </span>
+      {status ? (
+        <>
+          <span className="flex items-center gap-1" title="Emails por ver">
+            <Mail className="h-3.5 w-3.5" /> {status.emails_nao_vistos}
+          </span>
+          <span className="flex items-center gap-1" title="Pedidos ativos">
+            <ClipboardList className="h-3.5 w-3.5" /> {status.pedidos_ativos}
+          </span>
+          {status.last_sync ? (
+            <span className="flex items-center gap-1" title="Última verificação da caixa de entrada">
+              <RefreshCw className="h-3 w-3" /> {timeAgo(status.last_sync)}
+            </span>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 // Barra fixa em baixo, só desktop — lançador de "aplicações" à esquerda,
 // painéis abertos (incluindo minimizados) à direita, tal como a barra de
@@ -78,6 +110,8 @@ export default function Taskbar() {
           {activeContext.label}
         </span>
       ) : null}
+
+      <StatusCluster />
     </div>
   );
 }
