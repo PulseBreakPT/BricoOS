@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { NavLink, useLocation, useNavigate, Outlet } from "react-router-dom";
-import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Star, Trash2, Menu, Grid2x2 } from "lucide-react";
+import { ClipboardList, Truck, ListChecks, BarChart3, BookOpenCheck, Hammer, Mail, CheckCheck, FileText, User, Search, Sparkles, Activity, Trash2, Menu, Grid2x2 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
-import FavoritesPanel from "@/components/FavoritesPanel";
 import TrashPanel from "@/components/TrashPanel";
 import api from "@/lib/api";
 import { timeAgo } from "@/lib/pedido";
@@ -188,7 +187,7 @@ const chromeIconBtn = "flex items-center justify-center rounded-xl text-[color:v
 // de trabalho guardadas — nada disto existe fora do "lg".
 function SidebarContent({
   desktop = false, onNavigate,
-  onOpenFavorites, onOpenActivity, onOpenTrash, onOpenSearch, onOpenMissionControl,
+  onOpenActivity, onOpenTrash, onOpenSearch, onOpenMissionControl,
 }) {
   const { status } = useSystemStatus();
 
@@ -197,15 +196,6 @@ function SidebarContent({
       <div className="flex shrink-0 items-center justify-between px-1">
         <Brand />
         <div className="flex items-center gap-0.5">
-          <button
-            data-testid="sidebar-favorites-btn"
-            onClick={onOpenFavorites}
-            aria-label="Favoritos"
-            title="Favoritos"
-            className={`h-9 w-9 ${chromeIconBtn} hover:text-amber-400`}
-          >
-            <Star className="h-[18px] w-[18px]" />
-          </button>
           <button
             data-testid="sidebar-activity-btn"
             onClick={onOpenActivity}
@@ -224,7 +214,6 @@ function SidebarContent({
           >
             <Trash2 className="h-[18px] w-[18px]" />
           </button>
-          <NotificationsBell variant="sidebar" />
         </div>
       </div>
 
@@ -340,7 +329,6 @@ function LayoutInner() {
   const isDesktop = useIsDesktop();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [missionControlOpen, setMissionControlOpen] = useState(false);
@@ -374,7 +362,6 @@ function LayoutInner() {
       <aside className="os-chrome fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] px-4 py-5 lg:flex">
         <SidebarContent
           desktop
-          onOpenFavorites={() => setFavoritesOpen(true)}
           onOpenActivity={() => setActivityOpen(true)}
           onOpenTrash={() => setTrashOpen(true)}
           onOpenSearch={() => setPaletteOpen(true)}
@@ -392,7 +379,6 @@ function LayoutInner() {
         >
           <SidebarContent
             onNavigate={() => setMobileNavOpen(false)}
-            onOpenFavorites={() => { setMobileNavOpen(false); setFavoritesOpen(true); }}
             onOpenActivity={() => { setMobileNavOpen(false); setActivityOpen(true); }}
             onOpenTrash={() => { setMobileNavOpen(false); setTrashOpen(true); }}
             onOpenSearch={() => { setMobileNavOpen(false); setPaletteOpen(true); }}
@@ -446,7 +432,6 @@ function LayoutInner() {
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
-      <FavoritesPanel open={favoritesOpen} onOpenChange={setFavoritesOpen} />
       <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
     </div>
   );
