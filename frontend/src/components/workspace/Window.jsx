@@ -6,6 +6,7 @@ import { SIDEBAR_WIDTH, TASKBAR_RESERVE, WORKSPACE_GAP } from "@/lib/workspaceLa
 
 const MIN_W = 420;
 const MIN_H = 320;
+const SPLIT_FRACTIONS = [0.5, 0.33, 0.25];
 
 // Janela flutuante do desktop — arrastar pela barra de título, redimensionar
 // pelo canto inferior direito. A posição/tamanho só é confirmada no
@@ -20,17 +21,26 @@ export default function Window({ panel, zIndex }) {
 
   // Ancorar a metade do ecrã (split screen) — sai do maximizado primeiro se
   // preciso, para o novo tamanho não ficar escondido por baixo dele. A
-  // metade "esquerda" começa depois da sidebar, nunca por baixo dela.
+  // metade "esquerda" começa depois da sidebar, nunca por baixo dela. Tocar
+  // outra vez no mesmo lado avança para o próximo tamanho — 50% → 33% → 25%
+  // → 50%... (como o Rectangle/Stage Manager); 100% já existe via maximizar.
   const snapTo = useCallback((side) => {
     if (panel.maximized) toggleMaximize(panel.id);
     const usableW = window.innerWidth - SIDEBAR_WIDTH;
-    const w = Math.max(MIN_W, Math.round(usableW / 2) - WORKSPACE_GAP * 1.5);
+    const widthFor = (fraction) => Math.max(MIN_W, Math.round(usableW * fraction) - WORKSPACE_GAP * 1.5);
+    const alreadyOnSide = side === "left"
+      ? Math.abs(panel.x - (SIDEBAR_WIDTH + WORKSPACE_GAP)) < 2
+      : Math.abs(panel.x + panel.w - (window.innerWidth - WORKSPACE_GAP)) < 4;
+    const currentIndex = alreadyOnSide
+      ? SPLIT_FRACTIONS.findIndex((fraction) => Math.abs(panel.w - widthFor(fraction)) < 2)
+      : -1;
+    const w = widthFor(SPLIT_FRACTIONS[currentIndex >= 0 ? (currentIndex + 1) % SPLIT_FRACTIONS.length : 0]);
     const h = Math.max(MIN_H, window.innerHeight - TASKBAR_RESERVE - WORKSPACE_GAP * 2);
     const x = side === "left" ? SIDEBAR_WIDTH + WORKSPACE_GAP : window.innerWidth - w - WORKSPACE_GAP;
     movePanel(panel.id, x, WORKSPACE_GAP);
     resizePanel(panel.id, w, h);
     focusPanel(panel.id);
-  }, [panel.id, panel.maximized, toggleMaximize, movePanel, resizePanel, focusPanel]);
+  }, [panel.id, panel.maximized, panel.w, panel.x, toggleMaximize, movePanel, resizePanel, focusPanel]);
 
   const meta = PANEL_TYPES[panel.type];
   const Icon = meta?.icon;
@@ -127,10 +137,10 @@ export default function Window({ panel, zIndex }) {
       >
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" /> : null}
         <p className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{meta.title}</p>
-        <button data-window-btn data-testid={`window-snap-left-${panel.type}`} onClick={() => snapTo("left")} title="Ancorar à esquerda (ecrã dividido)" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <button data-window-btn data-testid={`window-snap-left-${panel.type}`} onClick={() => snapTo("left")} title="Ancorar à esquerda — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
           <PanelLeft className="h-3.5 w-3.5" />
         </button>
-        <button data-window-btn data-testid={`window-snap-right-${panel.type}`} onClick={() => snapTo("right")} title="Ancorar à direita (ecrã dividido)" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <button data-window-btn data-testid={`window-snap-right-${panel.type}`} onClick={() => snapTo("right")} title="Ancorar à direita — toca outra vez para 50% / 33% / 25%" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
           <PanelRight className="h-3.5 w-3.5" />
         </button>
         <button data-window-btn data-testid={`window-minimize-${panel.type}`} onClick={() => toggleMinimize(panel.id)} title="Minimizar" className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
