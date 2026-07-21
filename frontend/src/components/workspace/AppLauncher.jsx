@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useWorkspace } from "@/context/WorkspaceContext";
-import { PANEL_TYPES, PANEL_ORDER, routeMatchesPanelType } from "@/lib/panelRegistry";
+import {
+  PANEL_TYPES,
+  PANEL_ORDER,
+  routeMatchesPanelType,
+} from "@/lib/panelRegistry";
 import DockIcon from "@/components/workspace/DockIcon";
 import { haptics } from "@/lib/haptics";
 
@@ -12,7 +16,11 @@ const DOCK_ORDER_KEY = "brico_dock_order_v1";
 // removidos desaparecem, sem partir nada.
 function loadDockOrder() {
   let saved = [];
-  try { saved = JSON.parse(window.localStorage.getItem(DOCK_ORDER_KEY) || "[]"); } catch { saved = []; }
+  try {
+    saved = JSON.parse(window.localStorage.getItem(DOCK_ORDER_KEY) || "[]");
+  } catch {
+    saved = [];
+  }
   const known = saved.filter((t) => PANEL_ORDER.includes(t));
   const missing = PANEL_ORDER.filter((t) => !known.includes(t));
   return [...known, ...missing];
@@ -21,18 +29,25 @@ function loadDockOrder() {
 // Grelha de lançamento de "aplicações" na sidebar — o Dock que antes vivia
 // espremido na taskbar, agora ao lado da navegação principal, com espaço
 // para todas as apps sem disputar largura com os separadores abertos.
-export default function AppLauncher() {
+export default function AppLauncher({ variant = "sidebar", onLaunch }) {
   const { panels, openPanel } = useWorkspace();
   const location = useLocation();
   const [dockOrder, setDockOrder] = useState(loadDockOrder);
   const [dragType, setDragType] = useState(null);
 
   useEffect(() => {
-    try { window.localStorage.setItem(DOCK_ORDER_KEY, JSON.stringify(dockOrder)); } catch { /* quota cheia ou modo privado */ }
+    try {
+      window.localStorage.setItem(DOCK_ORDER_KEY, JSON.stringify(dockOrder));
+    } catch {
+      /* quota cheia ou modo privado */
+    }
   }, [dockOrder]);
 
   const dropOnType = (targetType) => {
-    if (!dragType || dragType === targetType) { setDragType(null); return; }
+    if (!dragType || dragType === targetType) {
+      setDragType(null);
+      return;
+    }
     haptics.impact();
     setDockOrder((prev) => {
       const next = prev.filter((t) => t !== dragType);
@@ -44,7 +59,13 @@ export default function AppLauncher() {
   };
 
   return (
-    <div className="grid grid-cols-5 gap-1.5">
+    <div
+      className={
+        variant === "launcher"
+          ? "grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4 lg:grid-cols-6"
+          : "grid grid-cols-5 gap-1.5"
+      }
+    >
       {dockOrder.map((type) => {
         const meta = PANEL_TYPES[type];
         if (!meta) return null;
@@ -58,8 +79,15 @@ export default function AppLauncher() {
             isOpen={count > 0}
             count={count}
             isCurrentRoute={isCurrentRoute}
-            onOpen={() => openPanel(type)}
-            onOpenNew={() => openPanel(type, { forceNew: true })}
+            variant={variant === "launcher" ? "launcher" : "compact"}
+            onOpen={() => {
+              openPanel(type);
+              onLaunch?.();
+            }}
+            onOpenNew={() => {
+              openPanel(type, { forceNew: true });
+              onLaunch?.();
+            }}
             onDragStartType={setDragType}
             onDropOnType={dropOnType}
           />
