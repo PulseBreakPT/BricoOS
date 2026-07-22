@@ -35,6 +35,7 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
+import BrandMark from "@/components/BrandMark";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
@@ -283,9 +284,7 @@ function SupplierEmailAlert() {
 function MobileBrand({ activeApp }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white">
-        <span className="relative z-10">B</span>
-      </span>
+      <BrandMark className="h-9 w-9 rounded-xl" />
       <div className="mobile-brand-copy min-w-0 leading-tight">
         <p className="truncate font-heading text-sm font-extrabold text-foreground">
           BRICO OS
@@ -728,9 +727,7 @@ function AppLauncherOverlay({
       >
         <div className="control-deck-header flex items-center justify-between border-b border-neutral-900/[0.08] px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-white">
-              <span className="relative z-10">B</span>
-            </span>
+            <BrandMark className="h-9 w-9 rounded-xl" />
             <span className="min-w-0">
               <span className="block font-heading text-lg font-extrabold tracking-tight text-neutral-900">
                 Control Deck

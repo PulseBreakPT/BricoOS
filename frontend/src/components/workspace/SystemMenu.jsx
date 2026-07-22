@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import BrandMark from "@/components/BrandMark";
 import {
   Check,
   Download,
@@ -172,9 +173,7 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
             <DialogTitle className="sr-only">Sobre o BRICO OS</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center pt-2 text-center">
-            <span className="os-brand-beacon relative flex h-14 w-14 items-center justify-center rounded-[18px] text-xl font-black text-white">
-              <span className="relative z-10">B</span>
-            </span>
+            <BrandMark className="h-14 w-14 rounded-[18px]" />
             <p className="mt-4 font-heading text-2xl font-black tracking-tight text-foreground">
               BRICO OS
             </p>

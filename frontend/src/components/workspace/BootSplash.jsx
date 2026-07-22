@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BrandMark from "@/components/BrandMark";
 
 function alreadyBooted() {
   try {
@@ -39,9 +40,7 @@ export default function BootSplash() {
       aria-hidden="true"
       className={`os-boot-splash fixed inset-0 z-[120] flex flex-col items-center justify-center ${phase === "fade" ? "os-boot-splash-fade" : ""}`}
     >
-      <span className="os-brand-beacon relative flex h-16 w-16 items-center justify-center rounded-[20px] text-2xl font-black text-white">
-        <span className="relative z-10">B</span>
-      </span>
+      <BrandMark className="h-16 w-16 rounded-[20px]" />
       <p className="mt-5 font-heading text-2xl font-black tracking-tight text-neutral-900">
         BRICO OS
       </p>
