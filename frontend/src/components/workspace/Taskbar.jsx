@@ -46,18 +46,19 @@ function DockRouteApp({ app, active, onOpen }) {
         haptics.tap();
         onOpen(app.route);
       }}
-      className="group relative flex h-14 w-12 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 hover:-translate-y-1.5 active:scale-90"
+      className={`os-dock-route group relative flex h-14 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 hover:-translate-y-1.5 active:scale-90 ${active ? "is-active" : ""}`}
       title={`Abrir ${meta.title}`}
       aria-label={`Abrir ${meta.title}`}
     >
       <span
-        className={`flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/20 bg-gradient-to-br ${app.gradient} text-white shadow-[0_12px_22px_-10px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_18px_28px_-12px_rgba(0,0,0,0.9)]`}
+        className={`os-dock-app-icon flex h-11 w-11 items-center justify-center rounded-[15px] border border-white/20 bg-gradient-to-br ${app.gradient} text-white shadow-[0_12px_22px_-10px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_18px_28px_-12px_rgba(0,0,0,0.9)]`}
       >
         <Icon className="h-5 w-5" strokeWidth={2} />
       </span>
       <span
         className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full bg-white transition-all ${active ? "w-4 opacity-100" : "w-1 opacity-0 group-hover:opacity-40"}`}
       />
+      <span className="os-dock-tooltip">{meta.title}</span>
     </button>
   );
 }
@@ -85,7 +86,7 @@ export default function Taskbar({
       data-testid="workspace-taskbar"
       className="pointer-events-none fixed inset-x-0 bottom-3 z-[64] hidden justify-center px-4 lg:flex"
     >
-      <div className="os-dock pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-x-auto rounded-[22px] border border-white/[0.13] px-2 py-1.5 shadow-[0_22px_55px_-18px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-2xl">
+      <div className="os-dock pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-x-auto overflow-y-hidden rounded-[26px] border border-white/[0.14] px-2.5 py-2 shadow-[0_24px_65px_-20px_rgba(0,0,0,0.92),inset_0_1px_0_rgba(255,255,255,0.13)] backdrop-blur-2xl">
         <button
           type="button"
           data-testid="dock-launcher"
@@ -93,7 +94,7 @@ export default function Taskbar({
             haptics.tap();
             onOpenLauncher?.();
           }}
-          className="group flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] text-white/65 transition-all hover:-translate-y-1 hover:bg-white/10 hover:text-white active:scale-90"
+          className="group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] text-white/65 transition-all hover:-translate-y-1 hover:bg-white/10 hover:text-white active:scale-90"
           title="Todas as aplicações"
         >
           <span className="grid grid-cols-2 gap-[3px] rounded-[11px] border border-white/15 bg-white/[0.08] p-2 shadow-inner transition-transform group-hover:scale-105">
@@ -104,6 +105,7 @@ export default function Taskbar({
               />
             ))}
           </span>
+          <span className="os-dock-tooltip">Aplicações</span>
         </button>
 
         <span
@@ -141,7 +143,7 @@ export default function Taskbar({
                 haptics.tap();
                 focusPanel(panel.id);
               }}
-              className="group relative flex h-12 w-11 shrink-0 items-center justify-center rounded-xl transition-all hover:-translate-y-1 hover:bg-white/[0.08] active:scale-90"
+              className="group relative flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl transition-all hover:-translate-y-1 hover:bg-white/[0.08] active:scale-90"
               title={`${meta.title}${panel.minimized ? " · minimizada" : " · janela aberta"}`}
             >
               <span
@@ -152,6 +154,10 @@ export default function Taskbar({
               <span
                 className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full ${panel.minimized ? "w-1 bg-white/35" : active ? "w-4 bg-emerald-400" : "w-1 bg-white/70"}`}
               />
+              <span className="os-dock-tooltip">
+                {meta.title}
+                {panel.minimized ? " · minimizada" : ""}
+              </span>
               <span
                 role="button"
                 tabIndex={-1}

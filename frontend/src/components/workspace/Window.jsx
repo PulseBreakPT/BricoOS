@@ -215,7 +215,7 @@ export default function Window({ panel, zIndex }) {
     <div
       data-testid={`window-${panel.type}`}
       onPointerDownCapture={() => focusPanel(panel.id)}
-      className={`pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-2xl border bg-white ${isActive ? "elev-window-active border-black/25" : "elev-window border-black/10"}`}
+      className={`os-floating-window pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-[22px] border bg-white ${isActive ? "elev-window-active border-white/20" : "elev-window border-white/10"}`}
       style={style}
     >
       {/* Barra de título — a moldura grafite da máquina a segurar a folha
@@ -227,10 +227,10 @@ export default function Window({ panel, zIndex }) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onDoubleClick={() => toggleMaximize(panel.id)}
-        className={`os-chrome flex shrink-0 cursor-grab items-center gap-2 border-b border-black/40 px-3 py-2 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
+        className={`os-primary-titlebar flex h-12 shrink-0 cursor-grab items-center gap-2 border-b border-black/40 px-2.5 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
       >
         <div
-          className="group mr-1 flex shrink-0 items-center gap-1.5"
+          className="group mr-1 flex shrink-0 items-center gap-0.5"
           aria-label="Controlos da janela"
         >
           <button
@@ -238,49 +238,60 @@ export default function Window({ panel, zIndex }) {
             data-testid={`window-close-${panel.type}`}
             onClick={() => closePanel(panel.id)}
             title="Fechar"
-            className="flex h-3 w-3 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/30"
+            aria-label="Fechar"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
           >
-            <X
-              className="h-2 w-2 text-black/0 group-hover:text-black/55"
-              strokeWidth={3}
-            />
+            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/30">
+              <X
+                className="h-2 w-2 text-black/0 group-hover:text-black/55"
+                strokeWidth={3}
+              />
+            </span>
           </button>
           <button
             data-window-btn
             data-testid={`window-minimize-${panel.type}`}
             onClick={() => toggleMinimize(panel.id)}
             title="Minimizar"
-            className="flex h-3 w-3 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/30"
+            aria-label="Minimizar"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
           >
-            <Minus
-              className="h-2 w-2 text-black/0 group-hover:text-black/55"
-              strokeWidth={3}
-            />
+            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/30">
+              <Minus
+                className="h-2 w-2 text-black/0 group-hover:text-black/55"
+                strokeWidth={3}
+              />
+            </span>
           </button>
           <button
             data-window-btn
             data-testid={`window-maximize-${panel.type}`}
             onClick={() => toggleMaximize(panel.id)}
             title={panel.maximized ? "Restaurar" : "Maximizar"}
-            className="flex h-3 w-3 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/30"
+            aria-label={panel.maximized ? "Restaurar" : "Maximizar"}
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
           >
-            {panel.maximized ? (
-              <Minimize2
-                className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
-                strokeWidth={3}
-              />
-            ) : (
-              <Maximize2
-                className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
-                strokeWidth={3}
-              />
-            )}
+            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/30">
+              {panel.maximized ? (
+                <Minimize2
+                  className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
+                  strokeWidth={3}
+                />
+              ) : (
+                <Maximize2
+                  className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
+                  strokeWidth={3}
+                />
+              )}
+            </span>
           </button>
         </div>
         {Icon ? (
-          <Icon
-            className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}
-          />
+          <span className="os-window-app-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10">
+            <Icon
+              className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}
+            />
+          </span>
         ) : null}
         <p
           className={`min-w-0 flex-1 truncate text-xs font-bold ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}
@@ -292,7 +303,8 @@ export default function Window({ panel, zIndex }) {
           data-testid={`window-snap-left-${panel.type}`}
           onClick={() => snapTo("left")}
           title="Ancorar à esquerda — toca outra vez para 50% / 33% / 25%"
-          className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Ancorar janela à esquerda"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
         >
           <PanelLeft className="h-3.5 w-3.5" />
         </button>
@@ -301,12 +313,13 @@ export default function Window({ panel, zIndex }) {
           data-testid={`window-snap-right-${panel.type}`}
           onClick={() => snapTo("right")}
           title="Ancorar à direita — toca outra vez para 50% / 33% / 25%"
-          className="rounded-md p-1 text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Ancorar janela à direita"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
         >
           <PanelRight className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-4">
+      <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain p-4">
         <Content />
       </div>
       {!panel.maximized ? (

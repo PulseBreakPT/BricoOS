@@ -21,7 +21,12 @@ import {
   X,
 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
@@ -38,7 +43,8 @@ import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
 import AppLauncher from "@/components/workspace/AppLauncher";
-import StatusCluster from "@/components/workspace/StatusCluster";
+import DesktopOperationsRail from "@/components/workspace/DesktopOperationsRail";
+import MobileSystemDock from "@/components/workspace/MobileSystemDock";
 import SystemBar from "@/components/workspace/SystemBar";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
@@ -230,18 +236,18 @@ function SupplierEmailAlert() {
   );
 }
 
-function MobileBrand() {
+function MobileBrand({ activeApp }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 via-red-500 to-amber-400 text-sm font-black text-white shadow-[0_8px_20px_-8px_rgba(239,68,68,0.85)] ring-1 ring-white/20">
-        B
+      <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white">
+        <span className="relative z-10">B</span>
       </span>
       <div className="min-w-0 leading-tight">
         <p className="truncate font-heading text-sm font-extrabold text-white">
           BRICO OS
         </p>
         <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
-          Sistema da loja
+          {activeApp?.shortTitle || "Sistema da loja"}
         </p>
       </div>
     </div>
@@ -270,7 +276,7 @@ function MobileNavigation({
       <button
         type="button"
         onClick={onOpenSearch}
-        className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-left text-sm text-white/50"
+        className="mt-5 flex min-h-12 items-center gap-2 rounded-2xl border border-white/10 bg-black/35 px-3.5 text-left text-sm text-white/50 transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-white/75"
       >
         <Search className="h-4 w-4" />{" "}
         <span className="flex-1">Pesquisar tudo</span>
@@ -297,7 +303,7 @@ function MobileNavigation({
                       onNavigate?.();
                     }}
                     className={({ isActive }) =>
-                      `relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-bold transition-all ${isActive ? "bg-white text-black shadow-lg" : "text-white/55 hover:bg-white/[0.07] hover:text-white"}`
+                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive ? "bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "text-white/55 hover:bg-white/[0.07] hover:text-white"}`
                     }
                   >
                     {({ isActive }) => (
@@ -326,14 +332,14 @@ function MobileNavigation({
         <button
           type="button"
           onClick={onOpenActivity}
-          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs font-bold text-white/55"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-bold text-white/55 transition-colors hover:bg-white/10 hover:text-white"
         >
           <Activity className="h-4 w-4" /> Atividade
         </button>
         <button
           type="button"
           onClick={onOpenTrash}
-          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-xs font-bold text-white/55"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-bold text-white/55 transition-colors hover:bg-white/10 hover:text-white"
         >
           <Trash2 className="h-4 w-4" /> Lixeira
         </button>
@@ -381,14 +387,27 @@ function DesktopSurface({ visible, onOpenRoute, onOpenPanel, onOpenLauncher }) {
     >
       <div
         aria-hidden="true"
-        className="os-wallpaper-mark absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2 select-none text-center"
+        className="os-wallpaper-mark absolute left-[44%] top-[46%] -translate-x-1/2 -translate-y-1/2 select-none text-center"
       >
-        <p className="font-heading text-[clamp(4rem,10vw,10rem)] font-black tracking-[-0.08em] text-white/[0.035]">
-          BRICO
+        <p className="font-heading text-[clamp(4rem,9vw,9rem)] font-black tracking-[-0.08em] text-white/[0.04]">
+          BRICO/OS
         </p>
-        <p className="-mt-5 text-[10px] font-black uppercase tracking-[0.7em] text-white/[0.10]">
-          store operating system
+        <p className="-mt-5 text-[9px] font-black uppercase tracking-[0.72em] text-white/[0.11]">
+          operations workstation
         </p>
+      </div>
+
+      <div
+        aria-hidden="true"
+        className="absolute bottom-28 left-6 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-white/15"
+      >
+        Workspace 01 · Grid 48 · PT
+      </div>
+      <div
+        aria-hidden="true"
+        className="absolute right-7 top-20 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-white/15"
+      >
+        Live surface · 2026
       </div>
 
       {visible ? (
@@ -435,21 +454,17 @@ function DesktopSurface({ visible, onOpenRoute, onOpenPanel, onOpenLauncher }) {
             </button>
           </div>
 
-          <div
-            className="absolute right-5 top-20 w-72 animate-fade-up"
-            style={{ "--stagger-i": 1 }}
-          >
-            <StatusCluster variant="desktop" />
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-white shadow-2xl backdrop-blur-xl">
-              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/35">
-                Área de trabalho
-              </p>
-              <p className="mt-2 text-sm font-bold">Tudo pronto, Tiago.</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-white/45">
-                Abre uma aplicação no dock ou usa ⌘K para encontrar qualquer
-                elemento da loja.
-              </p>
-            </div>
+          <div className="absolute bottom-32 left-1/2 w-[min(580px,60vw)] -translate-x-1/2 rounded-[28px] border border-white/[0.1] bg-black/20 p-6 text-center text-white shadow-2xl backdrop-blur-2xl animate-fade-up">
+            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/30">
+              Ambiente de trabalho livre
+            </p>
+            <p className="mt-2 font-heading text-2xl font-extrabold tracking-tight">
+              Tudo pronto, Tiago.
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-xs font-semibold leading-relaxed text-white/40">
+              Abre uma aplicação no dock ou usa ⌘K para encontrar pedidos,
+              clientes e documentos sem sair do teu contexto.
+            </p>
           </div>
         </>
       ) : null}
@@ -473,87 +488,101 @@ function PrimaryRouteWindow({
   return (
     <main
       data-testid="primary-app-window"
-      className={`os-primary-window fixed z-20 hidden flex-col overflow-hidden border bg-white shadow-[0_35px_90px_-28px_rgba(0,0,0,0.72)] lg:flex ${maximized ? "inset-x-0 bottom-[88px] top-12 rounded-none border-x-0 border-t-0" : "bottom-[98px] left-4 right-4 top-16 rounded-[22px] border-black/20"}`}
+      className={`os-primary-window fixed z-20 hidden flex-col overflow-hidden border border-white/[0.14] bg-white shadow-[0_38px_100px_-30px_rgba(0,0,0,0.82)] lg:flex ${maximized ? "os-primary-window-maximized inset-x-2 bottom-[88px] top-[62px] rounded-[18px]" : "bottom-[98px] left-4 right-4 top-[72px] rounded-[26px] 2xl:right-[316px]"}`}
     >
       <div
         data-testid="primary-window-titlebar"
-        className="os-primary-titlebar flex h-11 shrink-0 items-center border-b border-black/35 px-3"
+        className="os-primary-titlebar flex h-[52px] shrink-0 items-center border-b border-black/40 px-3.5"
       >
         <div
-          className="group mr-3 flex items-center gap-2"
+          className="group mr-2 flex items-center gap-0.5"
           aria-label="Controlos da janela"
         >
           <button
             type="button"
             onClick={onClose}
-            className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/25"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
             title="Fechar e mostrar o ambiente de trabalho"
+            aria-label="Fechar e mostrar o ambiente de trabalho"
           >
-            <X
-              className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
-              strokeWidth={3}
-            />
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/30">
+              <X
+                className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
+                strokeWidth={3}
+              />
+            </span>
           </button>
           <button
             type="button"
             onClick={onMinimize}
-            className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/25"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
             title="Minimizar"
+            aria-label="Minimizar"
           >
-            <Minus
-              className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
-              strokeWidth={3}
-            />
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/30">
+              <Minus
+                className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
+                strokeWidth={3}
+              />
+            </span>
           </button>
           <button
             type="button"
             onClick={onToggleMaximize}
-            className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/25"
+            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
             title={maximized ? "Restaurar" : "Maximizar"}
+            aria-label={maximized ? "Restaurar" : "Maximizar"}
           >
-            <Maximize2
-              className="h-2 w-2 text-black/0 group-hover:text-black/55"
-              strokeWidth={3}
-            />
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/30">
+              <Maximize2
+                className="h-2 w-2 text-black/0 group-hover:text-black/55"
+                strokeWidth={3}
+              />
+            </span>
           </button>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/10 bg-white/[0.08] text-white/75">
-            <Icon className="h-3.5 w-3.5" />
+        <span className="mr-3 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="os-window-app-icon flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 text-white/80">
+            <Icon className="h-4 w-4" />
           </span>
-          <div className="min-w-0 leading-none">
-            <p className="truncate text-[11px] font-extrabold text-white/90">
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-xs font-extrabold text-white/90">
               {app.title}
             </p>
-            <p className="mt-1 text-[8px] font-black uppercase tracking-[0.18em] text-white/25">
-              BRICO OS
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.2em] text-white/25">
+              BRICO OS / {app.shortTitle}
             </p>
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold text-white/40 2xl:flex">
+          <span className="hidden h-7 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 text-[9px] font-bold text-white/45 xl:flex">
             <span className="led led-ok" /> Sincronizado
           </span>
           <button
             type="button"
             onClick={onOpenSearch}
-            className="flex h-7 items-center gap-2 rounded-lg border border-white/10 bg-black/25 px-2.5 text-[10px] font-bold text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
+            className="flex h-8 items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 text-[10px] font-bold text-white/45 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white/75"
           >
             <Search className="h-3 w-3" /> Pesquisar{" "}
             <span className="font-mono text-[8px]">⌘K</span>
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-[hsl(var(--background))]">
-        <div className="mx-auto w-full max-w-[1760px] p-5 sm:p-7 xl:p-9">
+      <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain bg-[hsl(var(--background))]">
+        <div className="mx-auto w-full max-w-[1760px] p-5 sm:p-7 xl:p-8">
           {children}
         </div>
       </div>
-      <div className="flex h-6 shrink-0 items-center justify-between border-t border-slate-200 bg-white px-3 text-[9px] font-bold text-slate-400">
+      <div className="os-window-status flex h-7 shrink-0 items-center justify-between border-t border-slate-200/80 bg-white px-3.5 text-[9px] font-bold text-slate-400">
         <span className="flex items-center gap-1.5">
           <span className="led led-ok" /> Aplicação pronta
         </span>
-        <span className="font-mono">BRICO OS · {app.shortTitle}</span>
+        <span className="hidden items-center gap-3 font-mono sm:flex">
+          <span>⌘K pesquisar</span>
+          <span className="text-slate-300">/</span>
+          <span>BRICO OS · {app.shortTitle}</span>
+        </span>
       </div>
     </main>
   );
@@ -720,6 +749,13 @@ function LayoutInner() {
               <Outlet />
             </div>
           </PrimaryRouteWindow>
+          <DesktopOperationsRail
+            app={activeRouteApp}
+            visible={!primaryMaximized}
+            onOpenRoute={openRoute}
+            onOpenActivity={() => setActivityOpen(true)}
+            onOpenSearch={() => setPaletteOpen(true)}
+          />
           <DesktopWorkspace
             missionControlOpen={missionControlOpen}
             onMissionControlOpenChange={setMissionControlOpen}
@@ -735,12 +771,19 @@ function LayoutInner() {
           />
         </>
       ) : (
-        <>
+        <div className="mobile-os-shell min-h-dvh text-foreground">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetContent
               side="left"
-              className="os-chrome flex w-[86vw] max-w-sm flex-col gap-0 border-r border-white/[0.08] p-5 pr-10 pt-6 text-white"
+              className="os-mobile-drawer os-chrome flex w-[86vw] max-w-sm flex-col gap-0 border-r border-white/[0.08] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pr-10 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white"
             >
+              <SheetTitle className="sr-only">
+                Aplicações e ferramentas
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                Navega pelas aplicações principais ou abre as ferramentas do
+                sistema.
+              </SheetDescription>
               <MobileNavigation
                 onNavigate={() => setMobileNavOpen(false)}
                 onOpenSearch={() => {
@@ -758,33 +801,35 @@ function LayoutInner() {
               />
             </SheetContent>
           </Sheet>
-          <header className="os-chrome-flat sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-white/[0.08] px-3 py-2.5 sm:px-4">
-            <div className="flex min-w-0 items-center gap-2">
-              <button
-                type="button"
-                data-testid="mobile-nav-btn"
-                onClick={() => setMobileNavOpen(true)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white/65 hover:bg-white/10 hover:text-white"
-                aria-label="Abrir menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <MobileBrand />
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                data-testid="mobile-search-btn"
-                onClick={() => setPaletteOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
-                aria-label="Pesquisar"
-              >
-                <Search className="h-[18px] w-[18px]" />
-              </button>
-              <NotificationsBell variant="mobile" />
+          <header className="mobile-os-header sticky top-0 z-30 p-2 pb-0 pt-[calc(0.5rem+env(safe-area-inset-top))]">
+            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-white/[0.11] px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(0,0,0,0.9)]">
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="mobile-nav-btn"
+                  onClick={() => setMobileNavOpen(true)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Abrir menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <MobileBrand activeApp={activeRouteApp} />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  data-testid="mobile-search-btn"
+                  onClick={() => setPaletteOpen(true)}
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Pesquisar"
+                >
+                  <Search className="h-[18px] w-[18px]" />
+                </button>
+                <NotificationsBell variant="mobile" />
+              </div>
             </div>
           </header>
-          <main className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-7">
+          <main className="mobile-workspace px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pt-6">
             <div
               key={location.pathname}
               className="mx-auto w-full max-w-6xl animate-page-enter"
@@ -793,7 +838,11 @@ function LayoutInner() {
               <Outlet />
             </div>
           </main>
-        </>
+          <MobileSystemDock
+            moreOpen={mobileNavOpen}
+            onOpenMore={() => setMobileNavOpen(true)}
+          />
+        </div>
       )}
 
       <AppLauncherOverlay
