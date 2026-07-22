@@ -1,67 +1,40 @@
 import { useEffect, useState } from "react";
 import { Download, Share, SquarePlus, X } from "lucide-react";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 
 const DISMISS_KEY = "brico-pwa-install-dismissed";
 
-function isStandalone() {
-    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-}
-
-function isIos() {
-    const ua = window.navigator.userAgent;
-    const iOSDevice = /iphone|ipad|ipod/i.test(ua);
-    const iPadOS13Up = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-    return iOSDevice || iPadOS13Up;
-}
-
 export default function InstallPwaBanner() {
-    const [deferredPrompt, setDeferredPrompt] = useState(null);
-    const [visible, setVisible] = useState(false);
+    const { showInstallOption, install } = usePwaInstall();
+    const [dismissed, setDismissed] = useState(() => Boolean(localStorage.getItem(DISMISS_KEY)));
     const [showIosSteps, setShowIosSteps] = useState(false);
 
+    // Se a app for desinstalada, "showInstallOption" volta a true numa visita
+    // seguinte — mas o dispensar desta sessão específica não deve persistir
+    // para sempre, só até à próxima vez que a opção de instalar reaparecer.
     useEffect(() => {
-        if (isStandalone() || localStorage.getItem(DISMISS_KEY)) return;
+        if (showInstallOption) return;
+        setDismissed(false);
+        localStorage.removeItem(DISMISS_KEY);
+    }, [showInstallOption]);
 
-        if (isIos()) {
-            setVisible(true);
-            return;
-        }
-
-        const onPrompt = (e) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-            setVisible(true);
-        };
-        const onInstalled = () => {
-            setVisible(false);
-            localStorage.setItem(DISMISS_KEY, "1");
-        };
-
-        window.addEventListener("beforeinstallprompt", onPrompt);
-        window.addEventListener("appinstalled", onInstalled);
-        return () => {
-            window.removeEventListener("beforeinstallprompt", onPrompt);
-            window.removeEventListener("appinstalled", onInstalled);
-        };
-    }, []);
+    const visible = showInstallOption && !dismissed;
 
     const dismiss = () => {
-        setVisible(false);
+        setDismissed(true);
         setShowIosSteps(false);
         localStorage.setItem(DISMISS_KEY, "1");
     };
 
-    const install = async () => {
-        if (isIos()) {
+    const handleInstall = async () => {
+        const outcome = await install();
+        if (outcome === "ios-instructions") {
             setShowIosSteps((v) => !v);
             return;
         }
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-        setDeferredPrompt(null);
-        setVisible(false);
-        localStorage.setItem(DISMISS_KEY, "1");
+        if (outcome === "accepted" || outcome === "dismissed") {
+            setShowIosSteps(false);
+        }
     };
 
     if (!visible) return null;
@@ -94,7 +67,7 @@ export default function InstallPwaBanner() {
                     <button
                         type="button"
                         data-testid="pwa-install-btn"
-                        onClick={install}
+                        onClick={handleInstall}
                         className="h-9 rounded-xl bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                         Instalar
