@@ -7,7 +7,6 @@ import { withDeviceToken } from "@/lib/deviceAuth";
 import { Spinner } from "@/components/ui/spinner";
 import { timeAgo } from "@/lib/pedido";
 import QuickPeekTrigger from "@/components/QuickPeek";
-import FavoriteToggle from "@/components/FavoriteToggle";
 
 function fileUrl(item) {
   return item.source === "note_file"
@@ -88,12 +87,6 @@ export default function DownloadsCenter() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <FavoriteToggle
-                item={{
-                  kind: "pdf", id: `${it.source}-${it.id}`, label: it.filename,
-                  sublabel: it.kind_label, to: withDeviceToken(fileUrl(it)), external: true,
-                }}
-              />
               {it.note_id ? (
                 <button
                   type="button"

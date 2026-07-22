@@ -21,12 +21,12 @@ import { Empty, EmptyDescription } from "@/components/ui/empty";
 import { toast } from "sonner";
 import {
   Trash2, Send, Copy, Mail, Plus, AlertCircle, CheckCircle2,
-  Star, MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
+  MessageSquare, Sparkles, ArrowRightLeft, Flag, Receipt,
   BadgeCheck, Pencil, Bell, Tag, X, Calendar, Zap,
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
-  ArrowUpRight, Building2, FileWarning, Waypoints,
+  ArrowUpRight, Building2, FileWarning,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -39,8 +39,6 @@ import CaixilhariaDialog from "@/components/CaixilhariaDialog";
 import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPreviewDialog";
 import EntityStackBar from "@/components/EntityStackBar";
-import FavoriteToggle from "@/components/FavoriteToggle";
-import RelationGraph from "@/components/workspace/RelationGraph";
 import PhoneInput from "@/components/PhoneInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
@@ -135,7 +133,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // entidade relacionada; a EntityStackBar deixa voltar a qualquer nível
   // anterior sem perder onde se ficou no pedido.
   const [stack, setStack] = useState([]);
-  const [graphOpen, setGraphOpen] = useState(false);
   const pushFrame = (frame) => setStack((s) => [...s, { key: `${frame.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, ...frame }]);
   const popTo = (index) => setStack((s) => (index < 0 ? [] : s.slice(0, index + 1)));
 
@@ -216,7 +213,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setPhotos([]);
       setLightboxPhoto(null);
       setStack([]);
-      setGraphOpen(false);
       // Cada área abre logo o assistente certo: «band» na área Banda
       // Alumínios, «normal» na área geral da loja.
       setCreateMode(initialCreateMode || "choice");
@@ -461,10 +457,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       return;
     }
     await changeStatus(note.next_status);
-  };
-  const toggleFav = async () => {
-    await api.put(`/notes/${id}`, { favorite: !note.favorite });
-    await refreshChrome();
   };
   const remove = async () => {
     const who = note?.customer_name || "este pedido";
@@ -771,7 +763,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <p className="truncate font-heading text-base font-extrabold text-foreground">{s.name}</p>
               <p className="text-xs text-muted-foreground">Fornecedor</p>
             </div>
-            <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
           </div>
           <div className="space-y-2 rounded-2xl border border-border bg-muted/60 p-4 text-sm">
             {s.email ? (
@@ -911,11 +902,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </p>
               ) : null}
             </div>
-            {!isCreate && note ? (
-              <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-amber-400">
-                <Star className={`h-5 w-5 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
-              </button>
-            ) : null}
           </div>
 
           {/* Quick actions — grelha compacta no telemóvel, linha em ecrãs maiores */}
@@ -953,10 +939,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
-              <Button data-testid="detail-graph" size="sm" variant="outline" onClick={() => setGraphOpen(true)} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
-                <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
-              </Button>
-
               {/* Visualização vs edição: os dados do pedido só ficam editáveis
                   depois de premir "Editar" — o estado/prioridade acima
                   continuam sempre disponíveis, sem precisar de entrar em
@@ -2009,10 +1991,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         onOpenChange={(v) => !v && setPreviewAttachment(null)}
         attachment={previewAttachment}
       />
-
-      {graphOpen && note ? (
-        <RelationGraph rootKind="pedido" rootId={id} rootLabel={note.customer_name || "Pedido"} onClose={() => setGraphOpen(false)} />
-      ) : null}
     </Dialog>
   );
 }

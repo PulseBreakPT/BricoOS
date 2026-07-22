@@ -1745,17 +1745,6 @@ code {
   transform-origin: center bottom;
 }
 
-.relation-graph-canvas {
-  --graph-line: #e2e8f0;
-  width: min(540px, calc(100vw - 1rem), calc(100dvh - 8.75rem));
-  aspect-ratio: 1;
-}
-
-.relation-graph-node {
-  width: max(44px, var(--graph-node-size));
-  height: max(44px, var(--graph-node-size));
-}
-
 /* As superfícies de chrome continuam grafite nos dois temas; branco aqui é
    um estado ativo, não uma superfície de conteúdo. */
 /* Barra de arranque — enchimento determinado da esquerda p/ a direita. */

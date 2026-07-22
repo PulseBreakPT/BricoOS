@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Waypoints, Download, RotateCcw, Clock, ArrowRight, History, Upload, Star,
+  Download, RotateCcw, Clock, ArrowRight, History, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, getErrorMessage } from "@/lib/api";
@@ -10,8 +10,6 @@ import { formatDateTime, timeAgo, getStatusCfg } from "@/lib/pedido";
 import { previewKind } from "@/components/AttachmentPreviewDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import FavoriteToggle from "@/components/FavoriteToggle";
-import RelationGraph from "@/components/workspace/RelationGraph";
 
 function fileUrl(f) {
   if (f.source === "note_file") return `${API}/notes/${f.note_id}/files/${f.id}`;
@@ -43,26 +41,11 @@ function PedidoDetailSection({ item, onNavigate }) {
   const note = item.data;
   const st = getStatusCfg(note.status);
   const [activities, setActivities] = useState([]);
-  const [graphOpen, setGraphOpen] = useState(false);
-  const [favorite, setFavorite] = useState(!!note.favorite);
   const navigate = useNavigate();
 
   useEffect(() => {
-    setFavorite(!!note.favorite);
     api.get(`/notes/${item.id}/activities`).then(({ data }) => setActivities((data || []).slice(0, 6))).catch(() => setActivities([]));
-  }, [item.id, note.favorite]);
-
-  const toggleFav = async () => {
-    const next = !favorite;
-    setFavorite(next);
-    try {
-      await api.put(`/notes/${item.id}`, { favorite: next });
-      toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
-    } catch (e) {
-      setFavorite(!next);
-      toast.error(getErrorMessage(e));
-    }
-  };
+  }, [item.id]);
 
   return (
     <div className="space-y-4">
@@ -82,12 +65,6 @@ function PedidoDetailSection({ item, onNavigate }) {
         <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => navigate(`/?open=${item.id}`)}>
           Abrir pedido
         </Button>
-        <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => setGraphOpen(true)}>
-          <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
-        </Button>
-        <button type="button" onClick={toggleFav} title="Favorito" className="rounded-lg border border-border p-1.5 text-muted-foreground hover:text-amber-400">
-          <Star className={`h-4 w-4 ${favorite ? "fill-amber-400 text-amber-400" : ""}`} />
-        </button>
       </div>
       <div className="space-y-1.5">
         <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Relacionados</p>
@@ -108,44 +85,28 @@ function PedidoDetailSection({ item, onNavigate }) {
           </div>
         </div>
       ) : null}
-      {graphOpen ? (
-        <RelationGraph rootKind="pedido" rootId={item.id} rootLabel={note.customer_name || "Pedido"} onClose={() => setGraphOpen(false)} />
-      ) : null}
     </div>
   );
 }
 
 function FornecedorDetailSection({ item, onNavigate }) {
   const s = item.data;
-  const [graphOpen, setGraphOpen] = useState(false);
   return (
     <div className="space-y-3">
       <Field label="Email" value={s.email} />
       <Field label="Telefone" value={s.phone} />
       <Field label="Notas" value={s.notes} />
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => setGraphOpen(true)}>
-          <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
-        </Button>
-        <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
-      </div>
-      {graphOpen ? <RelationGraph rootKind="fornecedor" rootId={s.id} rootLabel={s.name} onClose={() => setGraphOpen(false)} /> : null}
     </div>
   );
 }
 
 function ClienteDetailSection({ item }) {
   const c = item.data;
-  const [graphOpen, setGraphOpen] = useState(false);
   return (
     <div className="space-y-3">
       <Field label="Telefone" value={c.phone} />
       <Field label="Email" value={c.email} />
       <Field label="Pedidos" value={`${c.pedidos_count} (${c.active_count} ativo${c.active_count === 1 ? "" : "s"})`} />
-      <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => setGraphOpen(true)}>
-        <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
-      </Button>
-      {graphOpen ? <RelationGraph rootKind="cliente" rootId={c.key} rootLabel={c.name} onClose={() => setGraphOpen(false)} /> : null}
     </div>
   );
 }
@@ -231,7 +192,6 @@ function FicheiroDetailSection({ item, onNavigate }) {
         {f.note_id ? (
           <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => onNavigate("pedido", f.note_id, f.note_label)}>Ver pedido</Button>
         ) : null}
-        <FavoriteToggle item={{ kind: "pdf", id: `${f.source}-${f.id}`, label: f.filename, sublabel: f.kind_label, to: url, external: true }} />
       </div>
       {canUploadVersion ? (
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-border p-2 text-xs font-semibold text-muted-foreground hover:border-input hover:text-foreground">

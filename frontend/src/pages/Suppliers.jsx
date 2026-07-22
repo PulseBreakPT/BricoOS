@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import PhoneInput from "@/components/PhoneInput";
-import FavoriteToggle from "@/components/FavoriteToggle";
 import LabelEditor from "@/components/LabelEditor";
 import AttachmentManager from "@/components/AttachmentManager";
 import { toast } from "sonner";
@@ -199,7 +198,6 @@ export default function Suppliers() {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
                   <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-muted hover:text-foreground active:scale-90">
                     <Pencil className="h-4 w-4" />
                   </button>

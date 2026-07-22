@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
+import TaskGroups from "@/pages/TaskGroups";
 import Catalog from "@/pages/Catalog";
 import Emails from "@/pages/Emails";
 
@@ -34,6 +35,7 @@ function App() {
               <Route path="/fornecedores" element={<Suppliers />} />
               <Route path="/emails" element={<Emails />} />
               <Route path="/tarefas" element={<Tasks />} />
+              <Route path="/grupos-tarefas" element={<TaskGroups />} />
               <Route path="/catalogo-tecnico" element={<Catalog />} />
             </Route>
           </Routes>

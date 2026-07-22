@@ -1,6 +1,6 @@
 import {
   ClipboardList, Users, Truck, Mail, FileText, Image as ImageIcon, FileSpreadsheet,
-  StickyNote, Calendar, Package, Archive, Trash2, Star, Inbox, RefreshCw, AlertTriangle, CheckCircle2,
+  StickyNote, Calendar, Package, Archive, Trash2, Inbox, RefreshCw, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -102,15 +102,6 @@ export const ROOT_FOLDERS = [
       const { data } = await api.get("/trash");
       return (data.items || []).map((it) => ({
         kind: "lixeira", id: `${it.kind}-${it.id}`, label: it.label, sublabel: `${it.kind} · ${it.sublabel || ""}`, data: it,
-      }));
-    },
-  },
-  {
-    key: "favoritos", label: "Favoritos", icon: Star,
-    fetch: async () => {
-      const { data } = await api.get("/notes", { params: { favorite: true } });
-      return (data.items || []).map((n) => ({
-        kind: "pedido", id: n.id, label: n.customer_name || "Sem nome", sublabel: n.description || "", data: n,
       }));
     },
   },

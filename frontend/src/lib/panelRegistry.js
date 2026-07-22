@@ -3,6 +3,7 @@ import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
+import TaskGroups from "@/pages/TaskGroups";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import Calculator from "@/components/miniapps/Calculator";
@@ -23,6 +24,7 @@ export const PANEL_TYPES = {
   emails: { title: "Emails", icon: Mail, Component: Emails },
   suppliers: { title: "Fornecedores", icon: Truck, Component: Suppliers },
   tasks: { title: "Tarefas", icon: ListChecks, Component: Tasks },
+  taskGroups: { title: "Grupos de Tarefas", icon: FolderTree, Component: TaskGroups },
   dashboard: { title: "Estatísticas", icon: BarChart3, Component: Dashboard },
   catalog: { title: "Catálogo técnico", icon: BookOpenCheck, Component: Catalog },
   health: { title: "Painel de Saúde", icon: HeartPulse, Component: HealthPanel },
@@ -34,7 +36,7 @@ export const PANEL_TYPES = {
 };
 
 export const PANEL_ORDER = [
-  "notes", "emails", "suppliers", "tasks", "dashboard", "catalog",
+  "notes", "emails", "suppliers", "tasks", "taskGroups", "dashboard", "catalog",
   "explorer", "health", "downloads", "calculator", "scratchpad", "stopwatch",
 ];
 
@@ -48,6 +50,7 @@ export const PANEL_ROUTES = {
   emails: "/emails",
   suppliers: "/fornecedores",
   tasks: "/tarefas",
+  taskGroups: "/grupos-tarefas",
   dashboard: "/estatisticas",
   catalog: "/catalogo-tecnico",
 };
