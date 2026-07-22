@@ -49,7 +49,7 @@ function BrandMark({ locked }) {
         {!locked ? <span className="led led-ok absolute -right-1 -top-1 ring-2 ring-[color:var(--chrome-deep)]" /> : null}
       </span>
       <h1 className="mt-4 font-heading text-lg font-black uppercase tracking-[0.28em] text-neutral-900">
-        Brico<span className="text-red-500">·</span>Assistente
+        Brico<span className="text-red-500">·</span>OS
       </h1>
       <p className="engraved mt-1.5">Acesso reservado</p>
     </div>
