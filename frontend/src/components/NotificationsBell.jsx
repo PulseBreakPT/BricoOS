@@ -56,7 +56,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
           className={`group relative flex items-center justify-center rounded-xl transition-all duration-200 active:scale-90 ${
             variant === "sidebar"
               ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-card/10 hover:text-white"
-              : "h-10 w-10 text-[color:var(--chrome-muted)] hover:bg-card/10 hover:text-white"
+              : "h-10 w-10 text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
           <Bell className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110 ${count > 0 ? "animate-shake" : ""}`} strokeWidth={2.2} />
