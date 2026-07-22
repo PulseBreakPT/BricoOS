@@ -1,17 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Estado partilhado por toda a app: o evento "beforeinstallprompt" só
-// dispara uma vez por carregamento de página, por isso é capturado aqui,
-// a um nível de módulo, em vez de dentro de um componente que pode nem
-// chegar a montar a tempo (banner dispensado, menu ainda fechado, etc.).
-// Qualquer botão "Instalar aplicação" em qualquer parte da app usa este
-// mesmo hook e vê sempre o estado mais recente.
-let deferredPrompt = null;
-const listeners = new Set();
-
-function notify() {
-  listeners.forEach((fn) => fn());
+// O evento "beforeinstallprompt" é capturado o mais cedo possível por um
+// script inline no <head> (ver public/index.html), que o guarda em
+// window.__bricoPWA. Isto evita a corrida em que o Chrome dispara o evento
+// antes de este bundle carregar — e o perde para sempre. Aqui apenas
+// garantimos que esse armazenamento existe (fallback para dev/casos raros
+// em que o script inline não esteja presente) e lemos o seu estado.
+function ensureStore() {
+  if (typeof window === "undefined") return null;
+  const store = (window.__bricoPWA = window.__bricoPWA || {
+    deferredPrompt: null,
+    bound: false,
+  });
+  if (!store.bound) {
+    store.bound = true;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      store.deferredPrompt = e;
+      window.dispatchEvent(new Event("brico:pwa-change"));
+    });
+    window.addEventListener("appinstalled", () => {
+      store.deferredPrompt = null;
+      window.dispatchEvent(new Event("brico:pwa-change"));
+    });
+  }
+  return store;
 }
+
+const store = ensureStore();
 
 function isStandaloneNow() {
   if (typeof window === "undefined") return false;
@@ -30,21 +46,6 @@ function isIosDevice() {
   return iOSDevice || iPadOS13Up;
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    notify();
-  });
-  // Não marcamos nada como "definitivamente instalado" em localStorage: se o
-  // dispositivo vier a desinstalar a app, uma futura visita deve voltar a
-  // encontrar a opção de instalar, não ficar bloqueada para sempre.
-  window.addEventListener("appinstalled", () => {
-    deferredPrompt = null;
-    notify();
-  });
-}
-
 // Hook para expor a opção "Instalar aplicação" em qualquer menu/botão da
 // app. Ao contrário do banner dispensável, esta opção nunca se esconde
 // sozinha por ter sido fechada antes — só desaparece quando a app já
@@ -58,21 +59,27 @@ export function usePwaInstall() {
       bump((n) => n + 1);
       setStandalone(isStandaloneNow());
     };
-    listeners.add(onChange);
-    return () => listeners.delete(onChange);
+    window.addEventListener("brico:pwa-change", onChange);
+    const mq = window.matchMedia?.("(display-mode: standalone)");
+    mq?.addEventListener?.("change", onChange);
+    return () => {
+      window.removeEventListener("brico:pwa-change", onChange);
+      mq?.removeEventListener?.("change", onChange);
+    };
   }, []);
 
   const ios = isIosDevice();
-  const canPrompt = Boolean(deferredPrompt);
+  const canPrompt = Boolean(store?.deferredPrompt);
   const showInstallOption = !standalone;
 
   const install = useCallback(async () => {
     if (ios) return "ios-instructions";
-    if (!deferredPrompt) return "unavailable";
-    deferredPrompt.prompt();
-    const choice = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    notify();
+    const dp = store?.deferredPrompt;
+    if (!dp) return "unavailable";
+    dp.prompt();
+    const choice = await dp.userChoice;
+    if (store) store.deferredPrompt = null;
+    window.dispatchEvent(new Event("brico:pwa-change"));
     return choice?.outcome === "accepted" ? "accepted" : "dismissed";
   }, [ios]);
 
