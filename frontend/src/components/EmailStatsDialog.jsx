@@ -22,7 +22,7 @@ function BarRow({ label, count, max, colorCls = "bg-blue-400" }) {
   const pct = max ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-24 shrink-0 truncate text-slate-600">{label}</span>
+      <span className="w-20 shrink-0 truncate text-slate-600 sm:w-24">{label}</span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${colorCls}`} style={{ width: `${pct}%` }} />
       </div>
@@ -51,19 +51,19 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="email-stats-dialog" className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-5 py-4">
+        <DialogHeader className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-5">
           <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
             <BarChart3 className="h-5 w-5" /> Estatísticas de email
           </DialogTitle>
           <p className="text-xs text-slate-500">Últimos 30 dias.</p>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           {loading || !stats ? (
             <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
           ) : (
             <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[430px]:grid-cols-3">
                 <Tile label="Tempo médio de resposta" value={stats.avg_response_hours != null ? `${stats.avg_response_hours}h` : "—"} />
                 <Tile label="Recebidos (30d)" value={stats.total_received_30d} />
                 <Tile label="Enviados (30d)" value={stats.total_sent_30d} />

@@ -33,7 +33,7 @@ function ResultRow({ testid, title, subtitle, onClick }) {
 // Pesquisa universal — Ctrl/Cmd+K no desktop, ícone de pesquisa no
 // telemóvel. Abre imediatamente o pedido/painel certo em vez de obrigar a
 // navegar entre páginas à procura.
-export default function CommandPalette({ open, onOpenChange }) {
+export default function CommandPalette({ open, onOpenChange, onLaunch }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -66,6 +66,7 @@ export default function CommandPalette({ open, onOpenChange }) {
   }, [q]);
 
   const goTo = (path, panelType) => {
+    onLaunch?.();
     if (isDesktop && panelType && !routeMatchesPanelType(location.pathname, panelType)) openPanel(panelType);
     else navigate(path);
     onOpenChange(false);
@@ -76,6 +77,7 @@ export default function CommandPalette({ open, onOpenChange }) {
     // pelo router — nunca abre como painel flutuante, para não arriscar dois
     // diálogos do mesmo pedido em simultâneo (um por instância de Notes).
     setActiveContext({ kind: "pedido", id: n.id, label: n.customer_name || "Pedido" });
+    onLaunch?.();
     navigate(`/?open=${n.id}`);
     onOpenChange(false);
   };
@@ -87,9 +89,9 @@ export default function CommandPalette({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="command-palette" className="elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-black/15 p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-white">
+      <DialogContent data-testid="command-palette" className="command-palette-dialog elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-black/15 p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-white">
         {/* Visor de comando — faixa grafite da máquina com o campo embutido. */}
-        <div className="os-chrome flex items-center gap-2.5 border-b border-black/40 py-3 pl-4 pr-10">
+        <div className="os-chrome flex items-center gap-2.5 border-b border-black/40 py-3 pl-4 pr-14 sm:pr-12">
           <Search className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" />
           <Input
             data-testid="command-palette-input"
@@ -105,8 +107,8 @@ export default function CommandPalette({ open, onOpenChange }) {
           {q.trim().length < 2 ? (
             <ResultGroup label="Ações rápidas" icon={Zap}>
               {[
-                { icon: Plus, label: "Novo pedido", run: () => { navigate("/?new=1"); onOpenChange(false); } },
-                { icon: Mail, label: "Abrir emails", run: () => { navigate("/emails"); onOpenChange(false); } },
+                { icon: Plus, label: "Novo pedido", run: () => { onLaunch?.(); navigate("/?new=1"); onOpenChange(false); } },
+                { icon: Mail, label: "Abrir emails", run: () => { onLaunch?.(); navigate("/emails"); onOpenChange(false); } },
                 {
                   icon: RefreshCw, label: "Verificar caixa de entrada agora",
                   run: async () => {
@@ -120,9 +122,9 @@ export default function CommandPalette({ open, onOpenChange }) {
                     }
                   },
                 },
-                { icon: FileClock, label: "Rascunhos por confirmar", run: () => { navigate("/emails"); onOpenChange(false); } },
-                { icon: ListChecks, label: "Tarefas", run: () => { navigate("/tarefas"); onOpenChange(false); } },
-                { icon: BarChart3, label: "Estatísticas", run: () => { navigate("/estatisticas"); onOpenChange(false); } },
+                { icon: FileClock, label: "Rascunhos por confirmar", run: () => { onLaunch?.(); navigate("/emails"); onOpenChange(false); } },
+                { icon: ListChecks, label: "Tarefas", run: () => { onLaunch?.(); navigate("/tarefas"); onOpenChange(false); } },
+                { icon: BarChart3, label: "Estatísticas", run: () => { onLaunch?.(); navigate("/estatisticas"); onOpenChange(false); } },
               ].map((a) => {
                 const AIcon = a.icon;
                 return (

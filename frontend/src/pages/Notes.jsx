@@ -481,7 +481,7 @@ export default function Notes() {
           do email do fornecedor; um clique abre o ecrã de confirmação */}
       {(today?.to_confirm || []).length > 0 ? (
         <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-emerald-900">
+          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-extrabold text-emerald-900">
             <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
             <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
           </h2>
@@ -492,7 +492,7 @@ export default function Notes() {
                 key={n.id}
                 data-testid={`to-confirm-${n.id}`}
                 onClick={() => setConfirmNote(n)}
-                className="flex w-full items-center gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-emerald-100/60"
+                className="flex w-full flex-col items-stretch gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-emerald-100/60 min-[420px]:flex-row min-[420px]:items-center"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold text-slate-900">{n.customer_name || "Sem nome"}</p>
@@ -501,7 +501,7 @@ export default function Notes() {
                     {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
                   <Send className="h-3.5 w-3.5" /> Rever e enviar
                 </span>
               </button>
@@ -743,7 +743,7 @@ export default function Notes() {
           ancestral com transform/filter — e mantém-se visível em qualquer
           scroll, seja qual for a altura da lista. */}
       {createPortal(
-        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-95 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16">
+        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="os-page-fab group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-95 lg:h-16 lg:w-16">
           <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
         </button>,
         document.body,

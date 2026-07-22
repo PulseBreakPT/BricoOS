@@ -830,7 +830,7 @@ function DraftsTab({ search }) {
             const p = n.pending_client_send;
             return (
               <button key={n.id} data-testid={`draft-email-${n.id}`} onClick={() => setConfirmNote(n)}
-                className="flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-left transition-colors hover:bg-emerald-50">
+                className="flex w-full flex-col items-stretch gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-left transition-colors hover:bg-emerald-50 min-[420px]:flex-row min-[420px]:items-center">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="truncate text-sm font-bold text-slate-900">{n.customer_name || "Sem nome"}</p>
@@ -845,7 +845,7 @@ function DraftsTab({ search }) {
                     {timeAgo(p?.created_at)}
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
                   <Send className="h-3.5 w-3.5" /> Rever e enviar
                 </span>
               </button>
@@ -950,7 +950,7 @@ export default function Emails() {
       <EmailRulesDialog open={rulesOpen} onOpenChange={setRulesOpen} />
       <EmailStatsDialog open={statsOpen} onOpenChange={setStatsOpen} />
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-col gap-2 min-[420px]:flex-row">
         <InputGroup className="h-11 flex-1 rounded-xl">
           <InputGroupAddon>
             <Search className="h-4 w-4 text-slate-400" />

@@ -14,6 +14,7 @@ import {
   Maximize2,
   Menu,
   Minus,
+  MonitorUp,
   Search,
   Trash2,
   Truck,
@@ -44,9 +45,11 @@ import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
 import ControlDeck from "@/components/workspace/ControlDeck";
 import DesktopOperationsRail from "@/components/workspace/DesktopOperationsRail";
+import MobileHomeSurface from "@/components/workspace/MobileHomeSurface";
 import MobileSystemDock from "@/components/workspace/MobileSystemDock";
 import OperationalRibbon from "@/components/workspace/OperationalRibbon";
 import SystemBar from "@/components/workspace/SystemBar";
+import ThemeToggle from "@/components/workspace/ThemeToggle";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
 
@@ -243,7 +246,7 @@ function MobileBrand({ activeApp }) {
       <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white">
         <span className="relative z-10">B</span>
       </span>
-      <div className="min-w-0 leading-tight">
+      <div className="mobile-brand-copy min-w-0 leading-tight">
         <p className="truncate font-heading text-sm font-extrabold text-white">
           BRICO OS
         </p>
@@ -257,6 +260,8 @@ function MobileBrand({ activeApp }) {
 
 function MobileNavigation({
   onNavigate,
+  onShowHome,
+  homeVisible,
   onOpenSearch,
   onOpenActivity,
   onOpenTrash,
@@ -285,6 +290,20 @@ function MobileNavigation({
           ⌘K
         </Kbd>
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          haptics.tap();
+          onShowHome?.();
+        }}
+        className={`mt-3 flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 text-left text-sm font-bold transition-colors ${homeVisible ? "border-white bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "border-white/10 bg-white/[0.05] text-white/65 hover:bg-white/10 hover:text-white"}`}
+      >
+        <MonitorUp
+          className={`h-[18px] w-[18px] ${homeVisible ? "text-red-600" : ""}`}
+        />
+        <span className="flex-1">Ambiente de trabalho</span>
+        <span className="led led-ok" />
+      </button>
       <nav className="scroll-chrome mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
@@ -301,21 +320,21 @@ function MobileNavigation({
                     data-testid={item.testid}
                     onClick={() => {
                       haptics.tap();
-                      onNavigate?.();
+                      onNavigate?.(item.path);
                     }}
                     className={({ isActive }) =>
-                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive ? "bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "text-white/55 hover:bg-white/[0.07] hover:text-white"}`
+                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive && !homeVisible ? "bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "text-white/55 hover:bg-white/[0.07] hover:text-white"}`
                     }
                   >
                     {({ isActive }) => (
                       <>
                         <Icon
-                          className={`h-[18px] w-[18px] ${isActive ? "text-red-600" : ""}`}
+                          className={`h-[18px] w-[18px] ${isActive && !homeVisible ? "text-red-600" : ""}`}
                         />
                         <span className="flex-1">{item.shortTitle}</span>
                         {count ? (
                           <span
-                            className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] font-black ${isActive ? "bg-red-600 text-white" : "bg-white/10 text-white/60"}`}
+                            className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] font-black ${isActive && !homeVisible ? "bg-red-600 text-white" : "bg-white/10 text-white/60"}`}
                           >
                             {count > 99 ? "99+" : count}
                           </span>
@@ -490,7 +509,7 @@ function PrimaryRouteWindow({
   return (
     <main
       data-testid="primary-app-window"
-      className={`os-primary-window fixed z-20 hidden flex-col overflow-hidden border border-white/[0.14] bg-white shadow-[0_38px_100px_-30px_rgba(0,0,0,0.82)] lg:flex ${maximized ? "os-primary-window-maximized inset-x-2 bottom-[88px] top-[62px] rounded-[18px]" : "bottom-[98px] left-4 right-4 top-[72px] rounded-[26px] 2xl:right-[316px]"}`}
+      className={`os-primary-window themed-surface fixed z-20 hidden flex-col overflow-hidden border border-white/[0.14] bg-white shadow-[0_38px_100px_-30px_rgba(0,0,0,0.82)] lg:flex ${maximized ? "os-primary-window-maximized rounded-[18px]" : "os-primary-window-windowed rounded-[26px]"}`}
     >
       <div
         data-testid="primary-window-titlebar"
@@ -555,7 +574,7 @@ function PrimaryRouteWindow({
       </div>
       <OperationalRibbon app={app} onOpenRoute={onOpenRoute} />
       <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain bg-[hsl(var(--background))]">
-        <div className="mx-auto w-full max-w-[1760px] p-5 sm:p-7 xl:p-8">
+        <div className="os-app-content mx-auto w-full p-5 sm:p-7 xl:p-8">
           {children}
         </div>
       </div>
@@ -605,12 +624,12 @@ function AppLauncherOverlay({
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="control-deck-overlay fixed inset-0 z-[80] hidden items-center justify-center p-6 backdrop-blur-2xl animate-scale-in lg:flex"
+      className="control-deck-overlay fixed inset-0 z-[80] hidden items-center justify-center p-3 backdrop-blur-2xl animate-scale-in sm:p-6 lg:flex"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="os-launcher-panel w-full max-w-[1120px] overflow-hidden rounded-[30px] border border-white/15 shadow-[0_50px_140px_-32px_rgba(0,0,0,0.98)] outline-none"
+        className="os-launcher-panel w-full max-w-[min(1120px,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] border border-white/15 shadow-[0_50px_140px_-32px_rgba(0,0,0,0.98)] outline-none sm:rounded-[30px]"
       >
         <div className="control-deck-header flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -664,8 +683,10 @@ function LayoutInner() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [missionControlOpen, setMissionControlOpen] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
-  const [primaryMinimized, setPrimaryMinimized] = useState(false);
+  const [homeVisible, setHomeVisible] = useState(true);
+  const [primaryMinimized, setPrimaryMinimized] = useState(true);
   const [primaryMaximized, setPrimaryMaximized] = useState(false);
+  const lastLocation = useRef(`${location.pathname}${location.search}`);
 
   const activeRouteApp = useMemo(
     () => getRouteApp(location.pathname),
@@ -676,9 +697,15 @@ function LayoutInner() {
   );
   const activeSystemApp = activeFloatingPanel
     ? PANEL_TYPES[activeFloatingPanel.type]
-    : primaryMinimized
+    : homeVisible || primaryMinimized
       ? null
       : activeRouteApp;
+
+  useEffect(() => {
+    // Cada nova sessão começa numa secretária limpa, mesmo que existam
+    // janelas persistidas de um turno anterior.
+    showDesktop();
+  }, [showDesktop]);
 
   useEffect(() => {
     const onKey = (event) => {
@@ -692,6 +719,7 @@ function LayoutInner() {
         isDesktop
       ) {
         event.preventDefault();
+        setHomeVisible(true);
         setPrimaryMinimized(true);
         showDesktop();
       }
@@ -705,11 +733,16 @@ function LayoutInner() {
   }, [isDesktop]);
 
   useEffect(() => {
+    const currentLocation = `${location.pathname}${location.search}`;
+    if (lastLocation.current === currentLocation) return;
+    lastLocation.current = currentLocation;
+    setHomeVisible(false);
     setPrimaryMinimized(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const openRoute = useCallback(
     (path) => {
+      setHomeVisible(false);
       setPrimaryMinimized(false);
       if (location.pathname !== path) navigate(path);
     },
@@ -717,6 +750,7 @@ function LayoutInner() {
   );
 
   const showDesktopNow = useCallback(() => {
+    setHomeVisible(true);
     setPrimaryMinimized(true);
     showDesktop();
   }, [showDesktop]);
@@ -740,19 +774,17 @@ function LayoutInner() {
             onOpenMissionControl={() => setMissionControlOpen(true)}
           />
           <DesktopSurface
-            visible={
-              primaryMinimized && !panels.some((panel) => !panel.minimized)
-            }
+            visible={homeVisible}
             onOpenRoute={openRoute}
             onOpenPanel={openPanel}
             onOpenLauncher={() => setLauncherOpen(true)}
           />
           <PrimaryRouteWindow
             app={activeRouteApp}
-            minimized={primaryMinimized}
+            minimized={homeVisible || primaryMinimized}
             maximized={primaryMaximized}
             onClose={showDesktopNow}
-            onMinimize={() => setPrimaryMinimized(true)}
+            onMinimize={showDesktopNow}
             onToggleMaximize={() => setPrimaryMaximized((value) => !value)}
             onOpenSearch={() => setPaletteOpen(true)}
             onOpenRoute={openRoute}
@@ -763,7 +795,7 @@ function LayoutInner() {
             </div>
           </PrimaryRouteWindow>
           <DesktopOperationsRail
-            app={activeRouteApp}
+            app={homeVisible ? null : activeRouteApp}
             visible={!primaryMaximized}
             onOpenRoute={openRoute}
             onOpenActivity={() => setActivityOpen(true)}
@@ -775,11 +807,15 @@ function LayoutInner() {
             onOpenLauncher={() => setLauncherOpen(true)}
             onShowDesktop={showDesktopNow}
             onOpenRoute={openRoute}
+            homeVisible={homeVisible}
             primaryWindow={{
               title: activeRouteApp.title,
               icon: activeRouteApp.icon,
-              minimized: primaryMinimized,
-              onFocus: () => setPrimaryMinimized(false),
+              minimized: homeVisible || primaryMinimized,
+              onFocus: () => {
+                setHomeVisible(false);
+                setPrimaryMinimized(false);
+              },
             }}
           />
         </>
@@ -798,7 +834,15 @@ function LayoutInner() {
                 sistema.
               </SheetDescription>
               <MobileNavigation
-                onNavigate={() => setMobileNavOpen(false)}
+                homeVisible={homeVisible}
+                onNavigate={(path) => {
+                  setMobileNavOpen(false);
+                  openRoute(path);
+                }}
+                onShowHome={() => {
+                  setMobileNavOpen(false);
+                  showDesktopNow();
+                }}
                 onOpenSearch={() => {
                   setMobileNavOpen(false);
                   setPaletteOpen(true);
@@ -826,7 +870,7 @@ function LayoutInner() {
                 >
                   <Menu className="h-5 w-5" />
                 </button>
-                <MobileBrand activeApp={activeRouteApp} />
+                <MobileBrand activeApp={homeVisible ? null : activeRouteApp} />
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <button
@@ -838,25 +882,40 @@ function LayoutInner() {
                 >
                   <Search className="h-[18px] w-[18px]" />
                 </button>
+                <ThemeToggle variant="mobile" />
                 <NotificationsBell variant="mobile" />
               </div>
             </div>
-            <OperationalRibbon
-              app={activeRouteApp}
-              variant="mobile"
-              onOpenRoute={openRoute}
-            />
+            {!homeVisible ? (
+              <OperationalRibbon
+                app={activeRouteApp}
+                variant="mobile"
+                onOpenRoute={openRoute}
+              />
+            ) : null}
           </header>
           <main className="mobile-workspace px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pt-6">
-            <div
-              key={location.pathname}
-              className="mx-auto w-full max-w-6xl animate-page-enter"
-            >
-              <SupplierEmailAlert />
-              <Outlet />
-            </div>
+            {homeVisible ? (
+              <MobileHomeSurface
+                onOpenRoute={openRoute}
+                onOpenSearch={() => setPaletteOpen(true)}
+                onOpenActivity={() => setActivityOpen(true)}
+                onOpenLauncher={() => setMobileNavOpen(true)}
+              />
+            ) : (
+              <div
+                key={`${location.pathname}${location.search}`}
+                className="mx-auto w-full max-w-7xl animate-page-enter"
+              >
+                <SupplierEmailAlert />
+                <Outlet />
+              </div>
+            )}
           </main>
           <MobileSystemDock
+            homeVisible={homeVisible}
+            onShowHome={showDesktopNow}
+            onOpenRoute={openRoute}
             moreOpen={mobileNavOpen}
             onOpenMore={() => setMobileNavOpen(true)}
           />
@@ -871,7 +930,14 @@ function LayoutInner() {
         onOpenActivity={() => setActivityOpen(true)}
       />
       <InstallPwaBanner />
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onLaunch={() => {
+          setHomeVisible(false);
+          setPrimaryMinimized(false);
+        }}
+      />
       <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
       <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
     </div>

@@ -71,6 +71,7 @@ export default function Taskbar({
   onOpenMissionControl,
   onShowDesktop,
   onOpenRoute,
+  homeVisible = false,
 }) {
   const { panels, activeId, focusPanel, closePanel } = useWorkspace();
   const location = useLocation();
@@ -117,7 +118,7 @@ export default function Taskbar({
           <DockRouteApp
             key={app.type}
             app={app}
-            active={routeIsActive(location.pathname, app.route)}
+            active={!homeVisible && routeIsActive(location.pathname, app.route)}
             onOpen={openRoute}
           />
         ))}
@@ -199,8 +200,9 @@ export default function Taskbar({
             haptics.tap();
             onShowDesktop?.();
           }}
-          className="os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/55 transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:text-white"
+          className={`os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:text-white ${homeVisible ? "bg-white text-black shadow-[0_8px_20px_-10px_rgba(255,255,255,0.75)]" : "text-white/55"}`}
           title="Mostrar ambiente de trabalho"
+          aria-current={homeVisible ? "page" : undefined}
         >
           <MonitorUp className="h-[18px] w-[18px]" />
         </button>

@@ -104,8 +104,8 @@ export default function ControlDeck({
   };
 
   return (
-    <div className="control-deck-grid grid min-h-0 lg:grid-cols-[minmax(0,1fr)_292px]">
-      <section className="min-w-0 border-b border-white/[0.08] p-5 sm:p-6 lg:border-b-0 lg:border-r">
+    <div className="control-deck-grid grid min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(260px,292px)]">
+      <section className="min-w-0 border-b border-white/[0.08] p-4 sm:p-6 xl:border-b-0 xl:border-r">
         <button
           type="button"
           data-testid="control-deck-search"

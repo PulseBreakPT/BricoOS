@@ -55,10 +55,14 @@ function GraphNode({ x, y, label, kind, onClick, main, small }) {
       data-testid={`graph-node-${kind}-${label}`}
       onClick={onClick}
       disabled={!onClick}
-      className={`absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full border p-1 text-center shadow-sm transition-transform ${
+      className={`relation-graph-node absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full border p-1 text-center shadow-sm transition-transform ${
         main ? "border-slate-900 bg-slate-900" : "border-slate-200 bg-white"
       } ${onClick ? "cursor-pointer hover:scale-105" : "cursor-default"}`}
-      style={{ left: x, top: y, width: size, height: size }}
+      style={{
+        left: `${(x / SIZE) * 100}%`,
+        top: `${(y / SIZE) * 100}%`,
+        "--graph-node-size": `${(size / SIZE) * 100}%`,
+      }}
     >
       {Icon ? <Icon className={`${small ? "h-3.5 w-3.5" : "h-4 w-4"} ${main ? "text-white" : "text-slate-400"}`} /> : null}
       <span className={`line-clamp-2 px-1.5 leading-tight ${small ? "text-[9px]" : "text-[10px]"} font-bold ${main ? "text-white" : "text-slate-700"}`}>
@@ -114,31 +118,31 @@ export default function RelationGraph({ rootKind, rootId, rootLabel, onClose }) 
   const expandedGroup = groups.find((g) => g.key === expanded);
 
   return (
-    <div data-testid="relation-graph" className="fixed inset-0 z-[75] flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex items-center gap-2 pb-3 text-white" onClick={(e) => e.stopPropagation()}>
+    <div data-testid="relation-graph" className="fixed inset-0 z-[75] flex flex-col items-center justify-center overflow-hidden bg-slate-900/80 p-2 backdrop-blur-sm sm:p-4" onClick={onClose}>
+      <div className="flex w-full max-w-[540px] min-w-0 items-center justify-center gap-2 pb-2 text-white sm:pb-3" onClick={(e) => e.stopPropagation()}>
         {history.length > 0 ? (
-          <button type="button" data-testid="graph-back" onClick={goBack} className="rounded-lg px-2 py-1 text-xs font-bold hover:bg-white/10">← Voltar</button>
+          <button type="button" data-testid="graph-back" onClick={goBack} className="flex min-h-11 shrink-0 items-center rounded-xl px-3 text-xs font-bold hover:bg-white/10">← Voltar</button>
         ) : null}
-        <p className="text-sm font-bold">{root.label}</p>
-        <button type="button" onClick={onClose} className="ml-4 rounded-lg p-1.5 hover:bg-white/10"><X className="h-4 w-4" /></button>
+        <p className="min-w-0 flex-1 text-center text-sm font-bold leading-tight">{root.label}</p>
+        <button type="button" onClick={onClose} aria-label="Fechar grafo" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-white/10"><X className="h-4 w-4" /></button>
       </div>
-      <div className="relative overflow-hidden rounded-2xl bg-white shadow-2xl" style={{ width: SIZE, height: SIZE }} onClick={(e) => e.stopPropagation()}>
+      <div className="relation-graph-canvas themed-surface relative overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {loading ? (
           <div className="flex h-full items-center justify-center"><Spinner className="h-6 w-6 text-slate-400" /></div>
         ) : (
           <>
-            <svg width={SIZE} height={SIZE} className="absolute inset-0">
+            <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
               {groups.map((g, i) => {
                 const pos = polar(CENTER, CENTER, RING_R, i * angleStep);
-                return <line key={`line-${g.key}`} x1={CENTER} y1={CENTER} x2={pos.x} y2={pos.y} stroke="#e2e8f0" strokeWidth={2} />;
+                return <line key={`line-${g.key}`} x1={CENTER} y1={CENTER} x2={pos.x} y2={pos.y} stroke="var(--graph-line)" strokeWidth={2} />;
               })}
               {expandedGroup ? expandedGroup.items.map((it, j, arr) => {
                 const gi = groups.findIndex((g) => g.key === expanded);
                 const base = gi * angleStep;
                 const a = base + (arr.length > 1 ? (j / (arr.length - 1) - 0.5) * 44 : 0);
                 const groupPos = polar(CENTER, CENTER, RING_R, base);
-                const itemPos = polar(CENTER, CENTER, RING_R + 110, a);
-                return <line key={`sline-${it.id}`} x1={groupPos.x} y1={groupPos.y} x2={itemPos.x} y2={itemPos.y} stroke="#e2e8f0" strokeWidth={1.5} />;
+                const itemPos = polar(CENTER, CENTER, RING_R + 72, a);
+                return <line key={`sline-${it.id}`} x1={groupPos.x} y1={groupPos.y} x2={itemPos.x} y2={itemPos.y} stroke="var(--graph-line)" strokeWidth={1.5} />;
               }) : null}
             </svg>
             <GraphNode x={CENTER} y={CENTER} label={root.label} kind={root.kind} main />
@@ -155,7 +159,7 @@ export default function RelationGraph({ rootKind, rootId, rootLabel, onClose }) 
               const gi = groups.findIndex((g) => g.key === expanded);
               const base = gi * angleStep;
               const a = base + (arr.length > 1 ? (j / (arr.length - 1) - 0.5) * 44 : 0);
-              const itemPos = polar(CENTER, CENTER, RING_R + 110, a);
+              const itemPos = polar(CENTER, CENTER, RING_R + 72, a);
               const canReroot = expandedGroup.kind === "pedido" || expandedGroup.kind === "fornecedor";
               return (
                 <GraphNode
@@ -167,7 +171,7 @@ export default function RelationGraph({ rootKind, rootId, rootLabel, onClose }) 
           </>
         )}
       </div>
-      <p className="mt-3 text-xs text-white/60">Clica num nó único para reenraizar · clica num grupo para expandir · Esc para fechar</p>
+      <p className="mt-2 max-w-[540px] px-3 text-center text-[11px] font-semibold leading-relaxed text-white/60 sm:mt-3 sm:text-xs">Toca num nó único para reenraizar · toca num grupo para expandir · Esc para fechar</p>
     </div>
   );
 }

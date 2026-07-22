@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X,
   Minus,
@@ -20,6 +20,20 @@ const MIN_W = 420;
 const MIN_H = 320;
 const SPLIT_FRACTIONS = [0.5, 0.33, 0.25];
 
+function getWorkspaceMetrics() {
+  if (window.innerWidth >= 3000) {
+    return { systemBarHeight: 82, taskbarReserve: 128, gap: 20 };
+  }
+  if (window.innerWidth >= 1920) {
+    return { systemBarHeight: 72, taskbarReserve: 112, gap: 18 };
+  }
+  return {
+    systemBarHeight: SYSTEM_BAR_HEIGHT,
+    taskbarReserve: TASKBAR_RESERVE,
+    gap: WORKSPACE_GAP,
+  };
+}
+
 // Janela flutuante do desktop — arrastar pela barra de título, redimensionar
 // pelo canto inferior direito. A posição/tamanho só é confirmada no
 // context (e por isso só aí é persistida) ao soltar o gesto; durante o
@@ -38,6 +52,22 @@ export default function Window({ panel, zIndex }) {
   const dragRef = useRef(null);
   const resizeRef = useRef(null);
   const [transient, setTransient] = useState(null);
+  const [, setViewportRevision] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    const onResize = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() =>
+        setViewportRevision((revision) => revision + 1),
+      );
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
 
   // Ancorar a metade do ecrã (split screen) — sai do maximizado primeiro se
   // preciso, para o novo tamanho não ficar escondido por baixo dele. A
@@ -46,14 +76,15 @@ export default function Window({ panel, zIndex }) {
   // → 50%... (como o Rectangle/Stage Manager); 100% já existe via maximizar.
   const snapTo = useCallback(
     (side) => {
+      const { systemBarHeight, taskbarReserve, gap } = getWorkspaceMetrics();
       if (panel.maximized) toggleMaximize(panel.id);
       const usableW = window.innerWidth - SIDEBAR_WIDTH;
       const widthFor = (fraction) =>
-        Math.max(MIN_W, Math.round(usableW * fraction) - WORKSPACE_GAP * 1.5);
+        Math.max(MIN_W, Math.round(usableW * fraction) - gap * 1.5);
       const alreadyOnSide =
         side === "left"
-          ? Math.abs(panel.x - (SIDEBAR_WIDTH + WORKSPACE_GAP)) < 2
-          : Math.abs(panel.x + panel.w - (window.innerWidth - WORKSPACE_GAP)) <
+          ? Math.abs(panel.x - (SIDEBAR_WIDTH + gap)) < 2
+          : Math.abs(panel.x + panel.w - (window.innerWidth - gap)) <
             4;
       const currentIndex = alreadyOnSide
         ? SPLIT_FRACTIONS.findIndex(
@@ -68,15 +99,15 @@ export default function Window({ panel, zIndex }) {
       const h = Math.max(
         MIN_H,
         window.innerHeight -
-          SYSTEM_BAR_HEIGHT -
-          TASKBAR_RESERVE -
-          WORKSPACE_GAP * 2,
+          systemBarHeight -
+          taskbarReserve -
+          gap * 2,
       );
       const x =
         side === "left"
-          ? SIDEBAR_WIDTH + WORKSPACE_GAP
-          : window.innerWidth - w - WORKSPACE_GAP;
-      movePanel(panel.id, x, SYSTEM_BAR_HEIGHT + WORKSPACE_GAP);
+          ? SIDEBAR_WIDTH + gap
+          : window.innerWidth - w - gap;
+      movePanel(panel.id, x, systemBarHeight + gap);
       resizePanel(panel.id, w, h);
       focusPanel(panel.id);
     },
@@ -113,12 +144,24 @@ export default function Window({ panel, zIndex }) {
       if (!dragRef.current) return;
       const dx = e.clientX - dragRef.current.startX;
       const dy = e.clientY - dragRef.current.startY;
+      const { systemBarHeight, taskbarReserve, gap } = getWorkspaceMetrics();
       // Mantém a janela dentro da área útil, abaixo da barra global.
-      const nx = Math.max(
-        SIDEBAR_WIDTH + WORKSPACE_GAP,
-        dragRef.current.origX + dx,
+      const maxX = Math.max(
+        gap,
+        window.innerWidth - panel.w - gap,
       );
-      const ny = Math.max(SYSTEM_BAR_HEIGHT, dragRef.current.origY + dy);
+      const maxY = Math.max(
+        systemBarHeight,
+        window.innerHeight - panel.h - taskbarReserve,
+      );
+      const nx = Math.min(
+        maxX,
+        Math.max(gap, dragRef.current.origX + dx),
+      );
+      const ny = Math.min(
+        maxY,
+        Math.max(systemBarHeight, dragRef.current.origY + dy),
+      );
       setTransient((t) => ({ w: panel.w, h: panel.h, ...t, x: nx, y: ny }));
     },
     [panel.w, panel.h],
@@ -168,8 +211,23 @@ export default function Window({ panel, zIndex }) {
       if (!resizeRef.current) return;
       const dx = e.clientX - resizeRef.current.startX;
       const dy = e.clientY - resizeRef.current.startY;
-      const nw = Math.max(MIN_W, resizeRef.current.origW + dx);
-      const nh = Math.max(MIN_H, resizeRef.current.origH + dy);
+      const { taskbarReserve, gap } = getWorkspaceMetrics();
+      const maxW = Math.max(
+        MIN_W,
+        window.innerWidth - panel.x - gap,
+      );
+      const maxH = Math.max(
+        MIN_H,
+        window.innerHeight - panel.y - taskbarReserve,
+      );
+      const nw = Math.min(
+        maxW,
+        Math.max(MIN_W, resizeRef.current.origW + dx),
+      );
+      const nh = Math.min(
+        maxH,
+        Math.max(MIN_H, resizeRef.current.origH + dy),
+      );
       setTransient((t) => ({ x: panel.x, y: panel.y, ...t, w: nw, h: nh }));
     },
     [panel.x, panel.y],
@@ -195,19 +253,45 @@ export default function Window({ panel, zIndex }) {
   if (panel.minimized || !meta) return null;
 
   const isActive = activeId === panel.id;
+  const { systemBarHeight, taskbarReserve, gap } = getWorkspaceMetrics();
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  const renderedW = Math.min(
+    transient?.w ?? panel.w,
+    Math.max(MIN_W, viewportW - gap * 2),
+  );
+  const renderedH = Math.min(
+    transient?.h ?? panel.h,
+    Math.max(
+      MIN_H,
+      viewportH - systemBarHeight - taskbarReserve - gap,
+    ),
+  );
+  const renderedX = Math.min(
+    Math.max(gap, transient?.x ?? panel.x),
+    Math.max(gap, viewportW - renderedW - gap),
+  );
+  const renderedY = Math.min(
+    Math.max(systemBarHeight + gap, transient?.y ?? panel.y),
+    Math.max(
+      systemBarHeight + gap,
+      viewportH - renderedH - taskbarReserve,
+    ),
+  );
+
   const style = panel.maximized
     ? {
-        left: SIDEBAR_WIDTH + WORKSPACE_GAP,
-        top: SYSTEM_BAR_HEIGHT + WORKSPACE_GAP,
-        right: WORKSPACE_GAP,
-        bottom: TASKBAR_RESERVE,
+        left: SIDEBAR_WIDTH + gap,
+        top: systemBarHeight + gap,
+        right: gap,
+        bottom: taskbarReserve,
         zIndex,
       }
     : {
-        left: transient?.x ?? panel.x,
-        top: transient?.y ?? panel.y,
-        width: transient?.w ?? panel.w,
-        height: transient?.h ?? panel.h,
+        left: renderedX,
+        top: renderedY,
+        width: renderedW,
+        height: renderedH,
         zIndex,
       };
 
@@ -215,7 +299,7 @@ export default function Window({ panel, zIndex }) {
     <div
       data-testid={`window-${panel.type}`}
       onPointerDownCapture={() => focusPanel(panel.id)}
-      className={`os-floating-window pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-[22px] border bg-white ${isActive ? "elev-window-active border-white/20" : "elev-window border-white/10"}`}
+      className={`os-floating-window themed-surface pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-[22px] border bg-white ${isActive ? "elev-window-active border-white/20" : "elev-window border-white/10"}`}
       style={style}
     >
       {/* Barra de título — a moldura grafite da máquina a segurar a folha

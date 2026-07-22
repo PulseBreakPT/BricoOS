@@ -1,6 +1,7 @@
 import { Activity, Grid2X2, LayoutGrid, Search, Trash2 } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 import StatusCluster from "@/components/workspace/StatusCluster";
+import ThemeToggle from "@/components/workspace/ThemeToggle";
 import WorkspaceMenu from "@/components/workspace/WorkspaceMenu";
 
 const systemButton =
@@ -24,7 +25,7 @@ export default function SystemBar({
   return (
     <header
       data-testid="system-bar"
-      className="os-system-bar fixed inset-x-3 top-2 z-[65] hidden h-12 items-center rounded-[18px] border border-white/[0.11] px-2.5 lg:grid lg:grid-cols-[minmax(250px,1fr)_minmax(300px,540px)_minmax(310px,1fr)]"
+      className="os-system-bar fixed inset-x-3 top-2 z-[65] hidden h-12 items-center rounded-[18px] border border-white/[0.11] px-2.5 lg:grid lg:grid-cols-[minmax(190px,0.9fr)_minmax(220px,1.2fr)_minmax(210px,0.9fr)] 2xl:grid-cols-[minmax(250px,1fr)_minmax(300px,540px)_minmax(310px,1fr)]"
     >
       <div className="flex min-w-0 items-center gap-2">
         <button
@@ -113,6 +114,7 @@ export default function SystemBar({
         >
           <Trash2 className="h-4 w-4" />
         </button>
+        <ThemeToggle />
         <NotificationsBell variant="sidebar" />
         <span className="mx-1 h-5 w-px bg-white/10" aria-hidden="true" />
         <StatusCluster variant="menubar" />
