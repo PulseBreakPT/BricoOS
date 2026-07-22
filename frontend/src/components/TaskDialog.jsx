@@ -23,6 +23,7 @@ const emptyForm = {
 };
 
 const NEW_GROUP_VALUE = "__new__";
+const NO_GROUP_VALUE = "__none__";
 
 export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   const isEdit = Boolean(task && task.id);
@@ -61,7 +62,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
       setNewGroupName("");
       return;
     }
-    set("group_id", v);
+    set("group_id", v === NO_GROUP_VALUE ? "" : v);
   };
 
   const createGroup = async () => {
@@ -101,10 +102,6 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   const save = async () => {
     if (!form.title.trim()) {
       toast.error("Escreve o título da tarefa.");
-      return;
-    }
-    if (!form.group_id) {
-      toast.error("Escolhe ou cria um grupo para a tarefa.");
       return;
     }
     setSaving(true);
@@ -154,7 +151,9 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
             data-testid="task-dialog-title"
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
             placeholder="Ex.: Ligar ao fornecedor de tintas"
+            autoFocus
           />
         </div>
 
@@ -178,9 +177,10 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
               </Button>
             </div>
           ) : (
-            <Select value={form.group_id || undefined} onValueChange={onGroupChange}>
-              <SelectTrigger data-testid="task-dialog-group"><SelectValue placeholder="Escolhe um grupo..." /></SelectTrigger>
+            <Select value={form.group_id || NO_GROUP_VALUE} onValueChange={onGroupChange}>
+              <SelectTrigger data-testid="task-dialog-group"><SelectValue placeholder="Sem grupo" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={NO_GROUP_VALUE}>Sem grupo</SelectItem>
                 {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
                 <SelectItem value={NEW_GROUP_VALUE}>+ Criar novo grupo</SelectItem>
               </SelectContent>
