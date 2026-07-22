@@ -1,5 +1,6 @@
 import { Activity, Search, Trash2 } from "lucide-react";
 import BrandMark from "@/components/BrandMark";
+import BrandWordmark from "@/components/BrandWordmark";
 import NotificationsBell from "@/components/NotificationsBell";
 import StatusCluster from "@/components/workspace/StatusCluster";
 import SystemMenu from "@/components/workspace/SystemMenu";
@@ -35,9 +36,7 @@ export default function SystemBar({
         >
           <BrandMark className="h-7 w-7 rounded-[9px]" />
           <span className="hidden leading-none xl:block">
-            <span className="block text-[11px] font-extrabold tracking-tight text-neutral-900">
-              BRICO OS
-            </span>
+            <BrandWordmark className="block h-3" />
             <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.2em] text-neutral-400">
               Operations
             </span>
