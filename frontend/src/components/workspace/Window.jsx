@@ -229,63 +229,6 @@ export default function Window({ panel, zIndex }) {
         onDoubleClick={() => toggleMaximize(panel.id)}
         className={`os-primary-titlebar flex h-12 shrink-0 cursor-grab items-center gap-2 border-b border-black/40 px-2.5 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
       >
-        <div
-          className="group mr-1 flex shrink-0 items-center gap-0.5"
-          aria-label="Controlos da janela"
-        >
-          <button
-            data-window-btn
-            data-testid={`window-close-${panel.type}`}
-            onClick={() => closePanel(panel.id)}
-            title="Fechar"
-            aria-label="Fechar"
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-          >
-            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/30">
-              <X
-                className="h-2 w-2 text-black/0 group-hover:text-black/55"
-                strokeWidth={3}
-              />
-            </span>
-          </button>
-          <button
-            data-window-btn
-            data-testid={`window-minimize-${panel.type}`}
-            onClick={() => toggleMinimize(panel.id)}
-            title="Minimizar"
-            aria-label="Minimizar"
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-          >
-            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/30">
-              <Minus
-                className="h-2 w-2 text-black/0 group-hover:text-black/55"
-                strokeWidth={3}
-              />
-            </span>
-          </button>
-          <button
-            data-window-btn
-            data-testid={`window-maximize-${panel.type}`}
-            onClick={() => toggleMaximize(panel.id)}
-            title={panel.maximized ? "Restaurar" : "Maximizar"}
-            aria-label={panel.maximized ? "Restaurar" : "Maximizar"}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-          >
-            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/30">
-              {panel.maximized ? (
-                <Minimize2
-                  className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
-                  strokeWidth={3}
-                />
-              ) : (
-                <Maximize2
-                  className="h-1.5 w-1.5 text-black/0 group-hover:text-black/50"
-                  strokeWidth={3}
-                />
-              )}
-            </span>
-          </button>
-        </div>
         {Icon ? (
           <span className="os-window-app-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10">
             <Icon
@@ -318,6 +261,43 @@ export default function Window({ panel, zIndex }) {
         >
           <PanelRight className="h-3.5 w-3.5" />
         </button>
+        <span className="mx-0.5 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
+        <div className="flex shrink-0 items-center gap-0.5" aria-label="Controlos da janela">
+          <button
+            data-window-btn
+            data-testid={`window-minimize-${panel.type}`}
+            onClick={() => toggleMinimize(panel.id)}
+            title="Minimizar"
+            aria-label="Minimizar"
+            className="os-window-control"
+          >
+            <Minus className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </button>
+          <button
+            data-window-btn
+            data-testid={`window-maximize-${panel.type}`}
+            onClick={() => toggleMaximize(panel.id)}
+            title={panel.maximized ? "Restaurar" : "Maximizar"}
+            aria-label={panel.maximized ? "Restaurar" : "Maximizar"}
+            className="os-window-control"
+          >
+            {panel.maximized ? (
+              <Minimize2 className="h-3 w-3" strokeWidth={2.1} />
+            ) : (
+              <Maximize2 className="h-3 w-3" strokeWidth={2.1} />
+            )}
+          </button>
+          <button
+            data-window-btn
+            data-testid={`window-close-${panel.type}`}
+            onClick={() => closePanel(panel.id)}
+            title="Fechar"
+            aria-label="Fechar"
+            className="os-window-control os-window-control-danger"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </button>
+        </div>
       </div>
       <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain p-4">
         <Content />

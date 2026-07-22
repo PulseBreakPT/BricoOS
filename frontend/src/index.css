@@ -418,6 +418,79 @@ a,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+/* Controlos proprietários do BRICO OS: discretos no repouso, explícitos no
+   foco. Substituem os semáforos de janela emprestados de outros sistemas. */
+.os-window-control {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.36);
+  transition:
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out-expo);
+}
+
+.os-window-control:hover,
+.os-window-control:focus-visible {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.os-window-control:active {
+  transform: scale(0.9);
+}
+
+.os-window-control-danger:hover,
+.os-window-control-danger:focus-visible {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(217, 38, 38, 0.22);
+  color: #fecaca;
+}
+
+/* A Ops Ribbon é a peça de assinatura: sinais do turno gravados no chrome,
+   não repetidos em mais um bloco de dashboard. */
+.os-ops-ribbon {
+  position: relative;
+  background:
+    linear-gradient(90deg, rgba(217, 38, 38, 0.055), transparent 26%),
+    linear-gradient(180deg, #16171a 0%, #0b0c0e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.os-ops-ribbon::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(217, 38, 38, 0.72),
+    rgba(242, 184, 75, 0.28) 24%,
+    transparent 62%
+  );
+  opacity: 0.65;
+}
+
+.os-ops-ribbon-mobile {
+  background:
+    linear-gradient(90deg, rgba(217, 38, 38, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(28, 29, 33, 0.98), rgba(8, 9, 11, 0.99));
+  box-shadow:
+    0 14px 32px -22px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
 .os-work-surface {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 80px),
@@ -744,6 +817,122 @@ a,
   backdrop-filter: blur(36px) saturate(1.2);
 }
 
+.control-deck-overlay {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(80, 83, 92, 0.22), transparent 38%),
+    rgba(2, 3, 5, 0.78);
+}
+
+.control-deck-header {
+  background:
+    linear-gradient(90deg, rgba(217, 38, 38, 0.08), transparent 28%),
+    rgba(8, 9, 11, 0.55);
+}
+
+.control-deck-grid {
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.045) 0.65px,
+    transparent 0.65px
+  );
+  background-size: 18px 18px;
+}
+
+.control-deck-command {
+  background:
+    linear-gradient(100deg, rgba(255, 255, 255, 0.055), transparent 55%),
+    rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 14px 30px -24px rgba(0, 0, 0, 0.9);
+}
+
+.control-deck-app {
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.control-deck-app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity var(--dur-normal) ease;
+}
+
+.control-deck-app:hover::before,
+.control-deck-app.is-active::before {
+  opacity: 1;
+}
+
+.control-deck-app-graphite::before {
+  background: radial-gradient(circle at 0% 0%, rgba(148, 163, 184, 0.16), transparent 58%);
+}
+
+.control-deck-app-blue::before {
+  background: radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.22), transparent 58%);
+}
+
+.control-deck-app-green::before {
+  background: radial-gradient(circle at 0% 0%, rgba(52, 211, 153, 0.18), transparent 58%);
+}
+
+.control-deck-app-amber::before {
+  background: radial-gradient(circle at 0% 0%, rgba(242, 184, 75, 0.2), transparent 58%);
+}
+
+.control-deck-app-signal::before {
+  background: radial-gradient(circle at 0% 0%, rgba(217, 38, 38, 0.22), transparent 58%);
+}
+
+.control-deck-app-violet::before {
+  background: radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.2), transparent 58%);
+}
+
+.control-deck-app-icon {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.control-deck-tools {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.control-deck-side {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 38%),
+    rgba(0, 0, 0, 0.16);
+}
+
+.control-deck-orbit {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  border-radius: 15px;
+  background: rgba(52, 211, 153, 0.07);
+  color: rgba(110, 231, 183, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 24px -12px rgba(52, 211, 153, 0.75);
+}
+
+.control-deck-wave {
+  min-width: 3px;
+  background: linear-gradient(180deg, rgba(242, 184, 75, 0.7), rgba(217, 38, 38, 0.32));
+  box-shadow: 0 0 8px -3px rgba(242, 184, 75, 0.55);
+}
+
+.control-deck-action {
+  background: rgba(255, 255, 255, 0.025);
+}
+
 @keyframes primary-window-in {
   from {
     opacity: 0;
@@ -873,6 +1062,55 @@ a,
 /* Números tabulares por omissão em valores estatísticos. */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* Visão espacial: as janelas passam a parecer superfícies reais do sistema,
+   não cartões vazios sobre um backdrop. */
+.mission-control-overlay {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(62, 66, 76, 0.32), transparent 34%),
+    radial-gradient(circle at 12% 4%, rgba(217, 38, 38, 0.12), transparent 28%),
+    rgba(4, 5, 7, 0.92);
+}
+
+.mission-control-glyph {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 28px -18px rgba(0, 0, 0, 0.9);
+}
+
+.mission-space-strip {
+  background:
+    linear-gradient(90deg, rgba(217, 38, 38, 0.055), transparent 26%),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.mission-window-wrap,
+.mission-window-card {
+  animation: mission-in 0.38s var(--ease-out-expo) both;
+  animation-delay: calc(var(--stagger-i, 0) * 42ms);
+}
+
+.mission-window-card {
+  background: #101114;
+  box-shadow:
+    0 28px 68px -30px rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.mission-window-card.is-active {
+  box-shadow:
+    0 30px 72px -28px rgba(0, 0, 0, 0.98),
+    0 0 34px -18px rgba(217, 38, 38, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.mission-preview {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
 /* ------------------------------------------------------------------ */

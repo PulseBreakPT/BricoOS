@@ -29,7 +29,11 @@ function loadDockOrder() {
 // Grelha de lançamento de "aplicações" na sidebar — o Dock que antes vivia
 // espremido na taskbar, agora ao lado da navegação principal, com espaço
 // para todas as apps sem disputar largura com os separadores abertos.
-export default function AppLauncher({ variant = "sidebar", onLaunch }) {
+export default function AppLauncher({
+  variant = "sidebar",
+  onLaunch,
+  types,
+}) {
   const { panels, openPanel } = useWorkspace();
   const location = useLocation();
   const [dockOrder, setDockOrder] = useState(loadDockOrder);
@@ -66,7 +70,9 @@ export default function AppLauncher({ variant = "sidebar", onLaunch }) {
           : "grid grid-cols-5 gap-1.5"
       }
     >
-      {dockOrder.map((type) => {
+      {dockOrder
+        .filter((type) => !types || types.includes(type))
+        .map((type) => {
         const meta = PANEL_TYPES[type];
         if (!meta) return null;
         const count = panels.filter((p) => p.type === type).length;
@@ -92,7 +98,7 @@ export default function AppLauncher({ variant = "sidebar", onLaunch }) {
             onDropOnType={dropOnType}
           />
         );
-      })}
+        })}
     </div>
   );
 }
