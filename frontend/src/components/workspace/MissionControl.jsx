@@ -1,24 +1,72 @@
-import { useEffect } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Layers3, MonitorUp, X } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
+import { haptics } from "@/lib/haptics";
 
-// Visão geral de todas as janelas abertas, inspirada no Mission Control do
-// macOS — em vez de ires alternando entre janelas às cegas (ou a abrir e
-// fechar páginas), vês tudo de uma vez e tocas na que queres. Cartões, não
-// miniaturas ao vivo: renderizar cada painel duas vezes (a app real +
-// reduzido aqui) tornaria a app mais lenta sem trazer informação que o
-// título/ícone já não dêem para uma decisão rápida de "para onde vou".
-export default function MissionControl({ open, onClose, primaryWindow }) {
+function PreviewSurface({ icon: Icon, primary = false }) {
+  return (
+    <div
+      className={`mission-preview relative overflow-hidden bg-white ${primary ? "h-44" : "h-32"}`}
+    >
+      <div aria-hidden="true" className="absolute inset-0 bg-dot-grid opacity-55" />
+      <div className="absolute inset-3 grid grid-cols-[30%_1fr] gap-2">
+        <div className="rounded-lg border border-slate-200 bg-slate-100/85 p-2">
+          <span className="block h-2 w-8 rounded-full bg-slate-300" />
+          <span className="mt-3 block h-1.5 w-full rounded-full bg-slate-200" />
+          <span className="mt-1.5 block h-1.5 w-4/5 rounded-full bg-slate-200" />
+          <span className="mt-1.5 block h-1.5 w-3/5 rounded-full bg-slate-200" />
+        </div>
+        <div className="grid grid-rows-[auto_1fr] gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
+            {[0, 1, 2].map((item) => (
+              <span
+                key={item}
+                className="h-8 rounded-lg border border-slate-200 bg-white shadow-sm"
+              />
+            ))}
+          </div>
+          <div className="relative rounded-lg border border-slate-200 bg-white shadow-sm">
+            {Icon ? (
+              <Icon
+                className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-slate-200"
+                strokeWidth={1.4}
+              />
+            ) : null}
+            <span className="absolute bottom-3 left-3 h-1.5 w-1/3 rounded-full bg-slate-200" />
+            <span className="absolute bottom-6 left-3 h-1.5 w-1/2 rounded-full bg-slate-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Visão espacial das janelas reais. Mostra apenas superfícies que existem,
+ * evitando "espaços" decorativos sem função, e preserva a hierarquia entre a
+ * aplicação principal e as ferramentas flutuantes.
+ */
+export default function MissionControl({
+  open,
+  onClose,
+  onShowDesktop,
+  primaryWindow,
+}) {
   const { panels, zOrder, activeId, focusPanel, closePanel } = useWorkspace();
+  const overlayRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
+    const focusTimer = window.setTimeout(() => overlayRef.current?.focus(), 0);
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -26,130 +74,201 @@ export default function MissionControl({ open, onClose, primaryWindow }) {
   const ordered = [...panels].sort(
     (a, b) => zOrder.indexOf(b.id) - zOrder.indexOf(a.id),
   );
+  const totalWindows = ordered.length + (primaryWindow ? 1 : 0);
   const PrimaryIcon = primaryWindow?.icon;
-  // Com janelas multi-instância (a mesma App aberta mais que uma vez), o
-  // título por si só deixa de identificar cada cartão — acrescenta "#2",
-  // "#3"... só quando há mesmo mais que uma instância do mesmo tipo.
   const typeCounts = {};
-  panels.forEach((p) => {
-    typeCounts[p.type] = (typeCounts[p.type] || 0) + 1;
+  panels.forEach((panel) => {
+    typeCounts[panel.type] = (typeCounts[panel.type] || 0) + 1;
   });
   const typeSeen = {};
 
+  const showDesktop = () => {
+    haptics.tap();
+    onShowDesktop?.();
+    onClose();
+  };
+
   return (
     <div
+      ref={overlayRef}
+      tabIndex={-1}
       data-testid="mission-control"
-      onClick={onClose}
-      className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-6 bg-[color:var(--chrome-deep)]/85 p-10 backdrop-blur-md animate-scale-in"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mission-control-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="mission-control-overlay fixed inset-0 z-[70] flex flex-col overflow-auto p-5 outline-none backdrop-blur-2xl animate-scale-in lg:p-8"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-60"
+        className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-45"
       />
-      <p className="engraved relative !text-white/50">
-        Mission Control — toca numa janela para voltar · Esc para fechar
-      </p>
-      {ordered.length === 0 && !primaryWindow ? (
-        <p className="relative text-sm text-white/50">Sem janelas abertas.</p>
+
+      <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between gap-5">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className="mission-control-glyph flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 text-white/70">
+            <Layers3 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-mono text-[8px] font-black uppercase tracking-[0.22em] text-white/25">
+              Workspace 01 · Multitarefa
+            </p>
+            <h2
+              id="mission-control-title"
+              className="mt-1 truncate font-heading text-2xl font-extrabold tracking-tight text-white"
+            >
+              Todas as janelas
+            </h2>
+          </div>
+          <span className="hidden rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 font-mono text-[9px] font-bold text-white/35 sm:inline-flex">
+            {totalWindows} {totalWindows === 1 ? "janela" : "janelas"}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            data-testid="mission-show-desktop"
+            onClick={showDesktop}
+            className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3.5 text-[10px] font-extrabold text-white/55 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
+          >
+            <MonitorUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Mostrar secretária</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white/45 transition-colors hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-200"
+            aria-label="Fechar visão geral"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      <div className="mission-space-strip relative mx-auto mt-5 flex w-full max-w-6xl items-center gap-3 rounded-[18px] border border-white/[0.08] px-3 py-2.5">
+        <span className="flex h-9 w-14 items-center justify-center rounded-xl border border-red-400/25 bg-red-500/10 font-mono text-[8px] font-black uppercase tracking-[0.12em] text-red-100/75">
+          OP·01
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[10px] font-extrabold text-white/65">
+            Operação principal
+          </span>
+          <span className="mt-0.5 block truncate text-[8px] font-semibold text-white/25">
+            {primaryWindow?.title || "Ambiente de trabalho"} · ferramentas do turno
+          </span>
+        </span>
+        <span className="flex items-center gap-2 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-white/22">
+          <span className="led led-ok" /> Espaço ativo
+        </span>
+      </div>
+
+      {totalWindows === 0 ? (
+        <div className="relative mx-auto my-auto flex max-w-md flex-col items-center py-16 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.04] text-white/25">
+            <MonitorUp className="h-7 w-7" />
+          </span>
+          <p className="mt-5 font-heading text-xl font-extrabold text-white/80">
+            Secretária livre
+          </p>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-white/30">
+            Abre uma aplicação no dock para começar um novo espaço de trabalho.
+          </p>
+        </div>
       ) : (
-        <div className="relative flex max-w-5xl flex-wrap items-stretch justify-center gap-5">
+        <div className="relative mx-auto my-auto grid w-full max-w-6xl grid-cols-1 items-start gap-4 py-7 md:grid-cols-2 xl:grid-cols-3">
           {primaryWindow ? (
-            <div
-              className="group relative w-72 animate-mission-in"
+            <button
+              data-testid="mission-control-primary"
+              onClick={() => {
+                haptics.tap();
+                primaryWindow.onFocus?.();
+                onClose();
+              }}
+              className={`mission-window-card group relative overflow-hidden rounded-[22px] border text-left transition-all duration-200 hover:-translate-y-1 hover:border-white/25 ${primaryWindow.minimized ? "border-white/10 opacity-70" : "is-active border-red-400/35"}`}
               style={{ "--stagger-i": 0 }}
             >
-              <button
-                data-testid="mission-control-primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  primaryWindow.onFocus?.();
-                  onClose();
-                }}
-                className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-2xl transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.03] ${primaryWindow.minimized ? "border-white/10 opacity-75" : "border-red-500/70 ring-2 ring-red-500/35"}`}
-              >
-                <div className="os-chrome flex items-center gap-2 border-b border-black/40 px-3 py-2">
-                  <span
-                    className={`led ${primaryWindow.minimized ? "" : "led-ok"}`}
-                  />
-                  {PrimaryIcon ? (
-                    <PrimaryIcon className="h-4 w-4 shrink-0 text-white/60" />
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">
-                    {primaryWindow.title}
-                  </span>
-                  {primaryWindow.minimized ? (
-                    <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white/45">
-                      Minimizada
-                    </span>
-                  ) : null}
-                </div>
-                <div className="relative flex h-36 items-center justify-center overflow-hidden bg-white">
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 bg-dot-grid opacity-70"
-                  />
-                  {PrimaryIcon ? (
-                    <PrimaryIcon
-                      className="relative h-11 w-11 text-slate-300"
-                      strokeWidth={1.4}
-                    />
-                  ) : null}
-                  <span className="absolute bottom-3 left-3 rounded-md bg-slate-950 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white">
-                    Aplicação principal
-                  </span>
-                </div>
-              </button>
-            </div>
+              <div className="os-primary-titlebar flex h-11 items-center gap-2.5 border-b border-black/40 px-3">
+                <span className="os-window-app-icon flex h-7 w-7 items-center justify-center rounded-lg border border-white/10">
+                  {PrimaryIcon ? <PrimaryIcon className="h-3.5 w-3.5 text-white/70" /> : null}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[11px] font-extrabold text-white/80">
+                  {primaryWindow.title}
+                </span>
+                <span className="rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-1 font-mono text-[7px] font-bold uppercase tracking-[0.1em] text-white/28">
+                  {primaryWindow.minimized ? "Minimizada" : "Principal"}
+                </span>
+              </div>
+              <PreviewSurface icon={PrimaryIcon} primary />
+              <div className="flex items-center justify-between border-t border-slate-200 bg-white px-3.5 py-2.5">
+                <span className="text-[10px] font-extrabold text-slate-700">
+                  Retomar aplicação
+                </span>
+                <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                  Workspace 01
+                </span>
+              </div>
+            </button>
           ) : null}
-          {ordered.map((p, cardIndex) => {
-            const meta = PANEL_TYPES[p.type];
+
+          {ordered.map((panel, cardIndex) => {
+            const meta = PANEL_TYPES[panel.type];
             if (!meta) return null;
             const Icon = meta.icon;
-            const isActive = activeId === p.id && !p.minimized;
-            typeSeen[p.type] = (typeSeen[p.type] || 0) + 1;
+            const active = activeId === panel.id && !panel.minimized;
+            typeSeen[panel.type] = (typeSeen[panel.type] || 0) + 1;
             const label =
-              typeCounts[p.type] > 1
-                ? `${meta.title} #${typeSeen[p.type]}`
+              typeCounts[panel.type] > 1
+                ? `${meta.title} #${typeSeen[panel.type]}`
                 : meta.title;
             return (
               <div
-                key={p.id}
-                className="group relative w-60 animate-mission-in"
+                key={panel.id}
+                className="mission-window-wrap group relative"
                 style={{ "--stagger-i": cardIndex + (primaryWindow ? 1 : 0) }}
               >
                 <button
-                  data-testid={`mission-control-card-${p.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    focusPanel(p.id);
+                  data-testid={`mission-control-card-${panel.id}`}
+                  onClick={() => {
+                    haptics.tap();
+                    focusPanel(panel.id);
                     onClose();
                   }}
-                  className={`flex w-full flex-col overflow-hidden rounded-2xl border bg-white text-left shadow-2xl transition-transform duration-150 hover:-translate-y-1.5 hover:scale-[1.03] ${isActive ? "border-red-500/70 ring-2 ring-red-500/50" : "border-white/10"}`}
+                  className={`mission-window-card w-full overflow-hidden rounded-[22px] border text-left transition-all duration-200 hover:-translate-y-1 hover:border-white/25 ${active ? "is-active border-emerald-400/35" : "border-white/10"} ${panel.minimized ? "opacity-70" : ""}`}
                 >
-                  <div className="os-chrome flex items-center gap-2 border-b border-black/40 px-3 py-2">
-                    <span className={`led ${isActive ? "led-ok" : ""}`} />
-                    <Icon className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-white">
+                  <div className="os-primary-titlebar flex h-11 items-center gap-2.5 border-b border-black/40 px-3">
+                    <span className="os-window-app-icon flex h-7 w-7 items-center justify-center rounded-lg border border-white/10">
+                      <Icon className="h-3.5 w-3.5 text-white/65" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-extrabold text-white/75">
                       {label}
                     </span>
-                    {p.minimized ? (
-                      <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-[color:var(--chrome-muted)]">
-                        Minimizada
-                      </span>
-                    ) : null}
+                    <span className="font-mono text-[7px] font-bold uppercase tracking-[0.1em] text-white/25">
+                      {panel.minimized ? "Minimizada" : active ? "Em foco" : "Aberta"}
+                    </span>
                   </div>
-                  <div className="flex h-28 items-center justify-center bg-dot-grid bg-white text-slate-300">
-                    <Icon className="h-9 w-9" strokeWidth={1.5} />
+                  <PreviewSurface icon={Icon} />
+                  <div className="flex items-center justify-between border-t border-slate-200 bg-white px-3.5 py-2.5">
+                    <span className="text-[10px] font-extrabold text-slate-700">
+                      Abrir janela
+                    </span>
+                    <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                      Ferramenta
+                    </span>
                   </div>
                 </button>
                 <button
-                  data-testid={`mission-control-close-${p.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closePanel(p.id);
+                  data-testid={`mission-control-close-${panel.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    haptics.tap();
+                    closePanel(panel.id);
                   }}
-                  title="Fechar"
-                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
+                  title="Fechar janela"
+                  aria-label={`Fechar ${label}`}
+                  className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-[#17181b] text-white/40 opacity-0 shadow-xl transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:border-red-400/30 hover:bg-red-500/20 hover:text-red-200"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -158,6 +277,11 @@ export default function MissionControl({ open, onClose, primaryWindow }) {
           })}
         </div>
       )}
+
+      <p className="relative mx-auto mt-auto font-mono text-[8px] font-bold uppercase tracking-[0.18em] text-white/20">
+        F3 visão geral · Esc voltar · ⌘H secretária
+      </p>
     </div>
   );
 }
+

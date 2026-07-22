@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -42,9 +42,10 @@ import { FavoritesProvider } from "@/context/FavoritesContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
-import AppLauncher from "@/components/workspace/AppLauncher";
+import ControlDeck from "@/components/workspace/ControlDeck";
 import DesktopOperationsRail from "@/components/workspace/DesktopOperationsRail";
 import MobileSystemDock from "@/components/workspace/MobileSystemDock";
+import OperationalRibbon from "@/components/workspace/OperationalRibbon";
 import SystemBar from "@/components/workspace/SystemBar";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
@@ -480,6 +481,7 @@ function PrimaryRouteWindow({
   onMinimize,
   onToggleMaximize,
   onOpenSearch,
+  onOpenRoute,
   children,
 }) {
   const Icon = app.icon;
@@ -494,54 +496,6 @@ function PrimaryRouteWindow({
         data-testid="primary-window-titlebar"
         className="os-primary-titlebar flex h-[52px] shrink-0 items-center border-b border-black/40 px-3.5"
       >
-        <div
-          className="group mr-2 flex items-center gap-0.5"
-          aria-label="Controlos da janela"
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-            title="Fechar e mostrar o ambiente de trabalho"
-            aria-label="Fechar e mostrar o ambiente de trabalho"
-          >
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/30">
-              <X
-                className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
-                strokeWidth={3}
-              />
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={onMinimize}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-            title="Minimizar"
-            aria-label="Minimizar"
-          >
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#febc2e] ring-1 ring-black/30">
-              <Minus
-                className="h-2.5 w-2.5 text-black/0 group-hover:text-black/60"
-                strokeWidth={3}
-              />
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={onToggleMaximize}
-            className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.07]"
-            title={maximized ? "Restaurar" : "Maximizar"}
-            aria-label={maximized ? "Restaurar" : "Maximizar"}
-          >
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#28c840] ring-1 ring-black/30">
-              <Maximize2
-                className="h-2 w-2 text-black/0 group-hover:text-black/55"
-                strokeWidth={3}
-              />
-            </span>
-          </button>
-        </div>
-        <span className="mr-3 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="os-window-app-icon flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 text-white/80">
             <Icon className="h-4 w-4" />
@@ -567,8 +521,39 @@ function PrimaryRouteWindow({
             <Search className="h-3 w-3" /> Pesquisar{" "}
             <span className="font-mono text-[8px]">⌘K</span>
           </button>
+          <span className="mx-0.5 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
+          <div className="flex items-center gap-0.5" aria-label="Controlos da janela">
+            <button
+              type="button"
+              onClick={onMinimize}
+              className="os-window-control"
+              title="Minimizar"
+              aria-label="Minimizar"
+            >
+              <Minus className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleMaximize}
+              className="os-window-control"
+              title={maximized ? "Restaurar" : "Maximizar"}
+              aria-label={maximized ? "Restaurar" : "Maximizar"}
+            >
+              <Maximize2 className="h-3 w-3" strokeWidth={2.1} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="os-window-control os-window-control-danger"
+              title="Fechar e mostrar o ambiente de trabalho"
+              aria-label="Fechar e mostrar o ambiente de trabalho"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.2} />
+            </button>
+          </div>
         </div>
       </div>
+      <OperationalRibbon app={app} onOpenRoute={onOpenRoute} />
       <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain bg-[hsl(var(--background))]">
         <div className="mx-auto w-full max-w-[1760px] p-5 sm:p-7 xl:p-8">
           {children}
@@ -588,14 +573,26 @@ function PrimaryRouteWindow({
   );
 }
 
-function AppLauncherOverlay({ open, onClose }) {
+function AppLauncherOverlay({
+  open,
+  onClose,
+  onOpenRoute,
+  onOpenSearch,
+  onOpenActivity,
+}) {
+  const dialogRef = useRef(null);
+
   useEffect(() => {
     if (!open) return undefined;
+    const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 0);
     const closeOnEscape = (event) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -608,33 +605,48 @@ function AppLauncherOverlay({ open, onClose }) {
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-[80] hidden items-center justify-center bg-black/55 p-8 backdrop-blur-xl animate-scale-in lg:flex"
+      className="control-deck-overlay fixed inset-0 z-[80] hidden items-center justify-center p-6 backdrop-blur-2xl animate-scale-in lg:flex"
     >
-      <div className="os-launcher-panel w-full max-w-4xl overflow-hidden rounded-[28px] border border-white/15 bg-[#111]/90 shadow-[0_45px_120px_-30px_rgba(0,0,0,0.95)]">
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-          <div>
-            <p className="font-heading text-xl font-extrabold text-white">
-              Aplicações
-            </p>
-            <p className="mt-0.5 text-[11px] font-semibold text-white/35">
-              Ferramentas da loja e janelas de trabalho
-            </p>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="os-launcher-panel w-full max-w-[1120px] overflow-hidden rounded-[30px] border border-white/15 shadow-[0_50px_140px_-32px_rgba(0,0,0,0.98)] outline-none"
+      >
+        <div className="control-deck-header flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-white">
+              <span className="relative z-10">B</span>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-heading text-lg font-extrabold tracking-tight text-white">
+                Control Deck
+              </span>
+              <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.18em] text-white/25">
+                Aplicações · ferramentas · turno
+              </span>
+            </span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-white/25 sm:block">
+              Esc para fechar
+            </span>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] text-white/40 transition-colors hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-200"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
           </button>
+          </div>
         </div>
-        <div className="max-h-[70vh] overflow-auto p-6 sm:p-8">
-          <AppLauncher variant="launcher" onLaunch={onClose} />
-        </div>
-        <div className="flex items-center justify-between border-t border-white/10 px-6 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-white/25">
-          <span>Arrasta para reordenar</span>
-          <span>Esc para fechar</span>
+        <div className="scroll-chrome max-h-[min(78vh,760px)] overflow-auto">
+          <ControlDeck
+            onClose={onClose}
+            onOpenRoute={onOpenRoute}
+            onOpenSearch={onOpenSearch}
+            onOpenActivity={onOpenActivity}
+          />
         </div>
       </div>
     </div>
@@ -743,6 +755,7 @@ function LayoutInner() {
             onMinimize={() => setPrimaryMinimized(true)}
             onToggleMaximize={() => setPrimaryMaximized((value) => !value)}
             onOpenSearch={() => setPaletteOpen(true)}
+            onOpenRoute={openRoute}
           >
             <SupplierEmailAlert />
             <div key={location.pathname} className="animate-page-enter">
@@ -828,6 +841,11 @@ function LayoutInner() {
                 <NotificationsBell variant="mobile" />
               </div>
             </div>
+            <OperationalRibbon
+              app={activeRouteApp}
+              variant="mobile"
+              onOpenRoute={openRoute}
+            />
           </header>
           <main className="mobile-workspace px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pt-6">
             <div
@@ -848,6 +866,9 @@ function LayoutInner() {
       <AppLauncherOverlay
         open={launcherOpen}
         onClose={() => setLauncherOpen(false)}
+        onOpenRoute={openRoute}
+        onOpenSearch={() => setPaletteOpen(true)}
+        onOpenActivity={() => setActivityOpen(true)}
       />
       <InstallPwaBanner />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />

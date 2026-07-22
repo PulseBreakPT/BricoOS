@@ -61,6 +61,7 @@ export default function DesktopWorkspace({
       <MissionControl
         open={missionControlOpen}
         onClose={() => onMissionControlOpenChange(false)}
+        onShowDesktop={onShowDesktop}
         primaryWindow={primaryWindow}
       />
     </>
