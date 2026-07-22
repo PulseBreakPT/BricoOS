@@ -11,9 +11,9 @@ const PRIORITY_COLORS = { alta: "bg-red-400", normal: "bg-amber-400", baixa: "bg
 
 function Tile({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-      <p className="text-xl font-extrabold text-slate-900">{value}</p>
-      <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+    <div className="rounded-xl border border-border bg-muted/60 p-3">
+      <p className="text-xl font-extrabold text-foreground">{value}</p>
+      <p className="text-[11px] font-semibold text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -22,11 +22,11 @@ function BarRow({ label, count, max, colorCls = "bg-blue-400" }) {
   const pct = max ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-20 shrink-0 truncate text-slate-600 sm:w-24">{label}</span>
-      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+      <span className="w-20 shrink-0 truncate text-muted-foreground sm:w-24">{label}</span>
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
         <div className={`h-full rounded-full ${colorCls}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-6 shrink-0 text-right font-bold text-slate-700">{count}</span>
+      <span className="w-6 shrink-0 text-right font-bold text-foreground">{count}</span>
     </div>
   );
 }
@@ -51,16 +51,16 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="email-stats-dialog" className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-5">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 sm:px-5">
           <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
             <BarChart3 className="h-5 w-5" /> Estatísticas de email
           </DialogTitle>
-          <p className="text-xs text-slate-500">Últimos 30 dias.</p>
+          <p className="text-xs text-muted-foreground">Últimos 30 dias.</p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           {loading || !stats ? (
-            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
           ) : (
             <div className="space-y-5">
               <div className="grid grid-cols-1 gap-2 min-[430px]:grid-cols-3">
@@ -71,12 +71,12 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
 
               {stats.fastest_suppliers.length > 0 ? (
                 <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Fornecedores mais rápidos a responder</p>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Fornecedores mais rápidos a responder</p>
                   <div className="space-y-1.5">
                     {stats.fastest_suppliers.map((s) => (
                       <div key={s.supplier} className="flex items-center justify-between text-xs">
-                        <span className="truncate text-slate-700">{s.supplier}</span>
-                        <span className="shrink-0 font-bold text-slate-500">{s.avg_hours}h · {s.count}×</span>
+                        <span className="truncate text-foreground">{s.supplier}</span>
+                        <span className="shrink-0 font-bold text-muted-foreground">{s.avg_hours}h · {s.count}×</span>
                       </div>
                     ))}
                   </div>
@@ -85,7 +85,7 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
 
               {stats.daily.length > 0 ? (
                 <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Volume diário</p>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Volume diário</p>
                   <div className="flex h-16 items-end gap-0.5">
                     {stats.daily.map((d) => (
                       <div key={d.date} title={`${d.date}: ${d.received} recebidos, ${d.sent} enviados`} className="flex flex-1 items-end gap-px">
@@ -94,7 +94,7 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-1.5 flex gap-3 text-[11px] text-slate-400">
+                  <div className="mt-1.5 flex gap-3 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-300" /> Recebidos</span>
                     <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Enviados</span>
                   </div>
@@ -102,7 +102,7 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
               ) : null}
 
               <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Por categoria</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Por categoria</p>
                 <div className="space-y-1.5">
                   {Object.entries(stats.by_category).map(([k, v]) => (
                     <BarRow key={k} label={CATEGORY_LABELS[k] || k} count={v} max={maxCategory} />
@@ -111,7 +111,7 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Por prioridade</p>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Por prioridade</p>
                 <div className="space-y-1.5">
                   {Object.entries(stats.by_priority).map(([k, v]) => (
                     <BarRow key={k} label={PRIORITY_LABELS[k] || k} count={v} max={Math.max(1, ...Object.values(stats.by_priority))} colorCls={PRIORITY_COLORS[k]} />

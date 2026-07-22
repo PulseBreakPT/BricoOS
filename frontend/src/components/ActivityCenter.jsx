@@ -42,19 +42,19 @@ export default function ActivityCenter({ open, onOpenChange }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-        <SheetHeader className="shrink-0 border-b border-slate-100 px-5 py-4 text-left">
+        <SheetHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
           <SheetTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
             <Activity className="h-5 w-5 text-red-600" /> Centro de Atividade
           </SheetTitle>
-          <SheetDescription className="text-xs text-slate-500">
+          <SheetDescription className="text-xs text-muted-foreground">
             Tudo o que aconteceu, no mesmo sítio — toca num evento para abrir o pedido.
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
-            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
           ) : items.length === 0 ? (
-            <p className="py-10 text-center text-xs text-slate-400">Ainda sem atividade registada.</p>
+            <p className="py-10 text-center text-xs text-muted-foreground">Ainda sem atividade registada.</p>
           ) : (
             <div className="space-y-0.5">
               {items.map((ev, i) => {
@@ -65,14 +65,14 @@ export default function ActivityCenter({ open, onOpenChange }) {
                     key={`${ev.at}-${i}`}
                     data-testid={`activity-event-${i}`}
                     onClick={ev.note_id ? () => openEvent(ev) : undefined}
-                    className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left ${ev.note_id ? "cursor-pointer transition-colors hover:bg-slate-50" : ""}`}
+                    className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left ${ev.note_id ? "cursor-pointer transition-colors hover:bg-muted" : ""}`}
                   >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold leading-snug text-slate-700">{ev.message}</span>
-                      <span className="mt-0.5 block text-[11px] text-slate-400">
+                      <span className="block text-xs font-semibold leading-snug text-foreground">{ev.message}</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
                         {ev.note_label ? `${ev.note_label} · ` : ""}{timeAgo(ev.at)}
                       </span>
                     </span>

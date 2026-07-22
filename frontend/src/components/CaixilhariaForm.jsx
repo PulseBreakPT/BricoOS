@@ -47,9 +47,9 @@ function modelOverall(catalog, systemKey) {
 function MiniTitle({ title, first = false }) {
   return (
     <div className={`flex items-center gap-3 ${first ? "" : "mt-5"}`}>
-      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
-      <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{title}</span>
-      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
+      <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{title}</span>
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
     </div>
   );
 }
@@ -62,7 +62,7 @@ function OverallBadge({ overall, selected = false }) {
       ? "bg-sky-300 text-sky-950"
       : overall.medal === "Bronze"
         ? "bg-orange-300 text-orange-950"
-        : selected ? "bg-white/25 text-white" : "bg-slate-900/10 text-slate-700";
+        : selected ? "bg-card/25 text-white" : "bg-foreground/10 text-foreground";
   return (
     <span className={`ml-1.5 inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-black tabular-nums ${medalTone}`}>
       {overall.score}
@@ -213,21 +213,21 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
     <div>
       {/* Cabeçalho compacto: aviso + atalho para o catálogo técnico */}
       {catalog.catalog_meta ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted p-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-blue-300">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground text-blue-300">
               <BookOpenCheck className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold text-slate-900">Pedido de caixilharia</p>
-              <p className="truncate text-[11px] text-slate-500">{catalog.aviso}</p>
+              <p className="truncate text-sm font-extrabold text-foreground">Pedido de caixilharia</p>
+              <p className="truncate text-[11px] text-muted-foreground">{catalog.aviso}</p>
             </div>
           </div>
           <a
             href="/catalogo-tecnico"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-bold text-foreground shadow-sm hover:border-blue-300 hover:text-[color:var(--pastel-blue-text)]"
           >
             <span className="hidden sm:inline">Comparar modelos</span>
             <span className="sm:hidden">Modelos</span>
@@ -237,7 +237,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
       ) : null}
 
       {hasComparisons ? (
-        <p className="mt-4 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2.5 text-xs text-blue-700">
+        <p className="mt-4 flex items-start gap-1.5 rounded-lg bg-[var(--pastel-blue-bg)] p-2.5 text-xs text-[color:var(--pastel-blue-text)]">
           <GitCompare className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           Pedido comparativo: o email pede um preço separado para cada opção.
         </p>
@@ -245,8 +245,8 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
 
       {/* Elementos */}
       <div className="mt-4 flex items-end justify-between gap-3">
-        <h3 className="font-heading text-base font-extrabold text-slate-900">Elementos do pedido</h3>
-        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+        <h3 className="font-heading text-base font-extrabold text-foreground">Elementos do pedido</h3>
+        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">
           {normalized.linhas.length} elem. · {totalUnits} un
         </span>
       </div>
@@ -256,32 +256,32 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
           <section
             key={line.id}
             data-testid={`caix-line-${lineIndex}`}
-            className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-colors ${expandedLineId === line.id ? "border-blue-300 ring-1 ring-blue-100" : "border-slate-200"}`}
+            className={`overflow-hidden rounded-2xl border bg-card shadow-sm transition-colors ${expandedLineId === line.id ? "border-blue-300 ring-1 ring-blue-100" : "border-border"}`}
           >
             {/* Cabeçalho do elemento */}
-            <div className={`flex items-center gap-1 bg-slate-50/80 px-2 py-1.5 sm:gap-2 sm:px-3 ${expandedLineId === line.id ? "border-b border-slate-100" : ""}`}>
+            <div className={`flex items-center gap-1 bg-muted/80 px-2 py-1.5 sm:gap-2 sm:px-3 ${expandedLineId === line.id ? "border-b border-border" : ""}`}>
               <button
                 type="button"
                 onClick={() => setExpandedLineId(expandedLineId === line.id ? "" : line.id)}
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 aria-expanded={expandedLineId === line.id}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-extrabold text-white">{lineIndex + 1}</span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-xs font-extrabold text-background">{lineIndex + 1}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-extrabold text-slate-900">{line.nome || catalog.produtos[line.produto] || "Elemento"}</span>
-                  <span className="block truncate text-[11px] text-slate-500">
+                  <span className="block truncate text-sm font-extrabold text-foreground">{line.nome || catalog.produtos[line.produto] || "Elemento"}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
                     {line.largura_mm && line.altura_mm ? `${line.largura_mm} × ${line.altura_mm} mm` : "Medidas por preencher"}
                     {line.opcoes.some((option) => option.sistema)
                       ? ` · ${line.opcoes.map((option) => catalog.modelos?.[option.sistema]?.name).filter(Boolean).join(" + ")}`
                       : ` · ${line.opcoes.length} opção${line.opcoes.length === 1 ? "" : "ões"}`}
                   </span>
                 </span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${expandedLineId === line.id ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expandedLineId === line.id ? "rotate-180" : ""}`} />
               </button>
-              <button type="button" onClick={() => duplicateLine(lineIndex)} title="Duplicar elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-slate-700">
+              <button type="button" onClick={() => duplicateLine(lineIndex)} title="Duplicar elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-card hover:text-foreground">
                 <Copy className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-25">
+              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-500 disabled:opacity-25">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -296,7 +296,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                     type="button"
                     data-testid={`caix-line-${lineIndex}-produto-${key}`}
                     onClick={() => pickProduct(lineIndex, key)}
-                    className={`rounded-xl border px-2 py-2.5 text-xs font-bold transition-colors ${line.produto === key ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+                    className={`rounded-xl border px-2 py-2.5 text-xs font-bold transition-colors ${line.produto === key ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground hover:bg-muted"}`}
                   >
                     {label}
                   </button>
@@ -341,8 +341,8 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               </div>
 
               {["janela", "porta"].includes(line.produto) && line.largura_mm && line.altura_mm ? (
-                <div className="mt-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 p-3">
-                  <p className="text-xs font-semibold text-blue-800">Incluir rede mosquiteira ou portada com as mesmas medidas?</p>
+                <div className="mt-3 rounded-xl border border-dashed border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
+                  <p className="text-xs font-semibold text-[color:var(--pastel-blue-text)]">Incluir rede mosquiteira ou portada com as mesmas medidas?</p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {[["rede_mosquiteira", "Rede mosquiteira", "rede"], ["portada", "Portada", "portada"]].map(([product, label, slug]) => {
                       const added = hasCompanion(line, product);
@@ -355,7 +355,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                           size="sm"
                           disabled={added}
                           onClick={() => addCompanionLine(lineIndex, product)}
-                          className={`h-8 rounded-lg text-xs ${added ? "border-emerald-300 bg-emerald-50 text-emerald-700 disabled:opacity-100" : ""}`}
+                          className={`h-8 rounded-lg text-xs ${added ? "border-emerald-300 bg-[var(--pastel-emerald-bg)] text-[color:var(--pastel-emerald-text)] disabled:opacity-100" : ""}`}
                         >
                           {added ? <Check className="mr-1 h-3.5 w-3.5" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
                           {label}{added ? " adicionada" : ""}
@@ -403,8 +403,8 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               {/* 4. Material e modelo */}
               <MiniTitle title="Material e modelo" />
               <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-[11px] text-slate-400">As medidas acima aplicam-se a todas as opções deste elemento.</p>
-                {line.opcoes.length > 1 ? <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">COMPARAÇÃO</span> : null}
+                <p className="text-[11px] text-muted-foreground">As medidas acima aplicam-se a todas as opções deste elemento.</p>
+                {line.opcoes.length > 1 ? <span className="shrink-0 rounded-full bg-[var(--pastel-blue-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-blue-text)]">COMPARAÇÃO</span> : null}
               </div>
 
               <div className="mt-2 space-y-3">
@@ -429,7 +429,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                   <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar outra opção
                 </Button>
                 {["janela", "porta"].includes(line.produto) ? (
-                  <Button type="button" variant="outline" size="sm" onClick={() => addOption(lineIndex, true)} className="h-9 rounded-xl border-blue-200 text-xs text-blue-700 hover:bg-blue-50">
+                  <Button type="button" variant="outline" size="sm" onClick={() => addOption(lineIndex, true)} className="h-9 rounded-xl border-blue-200 text-xs text-[color:var(--pastel-blue-text)] hover:bg-[var(--pastel-blue-bg)]">
                     <GitCompare className="mr-1 h-3.5 w-3.5" /> Comparar PVC / alumínio
                   </Button>
                 ) : null}
@@ -440,7 +440,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               <div className="mt-2.5 space-y-1.5">
                 <Textarea value={line.observacoes} onChange={(event) => updateLine(lineIndex, { observacoes: event.target.value })} rows={2} placeholder="Só deste elemento — ex.: manter o desenho atual, soleira baixa..." />
               </div>
-              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
+              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-emerald-200 text-xs font-bold text-[color:var(--pastel-emerald-text)] hover:bg-[var(--pastel-emerald-bg)]">
                 <Check className="mr-1.5 h-4 w-4" /> Concluir este elemento
               </Button>
             </div> : null}
@@ -449,11 +449,11 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
       </div>
 
       {/* Adicionar elementos */}
-      <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-3">
-        <p className="text-xs font-bold text-slate-700">Adicionar outro elemento</p>
+      <div className="mt-3 rounded-2xl border border-dashed border-border bg-muted/50 p-3">
+        <p className="text-xs font-bold text-foreground">Adicionar outro elemento</p>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {Object.entries(catalog.produtos).map(([key, label]) => (
-            <Button key={key} type="button" variant="outline" size="sm" onClick={() => addLine(key)} className="h-9 rounded-xl bg-white text-xs">
+            <Button key={key} type="button" variant="outline" size="sm" onClick={() => addLine(key)} className="h-9 rounded-xl bg-card text-xs">
               <Plus className="mr-1 h-3.5 w-3.5" /> {label}
             </Button>
           ))}
@@ -480,10 +480,10 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
   const isNet = option.familia === "redes";
 
   return (
-    <div data-testid={`caix-line-${lineIndex}-option-${optionIndex}`} className={`rounded-xl border p-3 ${line.opcoes.length > 1 ? "border-blue-200 bg-blue-50/30" : "border-slate-200 bg-slate-50/50"}`}>
+    <div data-testid={`caix-line-${lineIndex}-option-${optionIndex}`} className={`rounded-xl border p-3 ${line.opcoes.length > 1 ? "border-blue-200 bg-[var(--pastel-blue-bg)]" : "border-border bg-muted/50"}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-extrabold uppercase tracking-wide text-slate-700">Opção {optionLetter(optionIndex)}</p>
-        <button type="button" onClick={onRemove} disabled={line.opcoes.length === 1} className="rounded-lg p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-25">
+        <p className="text-xs font-extrabold uppercase tracking-wide text-foreground">Opção {optionLetter(optionIndex)}</p>
+        <button type="button" onClick={onRemove} disabled={line.opcoes.length === 1} className="rounded-lg p-1 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-500 disabled:opacity-25">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -505,7 +505,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
               key={key}
               type="button"
               onClick={() => onPickFamily(key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.familia === key ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.familia === key ? "bg-foreground text-background" : "border border-border bg-card text-muted-foreground hover:bg-muted"}`}
             >
               {family.label}
             </button>
@@ -540,7 +540,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   key={key}
                   type="button"
                   onClick={() => onSet("sistema", key)}
-                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.sistema === key ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${option.sistema === key ? "bg-blue-700 text-white" : "border border-border bg-card text-muted-foreground hover:bg-muted"}`}
                 >
                   {label}
                   <OverallBadge overall={overall} selected={option.sistema === key} />
@@ -549,22 +549,22 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
             })}
           </div>
           {!compatibleSystems.length ? (
-            <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
+            <p className="flex items-start gap-1.5 rounded-lg bg-[var(--pastel-amber-bg)] p-2 text-xs text-[color:var(--pastel-amber-text)]">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Não há modelos desta família compatíveis com o tipo de abertura escolhido.
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-amber-700">Escolhe primeiro o material.</p>
+        <p className="mt-2 text-xs text-[color:var(--pastel-amber-text)]">Escolhe primeiro o material.</p>
       )}
 
       {selectedModel ? (
         <SelectedModelSummary model={selectedModel} analysisId={analysisId} overall={modelOverall(catalog, option.sistema)} />
       ) : null}
 
-      <details className="mt-3 rounded-lg border border-slate-200 bg-white">
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-slate-600">Acabamento e acessórios</summary>
-        <div className="border-t border-slate-100 p-3">
+      <details className="mt-3 rounded-lg border border-border bg-card">
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-muted-foreground">Acabamento e acessórios</summary>
+        <div className="border-t border-border p-3">
           {isNet ? (
             <div className="space-y-1.5">
               <Label>Cor do perfil</Label>
@@ -589,7 +589,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                 </div>
               </div>
               {catalog.vidros?.[option.material] ? (
-                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-blue-50 p-2 text-[11px] leading-relaxed text-blue-800">
+                <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-[var(--pastel-blue-bg)] p-2 text-[11px] leading-relaxed text-[color:var(--pastel-blue-text)]">
                   <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
                   <span><strong>{catalog.vidros[option.material].benefit}</strong> {catalog.vidros[option.material].typical_use}</span>
                 </p>
@@ -633,23 +633,23 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
 
 function SelectedModelSummary({ model, analysisId, overall }) {
   return (
-    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5">
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-2.5">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white">
           <Check className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-extrabold text-slate-900">
+          <p className="truncate text-xs font-extrabold text-foreground">
             {model.name}
             {overall ? (
-              <span className="ml-1.5 rounded-full bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-emerald-900">
+              <span className="ml-1.5 rounded-full bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-[color:var(--pastel-emerald-text)]">
                 {overall.score}{overall.medal ? ` · ${overall.medal}` : ""}
               </span>
             ) : null}
           </p>
-          <p className="truncate text-[10px] text-slate-500">{model.category_label}</p>
+          <p className="truncate text-[10px] text-muted-foreground">{model.category_label}</p>
         </div>
-        <a href={`/catalogo-tecnico?modelo=${encodeURIComponent(analysisId)}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-50">
+        <a href={`/catalogo-tecnico?modelo=${encodeURIComponent(analysisId)}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-blue-200 bg-card px-2 py-1.5 text-[10px] font-bold text-[color:var(--pastel-blue-text)] hover:bg-[var(--pastel-blue-bg)]">
           Ver ficha <ExternalLink className="h-3 w-3" />
         </a>
       </div>

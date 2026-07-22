@@ -54,19 +54,19 @@ export default function FavoritesPanel({ open, onOpenChange }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-        <SheetHeader className="shrink-0 border-b border-slate-100 px-5 py-4 text-left">
+        <SheetHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
           <SheetTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
             <Star className="h-5 w-5 text-amber-500" /> Favoritos
           </SheetTitle>
-          <SheetDescription className="text-xs text-slate-500">
+          <SheetDescription className="text-xs text-muted-foreground">
             Pedidos, fornecedores, emails, ficheiros e tarefas fixados — sempre à mão.
           </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
-            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
           ) : groups.length === 0 ? (
-            <p className="py-10 text-center text-xs text-slate-400">
+            <p className="py-10 text-center text-xs text-muted-foreground">
               Ainda sem favoritos — toca na estrela junto de um pedido, fornecedor, email, ficheiro ou tarefa.
             </p>
           ) : (
@@ -75,28 +75,28 @@ export default function FavoritesPanel({ open, onOpenChange }) {
               const Icon = meta.icon;
               return (
                 <div key={g.kind} className="mb-4">
-                  <p className="mb-1.5 px-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-400">{meta.label}</p>
+                  <p className="mb-1.5 px-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{meta.label}</p>
                   <div className="space-y-1">
                     {g.items.map((it) => (
-                      <div key={`${it.kind}-${it.id}`} className="group flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-slate-50">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <div key={`${it.kind}-${it.id}`} className="group flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-muted">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                           <Icon className="h-3.5 w-3.5" />
                         </span>
                         <button type="button" onClick={() => goTo(it)} className="min-w-0 flex-1 text-left">
-                          <span className="block truncate text-xs font-bold text-slate-800">{it.label}</span>
-                          {it.sublabel ? <span className="block truncate text-[11px] text-slate-400">{it.sublabel}</span> : null}
+                          <span className="block truncate text-xs font-bold text-foreground">{it.label}</span>
+                          {it.sublabel ? <span className="block truncate text-[11px] text-muted-foreground">{it.sublabel}</span> : null}
                         </button>
                         {g.kind !== "pedido" ? (
                           <button
                             type="button"
                             title="Remover dos favoritos"
                             onClick={() => removeFavorite(it.kind, it.id)}
-                            className="shrink-0 rounded-md p-1 text-slate-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                            className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         ) : (
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         )}
                       </div>
                     ))}

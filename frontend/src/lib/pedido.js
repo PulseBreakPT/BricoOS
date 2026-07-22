@@ -1,25 +1,29 @@
+// bg/text usam variáveis CSS (index.css, :root + [data-theme="dark"]) em
+// vez de hex fixo — os badges de estado/prioridade, usados em toda a app
+// via inline style, trocam de tom sozinhos ao mudar de tema. O "dot"
+// (pequeno indicador circular) mantém a cor viva: já lê bem em ambos os temas.
 export const STATUS_CONFIG = {
-  novo: { label: "Novo", bg: "#ECFCCB", text: "#4D7C0F", dot: "#84CC16" },
-  pendente: { label: "Pendente", bg: "#FEF3C7", text: "#B45309", dot: "#D97706" },
-  em_preparacao: { label: "Em preparação", bg: "#E0E7FF", text: "#4338CA", dot: "#6366F1" },
-  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "#DBEAFE", text: "#1D4ED8", dot: "#2563EB" },
-  aguarda_fornecedor: { label: "Espera fornecedor", bg: "#CFFAFE", text: "#0E7490", dot: "#06B6D4" },
-  orcamento_recebido: { label: "Orçamento recebido", bg: "#EDE9FE", text: "#6D28D9", dot: "#8B5CF6" },
-  aguarda_cliente: { label: "Espera cliente", bg: "#FFEDD5", text: "#C2410C", dot: "#EA580C" },
-  aprovado: { label: "Aprovado", bg: "#DCFCE7", text: "#15803D", dot: "#22C55E" },
-  rejeitado: { label: "Rejeitado", bg: "#FFE4E6", text: "#BE123C", dot: "#F43F5E" },
-  encomendado: { label: "Encomendado", bg: "#CCFBF1", text: "#0F766E", dot: "#14B8A6" },
-  concluido: { label: "Concluído", bg: "#D1FAE5", text: "#166534", dot: "#16A34A" },
-  cancelado: { label: "Cancelado", bg: "#FCE7F3", text: "#BE185D", dot: "#EC4899" },
+  novo: { label: "Novo", bg: "var(--badge-novo-bg)", text: "var(--badge-novo-text)", dot: "#84CC16" },
+  pendente: { label: "Pendente", bg: "var(--badge-pendente-bg)", text: "var(--badge-pendente-text)", dot: "#D97706" },
+  em_preparacao: { label: "Em preparação", bg: "var(--badge-em_preparacao-bg)", text: "var(--badge-em_preparacao-text)", dot: "#6366F1" },
+  enviado_fornecedor: { label: "Enviado ao fornecedor", bg: "var(--badge-enviado_fornecedor-bg)", text: "var(--badge-enviado_fornecedor-text)", dot: "#2563EB" },
+  aguarda_fornecedor: { label: "Espera fornecedor", bg: "var(--badge-aguarda_fornecedor-bg)", text: "var(--badge-aguarda_fornecedor-text)", dot: "#06B6D4" },
+  orcamento_recebido: { label: "Orçamento recebido", bg: "var(--badge-orcamento_recebido-bg)", text: "var(--badge-orcamento_recebido-text)", dot: "#8B5CF6" },
+  aguarda_cliente: { label: "Espera cliente", bg: "var(--badge-aguarda_cliente-bg)", text: "var(--badge-aguarda_cliente-text)", dot: "#EA580C" },
+  aprovado: { label: "Aprovado", bg: "var(--badge-aprovado-bg)", text: "var(--badge-aprovado-text)", dot: "#22C55E" },
+  rejeitado: { label: "Rejeitado", bg: "var(--badge-rejeitado-bg)", text: "var(--badge-rejeitado-text)", dot: "#F43F5E" },
+  encomendado: { label: "Encomendado", bg: "var(--badge-encomendado-bg)", text: "var(--badge-encomendado-text)", dot: "#14B8A6" },
+  concluido: { label: "Concluído", bg: "var(--badge-concluido-bg)", text: "var(--badge-concluido-text)", dot: "#16A34A" },
+  cancelado: { label: "Cancelado", bg: "var(--badge-cancelado-bg)", text: "var(--badge-cancelado-text)", dot: "#EC4899" },
 };
 export const STATUS_ORDER = Object.keys(STATUS_CONFIG);
 export const getStatusCfg = (k) => STATUS_CONFIG[k] || STATUS_CONFIG.novo;
 
 export const PRIORITY_CONFIG = {
-  urgente: { label: "Urgente", bg: "#FEE2E2", text: "#B91C1C", dot: "#DC2626" },
-  alta: { label: "Alta", bg: "#FFEDD5", text: "#C2410C", dot: "#EA580C" },
-  media: { label: "Média", bg: "#FEF9C3", text: "#A16207", dot: "#EAB308" },
-  baixa: { label: "Baixa", bg: "#DCFCE7", text: "#15803D", dot: "#22C55E" },
+  urgente: { label: "Urgente", bg: "var(--badge-urgente-bg)", text: "var(--badge-urgente-text)", dot: "#DC2626" },
+  alta: { label: "Alta", bg: "var(--badge-alta-bg)", text: "var(--badge-alta-text)", dot: "#EA580C" },
+  media: { label: "Média", bg: "var(--badge-media-bg)", text: "var(--badge-media-text)", dot: "#EAB308" },
+  baixa: { label: "Baixa", bg: "var(--badge-baixa-bg)", text: "var(--badge-baixa-text)", dot: "#22C55E" },
 };
 export const PRIORITY_ORDER = ["urgente", "alta", "media", "baixa"];
 export const getPriorityCfg = (k) => PRIORITY_CONFIG[k] || PRIORITY_CONFIG.media;

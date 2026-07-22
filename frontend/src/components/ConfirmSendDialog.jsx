@@ -68,11 +68,11 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="confirm-send-dialog" className="flex max-h-[94vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-5 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
           <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">
             Confirmar envio ao cliente
           </DialogTitle>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {note.customer_name || "Cliente"} · preparado automaticamente — revê e confirma. Nada é enviado sem a tua confirmação.
           </p>
         </DialogHeader>
@@ -84,14 +84,14 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
             href={withDeviceToken(`${API}/notes/${note.id}/files/${pending.pdf_file_id}`)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition-colors hover:border-slate-400"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3 transition-colors hover:border-input"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--pastel-red-bg)] text-red-600">
               <FileText className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-bold text-slate-900">{pending.pdf_filename || "Orçamento (PDF)"}</span>
-              <span className="block text-xs text-slate-500">
+              <span className="block truncate text-sm font-bold text-foreground">{pending.pdf_filename || "Orçamento (PDF)"}</span>
+              <span className="block text-xs text-muted-foreground">
                 {pending.total != null ? `${Number(pending.total).toFixed(2)} € c/ IVA` : ""}
                 {pending.eff_margin_pct != null ? ` · margem final ${Number(pending.eff_margin_pct).toFixed(1)}%` : ""}
                 {" · toca para rever o PDF"}
@@ -105,15 +105,15 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
           </div>
           <div className="mt-3 space-y-1.5">
             <Label>Assunto</Label>
-            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-amber-400 bg-amber-50" : ""} />
+            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-amber-400 bg-[var(--pastel-amber-bg)]" : ""} />
             {pending.subject_needs_review ? (
-              <p data-testid="subject-review-warning" className="text-xs text-amber-700">
+              <p data-testid="subject-review-warning" className="text-xs text-[color:var(--pastel-amber-text)]">
                 {(pending.obra_candidates || []).length > 1
                   ? `O PDF tem vários números de obra possíveis (${pending.obra_candidates.join(", ")}) — confirma o assunto antes de enviar.`
                   : "Não foi possível ler o número da obra no PDF — confirma o assunto antes de enviar."}
               </p>
             ) : (
-              pending.obra ? <p className="text-[11px] text-slate-400">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
+              pending.obra ? <p className="text-[11px] text-muted-foreground">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
             )}
           </div>
           <div className="mt-3 space-y-1.5">
@@ -122,17 +122,17 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-slate-100 bg-white px-5 py-3">
+        <div className="shrink-0 border-t border-border bg-card px-5 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <Button data-testid="confirm-send-btn" onClick={send} disabled={sending || discarding || !to.trim()} className="rounded-xl">
               {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
               Confirmar e enviar
             </Button>
-            <Button data-testid="confirm-send-discard" variant="outline" onClick={discard} disabled={sending || discarding} className="rounded-xl border-red-200 text-red-600 hover:bg-red-50">
+            <Button data-testid="confirm-send-discard" variant="outline" onClick={discard} disabled={sending || discarding} className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)]">
               {discarding ? <Spinner className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Descartar
             </Button>
-            <p className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
+            <p className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" /> Envio só com confirmação
             </p>
           </div>

@@ -12,7 +12,7 @@ import api, { getErrorMessage } from "@/lib/api";
 const FIELD_LABELS = { subject: "Assunto", body: "Corpo", from_email: "Remetente", category: "Categoria (IA)" };
 const OP_LABELS = { contains: "contém", equals: "é igual a" };
 const ACTION_LABELS = { priority: "Definir prioridade" };
-const SELECT_CLS = "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500";
+const SELECT_CLS = "rounded-lg border border-border bg-card px-2 py-1.5 text-xs font-semibold text-foreground outline-none focus:border-blue-500";
 
 const EMPTY = { name: "", enabled: true, conditions: [{ field: "subject", op: "contains", value: "" }], actions: [{ type: "priority", value: "" }] };
 
@@ -84,11 +84,11 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="email-rules-dialog" className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-5 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
           <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
             <Wand2 className="h-5 w-5" /> Regras automáticas
           </DialogTitle>
-          <p className="text-xs text-slate-500">Aplicadas a cada email recebido — se todas as condições corresponderem, todas as ações são executadas.</p>
+          <p className="text-xs text-muted-foreground">Aplicadas a cada email recebido — se todas as condições corresponderem, todas as ações são executadas.</p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -103,7 +103,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                 <Label>Se (todas as condições)</Label>
                 <div className="mt-1.5 space-y-2">
                   {form.conditions.map((c, i) => (
-                    <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-slate-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
+                    <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-border p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
                       <div className="flex gap-1.5">
                         <select value={c.field} onChange={(e) => setCondition(i, { field: e.target.value })} className={`${SELECT_CLS} flex-1 sm:flex-none min-w-0`}>
                           {Object.entries(FIELD_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
@@ -115,7 +115,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                       <div className="flex items-center gap-1.5">
                         <Input value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} placeholder="valor" className="h-8 flex-1 text-xs" />
                         {form.conditions.length > 1 ? (
-                          <button type="button" onClick={() => removeCondition(i)} aria-label="Remover condição" title="Remover condição" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => removeCondition(i)} aria-label="Remover condição" title="Remover condição" className="shrink-0 text-muted-foreground hover:text-red-600"><X className="h-4 w-4" /></button>
                         ) : null}
                       </div>
                     </div>
@@ -138,7 +138,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                         <option value="baixa">baixa</option>
                       </select>
                       {form.actions.length > 1 ? (
-                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-muted-foreground hover:text-red-600"><X className="h-4 w-4" /></button>
                       ) : null}
                     </div>
                   ))}
@@ -161,24 +161,24 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Nova regra
               </Button>
               {loading ? (
-                <div className="flex justify-center py-8"><Spinner className="h-5 w-5 text-slate-400" /></div>
+                <div className="flex justify-center py-8"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
               ) : items.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-400">Sem regras criadas.</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">Sem regras criadas.</p>
               ) : (
                 <div className="space-y-2">
                   {items.map((r) => (
-                    <div key={r.id} data-testid={`rule-${r.id}`} className={`rounded-xl border p-3 ${r.enabled ? "border-slate-200" : "border-slate-100 opacity-60"}`}>
+                    <div key={r.id} data-testid={`rule-${r.id}`} className={`rounded-xl border p-3 ${r.enabled ? "border-border" : "border-border opacity-60"}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-slate-900">{r.name}</p>
-                          <p className="mt-0.5 text-[11px] text-slate-500">
+                          <p className="truncate text-sm font-bold text-foreground">{r.name}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
                             {r.conditions.length} condição(ões) · {r.actions.map((a) => ACTION_LABELS[a.type] || a.type).join(", ")}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <Switch checked={r.enabled} onCheckedChange={() => toggleEnabled(r)} aria-label={r.enabled ? "Desativar regra" : "Ativar regra"} />
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(r)} aria-label="Editar regra" title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => remove(r)} aria-label="Eliminar regra" title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-[var(--pastel-red-bg)]" onClick={() => remove(r)} aria-label="Eliminar regra" title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
                     </div>

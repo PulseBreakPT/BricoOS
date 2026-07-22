@@ -57,8 +57,8 @@ const SEGMENTS = {
     shortTitle: "Pedidos de Clientes",
     subtitle: "Todos os pedidos da loja exceto os da Banda Alumínios.",
     icon: Store,
-    accent: "text-slate-900",
-    iconAccent: "bg-slate-900 text-white",
+    accent: "text-foreground",
+    iconAccent: "bg-foreground text-background",
     createMode: "normal",
     empty: "Sem pedidos de clientes. Crie um novo com o botão +.",
   },
@@ -85,11 +85,11 @@ function greeting() {
 // na lista ao clicar — o resumo e a lista são o mesmo painel, não duas páginas.
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
-    slate: { tile: "bg-slate-100 text-slate-700", value: "text-slate-700" },
-    blue: { tile: "bg-blue-100 text-blue-700", value: "text-blue-700" },
-    amber: { tile: "bg-amber-100 text-amber-700", value: "text-amber-700" },
-    red: { tile: "bg-red-100 text-red-700", value: "text-red-700" },
-    green: { tile: "bg-emerald-100 text-emerald-700", value: "text-emerald-700" },
+    slate: { tile: "bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]", value: "text-[color:var(--tone-slate-text)]" },
+    blue: { tile: "bg-[var(--tone-blue-bg)] text-[color:var(--tone-blue-text)]", value: "text-[color:var(--tone-blue-text)]" },
+    amber: { tile: "bg-[var(--tone-amber-bg)] text-[color:var(--tone-amber-text)]", value: "text-[color:var(--tone-amber-text)]" },
+    red: { tile: "bg-[var(--tone-red-bg)] text-[color:var(--tone-red-text)]", value: "text-[color:var(--tone-red-text)]" },
+    green: { tile: "bg-[var(--tone-green-bg)] text-[color:var(--tone-green-text)]", value: "text-[color:var(--tone-green-text)]" },
   };
   const t = tones[tone];
   const Tag = onClick ? "button" : "div";
@@ -97,9 +97,9 @@ function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`flex min-w-0 items-center gap-2 rounded-xl border bg-white px-2.5 py-2 transition-all duration-150 sm:shrink-0 sm:px-3 ${
-        active ? "border-slate-900 shadow-md ring-1 ring-slate-900" : "border-slate-200 shadow-sm"
-      } ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:scale-95" : ""}`}
+      className={`flex min-w-0 items-center gap-2 rounded-xl border bg-card px-2.5 py-2 transition-all duration-150 sm:shrink-0 sm:px-3 ${
+        active ? "border-foreground shadow-md ring-1 ring-foreground" : "border-border shadow-sm"
+      } ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:border-input hover:shadow-md active:scale-95" : ""}`}
     >
       {Icon ? (
         <span className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:flex ${t.tile}`}>
@@ -107,7 +107,7 @@ function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick
         </span>
       ) : null}
       <span className={`shrink-0 font-heading text-base font-extrabold tabular-nums sm:text-lg ${t.value}`}>{value}</span>
-      <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
+      <span className="truncate text-[11px] font-bold text-muted-foreground sm:text-xs">{label}</span>
     </Tag>
   );
 }
@@ -421,7 +421,7 @@ export default function Notes() {
   return (
     <div>
       {/* Abas das duas áreas — cada uma só com os seus pedidos */}
-      <div className="card-elevated relative grid grid-cols-2 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5">
+      <div className="card-elevated relative grid grid-cols-2 gap-1.5 rounded-2xl border border-border bg-card p-1.5">
         {Object.entries(SEGMENTS).map(([key, cfg]) => {
           const Icon = cfg.icon;
           const active = segment === key;
@@ -433,13 +433,13 @@ export default function Notes() {
               onClick={() => changeSegment(key)}
               className={`relative flex items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-xs font-bold transition-all duration-200 sm:text-sm ${
                 active
-                  ? `shadow-sm ${key === "band" ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200" : "bg-slate-100 text-slate-900 ring-1 ring-slate-300"}`
-                  : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                  ? `shadow-sm ${key === "band" ? "bg-[var(--pastel-orange-bg)] text-[color:var(--pastel-orange-text)] ring-1 ring-orange-200" : "bg-muted text-foreground ring-1 ring-slate-300"}`
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${active ? "scale-110" : ""}`} />
               <span className="truncate">{cfg.shortTitle || cfg.title}</span>
-              {active ? <span className={`absolute -bottom-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full ${key === "band" ? "bg-orange-500" : "bg-slate-900"}`} /> : null}
+              {active ? <span className={`absolute -bottom-0.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full ${key === "band" ? "bg-orange-500" : "bg-foreground"}`} /> : null}
             </button>
           );
         })}
@@ -454,7 +454,7 @@ export default function Notes() {
           <h1 data-testid="segment-title" className={`mt-0.5 font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
             {seg.title}
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {!today
               ? seg.subtitle
               : counts.waiting_me
@@ -480,23 +480,23 @@ export default function Notes() {
       {/* Prontos para enviar — email + PDF preparados automaticamente a partir
           do email do fornecedor; um clique abre o ecrã de confirmação */}
       {(today?.to_confirm || []).length > 0 ? (
-        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
-          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-extrabold text-emerald-900">
+        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-4 sm:p-5">
+          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-extrabold text-[color:var(--pastel-emerald-text)]">
             <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
             <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
           </h2>
-          <p className="mt-0.5 text-xs text-emerald-800/80">Analisados e calculados automaticamente — só falta a tua confirmação.</p>
+          <p className="mt-0.5 text-xs text-[color:var(--pastel-emerald-text)]/80">Analisados e calculados automaticamente — só falta a tua confirmação.</p>
           <div className="mt-3 space-y-2">
             {today.to_confirm.map((n) => (
               <button
                 key={n.id}
                 data-testid={`to-confirm-${n.id}`}
                 onClick={() => setConfirmNote(n)}
-                className="flex w-full flex-col items-stretch gap-3 rounded-xl bg-white p-3 text-left transition-colors hover:bg-emerald-100/60 min-[420px]:flex-row min-[420px]:items-center"
+                className="flex w-full flex-col items-stretch gap-3 rounded-xl bg-card p-3 text-left transition-colors hover:bg-[var(--pastel-emerald-bg)] min-[420px]:flex-row min-[420px]:items-center"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold text-slate-900">{n.customer_name || "Sem nome"}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-sm font-extrabold text-foreground">{n.customer_name || "Sem nome"}</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {n.pending_client_send?.pdf_filename || "PDF pronto"}
                     {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                   </p>
@@ -512,30 +512,30 @@ export default function Notes() {
 
       {/* Precisa de atenção — triagem no topo, o resto é a própria lista */}
       {attention.length > 0 ? (
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-slate-900">
+        <section className="mt-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-foreground">
             <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
-            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{today.attention_count}</span>
+            <span className="rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-xs font-bold text-[color:var(--pastel-red-text)]">{today.attention_count}</span>
           </h2>
           <div className="mt-3 space-y-2">
             {attention.slice(0, 4).map((a) => (
               <button
                 key={a.id} data-testid={`attention-${a.id}`}
                 onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
-                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${a.severity === "high" ? "border-red-200 bg-red-50/40" : "border-amber-200 bg-amber-50/40"}`}
+                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-muted ${a.severity === "high" ? "border-red-200 bg-[var(--pastel-red-bg)]" : "border-amber-200 bg-[var(--pastel-amber-bg)]"}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-[var(--pastel-red-bg)] text-red-600" : "bg-[var(--pastel-amber-bg)] text-amber-600"}`}>
                   <AlertTriangle className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold text-slate-900">{a.title}</p>
-                  <p className="truncate text-xs text-slate-500">{a.message}</p>
+                  <p className="truncate text-sm font-extrabold text-foreground">{a.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">{a.message}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
             ))}
             {today.attention_count > 4 ? (
-              <button onClick={() => setPreset("overdue")} className="w-full rounded-xl border border-dashed border-slate-200 p-2 text-center text-xs font-semibold text-slate-500 hover:text-slate-900">
+              <button onClick={() => setPreset("overdue")} className="w-full rounded-xl border border-dashed border-border p-2 text-center text-xs font-semibold text-muted-foreground hover:text-foreground">
                 Ver os restantes na lista (filtro "Atrasados") →
               </button>
             ) : null}
@@ -547,7 +547,7 @@ export default function Notes() {
         <div className="flex gap-2">
           <InputGroup className="h-11 flex-1 rounded-xl">
             <InputGroupAddon>
-              <Search className="h-4 w-4 text-slate-400" />
+              <Search className="h-4 w-4 text-muted-foreground" />
             </InputGroupAddon>
             <InputGroupInput ref={searchRef} data-testid="search-notes" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Procurar cliente, telefone, artigo..." />
           </InputGroup>
@@ -597,7 +597,7 @@ export default function Notes() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-500">
+              <div className="flex items-center gap-2 rounded-lg bg-muted p-2 text-[11px] text-muted-foreground">
                 <Keyboard className="h-3.5 w-3.5" /> Atalhos: <b>N</b> novo · <b>/</b> procurar · <b>F</b> foco
               </div>
               <Button data-testid="clear-filters" variant="ghost" onClick={clearFilters} className="w-full">Limpar filtros</Button>
@@ -614,8 +614,8 @@ export default function Notes() {
               onClick={() => setPreset(p.key)}
               className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${
                 preset === p.key
-                  ? "bg-slate-900 text-white shadow-md shadow-slate-400/40"
-                  : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                  ? "bg-foreground text-background shadow-md shadow-slate-400/40"
+                  : "border border-border bg-card text-muted-foreground shadow-sm hover:-translate-y-0.5 hover:border-input hover:shadow-md"
               }`}
             >
               {p.label}
@@ -625,7 +625,7 @@ export default function Notes() {
 
         {/* Category pills */}
         <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:-mx-1 sm:px-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0">
-          <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-500 shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}>Todas as secções</button>
+          <button data-testid="filter-todos" onClick={() => setCategory("todos")} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-foreground text-background shadow-md shadow-slate-400/40" : "border border-border bg-card text-muted-foreground shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}>Todas as secções</button>
           {CATEGORY_LIST.map((c) => {
             const Icon = c.icon;
             const active = category === c.key;
@@ -649,28 +649,28 @@ export default function Notes() {
               onCheckedChange={toggleSelectAll}
             />
           ) : null}
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            <span className="font-mono text-sm tabular-nums text-slate-900">{total}</span> pedido{total === 1 ? "" : "s"}
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="font-mono text-sm tabular-nums text-foreground">{total}</span> pedido{total === 1 ? "" : "s"}
           </p>
         </div>
-        {loading ? <Spinner className="h-4 w-4 text-slate-400" /> : null}
+        {loading ? <Spinner className="h-4 w-4 text-muted-foreground" /> : null}
       </div>
 
       {/* Seleção em grupo — ações sobre vários pedidos de uma vez */}
       {selected.size > 0 ? (
-        <div className="card-elevated mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-xs font-bold text-slate-900">
+        <div className="card-elevated mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+          <span className="text-xs font-bold text-foreground">
             <span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span>
             selecionado{selected.size === 1 ? "" : "s"}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button data-testid="bulk-resolve" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkResolve} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+            <Button data-testid="bulk-resolve" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkResolve} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
             </Button>
-            <Button data-testid="bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-red-50 px-2.5 text-xs text-red-700 hover:bg-red-100">
+            <Button data-testid="bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-[var(--pastel-red-bg)] px-2.5 text-xs text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]">
               <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Mover para a lixeira
             </Button>
-            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+            <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
               <X className="mr-1.5 h-3.5 w-3.5" /> Limpar
             </Button>
           </div>
@@ -681,7 +681,7 @@ export default function Notes() {
       {focusMode ? (
         <div data-testid="focus-panel" className="mt-3">
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-400">Sem pedidos para focar.</div>
+            <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">Sem pedidos para focar.</div>
           ) : focusNote ? (
             <FocusCard
               note={focusNote}
@@ -716,21 +716,21 @@ export default function Notes() {
       )}
 
       {!loading && items.length === 0 && !focusMode && !kanbanView ? (
-        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-border bg-card/60 px-6 py-14">
           <EmptyMedia>
             <div className="relative">
-              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-muted/60 blur-xl" />
               <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg ${seg.iconAccent}`}>
                 <SegIcon className="h-7 w-7" />
               </div>
             </div>
           </EmptyMedia>
           <EmptyHeader className="max-w-xs gap-1">
-            <EmptyTitle className="font-heading font-extrabold text-slate-900">Sem pedidos nesta área</EmptyTitle>
-            <EmptyDescription className="text-slate-500">{seg.empty}</EmptyDescription>
+            <EmptyTitle className="font-heading font-extrabold text-foreground">Sem pedidos nesta área</EmptyTitle>
+            <EmptyDescription className="text-muted-foreground">{seg.empty}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
               <Plus className="h-4 w-4" strokeWidth={2.6} /> Criar o primeiro pedido
             </button>
           </EmptyContent>
@@ -776,12 +776,12 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
   const st = getStatusCfg(note.status);
   const pr = getPriorityCfg(note.priority);
   return (
-    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60">
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+    <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-border bg-card shadow-lg shadow-slate-200/60">
+      <div className="flex items-center justify-between border-b border-border bg-muted/70 px-5 py-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
           <Focus className="h-4 w-4" /> Modo de foco · {index + 1} de {total}
         </div>
-        <button data-testid="focus-exit" onClick={onExit} className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"><X className="h-4 w-4" /></button>
+        <button data-testid="focus-exit" onClick={onExit} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
       </div>
       <div className="px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -790,16 +790,16 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           </span>
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: pr.bg, color: pr.text }}>{pr.label}</span>
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: c.bg, color: c.text }}>{c.label}</span>
-          {note.is_overdue ? <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">Parado há {note.waiting_days}d</span> : null}
+          {note.is_overdue ? <span className="rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]">Parado há {note.waiting_days}d</span> : null}
         </div>
-        <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
-        {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-slate-500 hover:text-slate-900 hover:underline">{note.phone}</a> : null}
-        <p className="mt-3 text-base text-slate-700">{note.description}</p>
-        {note.measurements ? <p className="mt-1 font-mono text-sm text-slate-500">Medidas: {note.measurements}</p> : null}
+        <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
+        {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-muted-foreground hover:text-foreground hover:underline">{note.phone}</a> : null}
+        <p className="mt-3 text-base text-foreground">{note.description}</p>
+        {note.measurements ? <p className="mt-1 font-mono text-sm text-muted-foreground">Medidas: {note.measurements}</p> : null}
 
-        <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Próxima ação sugerida</p>
-          <p className="mt-1 text-sm font-semibold text-slate-800">{note.next_action || "Concluído"}</p>
+        <div className="mt-5 rounded-2xl bg-muted p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Próxima ação sugerida</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{note.next_action || "Concluído"}</p>
           {note.next_status ? (
             <Button data-testid="focus-advance" onClick={() => actions.advance(note)} className="mt-3 w-full rounded-xl">
               <Zap className="mr-2 h-4 w-4" /> {getNextActionCta(note)} <span className="ml-1 opacity-70">(Enter)</span>
@@ -813,11 +813,11 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           <Button data-testid="focus-resolve" variant="outline" className="rounded-xl" onClick={() => actions.resolve(note)}><CheckCircle2 className="mr-2 h-4 w-4" /> Resolver</Button>
           <Button data-testid="focus-duplicate" variant="outline" className="rounded-xl" onClick={() => actions.duplicate(note)}><Copy className="mr-2 h-4 w-4" /> Duplicar</Button>
         </div>
-        <button data-testid="focus-open" onClick={onOpen} className="mt-3 w-full text-center text-xs font-semibold text-slate-500 hover:text-slate-900">Abrir pedido completo →</button>
+        <button data-testid="focus-open" onClick={onOpen} className="mt-3 w-full text-center text-xs font-semibold text-muted-foreground hover:text-foreground">Abrir pedido completo →</button>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+      <div className="flex items-center justify-between border-t border-border px-5 py-3">
         <Button data-testid="focus-prev" variant="ghost" size="sm" onClick={onPrev} disabled={index === 0}><ArrowLeft className="mr-1 h-4 w-4" /> Anterior</Button>
-        <span className="text-xs text-slate-400">← → para navegar</span>
+        <span className="text-xs text-muted-foreground">← → para navegar</span>
         <Button data-testid="focus-next" variant="ghost" size="sm" onClick={onNext} disabled={index === total - 1}>Seguinte <ArrowRight className="ml-1 h-4 w-4" /></Button>
       </div>
     </div>

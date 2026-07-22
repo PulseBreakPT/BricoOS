@@ -61,9 +61,9 @@ function FolderRow({ folder, onClick }) {
       type="button"
       data-testid={`explorer-folder-${folder.key}`}
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-slate-600 hover:bg-slate-100"
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground hover:bg-muted"
     >
-      <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {folder.label}
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {folder.label}
     </button>
   );
 }
@@ -75,14 +75,14 @@ function ItemRow({ item, active, onClick }) {
       type="button"
       data-testid={`explorer-item-${item.kind}-${item.id}`}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${active ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${active ? "bg-foreground text-background" : "text-foreground hover:bg-muted"}`}
     >
-      <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-white" : "text-slate-400"}`} />
+      <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-white" : "text-muted-foreground"}`} />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-bold">{item.label}</span>
-        {item.sublabel ? <span className={`block truncate text-[11px] ${active ? "text-slate-300" : "text-slate-400"}`}>{item.sublabel}</span> : null}
+        {item.sublabel ? <span className={`block truncate text-[11px] ${active ? "text-muted-foreground" : "text-muted-foreground"}`}>{item.sublabel}</span> : null}
       </span>
-      {DRILLABLE.has(item.kind) ? <span className={`text-[10px] ${active ? "text-slate-300" : "text-slate-300"}`}>›</span> : null}
+      {DRILLABLE.has(item.kind) ? <span className={`text-[10px] ${active ? "text-muted-foreground" : "text-muted-foreground"}`}>›</span> : null}
     </button>
   );
 }
@@ -90,25 +90,25 @@ function ItemRow({ item, active, onClick }) {
 function ExplorerColumn({ column, query, selectedId, onOpenFolder, onOpenItem }) {
   if (column.type === "root") {
     return (
-      <div className="w-56 shrink-0 overflow-y-auto border-r border-slate-100 p-1.5">
-        <p className="px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Loja</p>
+      <div className="w-56 shrink-0 overflow-y-auto border-r border-border p-1.5">
+        <p className="px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Loja</p>
         {ROOT_FOLDERS.map((f) => <FolderRow key={f.key} folder={f} onClick={() => onOpenFolder(f)} />)}
-        <p className="mt-3 px-2 pb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Espaços inteligentes</p>
+        <p className="mt-3 px-2 pb-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Espaços inteligentes</p>
         {SMART_SPACES.map((f) => <FolderRow key={f.key} folder={f} onClick={() => onOpenFolder(f)} />)}
       </div>
     );
   }
   if (column.type === "loading") {
-    return <div className="flex w-56 shrink-0 items-center justify-center border-r border-slate-100 p-4"><Spinner className="h-4 w-4 text-slate-400" /></div>;
+    return <div className="flex w-56 shrink-0 items-center justify-center border-r border-border p-4"><Spinner className="h-4 w-4 text-muted-foreground" /></div>;
   }
   const term = query.trim().toLowerCase();
   const filtered = term ? column.items.filter((it) => `${it.label} ${it.sublabel}`.toLowerCase().includes(term)) : column.items;
   return (
-    <div className="w-64 shrink-0 overflow-y-auto border-r border-slate-100 p-1.5">
-      <p className="truncate px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+    <div className="w-64 shrink-0 overflow-y-auto border-r border-border p-1.5">
+      <p className="truncate px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">
         {column.label} ({filtered.length})
       </p>
-      {filtered.length === 0 ? <p className="px-2 py-4 text-center text-xs text-slate-400">{column.error ? "Erro ao carregar." : "Vazio."}</p> : null}
+      {filtered.length === 0 ? <p className="px-2 py-4 text-center text-xs text-muted-foreground">{column.error ? "Erro ao carregar." : "Vazio."}</p> : null}
       {filtered.map((it) => (
         <ItemRow key={`${it.kind}-${it.id}`} item={it} active={selectedId === it.id} onClick={() => onOpenItem(it)} />
       ))}
@@ -164,17 +164,17 @@ export default function Explorer() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5">
-        <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      <div className="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-border bg-card px-2.5">
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <input
           data-testid="explorer-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Pesquisar dentro da pasta aberta..."
-          className="h-8 w-full border-0 bg-transparent text-xs outline-none placeholder:text-slate-400"
+          className="h-8 w-full border-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
         />
       </div>
-      <div className="flex min-h-0 flex-1 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="flex min-h-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card">
         {columns.map((col, i) => (
           <ExplorerColumn
             key={i}
@@ -185,7 +185,7 @@ export default function Explorer() {
             onOpenItem={(it) => openItem(it, i)}
           />
         ))}
-        <div className="w-72 shrink-0 overflow-y-auto border-l border-slate-100 bg-slate-50/60 p-3">
+        <div className="w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/60 p-3">
           <ExplorerDetailPane item={selected} onNavigate={openEntity} />
         </div>
       </div>

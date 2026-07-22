@@ -70,17 +70,17 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="link-email-dialog" className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <DialogHeader className="shrink-0 border-b border-slate-100 px-5 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
           <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">Associar a um pedido</DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
+          <DialogDescription className="text-xs text-muted-foreground">
             {email ? `${email.from_name || email.from_email} — ${email.subject || "(sem assunto)"}` : ""}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="shrink-0 border-b border-slate-100 px-5 py-3">
+        <div className="shrink-0 border-b border-border px-5 py-3">
           <InputGroup className="h-10 rounded-xl">
             <InputGroupAddon>
-              <Search className="h-4 w-4 text-slate-400" />
+              <Search className="h-4 w-4 text-muted-foreground" />
             </InputGroupAddon>
             <InputGroupInput
               autoFocus
@@ -94,7 +94,7 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
           {loading ? (
-            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>
+            <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
           ) : results.length === 0 ? (
             <Empty className="py-10">
               <EmptyDescription>Sem pedidos que correspondam à pesquisa.</EmptyDescription>
@@ -110,16 +110,16 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
                     data-testid={`link-email-note-${n.id}`}
                     disabled={linkingId === n.id}
                     onClick={() => link(n)}
-                    className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-slate-50 disabled:opacity-50"
+                    className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-muted disabled:opacity-50"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-900">{n.customer_name || "Sem nome"}</p>
-                      <p className="truncate text-xs text-slate-500">{n.description}</p>
+                      <p className="truncate text-sm font-bold text-foreground">{n.customer_name || "Sem nome"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{n.description}</p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />{st.label}
                     </span>
-                    {linkingId === n.id ? <Spinner className="h-4 w-4 shrink-0 text-slate-400" /> : <Link2 className="h-4 w-4 shrink-0 text-slate-300" />}
+                    {linkingId === n.id ? <Spinner className="h-4 w-4 shrink-0 text-muted-foreground" /> : <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   </button>
                 );
               })}

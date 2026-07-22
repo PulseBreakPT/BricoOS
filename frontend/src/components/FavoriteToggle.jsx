@@ -13,7 +13,7 @@ export default function FavoriteToggle({ item, className = "", size = "h-4 w-4" 
       data-testid={`favorite-toggle-${item.kind}-${item.id}`}
       title={fav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); haptics.selection(); toggleFavorite(item); }}
-      className={`shrink-0 rounded-lg p-1.5 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90 ${className}`}
+      className={`shrink-0 rounded-lg p-1.5 text-muted-foreground transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90 ${className}`}
     >
       <Star className={`${size} ${fav ? "fill-amber-400 text-amber-400" : ""}`} />
     </button>

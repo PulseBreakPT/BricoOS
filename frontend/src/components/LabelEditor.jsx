@@ -19,9 +19,9 @@ export default function LabelEditor({ labels, onChange, testIdPrefix = "label" }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {labels.map((l) => (
-        <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+        <span key={l} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
           <Tag className="h-3 w-3" /> {l}
-          <button type="button" data-testid={`${testIdPrefix}-remove-${l}`} onClick={() => remove(l)} className="ml-0.5 text-slate-400 hover:text-red-500">
+          <button type="button" data-testid={`${testIdPrefix}-remove-${l}`} onClick={() => remove(l)} className="ml-0.5 text-muted-foreground hover:text-red-500">
             <X className="h-3 w-3" />
           </button>
         </span>

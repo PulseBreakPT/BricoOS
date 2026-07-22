@@ -10,10 +10,10 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 const MISSING = "Dados não encontrados em fontes oficiais.";
 
 const scoreTone = (score) => {
-  if (score === null || score === undefined) return "border-slate-200 bg-slate-100 text-slate-400";
-  if (score >= 90) return "border-amber-300 bg-amber-300 text-slate-950";
-  if (score >= 75) return "border-emerald-400 bg-emerald-400 text-slate-950";
-  if (score >= 60) return "border-blue-400 bg-blue-400 text-slate-950";
+  if (score === null || score === undefined) return "border-border bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]";
+  if (score >= 90) return "border-amber-300 bg-amber-300 text-foreground";
+  if (score >= 75) return "border-emerald-400 bg-emerald-400 text-foreground";
+  if (score >= 60) return "border-blue-400 bg-blue-400 text-foreground";
   return "border-red-500 bg-red-500 text-white";
 };
 
@@ -32,10 +32,10 @@ const statusLabel = (status) => ({
 }[status] || status);
 
 const statusTone = (status) => {
-  if (status === "scored") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (["conflict", "legacy_unmapped"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-800";
-  if (["missing", "partial"].includes(status)) return "border-purple-200 bg-purple-50 text-purple-700";
-  return "border-blue-200 bg-blue-50 text-blue-800";
+  if (status === "scored") return "border-border bg-[var(--tone-green-bg)] text-[color:var(--tone-green-text)]";
+  if (["conflict", "legacy_unmapped"].includes(status)) return "border-border bg-[var(--tone-amber-bg)] text-[color:var(--tone-amber-text)]";
+  if (["missing", "partial"].includes(status)) return "border-border bg-[var(--tone-purple-bg)] text-[color:var(--tone-purple-text)]";
+  return "border-border bg-[var(--tone-blue-bg)] text-[color:var(--tone-blue-text)]";
 };
 
 function OverallBadge({ overall, compact = false }) {
@@ -54,20 +54,20 @@ function RankingCard({ model, selected, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`min-w-[13rem] flex-1 shrink-0 snap-start rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[14rem] ${selected ? "border-amber-400 bg-amber-50/70 shadow-md shadow-amber-200/50 ring-1 ring-amber-300" : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"}`}
+      className={`min-w-[13rem] flex-1 shrink-0 snap-start rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-1 active:scale-[0.98] sm:min-w-[14rem] ${selected ? "border-amber-400 bg-[var(--pastel-amber-bg)] shadow-md shadow-amber-200/50 ring-1 ring-amber-300" : "border-border bg-card shadow-sm hover:border-input hover:shadow-md"}`}
     >
       <div className="flex items-start gap-3">
         <OverallBadge overall={overall} compact />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {overall.medal ? <Medal className="h-3.5 w-3.5 text-amber-500" /> : null}
-            <p className="truncate text-sm font-extrabold text-slate-900">{model.name}</p>
+            <p className="truncate text-sm font-extrabold text-foreground">{model.name}</p>
           </div>
-          <p className="mt-0.5 truncate text-[10px] text-slate-500">{model.material} · {model.category_label}</p>
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{model.material} · {model.category_label}</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            {overall.category ? <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-black text-white">{overall.category}</span> : null}
-            {overall.rank ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">#{overall.rank}</span> : null}
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">{overall.coverage_percent}% cobertura</span>
+            {overall.category ? <span className="rounded bg-foreground px-1.5 py-0.5 text-[9px] font-black text-background">{overall.category}</span> : null}
+            {overall.rank ? <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">#{overall.rank}</span> : null}
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">{overall.coverage_percent}% cobertura</span>
           </div>
         </div>
       </div>
@@ -79,9 +79,9 @@ function WinnerStrip({ winners }) {
   return (
     <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
       {Object.entries(winners || {}).filter(([key]) => key !== "quality_price").map(([key, winner]) => (
-        <div key={key} className="rounded-xl border border-slate-200 bg-slate-50/80 p-2.5">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{winner.label}</p>
-          <p className="mt-1 text-[11px] font-bold leading-snug text-slate-700">{winner.value}</p>
+        <div key={key} className="rounded-xl border border-border bg-muted/80 p-2.5">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{winner.label}</p>
+          <p className="mt-1 text-[11px] font-bold leading-snug text-foreground">{winner.value}</p>
           {winner.score !== undefined ? <p className="mt-1 font-mono text-[10px] font-bold text-amber-600">{winner.score}/100</p> : null}
         </div>
       ))}
@@ -113,14 +113,14 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
   }, [analysis.comparisons, leftId, rightId]);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+    <div className="rounded-2xl border border-border bg-card p-3 sm:p-4">
       <div className="flex items-center gap-2">
-        <GitCompare className="h-4 w-4 text-blue-700" />
-        <h4 className="text-sm font-extrabold text-slate-900">Comparação direta</h4>
+        <GitCompare className="h-4 w-4 text-[color:var(--pastel-blue-text)]" />
+        <h4 className="text-sm font-extrabold text-foreground">Comparação direta</h4>
       </div>
       <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
         <ModelSelect value={leftId} models={models} onChange={onLeft} />
-        <span className="text-center font-mono text-[10px] font-bold text-slate-400">VS</span>
+        <span className="text-center font-mono text-[10px] font-bold text-muted-foreground">VS</span>
         <ModelSelect value={rightId} models={models} onChange={onRight} />
       </div>
 
@@ -130,17 +130,17 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
             const leftFeature = left.features[axis.key];
             const rightFeature = right.features[axis.key];
             return (
-              <div key={axis.key} className="rounded-xl bg-slate-50 p-2.5">
+              <div key={axis.key} className="rounded-xl bg-muted p-2.5">
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className={`font-mono font-black ${axis.winner === "left" ? "text-emerald-700" : "text-slate-600"}`}>{axis.left_score}</span>
-                  <span className="text-center font-bold text-slate-600">{axis.label}</span>
-                  <span className={`font-mono font-black ${axis.winner === "right" ? "text-emerald-700" : "text-slate-600"}`}>{axis.right_score}</span>
+                  <span className={`font-mono font-black ${axis.winner === "left" ? "text-[color:var(--pastel-emerald-text)]" : "text-muted-foreground"}`}>{axis.left_score}</span>
+                  <span className="text-center font-bold text-muted-foreground">{axis.label}</span>
+                  <span className={`font-mono font-black ${axis.winner === "right" ? "text-[color:var(--pastel-emerald-text)]" : "text-muted-foreground"}`}>{axis.right_score}</span>
                 </div>
                 <div className="mt-1.5 grid grid-cols-2 gap-1">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="ml-auto h-full rounded-full bg-blue-600" style={{ width: `${axis.left_score}%` }} /></div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-amber-500" style={{ width: `${axis.right_score}%` }} /></div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="ml-auto h-full rounded-full bg-blue-600" style={{ width: `${axis.left_score}%` }} /></div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-amber-500" style={{ width: `${axis.right_score}%` }} /></div>
                 </div>
-                <div className="mt-1 flex justify-between gap-3 text-[9px] text-slate-500">
+                <div className="mt-1 flex justify-between gap-3 text-[9px] text-muted-foreground">
                   <span className="truncate">{leftFeature.value}</span>
                   <span className="shrink-0 font-mono">Δ {axis.delta_points} pts{axis.difference_percent !== null ? ` · ${axis.difference_percent}%` : ""}</span>
                   <span className="truncate text-right">{rightFeature.value}</span>
@@ -149,21 +149,21 @@ function ComparisonPanel({ analysis, leftId, rightId, onLeft, onRight }) {
             );
           })}
           <div className="grid grid-cols-1 gap-2 pt-1 text-[10px] sm:grid-cols-2">
-            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-900">
+            <div className="rounded-lg bg-[var(--pastel-emerald-bg)] p-2 text-[color:var(--pastel-emerald-text)]">
               <strong>{left.name} superior em</strong><br />{comparison.superior_left.length ? comparison.superior_left.join(", ") : "Nenhum eixo comparável."}
             </div>
-            <div className="rounded-lg bg-amber-50 p-2 text-amber-900">
+            <div className="rounded-lg bg-[var(--pastel-amber-bg)] p-2 text-[color:var(--pastel-amber-text)]">
               <strong>{right.name} superior em</strong><br />{comparison.inferior_left.length ? comparison.inferior_left.join(", ") : "Nenhum eixo comparável."}
             </div>
           </div>
         </div>
       ) : (
-        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">{leftId === rightId ? "Escolhe dois modelos diferentes." : MISSING}</p>
+        <p className="mt-3 rounded-xl bg-muted p-3 text-xs text-muted-foreground">{leftId === rightId ? "Escolhe dois modelos diferentes." : MISSING}</p>
       )}
-      <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-500">
+      <p className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
         <Scale className="mt-0.5 h-3 w-3 shrink-0" /> Só são comparados eixos com a mesma base de cálculo. “Δ pts” é a diferença na escala Brico2; a percentagem aparece apenas quando pode ser calculada sobre valores físicos equivalentes.
       </p>
-      <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[10px] text-slate-600">
+      <p className="mt-2 rounded-lg border border-border bg-muted p-2 text-[10px] text-muted-foreground">
         <strong>Relação qualidade/preço:</strong> {analysis.winners?.quality_price?.value || MISSING} {analysis.winners?.quality_price?.explanation}
       </p>
     </div>
@@ -179,43 +179,43 @@ function ModelSelect({ value, models, onChange }) {
       placeholder="Escolher modelo..."
       searchPlaceholder="Procurar modelo..."
       emptyText="Sem modelos."
-      className="rounded-xl px-2 py-2.5 text-xs font-bold text-slate-700"
+      className="rounded-xl px-2 py-2.5 text-xs font-bold text-foreground"
     />
   );
 }
 
 function FeatureAudit({ feature }) {
   return (
-    <details className="group rounded-xl border border-slate-200 bg-white">
+    <details className="group rounded-xl border border-border bg-card">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-xs font-bold text-slate-800">{feature.label}</p>
+            <p className="text-xs font-bold text-foreground">{feature.label}</p>
             <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${statusTone(feature.status)}`}>{statusLabel(feature.status)}</span>
           </div>
-          <p className="mt-0.5 truncate text-[10px] text-slate-500">{feature.value}</p>
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{feature.value}</p>
         </div>
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border font-mono text-xs font-black ${feature.score === null ? "border-slate-200 bg-slate-50 text-slate-400" : scoreTone(feature.score)}`}>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border font-mono text-xs font-black ${feature.score === null ? "border-border bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]" : scoreTone(feature.score)}`}>
           {feature.score ?? "N/D"}
         </span>
       </summary>
-      <div className="space-y-2 border-t border-slate-100 p-3 text-[10px] leading-relaxed text-slate-600">
+      <div className="space-y-2 border-t border-border p-3 text-[10px] leading-relaxed text-muted-foreground">
         <p>{feature.explanation}</p>
         {feature.formula ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-100/80 p-2.5 text-slate-600">
-            <p className="flex items-center gap-1 font-bold text-slate-900"><Calculator className="h-3 w-3" /> Cálculo</p>
+          <div className="rounded-lg border border-border bg-muted/80 p-2.5 text-muted-foreground">
+            <p className="flex items-center gap-1 font-bold text-foreground"><Calculator className="h-3 w-3" /> Cálculo</p>
             <p className="mt-1 font-mono text-[9px]">{feature.formula}</p>
           </div>
         ) : null}
         {feature.standard ? (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded-lg bg-slate-50 p-2"><strong className="text-slate-800">Norma</strong><br />{feature.standard}<br /><span className="text-slate-400">{feature.standard_status}</span></div>
-            <div className="rounded-lg bg-slate-50 p-2"><strong className="text-slate-800">Escala / melhor classe</strong><br />{feature.official_scale}<br /><span className="text-slate-400">{feature.official_best}</span></div>
+            <div className="rounded-lg bg-muted p-2"><strong className="text-foreground">Norma</strong><br />{feature.standard}<br /><span className="text-muted-foreground">{feature.standard_status}</span></div>
+            <div className="rounded-lg bg-muted p-2"><strong className="text-foreground">Escala / melhor classe</strong><br />{feature.official_scale}<br /><span className="text-muted-foreground">{feature.official_best}</span></div>
           </div>
         ) : null}
         <div className="flex flex-wrap gap-1.5">
           {(feature.sources || []).filter((source) => source.url).map((source) => (
-            <a key={`${source.type}-${source.url}`} href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 font-bold text-blue-700 hover:bg-blue-100">
+            <a key={`${source.type}-${source.url}`} href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-[var(--pastel-blue-bg)] px-2 py-1 font-bold text-[color:var(--pastel-blue-text)] hover:bg-[var(--pastel-blue-bg)]">
               {source.label} <ExternalLink className="h-2.5 w-2.5" />
             </a>
           ))}
@@ -230,35 +230,35 @@ function ModelAnalysis({ model }) {
   const positiveUses = model.recommendations.filter((item) => item.status !== "not_determined");
   const unresolvedUses = model.recommendations.filter((item) => item.status === "not_determined");
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+    <div className="rounded-2xl border border-border bg-muted p-3 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <OverallBadge overall={model.overall} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-heading text-lg font-black text-slate-950">{model.name}</h4>
-            {model.overall.category ? <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">{model.overall.category}</span> : null}
-            {model.overall.medal ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800"><Award className="h-3 w-3" /> {model.overall.medal}</span> : null}
+            <h4 className="font-heading text-lg font-black text-foreground">{model.name}</h4>
+            {model.overall.category ? <span className="rounded-full bg-foreground px-2 py-0.5 text-[10px] font-black text-background">{model.overall.category}</span> : null}
+            {model.overall.medal ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-amber-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-amber-text)]"><Award className="h-3 w-3" /> {model.overall.medal}</span> : null}
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-slate-600">{model.description}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
-            <span className="rounded bg-white px-2 py-1">Cobertura {model.overall.coverage_percent}%</span>
-            {model.overall.rank ? <span className="rounded bg-white px-2 py-1">Ranking #{model.overall.rank}</span> : null}
-            {model.overall.percentile ? <span className="rounded bg-white px-2 py-1">Percentil {model.overall.percentile}</span> : null}
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{model.description}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="rounded bg-card px-2 py-1">Cobertura {model.overall.coverage_percent}%</span>
+            {model.overall.rank ? <span className="rounded bg-card px-2 py-1">Ranking #{model.overall.rank}</span> : null}
+            {model.overall.percentile ? <span className="rounded bg-card px-2 py-1">Percentil {model.overall.percentile}</span> : null}
           </div>
         </div>
       </div>
 
       {model.overall.score === null ? (
-        <p className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
-          <FileSearch className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+          <FileSearch className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <span><strong>Overall bloqueado.</strong> {model.overall.explanation} São necessários os cinco eixos centrais comparáveis.</span>
         </p>
       ) : (
-        <details className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-emerald-900">Auditar o Overall geral</summary>
-          <div className="border-t border-emerald-100 p-3 text-[10px] leading-relaxed text-emerald-900">
+        <details className="mt-3 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)]">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[color:var(--pastel-emerald-text)]">Auditar o Overall geral</summary>
+          <div className="border-t border-emerald-100 p-3 text-[10px] leading-relaxed text-[color:var(--pastel-emerald-text)]">
             <p>{model.overall.explanation}</p>
-            <p className="mt-2 rounded-lg bg-white/70 p-2 font-mono text-[9px]">{model.overall.formula}</p>
+            <p className="mt-2 rounded-lg bg-card/70 p-2 font-mono text-[9px]">{model.overall.formula}</p>
           </div>
         </details>
       )}
@@ -266,7 +266,7 @@ function ModelAnalysis({ model }) {
       {model.conflicts.length ? (
         <div className="mt-3 space-y-2">
           {model.conflicts.map((conflict) => (
-            <div key={conflict.field} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[10px] leading-relaxed text-amber-900">
+            <div key={conflict.field} className="rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-[10px] leading-relaxed text-[color:var(--pastel-amber-text)]">
               <p className="flex items-center gap-1 font-extrabold"><AlertTriangle className="h-3.5 w-3.5" /> Conflito · {conflict.field}</p>
               <p className="mt-1">{conflict.summary}</p>
               <div className="mt-1 flex flex-wrap gap-2">{conflict.sources.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="font-bold underline">Abrir fonte</a>)}</div>
@@ -280,13 +280,13 @@ function ModelAnalysis({ model }) {
       </div>
 
       {model.manufacturer_sources.length ? (
-        <details className="mt-3 rounded-xl border border-blue-200 bg-blue-50">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-blue-900">Dados do fabricante do sistema · escopo separado</summary>
+        <details className="mt-3 rounded-xl border border-blue-200 bg-[var(--pastel-blue-bg)]">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[color:var(--pastel-blue-text)]">Dados do fabricante do sistema · escopo separado</summary>
           <div className="space-y-2 border-t border-blue-100 p-3">
             {model.manufacturer_sources.map((source) => (
-              <div key={source.url} className="rounded-lg bg-white p-2.5 text-[10px] text-slate-600">
-                <a href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-blue-700">{source.label} <ExternalLink className="h-3 w-3" /></a>
-                <p className="mt-1 font-semibold text-amber-700">{source.scope}</p>
+              <div key={source.url} className="rounded-lg bg-card p-2.5 text-[10px] text-muted-foreground">
+                <a href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[color:var(--pastel-blue-text)]">{source.label} <ExternalLink className="h-3 w-3" /></a>
+                <p className="mt-1 font-semibold text-[color:var(--pastel-amber-text)]">{source.scope}</p>
                 <p className="mt-1">{Object.entries(source.published).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>
               </div>
             ))}
@@ -300,11 +300,11 @@ function ModelAnalysis({ model }) {
         <InsightList title="Limitações documentais" icon={AlertTriangle} items={model.limitations} tone="amber" />
       </div>
 
-      <details className="mt-3 rounded-xl border border-slate-200 bg-white">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-700">Casos de utilização e limites da recomendação</summary>
-        <div className="grid grid-cols-1 gap-2 border-t border-slate-100 p-3 sm:grid-cols-2">
+      <details className="mt-3 rounded-xl border border-border bg-card">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-foreground">Casos de utilização e limites da recomendação</summary>
+        <div className="grid grid-cols-1 gap-2 border-t border-border p-3 sm:grid-cols-2">
           {[...positiveUses, ...unresolvedUses].map((item) => (
-            <div key={item.use} className={`rounded-lg p-2 text-[10px] ${item.status === "not_determined" ? "bg-slate-50 text-slate-500" : "bg-emerald-50 text-emerald-900"}`}>
+            <div key={item.use} className={`rounded-lg p-2 text-[10px] ${item.status === "not_determined" ? "bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]" : "bg-[var(--tone-green-bg)] text-[color:var(--tone-green-text)]"}`}>
               <p className="font-extrabold">{item.use}</p><p className="mt-0.5 leading-relaxed">{item.reason}</p>
             </div>
           ))}
@@ -315,7 +315,7 @@ function ModelAnalysis({ model }) {
 }
 
 function InsightList({ title, icon: Icon, items, tone }) {
-  const classes = tone === "emerald" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700";
+  const classes = tone === "emerald" ? "border-border bg-[var(--tone-green-bg)] text-[color:var(--tone-green-text)]" : tone === "amber" ? "border-border bg-[var(--tone-amber-bg)] text-[color:var(--tone-amber-text)]" : "border-border bg-card text-foreground";
   return (
     <div className={`rounded-xl border p-3 ${classes}`}>
       <p className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide"><Icon className="h-3.5 w-3.5" /> {title}</p>
@@ -341,18 +341,18 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
   const spotlight = ranked.length ? ranked.slice(0, 3) : models.slice(0, 3);
 
   return (
-    <section className={`${standalone ? "" : "mt-4"} card-elevated overflow-hidden rounded-2xl border border-slate-200 bg-white sm:rounded-3xl`}>
+    <section className={`${standalone ? "" : "mt-4"} card-elevated overflow-hidden rounded-2xl border border-border bg-card sm:rounded-3xl`}>
       <div className="relative p-3 sm:p-5">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-100/60 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[var(--pastel-blue-bg)] blur-3xl" />
         <div className="relative flex flex-col items-start justify-between gap-3 sm:flex-row">
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-600"><Trophy className="h-5 w-5" /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-[var(--tone-amber-bg)] text-[color:var(--tone-amber-text)]"><Trophy className="h-5 w-5" /></span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-heading text-base font-black text-slate-900">Overall técnico do catálogo</h3>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[9px] text-slate-500">{analysis.methodology.name}</span>
+                <h3 className="font-heading text-base font-black text-foreground">Overall técnico do catálogo</h3>
+                <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[9px] text-muted-foreground">{analysis.methodology.name}</span>
               </div>
-              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">Comparação rápida com fórmula, norma e fonte em cada nota. É um índice Brico2 auditável — não uma certificação.</p>
+              <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">Comparação rápida com fórmula, norma e fonte em cada nota. É um índice Brico2 auditável — não uma certificação.</p>
             </div>
           </div>
           <div className="grid w-full grid-cols-3 gap-2 text-center sm:w-auto">
@@ -373,37 +373,37 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
         <WinnerStrip winners={analysis.winners} />
       </div>
 
-      <details open={analysisOpen} onToggle={(event) => setAnalysisOpen(event.currentTarget.open)} className="group border-t border-slate-200 bg-slate-50/70">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-extrabold text-slate-900 transition-colors hover:bg-slate-100/70 sm:px-5">
+      <details open={analysisOpen} onToggle={(event) => setAnalysisOpen(event.currentTarget.open)} className="group border-t border-border bg-muted/70">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-extrabold text-foreground transition-colors hover:bg-muted/70 sm:px-5">
           <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-amber-500" /> {analysisOpen ? "Ocultar análise detalhada" : "Abrir análise, comparação e auditoria completa"}</span>
-          <ArrowRight className="h-4 w-4 text-slate-400 transition group-open:rotate-90" />
+          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-open:rotate-90" />
         </summary>
-        <div className="space-y-4 border-t border-slate-200 bg-slate-50 p-2 sm:p-4">
+        <div className="space-y-4 border-t border-border bg-muted p-2 sm:p-4">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[22rem_1fr]">
             <div className="order-2 min-w-0 space-y-3 xl:order-1">
               <ComparisonPanel analysis={analysis} leftId={leftId} rightId={rightId} onLeft={setLeftId} onRight={setRightId} />
-              <div className="hidden rounded-2xl border border-slate-200 bg-white p-3 xl:block">
-                <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900"><Database className="h-4 w-4 text-blue-700" /> Todos os modelos</p>
+              <div className="hidden rounded-2xl border border-border bg-card p-3 xl:block">
+                <p className="flex items-center gap-1.5 text-xs font-extrabold text-foreground"><Database className="h-4 w-4 text-[color:var(--pastel-blue-text)]" /> Todos os modelos</p>
                 <div className="mt-2 space-y-1">
                   {models.map((model) => (
-                    <button key={model.id} type="button" onClick={() => setSelectedId(model.id)} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${selected.id === model.id ? "bg-slate-900 text-white shadow-md shadow-slate-400/30" : "hover:bg-slate-50"}`}>
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-mono text-[10px] font-black ${selected.id === model.id ? scoreTone(model.overall.score) : "border-slate-200 bg-slate-50 text-slate-600"}`}>{model.overall.score ?? "N/D"}</span>
-                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{model.name}</span><span className={`block truncate text-[9px] ${selected.id === model.id ? "text-white/50" : "text-slate-400"}`}>{model.category_label}</span></span>
+                    <button key={model.id} type="button" onClick={() => setSelectedId(model.id)} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${selected.id === model.id ? "bg-foreground text-background shadow-md shadow-slate-400/30" : "hover:bg-muted"}`}>
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-mono text-[10px] font-black ${selected.id === model.id ? scoreTone(model.overall.score) : "border-border bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]"}`}>{model.overall.score ?? "N/D"}</span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{model.name}</span><span className={`block truncate text-[9px] ${selected.id === model.id ? "text-white/50" : "text-muted-foreground"}`}>{model.category_label}</span></span>
                       {model.conflicts.length ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> : null}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-[10px] leading-relaxed text-blue-900">
+              <div className="rounded-2xl border border-blue-200 bg-[var(--pastel-blue-bg)] p-3 text-[10px] leading-relaxed text-[color:var(--pastel-blue-text)]">
                 <p className="flex items-center gap-1 font-extrabold"><BookOpenCheck className="h-3.5 w-3.5" /> Atualização protegida</p>
                 <p className="mt-1">{analysis.methodology.update_rule}</p>
               </div>
               <MethodologyPanel methodology={analysis.methodology} models={models} />
             </div>
             <div className="order-1 min-w-0 space-y-3 xl:order-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 xl:hidden">
-                <label htmlFor="catalog-model-mobile" className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Modelo em análise</label>
-                <NativeSelect id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus-visible:border-blue-500 focus-visible:ring-blue-500/50">
+              <div className="rounded-2xl border border-border bg-card p-3 xl:hidden">
+                <label htmlFor="catalog-model-mobile" className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Modelo em análise</label>
+                <NativeSelect id="catalog-model-mobile" value={selected.id} onChange={(event) => setSelectedId(event.target.value)} className="rounded-xl px-3 py-2.5 text-sm font-bold text-foreground focus-visible:border-blue-500 focus-visible:ring-blue-500/50">
                   {models.map((model) => <NativeSelectOption key={model.id} value={model.id}>{model.name} · {model.overall.score ?? "N/D"}</NativeSelectOption>)}
                 </NativeSelect>
               </div>
@@ -419,25 +419,25 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
 function MethodologyPanel({ methodology, models }) {
   const labelFor = (key) => models[0]?.features?.[key]?.label || key;
   return (
-    <details className="rounded-2xl border border-slate-200 bg-white">
-      <summary className="cursor-pointer px-3 py-2.5 text-xs font-extrabold text-slate-800">Pesos, categorias e regra do ranking</summary>
-      <div className="space-y-3 border-t border-slate-100 p-3 text-[10px] leading-relaxed text-slate-600">
+    <details className="rounded-2xl border border-border bg-card">
+      <summary className="cursor-pointer px-3 py-2.5 text-xs font-extrabold text-foreground">Pesos, categorias e regra do ranking</summary>
+      <div className="space-y-3 border-t border-border p-3 text-[10px] leading-relaxed text-muted-foreground">
         <p>{methodology.ranking_rule}</p>
         <div>
-          <p className="font-extrabold text-slate-800">Pesos definidos</p>
+          <p className="font-extrabold text-foreground">Pesos definidos</p>
           <div className="mt-1 flex flex-wrap gap-1">
             {Object.entries(methodology.weights).map(([key, weight]) => (
-              <span key={key} className={`rounded-md px-2 py-1 ${methodology.active_features.includes(key) ? "bg-emerald-50 font-bold text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+              <span key={key} className={`rounded-md px-2 py-1 ${methodology.active_features.includes(key) ? "bg-[var(--tone-green-bg)] font-bold text-[color:var(--tone-green-text)]" : "bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]"}`}>
                 {labelFor(key)} {weight}%{methodology.active_features.includes(key) ? " · ativo" : " · sem cobertura comum"}
               </span>
             ))}
           </div>
         </div>
         <div>
-          <p className="font-extrabold text-slate-800">Categorias Brico2</p>
+          <p className="font-extrabold text-foreground">Categorias Brico2</p>
           <p className="mt-1 font-mono text-[9px]">{methodology.category_bands.map((band) => `${band.category} ≥ ${band.minimum}`).join(" · ")}</p>
         </div>
-        <p className="rounded-lg bg-amber-50 p-2 text-amber-900"><strong>Regra de segurança:</strong> {methodology.missing_text}</p>
+        <p className="rounded-lg bg-[var(--pastel-amber-bg)] p-2 text-[color:var(--pastel-amber-text)]"><strong>Regra de segurança:</strong> {methodology.missing_text}</p>
       </div>
     </details>
   );
@@ -445,9 +445,9 @@ function MethodologyPanel({ methodology, models }) {
 
 function Stat({ value, label }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
-      <p className="font-mono text-sm font-black text-slate-900">{value}</p>
-      <p className="text-[8px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+    <div className="rounded-xl border border-border bg-muted/80 px-2.5 py-1.5">
+      <p className="font-mono text-sm font-black text-foreground">{value}</p>
+      <p className="text-[8px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
     </div>
   );
 }

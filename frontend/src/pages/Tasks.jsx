@@ -142,7 +142,7 @@ export default function Tasks() {
     return (
       <div
         data-testid={`task-row-${t.id}`}
-        className={`group flex items-center gap-3 rounded-xl border bg-white p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 card-elevated-hover ${selected.has(t.id) ? "border-slate-900 ring-2 ring-slate-900/10" : "border-slate-200/90"}`}
+        className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-input card-elevated-hover ${selected.has(t.id) ? "border-foreground ring-2 ring-foreground/10" : "border-border"}`}
       >
         <Checkbox
           data-testid={`task-select-${t.id}`}
@@ -157,7 +157,7 @@ export default function Tasks() {
           className="h-5 w-5 rounded-md transition-transform duration-150 hover:scale-110 active:scale-90"
         />
         <button className="min-w-0 flex-1 text-left" onClick={() => openEdit(t)}>
-          <p className={`text-sm font-semibold text-slate-900 ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
+          <p className={`text-sm font-semibold text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <CategoryBadge category={t.category} />
             {t.priority && t.priority !== "nenhuma" ? (
@@ -168,7 +168,7 @@ export default function Tasks() {
             {t.due_date ? (
               <span
                 className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  overdue ? "bg-red-100 text-red-700" : isToday(t.due_date) ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+                  overdue ? "bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)]" : isToday(t.due_date) ? "bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)]" : "bg-[var(--pastel-blue-bg)] text-[color:var(--pastel-blue-text)]"
                 }`}
               >
                 <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}
@@ -176,17 +176,17 @@ export default function Tasks() {
               </span>
             ) : null}
             {progress ? (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                 {progress.done}/{progress.total}
               </span>
             ) : null}
             {(t.labels || []).slice(0, 3).map((l) => (
-              <span key={l} className="rounded-full bg-slate-900/5 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{l}</span>
+              <span key={l} className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{l}</span>
             ))}
           </div>
         </button>
         <FavoriteToggle item={{ kind: "tarefa", id: t.id, label: t.title, sublabel: t.due_date ? formatDue(t.due_date) : "", to: "/tarefas" }} />
-        <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-slate-300 transition-all duration-150 hover:scale-110 hover:bg-red-50 hover:text-red-500 active:scale-90">
+        <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-500 active:scale-90">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -198,27 +198,27 @@ export default function Tasks() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <p className="kicker">Coisas por fazer</p>
-          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Tarefas</h1>
-          <p className="text-sm text-slate-500">Por secção: construção, bricolagem, decoração e jardim.</p>
+          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Tarefas</h1>
+          <p className="text-sm text-muted-foreground">Por secção: construção, bricolagem, decoração e jardim.</p>
         </div>
         {tasks.length > 0 ? (
-          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
             <div className="leading-tight">
-              <p className="font-mono text-lg font-bold tabular-nums text-slate-900">{allDone}<span className="text-slate-300">/{tasks.length}</span></p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">concluídas</p>
+              <p className="font-mono text-lg font-bold tabular-nums text-foreground">{allDone}<span className="text-muted-foreground">/{tasks.length}</span></p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">concluídas</p>
             </div>
             <div className="w-24 sm:w-32">
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-slate-900"}`} style={{ width: `${pct}%` }} />
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
               </div>
-              <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-slate-400">{pct}%</p>
+              <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{pct}%</p>
             </div>
           </div>
         ) : null}
       </div>
 
       {/* Add task */}
-      <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated">
+      <div className="mt-6 rounded-2xl border border-border bg-card p-4 card-elevated">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             data-testid="task-title-input"
@@ -262,7 +262,7 @@ export default function Tasks() {
             key={v.key}
             data-testid={`task-view-${v.key}`}
             onClick={() => setView(v.key)}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${view === v.key ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"}`}
+            className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${view === v.key ? "bg-foreground text-background shadow-md shadow-slate-400/40" : "border border-border bg-card text-muted-foreground shadow-sm hover:-translate-y-0.5 hover:border-input hover:shadow-md"}`}
           >
             {v.label}
           </button>
@@ -274,7 +274,7 @@ export default function Tasks() {
         <button
           data-testid="task-filter-todos"
           onClick={() => setCategory("todos")}
-          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-slate-900 text-white shadow-md shadow-slate-400/40" : "border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}
+          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all duration-150 active:scale-95 ${category === "todos" ? "bg-foreground text-background shadow-md shadow-slate-400/40" : "border border-border bg-card text-muted-foreground shadow-sm hover:-translate-y-0.5 hover:shadow-md"}`}
         >
           Todas as secções
         </button>
@@ -295,19 +295,19 @@ export default function Tasks() {
       </div>
 
       {selected.size > 0 ? (
-        <div className="card-elevated mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-xs font-bold text-slate-900">
+        <div className="card-elevated mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+          <span className="text-xs font-bold text-foreground">
             <span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span>
             selecionada{selected.size === 1 ? "" : "s"}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button data-testid="task-bulk-complete" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkComplete} className="h-8 rounded-lg border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+            <Button data-testid="task-bulk-complete" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkComplete} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
               Concluir
             </Button>
-            <Button data-testid="task-bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-red-50 px-2.5 text-xs text-red-700 hover:bg-red-100">
+            <Button data-testid="task-bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-[var(--pastel-red-bg)] px-2.5 text-xs text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]">
               <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Mover para a lixeira
             </Button>
-            <Button data-testid="task-bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+            <Button data-testid="task-bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
               Limpar
             </Button>
           </div>
@@ -320,7 +320,7 @@ export default function Tasks() {
 
       {done.length > 0 ? (
         <div className="mt-8">
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Concluídas ({done.length})</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Concluídas ({done.length})</p>
           <div className="space-y-2">
             {done.map((t) => <Row key={t.id} t={t} />)}
           </div>
@@ -328,18 +328,18 @@ export default function Tasks() {
       ) : null}
 
       {filtered.length === 0 ? (
-        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-border bg-card/60 px-6 py-14">
           <EmptyMedia>
             <div className="relative">
-              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-muted/60 blur-xl" />
+              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-gradient-to-br from-white to-slate-50 text-red-600">
                 <ListChecks className="h-7 w-7" />
               </div>
             </div>
           </EmptyMedia>
           <EmptyHeader className="max-w-xs gap-1">
-            <EmptyTitle className="font-heading font-extrabold text-slate-900">Nada por fazer aqui</EmptyTitle>
-            <EmptyDescription className="text-slate-500">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</EmptyDescription>
+            <EmptyTitle className="font-heading font-extrabold text-foreground">Nada por fazer aqui</EmptyTitle>
+            <EmptyDescription className="text-muted-foreground">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : null}

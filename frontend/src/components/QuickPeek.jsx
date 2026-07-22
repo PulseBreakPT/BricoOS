@@ -111,7 +111,7 @@ export default function QuickPeekTrigger({ children, renderPeek, as: Comp = "div
           className="pointer-events-none fixed z-[80] w-72 animate-in fade-in zoom-in-95 duration-100"
           style={{ top, left }}
         >
-          <div className="pointer-events-none rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+          <div className="pointer-events-none rounded-xl border border-border bg-card p-3 shadow-2xl">
             {renderPeek()}
           </div>
         </div>,

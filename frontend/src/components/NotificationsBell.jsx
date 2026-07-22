@@ -15,9 +15,9 @@ const KIND_ICON = {
   reminder_overdue: Bell,
 };
 const SEV = {
-  high: { ring: "border-red-200 bg-red-50", icon: "bg-red-100 text-red-600", dot: "#DC2626" },
-  medium: { ring: "border-amber-200 bg-amber-50", icon: "bg-amber-100 text-amber-600", dot: "#D97706" },
-  low: { ring: "border-blue-200 bg-blue-50", icon: "bg-blue-100 text-blue-600", dot: "#2563EB" },
+  high: { ring: "border-red-200 bg-[var(--pastel-red-bg)]", icon: "bg-[var(--pastel-red-bg)] text-red-600", dot: "#DC2626" },
+  medium: { ring: "border-amber-200 bg-[var(--pastel-amber-bg)]", icon: "bg-[var(--pastel-amber-bg)] text-amber-600", dot: "#D97706" },
+  low: { ring: "border-blue-200 bg-[var(--pastel-blue-bg)]", icon: "bg-[var(--pastel-blue-bg)] text-blue-600", dot: "#2563EB" },
 };
 
 export default function NotificationsBell({ variant = "sidebar" }) {
@@ -55,8 +55,8 @@ export default function NotificationsBell({ variant = "sidebar" }) {
           data-testid="notifications-bell"
           className={`group relative flex items-center justify-center rounded-xl transition-all duration-200 active:scale-90 ${
             variant === "sidebar"
-              ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"
-              : "h-10 w-10 text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"
+              ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-card/10 hover:text-white"
+              : "h-10 w-10 text-[color:var(--chrome-muted)] hover:bg-card/10 hover:text-white"
           }`}
         >
           <Bell className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110 ${count > 0 ? "animate-shake" : ""}`} strokeWidth={2.2} />
@@ -70,20 +70,20 @@ export default function NotificationsBell({ variant = "sidebar" }) {
       <SheetContent data-testid="notifications-panel" className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="font-heading text-xl font-bold tracking-tight">
-            Alertas {count > 0 ? <span className="text-slate-400">({count})</span> : null}
+            Alertas {count > 0 ? <span className="text-muted-foreground">({count})</span> : null}
           </SheetTitle>
         </SheetHeader>
         <div className="mt-5 space-y-2.5">
           {data.items.length === 0 ? (
-            <Empty className="mt-16 text-slate-400">
+            <Empty className="mt-16 text-muted-foreground">
               <EmptyMedia>
-                <div className="flex h-16 w-16 animate-in items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 zoom-in-50 duration-500">
+                <div className="flex h-16 w-16 animate-in items-center justify-center rounded-2xl bg-[var(--pastel-emerald-bg)] text-emerald-500 zoom-in-50 duration-500">
                   <Bell className="h-7 w-7" />
                 </div>
               </EmptyMedia>
               <EmptyHeader className="gap-1">
-                <EmptyTitle className="font-heading font-extrabold text-slate-700">Tudo em dia</EmptyTitle>
-                <EmptyDescription className="text-sm text-slate-400">Nenhum pedido esquecido ou atrasado.</EmptyDescription>
+                <EmptyTitle className="font-heading font-extrabold text-foreground">Tudo em dia</EmptyTitle>
+                <EmptyDescription className="text-sm text-muted-foreground">Nenhum pedido esquecido ou atrasado.</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : data.items.map((n) => {
@@ -101,8 +101,8 @@ export default function NotificationsBell({ variant = "sidebar" }) {
                     <Icon className="h-4 w-4" />
                   </ItemMedia>
                   <ItemContent className="gap-0">
-                    <ItemTitle className="truncate text-sm text-slate-900">{n.title}</ItemTitle>
-                    <ItemDescription className="line-clamp-none text-xs text-slate-600">{n.message}</ItemDescription>
+                    <ItemTitle className="truncate text-sm text-foreground">{n.title}</ItemTitle>
+                    <ItemDescription className="line-clamp-none text-xs text-muted-foreground">{n.message}</ItemDescription>
                   </ItemContent>
                 </button>
               </Item>

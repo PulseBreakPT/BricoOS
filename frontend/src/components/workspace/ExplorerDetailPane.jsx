@@ -23,18 +23,18 @@ function Field({ label, value }) {
   if (!value) return null;
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-xs font-semibold text-slate-700">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs font-semibold text-foreground">{value}</p>
     </div>
   );
 }
 
 function RelatedLink({ icon: Icon, label, onClick }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50">
-      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : null}
+    <button type="button" onClick={onClick} className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 text-left text-xs font-semibold text-foreground hover:border-input hover:bg-muted">
+      {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
     </button>
   );
 }
@@ -71,11 +71,11 @@ function PedidoDetailSection({ item, onNavigate }) {
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />{st.label}
         </span>
       </div>
-      {note.description ? <p className="text-xs text-slate-600">{note.description}</p> : null}
+      {note.description ? <p className="text-xs text-muted-foreground">{note.description}</p> : null}
       {note.next_action ? (
-        <div className="rounded-lg bg-slate-50 p-2">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Próxima ação</p>
-          <p className="mt-0.5 text-xs font-semibold text-slate-700">{note.next_action}</p>
+        <div className="rounded-lg bg-muted p-2">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Próxima ação</p>
+          <p className="mt-0.5 text-xs font-semibold text-foreground">{note.next_action}</p>
         </div>
       ) : null}
       <div className="flex flex-wrap gap-1.5">
@@ -85,24 +85,24 @@ function PedidoDetailSection({ item, onNavigate }) {
         <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={() => setGraphOpen(true)}>
           <Waypoints className="mr-1.5 h-3.5 w-3.5" /> Ver grafo
         </Button>
-        <button type="button" onClick={toggleFav} title="Favorito" className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-amber-400">
+        <button type="button" onClick={toggleFav} title="Favorito" className="rounded-lg border border-border p-1.5 text-muted-foreground hover:text-amber-400">
           <Star className={`h-4 w-4 ${favorite ? "fill-amber-400 text-amber-400" : ""}`} />
         </button>
       </div>
       <div className="space-y-1.5">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Relacionados</p>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Relacionados</p>
         {note.customer_name ? <RelatedLink label={`Cliente: ${note.customer_name}`} onClick={() => onNavigate("pedido", item.id, note.customer_name)} /> : null}
         {note.supplier_id ? <RelatedLink label="Ver fornecedor" onClick={() => onNavigate("fornecedor", note.supplier_id, "Fornecedor")} /> : null}
       </div>
       {activities.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Linha temporal</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Linha temporal</p>
           <div className="space-y-1.5">
             {activities.map((a) => (
-              <div key={a.id} className="flex items-start gap-1.5 text-[11px] text-slate-500">
-                <Clock className="mt-0.5 h-3 w-3 shrink-0 text-slate-300" />
+              <div key={a.id} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                <Clock className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1">{a.message}</span>
-                <span className="shrink-0 text-slate-400">{timeAgo(a.created_at)}</span>
+                <span className="shrink-0 text-muted-foreground">{timeAgo(a.created_at)}</span>
               </div>
             ))}
           </div>
@@ -215,9 +215,9 @@ function FicheiroDetailSection({ item, onNavigate }) {
   return (
     <div className="space-y-3">
       {kind === "image" ? (
-        <img src={url} alt={f.filename} className="max-h-40 w-full rounded-lg border border-slate-200 bg-slate-50 object-contain" />
+        <img src={url} alt={f.filename} className="max-h-40 w-full rounded-lg border border-border bg-muted object-contain" />
       ) : kind === "pdf" ? (
-        <iframe title={f.filename} src={url} className="h-40 w-full rounded-lg border border-slate-200 bg-white" />
+        <iframe title={f.filename} src={url} className="h-40 w-full rounded-lg border border-border bg-card" />
       ) : null}
       <Field label="Fornecedor" value={f.supplier_label} />
       <Field label="Pedido" value={f.note_label} />
@@ -234,18 +234,18 @@ function FicheiroDetailSection({ item, onNavigate }) {
         <FavoriteToggle item={{ kind: "pdf", id: `${f.source}-${f.id}`, label: f.filename, sublabel: f.kind_label, to: url, external: true }} />
       </div>
       {canUploadVersion ? (
-        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 p-2 text-xs font-semibold text-slate-500 hover:border-slate-400 hover:text-slate-700">
+        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-border p-2 text-xs font-semibold text-muted-foreground hover:border-input hover:text-foreground">
           {uploading ? <Spinner className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />} Nova versão
           <input type="file" className="hidden" disabled={uploading} onChange={(e) => { uploadNewVersion(e.target.files); e.target.value = ""; }} />
         </label>
       ) : null}
       {versions && versions.length > 1 ? (
         <div className="space-y-1.5">
-          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><History className="h-3 w-3" /> Versões</p>
+          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><History className="h-3 w-3" /> Versões</p>
           {versions.map((v) => (
             <a
               key={v.id} href={withDeviceToken(fileUrl(v))} target="_blank" rel="noreferrer"
-              className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs ${v.is_current || v.id === f.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+              className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs ${v.is_current || v.id === f.id ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground hover:bg-muted"}`}
             >
               <span>v{v.version}</span>
               <span className="text-[11px] opacity-80">{timeAgo(v.created_at)}</span>
@@ -298,13 +298,13 @@ function ProdutoDetailSection({ item }) {
 // relacionados navegáveis e (para ficheiros) histórico de versões.
 export default function ExplorerDetailPane({ item, onNavigate }) {
   if (!item) {
-    return <p className="py-10 text-center text-xs text-slate-400">Seleciona um item para ver detalhes.</p>;
+    return <p className="py-10 text-center text-xs text-muted-foreground">Seleciona um item para ver detalhes.</p>;
   }
   return (
     <div className="space-y-3">
       <div>
-        <p className="truncate font-heading text-sm font-extrabold text-slate-900">{item.label}</p>
-        {item.sublabel ? <p className="truncate text-xs text-slate-400">{item.sublabel}</p> : null}
+        <p className="truncate font-heading text-sm font-extrabold text-foreground">{item.label}</p>
+        {item.sublabel ? <p className="truncate text-xs text-muted-foreground">{item.sublabel}</p> : null}
       </div>
       {item.kind === "pedido" ? <PedidoDetailSection item={item} onNavigate={onNavigate} /> : null}
       {item.kind === "fornecedor" ? <FornecedorDetailSection item={item} onNavigate={onNavigate} /> : null}
