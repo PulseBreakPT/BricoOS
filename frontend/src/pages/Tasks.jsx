@@ -1,22 +1,18 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Trash2, ListChecks, CalendarDays, Repeat, SlidersHorizontal, FolderTree } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Plus, Trash2, ListChecks, CalendarDays, Repeat, FolderTree } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
+import { haptics } from "@/lib/haptics";
 import { toast } from "sonner";
 import {
-  getTaskPriority, TASK_PRIORITIES, isOverdue, isToday, isNext7Days, formatDue, smartTaskSort, subtaskProgress,
+  getTaskPriority, isOverdue, isToday, isNext7Days, formatDue, smartTaskSort, subtaskProgress,
 } from "@/lib/taskMeta";
-
-const NEW_GROUP_VALUE = "__new__";
 
 const SMART_VIEWS = [
   { key: "todas", label: "Todas" },
@@ -40,14 +36,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [view, setView] = useState("todas");
   const [category, setCategory] = useState("todos");
-  const [title, setTitle] = useState("");
-  const [addCategory, setAddCategory] = useState("construcao");
-  const [addPriority, setAddPriority] = useState("nenhuma");
-  const [addGroupId, setAddGroupId] = useState("");
   const [groups, setGroups] = useState([]);
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [creatingGroupBusy, setCreatingGroupBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
@@ -72,45 +61,6 @@ export default function Tasks() {
   useEffect(() => { load(); loadGroups(); }, [load, loadGroups]);
 
   const groupsById = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g.name])), [groups]);
-
-  const onAddGroupChange = (v) => {
-    if (v === NEW_GROUP_VALUE) {
-      setCreatingGroup(true);
-      setNewGroupName("");
-      return;
-    }
-    setAddGroupId(v);
-  };
-
-  const createGroup = async () => {
-    if (!newGroupName.trim()) { toast.error("Indica o nome do grupo."); return; }
-    setCreatingGroupBusy(true);
-    try {
-      const { data } = await api.post("/task-groups", { name: newGroupName.trim() });
-      setGroups((g) => [...g, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setAddGroupId(data.id);
-      setCreatingGroup(false);
-      setNewGroupName("");
-      toast.success("Grupo criado");
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao criar grupo"));
-    } finally {
-      setCreatingGroupBusy(false);
-    }
-  };
-
-  const add = async () => {
-    if (!title.trim()) { toast.error("Escreve a tarefa."); return; }
-    if (!addGroupId) { toast.error("Escolhe ou cria um grupo para a tarefa."); return; }
-    try {
-      await api.post("/tasks", { title: title.trim(), category: addCategory, priority: addPriority, group_id: addGroupId });
-      setTitle("");
-      toast.success("Tarefa adicionada");
-      load();
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao adicionar a tarefa"));
-    }
-  };
 
   const toggle = async (t) => {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
@@ -248,86 +198,25 @@ export default function Tasks() {
           <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Tarefas</h1>
           <p className="text-sm text-muted-foreground">Por secção: construção, bricolagem, decoração e jardim.</p>
         </div>
-        {tasks.length > 0 ? (
-          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
-            <div className="leading-tight">
-              <p className="font-mono text-lg font-bold tabular-nums text-foreground">{allDone}<span className="text-muted-foreground">/{tasks.length}</span></p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">concluídas</p>
-            </div>
-            <div className="w-24 sm:w-32">
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
+        <div className="flex items-center gap-3">
+          {tasks.length > 0 ? (
+            <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+              <div className="leading-tight">
+                <p className="font-mono text-lg font-bold tabular-nums text-foreground">{allDone}<span className="text-muted-foreground">/{tasks.length}</span></p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">concluídas</p>
               </div>
-              <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{pct}%</p>
+              <div className="w-24 sm:w-32">
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
+                </div>
+                <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{pct}%</p>
+              </div>
             </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Add task */}
-      <div className="mt-6 rounded-2xl border border-border bg-card p-4 card-elevated">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            data-testid="task-title-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="Nova tarefa..."
-            className="h-11 flex-1 rounded-xl"
-          />
-          {!creatingGroup ? (
-            <Select value={addGroupId || undefined} onValueChange={onAddGroupChange}>
-              <SelectTrigger data-testid="task-group-select" className="h-11 rounded-xl sm:w-40"><SelectValue placeholder="Grupo..." /></SelectTrigger>
-              <SelectContent>
-                {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                <SelectItem value={NEW_GROUP_VALUE}>+ Criar novo grupo</SelectItem>
-              </SelectContent>
-            </Select>
           ) : null}
-          <Select value={addCategory} onValueChange={setAddCategory}>
-            <SelectTrigger data-testid="task-category-select" className="h-11 rounded-xl sm:w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CATEGORY_LIST.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={addPriority} onValueChange={setAddPriority}>
-            <SelectTrigger data-testid="task-priority-select" className="h-11 rounded-xl sm:w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Object.entries(TASK_PRIORITIES).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button data-testid="add-task-btn" onClick={add} className="h-11 rounded-xl">
-            <Plus className="mr-1 h-4 w-4" /> Adicionar
-          </Button>
-          <Button
-            data-testid="add-task-advanced-btn"
-            variant="outline"
-            onClick={openNew}
-            className="h-11 shrink-0 rounded-xl px-3"
-            title="Nova tarefa com data, repetição e subtarefas"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
+          <Button data-testid="add-task-btn" onClick={openNew} className="hidden rounded-xl shadow-lg shadow-slate-400/30 transition-all hover:-translate-y-0.5 hover:shadow-xl sm:inline-flex">
+            <Plus className="mr-2 h-4 w-4" /> Nova tarefa
           </Button>
         </div>
-        {creatingGroup ? (
-          <div className="mt-2 flex gap-2">
-            <Input
-              data-testid="task-new-group-name"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createGroup(); } }}
-              placeholder="Nome do novo grupo"
-              className="h-11 flex-1 rounded-xl"
-              autoFocus
-            />
-            <Button type="button" variant="outline" disabled={creatingGroupBusy} onClick={createGroup} className="h-11 shrink-0 rounded-xl px-3">
-              Criar
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setCreatingGroup(false)} className="h-11 shrink-0 rounded-xl px-3">
-              Cancelar
-            </Button>
-          </div>
-        ) : null}
       </div>
 
       {/* Smart views */}
@@ -414,10 +303,26 @@ export default function Tasks() {
           </EmptyMedia>
           <EmptyHeader className="max-w-xs gap-1">
             <EmptyTitle className="font-heading font-extrabold text-foreground">Nada por fazer aqui</EmptyTitle>
-            <EmptyDescription className="text-muted-foreground">Escreve a primeira tarefa na caixa acima — fica organizada por secção e prioridade.</EmptyDescription>
+            <EmptyDescription className="text-muted-foreground">Cria a primeira tarefa — fica organizada por secção e prioridade.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : null}
+
+      {createPortal(
+        <button
+          data-testid="fab-new-task"
+          onClick={() => {
+            haptics.tap();
+            openNew();
+          }}
+          aria-label="Nova tarefa"
+          title="Nova tarefa"
+          className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 select-none touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-150 will-change-transform hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/50 active:scale-90 active:duration-75 sm:hidden"
+        >
+          <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
+        </button>,
+        document.body,
+      )}
 
       <TaskDialog open={dialogOpen} onOpenChange={setDialogOpen} task={editingTask} onSaved={() => { load(); loadGroups(); }} />
     </div>
