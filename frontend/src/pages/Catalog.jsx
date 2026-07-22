@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import axios from "axios";
+import { toast } from "sonner";
 import {
   AlertTriangle, ArrowLeft, BookOpenCheck, ExternalLink, RefreshCw,
   Ruler, ShieldCheck,
@@ -14,22 +16,73 @@ export default function Catalog() {
   const [catalog, setCatalog] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState(null);
   const selectedModel = searchParams.get("modelo") || "";
 
-  const loadCatalog = useCallback(async () => {
-    setLoading(true);
+  const requestSeq = useRef(0);
+  const retryBtnRef = useRef(null);
+  const hadErrorBefore = useRef(false);
+  const hasDataRef = useRef(false); // evita recriar loadCatalog a cada resposta (catalog mudaria de identidade)
+
+  const loadCatalog = useCallback(async (signal) => {
+    const seq = ++requestSeq.current;
+    const hasData = hasDataRef.current;
+    // Uma atualização em segundo plano (já há dados na página) não deve
+    // esconder tudo atrás do spinner grande — só o primeiro carregamento
+    // bloqueia a página inteira.
+    if (hasData) setRefreshing(true); else setLoading(true);
     setError("");
     try {
-      const { data } = await api.get("/caixilharia/catalog");
+      const { data } = await api.get("/caixilharia/catalog", { signal });
+      if (seq !== requestSeq.current) return; // resposta ultrapassada por um pedido mais recente
       setCatalog(data);
+      hasDataRef.current = true;
+      setLastLoadedAt(Date.now());
     } catch (requestError) {
-      setError(getErrorMessage(requestError, "Não foi possível carregar o catálogo técnico."));
+      if (axios.isCancel(requestError) || seq !== requestSeq.current) return;
+      const message = getErrorMessage(requestError, "Não foi possível carregar o catálogo técnico.");
+      if (hasData) {
+        // Já havia catálogo na página — não vale a pena substituir tudo por
+        // um ecrã de erro; o utilizador só perde uma atualização, não o que
+        // já estava a ver.
+        toast.error(message);
+      } else {
+        setError(message);
+      }
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
-  useEffect(() => { loadCatalog(); }, [loadCatalog]);
+  useEffect(() => {
+    // O controller pertence ao efeito, não ao loadCatalog — assim o cleanup
+    // consegue cancelar o pedido a meio (mudança rápida de rota, StrictMode
+    // a montar/desmontar duas vezes em dev), em vez de só descartar a resposta.
+    const controller = new AbortController();
+    loadCatalog(controller.signal);
+    return () => controller.abort();
+  }, [loadCatalog]);
+
+  // Leva o foco para o botão de retry assim que o erro bloqueante aparece —
+  // quem navega por teclado não fica perdido a meio da página.
+  useEffect(() => {
+    if (error && !hadErrorBefore.current) retryBtnRef.current?.focus();
+    hadErrorBefore.current = !!error;
+  }, [error]);
+
+  // Ids de modelo conhecidos do catálogo — permite validar um deep-link
+  // (?modelo=) sem depender de CatalogIntelligence já ter corrido.
+  const catalogModelIds = useMemo(
+    () => new Set(Object.keys(catalog?.analise_tecnica?.modelos || catalog?.modelos || {})),
+    [catalog],
+  );
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && selectedModel && catalogModelIds.size > 0 && !catalogModelIds.has(selectedModel)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[Catalog] ?modelo=${selectedModel} não corresponde a nenhum modelo conhecido do catálogo.`);
+    }
+  }, [selectedModel, catalogModelIds]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -88,12 +141,12 @@ export default function Catalog() {
       ) : error ? (
         <div className="rounded-2xl border border-red-200 bg-[var(--pastel-red-bg)] p-4 text-[color:var(--pastel-red-text)]">
           <p className="flex items-start gap-2 text-sm font-bold"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {error}</p>
-          <Button type="button" variant="outline" onClick={loadCatalog} className="mt-3 rounded-xl border-red-200 bg-card text-[color:var(--pastel-red-text)]">
-            <RefreshCw className="mr-1.5 h-4 w-4" /> Tentar novamente
+          <Button ref={retryBtnRef} type="button" variant="outline" disabled={refreshing} onClick={() => loadCatalog()} className="mt-3 rounded-xl border-red-200 bg-card text-[color:var(--pastel-red-text)]">
+            {refreshing ? <Spinner className="mr-1.5 h-4 w-4" /> : <RefreshCw className="mr-1.5 h-4 w-4" />} Tentar novamente
           </Button>
         </div>
       ) : (
-        <CatalogIntelligence analysis={catalog?.analise_tecnica} initialModelId={selectedModel} standalone />
+        <CatalogIntelligence analysis={catalog?.analise_tecnica} initialModelId={selectedModel} loadedAt={lastLoadedAt} standalone />
       )}
     </div>
   );

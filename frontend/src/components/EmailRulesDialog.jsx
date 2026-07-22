@@ -47,6 +47,11 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("O nome da regra é obrigatório"); return; }
+    // Uma condição/ação sem valor não corresponde a nada de útil (ou
+    // corresponde a tudo, consoante a leitura do backend) — melhor barrar
+    // aqui do que guardar em silêncio uma regra que não faz o que parece.
+    if (form.conditions.some((c) => !c.value.trim())) { toast.error("Preenche o valor de todas as condições."); return; }
+    if (form.actions.some((a) => !a.value.trim())) { toast.error("Escolhe a prioridade de todas as ações."); return; }
     setSaving(true);
     try {
       if (editing?.id) await api.put(`/email-rules/${editing.id}`, form);

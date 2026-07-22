@@ -62,16 +62,23 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
   const [aboutOpen, setAboutOpen] = useState(false);
   const { showInstallOption, install } = usePwaInstall();
   const [iosStepsOpen, setIosStepsOpen] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   const handleInstall = async () => {
+    if (installing) return;
     haptics.tap();
-    const outcome = await install();
-    if (outcome === "ios-instructions") {
-      setIosStepsOpen(true);
-    } else if (outcome === "unavailable") {
-      toast.info("Ainda não é possível instalar automaticamente. Recarrega a página ou usa o menu do navegador (⋮) e escolhe \"Instalar aplicação\".");
-    } else if (outcome === "accepted") {
-      toast.success("BRICO OS instalado!");
+    setInstalling(true);
+    try {
+      const outcome = await install();
+      if (outcome === "ios-instructions") {
+        setIosStepsOpen(true);
+      } else if (outcome === "unavailable") {
+        toast.info("Ainda não é possível instalar automaticamente. Recarrega a página ou usa o menu do navegador (⋮) e escolhe \"Instalar aplicação\".");
+      } else if (outcome === "accepted") {
+        toast.success("BRICO OS instalado!");
+      }
+    } finally {
+      setInstalling(false);
     }
   };
 
@@ -113,6 +120,7 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
           {showInstallOption ? (
             <DropdownMenuItem
               data-testid="system-menu-install"
+              disabled={installing}
               onClick={handleInstall}
             >
               <Download className="mr-2 h-4 w-4" /> Instalar aplicação

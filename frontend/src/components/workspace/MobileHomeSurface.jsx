@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Activity,
   BarChart3,
@@ -9,6 +9,7 @@ import {
   Truck,
 } from "lucide-react";
 import { useSystemStatus } from "@/context/SystemStatusContext";
+import { useClock } from "@/hooks/useClock";
 import { haptics } from "@/lib/haptics";
 
 const HOME_APPS = [
@@ -61,17 +62,6 @@ const METRICS = [
   { key: "emails_nao_vistos", label: "Emails por ver", route: "/emails" },
   { key: "tarefas_pendentes", label: "Tarefas pendentes", route: "/tarefas" },
 ];
-
-function useClock() {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return now;
-}
 
 function greetingFor(hour) {
   if (hour < 12) return "Bom dia";

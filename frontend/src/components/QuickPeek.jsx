@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { haptics } from "@/lib/haptics";
 
 const HOVER_DELAY = 450;
 const LONGPRESS_DELAY = 450;
@@ -51,7 +52,10 @@ export default function QuickPeekTrigger({ children, renderPeek, as: Comp = "div
     timerRef.current = setTimeout(() => {
       suppressClickRef.current = true;
       openPeek();
-      if (navigator.vibrate) navigator.vibrate(8);
+      // Usa a mesma abstração de haptics do resto da app, em vez de chamar
+      // navigator.vibrate diretamente — mantém uma única fonte de verdade
+      // para o feedback tátil (e qualquer preferência futura de o desligar).
+      haptics.tap();
     }, LONGPRESS_DELAY);
   };
   const onPointerMove = (e) => {

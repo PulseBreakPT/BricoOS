@@ -56,6 +56,9 @@ export default function AppLauncher({
     setDockOrder((prev) => {
       const next = prev.filter((t) => t !== dragType);
       const targetIndex = next.indexOf(targetType);
+      // Alvo não encontrado (ordem reconciliada a meio do arrasto) — não
+      // insere às cegas no fim errado, ignora o drop.
+      if (targetIndex === -1) return prev;
       next.splice(targetIndex, 0, dragType);
       return next;
     });

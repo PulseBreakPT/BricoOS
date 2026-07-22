@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { ROOT_FOLDERS, SMART_SPACES, iconForItem } from "@/lib/explorerFolders";
 import api from "@/lib/api";
@@ -127,29 +127,41 @@ export default function Explorer() {
   const [columns, setColumns] = useState([{ type: "root" }]);
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
+  // Um clique rápido noutra pasta/item da mesma coluna dispara um novo
+  // pedido antes do anterior responder — sem sequência por índice, a
+  // resposta mais lenta podia chegar depois e substituir a coluna certa
+  // pela do clique já abandonado.
+  const columnSeqRef = useRef({});
 
   const openFolder = async (folder, atIndex) => {
+    const seq = (columnSeqRef.current[atIndex] = (columnSeqRef.current[atIndex] || 0) + 1);
     setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "loading" }]);
     setSelected(null);
     try {
       const items = await folder.fetch();
+      if (columnSeqRef.current[atIndex] !== seq) return;
       setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "items", label: folder.label, items }]);
     } catch {
+      if (columnSeqRef.current[atIndex] !== seq) return;
       setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "items", label: folder.label, items: [], error: true }]);
     }
   };
 
   const openItem = async (item, atIndex) => {
     setSelected(item);
+    columnSeqRef.current[atIndex] = (columnSeqRef.current[atIndex] || 0) + 1;
     if (!DRILLABLE.has(item.kind)) {
       setColumns((prev) => prev.slice(0, atIndex + 1));
       return;
     }
+    const seq = columnSeqRef.current[atIndex];
     setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "loading" }]);
     try {
       const items = await fetchRelated(item.kind, item.id);
+      if (columnSeqRef.current[atIndex] !== seq) return;
       setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "items", label: item.label, items }]);
     } catch {
+      if (columnSeqRef.current[atIndex] !== seq) return;
       setColumns((prev) => [...prev.slice(0, atIndex + 1), { type: "items", label: item.label, items: [], error: true }]);
     }
   };

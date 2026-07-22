@@ -4,9 +4,26 @@ import { usePwaInstall } from "@/hooks/usePwaInstall";
 
 const DISMISS_KEY = "brico-pwa-install-dismissed";
 
+// localStorage pode lançar em modo privado/armazenamento bloqueado (algumas
+// versões do Safari, por exemplo) — o resto do código já protege sempre
+// estas chamadas (ThemeContext, WorkspaceContext...); faltava aqui.
+function readDismissed() {
+    try {
+        return Boolean(localStorage.getItem(DISMISS_KEY));
+    } catch {
+        return false;
+    }
+}
+function writeDismissed(value) {
+    try {
+        if (value) localStorage.setItem(DISMISS_KEY, "1");
+        else localStorage.removeItem(DISMISS_KEY);
+    } catch { /* armazenamento bloqueado — o dispensar só dura a sessão em memória */ }
+}
+
 export default function InstallPwaBanner() {
     const { showInstallOption, install } = usePwaInstall();
-    const [dismissed, setDismissed] = useState(() => Boolean(localStorage.getItem(DISMISS_KEY)));
+    const [dismissed, setDismissed] = useState(readDismissed);
     const [showIosSteps, setShowIosSteps] = useState(false);
 
     // Se a app for desinstalada, "showInstallOption" volta a true numa visita
@@ -15,7 +32,7 @@ export default function InstallPwaBanner() {
     useEffect(() => {
         if (showInstallOption) return;
         setDismissed(false);
-        localStorage.removeItem(DISMISS_KEY);
+        writeDismissed(false);
     }, [showInstallOption]);
 
     const visible = showInstallOption && !dismissed;
@@ -23,7 +40,7 @@ export default function InstallPwaBanner() {
     const dismiss = () => {
         setDismissed(true);
         setShowIosSteps(false);
-        localStorage.setItem(DISMISS_KEY, "1");
+        writeDismissed(true);
     };
 
     const handleInstall = async () => {

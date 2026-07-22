@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { RefreshCw, ClipboardList, Mail, ListChecks, FileClock, Paperclip, Zap, AlertTriangle } from "lucide-react";
-import api from "@/lib/api";
+import { toast } from "sonner";
+import api, { getErrorMessage } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 import { timeAgo } from "@/lib/pedido";
 
@@ -38,13 +39,24 @@ function StatusRow({ ok, label, detail }) {
 export default function HealthPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const loadSeq = useRef(0);
 
   const load = () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     api.get("/system/health")
-      .then(({ data: d }) => setData(d))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+      .then(({ data: d }) => { if (seq === loadSeq.current) setData(d); })
+      .catch((e) => {
+        if (seq !== loadSeq.current) return;
+        if (data) {
+          // Já havia dados na página — um "Atualizar" que falha (ex.: sem
+          // rede por um instante) não deve apagar o último estado conhecido.
+          toast.error(getErrorMessage(e, "Não foi possível atualizar"));
+        } else {
+          setData(null);
+        }
+      })
+      .finally(() => { if (seq === loadSeq.current) setLoading(false); });
   };
   useEffect(() => { load(); }, []);
 

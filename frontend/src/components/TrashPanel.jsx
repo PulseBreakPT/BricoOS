@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Trash2, ClipboardList, ListChecks, Truck, RotateCcw, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,14 +21,22 @@ const KIND_META = {
 export default function TrashPanel({ open, onOpenChange, onRestored }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const loadSeq = useRef(0);
 
   const load = () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
+    setLoadError(false);
     api.get("/trash")
-      .then(({ data }) => setItems(data.items || []))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+      .then(({ data }) => { if (seq === loadSeq.current) setItems(data.items || []); })
+      .catch(() => {
+        if (seq !== loadSeq.current) return;
+        setItems([]);
+        setLoadError(true);
+      })
+      .finally(() => { if (seq === loadSeq.current) setLoading(false); });
   };
 
   useEffect(() => { if (open) load(); }, [open]);
@@ -76,6 +84,8 @@ export default function TrashPanel({ open, onOpenChange, onRestored }) {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
             <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
+          ) : loadError ? (
+            <p className="py-10 text-center text-xs text-muted-foreground">Não foi possível carregar a lixeira.</p>
           ) : items.length === 0 ? (
             <p className="py-10 text-center text-xs text-muted-foreground">A lixeira está vazia.</p>
           ) : (

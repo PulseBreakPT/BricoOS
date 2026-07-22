@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const KEY = "brico_scratchpad_v1";
 
@@ -13,13 +14,35 @@ export default function Scratchpad() {
     try { return window.localStorage.getItem(KEY) || ""; } catch { return ""; }
   });
   const saveTimer = useRef(null);
+  const warnedRef = useRef(false);
 
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      try { window.localStorage.setItem(KEY, text); } catch { /* quota cheia ou modo privado — perde-se ao fechar */ }
+      try {
+        window.localStorage.setItem(KEY, text);
+      } catch {
+        // Quota cheia ou modo privado — sem aviso, o utilizador só descobria
+        // que perdeu o texto ao voltar a abrir a app, dias depois.
+        if (!warnedRef.current) {
+          warnedRef.current = true;
+          toast.error("Não foi possível guardar — o texto pode perder-se ao fechar.");
+        }
+      }
     }, 300);
     return () => clearTimeout(saveTimer.current);
+  }, [text]);
+
+  // Se o bloco de notas estiver aberto em duas janelas/separadores, uma
+  // gravação numa não devia ficar invisível na outra até se recarregar.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === KEY && e.newValue != null && e.newValue !== text) {
+        setText(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [text]);
 
   const clear = () => {

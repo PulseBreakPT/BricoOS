@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Mail, Inbox, Send, FileClock, Search, FileText, RefreshCw,
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
@@ -39,10 +40,12 @@ const PAGE_SIZE = 30;
 // o que o utilizador está a ver (ex.: um email expandido).
 function useAutoRefresh(callback, ms = 45000) {
   useEffect(() => {
-    const id = setInterval(callback, ms);
-    const onFocus = () => callback();
-    window.addEventListener("focus", onFocus);
-    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+    // Só vale a pena verificar se a aba estiver mesmo visível — poupa
+    // pedidos ao servidor quando a app fica horas ao fundo numa aba esquecida.
+    const tick = () => { if (document.visibilityState === "visible") callback(); };
+    const id = setInterval(tick, ms);
+    window.addEventListener("focus", tick);
+    return () => { clearInterval(id); window.removeEventListener("focus", tick); };
   }, [callback, ms]);
 }
 
@@ -158,39 +161,56 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [linkDialogFor, setLinkDialogFor] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [markingAllSeen, setMarkingAllSeen] = useState(false);
   const navigate = useNavigate();
+  const loadSeq = useRef(0);
 
   const load = useCallback(async (opts = {}) => {
+    const seq = ++loadSeq.current;
     if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/inbox", {
         params: { search: search || undefined, limit: PAGE_SIZE },
       });
+      // Uma atualização silenciosa em segundo plano pode responder depois de
+      // um load() mais recente (ex.: o utilizador mudou a pesquisa entretanto)
+      // — nesse caso, a resposta mais antiga não deve pisar a mais nova.
+      if (seq !== loadSeq.current) return;
       setItems(data.items); setTotal(data.total);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar a caixa de entrada"));
     } finally {
+      // O spinner de carregamento segue sempre o próprio pedido explícito,
+      // não a corrida entre pedidos — uma atualização silenciosa a demorar
+      // mais não pode deixar o spinner preso por não ser "a mais recente".
       if (!opts.silent) setLoading(false);
     }
   }, [search]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // Enquanto a pesquisa IA está ativa e a mostrar resultados, o resultado
+    // desta chamada nem chega a ser exibido — poupa o pedido normal.
+    if (smartQuery) return;
+    load();
+  }, [load, smartQuery]);
   useAutoRefresh(useCallback(() => load({ silent: true }), [load]));
 
   // Pesquisa inteligente: só corre quando o utilizador confirma (Enter), não
   // a cada tecla — cada pesquisa é uma chamada à IA para interpretar o texto.
   useEffect(() => {
     if (!smartQuery) { setSmartResult(null); return; }
+    const controller = new AbortController();
     let cancelled = false;
     setSmartLoading(true);
-    api.post("/emails/smart-search", { query: smartQuery.q })
+    api.post("/emails/smart-search", { query: smartQuery.q }, { signal: controller.signal })
       .then(({ data }) => { if (!cancelled) setSmartResult(data); })
       .catch((e) => {
-        if (cancelled) return;
+        if (cancelled || axios.isCancel(e)) return;
         toast.error(getErrorMessage(e, "Não foi possível interpretar a pesquisa"));
         setSmartResult({ items: [], total: 0, interpreted: null });
       })
       .finally(() => { if (!cancelled) setSmartLoading(false); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [smartQuery]);
 
   const displayItems = smartQuery ? (smartResult?.items || []) : items;
@@ -241,10 +261,16 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   };
 
   const markAllSeen = async () => {
+    if (markingAllSeen) return; // clique duplo não deve disparar dois POSTs concorrentes
+    setMarkingAllSeen(true);
     try {
       await api.post("/emails/seen-all");
       await load();
-    } catch (e) { toast.error(getErrorMessage(e)); }
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setMarkingAllSeen(false);
+    }
   };
 
   const openItem = async (m) => {
@@ -305,6 +331,11 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     });
   };
   const clearSelection = () => setSelected(new Set());
+  // Mudar de pesquisa (ou entrar/sair do modo IA) troca por completo a lista
+  // visível — mantiver a seleção antiga só criaria "fantasmas" selecionados
+  // que já não aparecem em lado nenhum. Uma atualização silenciosa de fundo
+  // não passa por aqui, por isso não perde a seleção do utilizador à toa.
+  useEffect(() => { clearSelection(); }, [search, smartQuery]);
   const toggleSelectAll = () => {
     setSelected((prev) => (prev.size === displayItems.length ? new Set() : new Set(displayItems.map((m) => m.id))));
   };
@@ -337,8 +368,8 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
           <p className="text-sm text-muted-foreground">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" onClick={markAllSeen} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
-            <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar vistos
+          <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" disabled={markingAllSeen} onClick={markAllSeen} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
+            {markingAllSeen ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <CheckCheck className="mr-1.5 h-3.5 w-3.5" />} Marcar vistos
           </Button>
           <Button data-testid="emails-sync" size="sm" variant="outline" disabled={syncing} onClick={sync} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
             {syncing ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />} Verificar
@@ -578,12 +609,15 @@ function SentTab({ search }) {
   const [awaitingOnly, setAwaitingOnly] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const navigate = useNavigate();
+  const loadSeq = useRef(0);
 
   const load = useCallback(async (opts = {}) => {
+    const seq = ++loadSeq.current;
     if (!opts.silent) setLoading(true);
     try {
       if (awaitingOnly) {
         const { data } = await api.get("/emails/awaiting-reply", { params: { days: 3 } });
+        if (seq !== loadSeq.current) return;
         let its = data.items;
         if (kind !== "todos") its = its.filter((m) => m.kind === kind);
         if (search) {
@@ -595,9 +629,11 @@ function SentTab({ search }) {
         const { data } = await api.get("/emails/sent", {
           params: { search: search || undefined, kind: kind === "todos" ? undefined : kind, limit: PAGE_SIZE },
         });
+        if (seq !== loadSeq.current) return;
         setItems(data.items); setTotal(data.total);
       }
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os emails enviados"));
     } finally {
       if (!opts.silent) setLoading(false);
@@ -696,13 +732,18 @@ function ThreadsTab({ search }) {
   const [messages, setMessages] = useState([]);
   const [loadingThread, setLoadingThread] = useState(false);
   const navigate = useNavigate();
+  const loadSeq = useRef(0);
+  const openSeq = useRef(0);
 
   const load = useCallback(async (opts = {}) => {
+    const seq = ++loadSeq.current;
     if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/threads");
+      if (seq !== loadSeq.current) return;
       setThreads(data.items);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar as conversas"));
     } finally {
       if (!opts.silent) setLoading(false);
@@ -715,13 +756,20 @@ function ThreadsTab({ search }) {
     if (openKey === t.key) { setOpenKey(null); return; }
     setOpenKey(t.key);
     setLoadingThread(true);
+    // Se a conversa aberta anteriormente ainda estiver a carregar quando se
+    // abre outra, a resposta mais lenta não pode pisar as mensagens da
+    // conversa que entretanto ficou aberta — cada abertura tem o seu próprio
+    // número de sequência.
+    const seq = ++openSeq.current;
     try {
       const { data } = await api.get("/emails/threads/view", { params: { key: t.key } });
+      if (seq !== openSeq.current) return;
       setMessages(data.items);
     } catch (e) {
+      if (seq !== openSeq.current) return;
       toast.error(getErrorMessage(e, "Não foi possível abrir a conversa"));
     } finally {
-      setLoadingThread(false);
+      if (seq === openSeq.current) setLoadingThread(false);
     }
   };
 
@@ -787,13 +835,17 @@ function DraftsTab({ search }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmNote, setConfirmNote] = useState(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async (opts = {}) => {
+    const seq = ++loadSeq.current;
     if (!opts.silent) setLoading(true);
     try {
       const { data } = await api.get("/emails/drafts");
+      if (seq !== loadSeq.current) return;
       setItems(data.items);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       if (!opts.silent) toast.error(getErrorMessage(e, "Erro ao carregar os rascunhos"));
     } finally {
       if (!opts.silent) setLoading(false);
@@ -878,8 +930,11 @@ export default function Emails() {
   }, [search]);
 
   const runSmartSearch = () => {
-    if (!search.trim()) return;
-    setSmartQuery({ q: search.trim() });
+    const q = search.trim();
+    if (!q) return;
+    // Enter repetido sem mudar o texto não deve repetir a chamada à IA.
+    if (smartQuery?.q === q) return;
+    setSmartQuery({ q });
   };
 
   const toggleSmart = () => {

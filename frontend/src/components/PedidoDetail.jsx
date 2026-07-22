@@ -433,14 +433,22 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
 
   const changeStatus = async (status) => {
-    await api.patch(`/notes/${id}/status`, { status });
-    toast.success("Estado atualizado");
-    await refreshChrome();
+    try {
+      await api.patch(`/notes/${id}/status`, { status });
+      toast.success("Estado atualizado");
+      await refreshChrome();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao mudar de estado"));
+    }
   };
   const changePriority = async (priority) => {
     set("priority", priority);
-    await api.put(`/notes/${id}`, { priority });
-    await refreshChrome();
+    try {
+      await api.put(`/notes/${id}`, { priority });
+      await refreshChrome();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao mudar a prioridade"));
+    }
   };
   const advance = async () => {
     if (!note?.next_status) return;
@@ -471,14 +479,22 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     }
   };
   const resolveNote = async () => {
-    await api.post(`/notes/${id}/resolve`);
-    toast.success("Pedido resolvido e arquivado");
-    await refreshChrome();
+    try {
+      await api.post(`/notes/${id}/resolve`);
+      toast.success("Pedido resolvido e arquivado");
+      await refreshChrome();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao resolver o pedido"));
+    }
   };
   const reopenNote = async () => {
-    await api.post(`/notes/${id}/reopen`);
-    toast.success("Pedido reaberto");
-    await refreshChrome();
+    try {
+      await api.post(`/notes/${id}/reopen`);
+      toast.success("Pedido reaberto");
+      await refreshChrome();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao reabrir o pedido"));
+    }
   };
 
   const addLabel = async (val) => {
@@ -486,19 +502,39 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     if (!v || form.labels.includes(v)) { setLabelInput(""); return; }
     const labels = [...form.labels, v];
     set("labels", labels); setLabelInput("");
-    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); dirty.current = false; await refresh(); }
+    if (!isCreate) {
+      try {
+        await api.put(`/notes/${id}`, { labels });
+        dirty.current = false;
+        await refresh();
+      } catch (e) {
+        toast.error(getErrorMessage(e, "Não foi possível adicionar a etiqueta"));
+      }
+    }
   };
   const removeLabel = async (val) => {
     const labels = form.labels.filter((l) => l !== val);
     set("labels", labels);
-    if (!isCreate) { await api.put(`/notes/${id}`, { labels }); dirty.current = false; await refresh(); }
+    if (!isCreate) {
+      try {
+        await api.put(`/notes/${id}`, { labels });
+        dirty.current = false;
+        await refresh();
+      } catch (e) {
+        toast.error(getErrorMessage(e, "Não foi possível remover a etiqueta"));
+      }
+    }
   };
 
   const addComment = async () => {
     if (!comment.trim()) return;
-    await api.post(`/notes/${id}/comment`, { message: comment.trim() });
-    setComment("");
-    await refresh();
+    try {
+      await api.post(`/notes/${id}/comment`, { message: comment.trim() });
+      setComment("");
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível adicionar o comentário"));
+    }
   };
 
   const [loggingEvent, setLoggingEvent] = useState("");
@@ -517,12 +553,30 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   const addTask = async () => {
     if (!newTask.title.trim()) { toast.error("Escreve o lembrete."); return; }
-    await api.post(`/notes/${id}/tasks`, { title: newTask.title.trim(), due_date: newTask.due_date });
-    setNewTask({ title: "", due_date: "" });
-    await refresh();
+    try {
+      await api.post(`/notes/${id}/tasks`, { title: newTask.title.trim(), due_date: newTask.due_date });
+      setNewTask({ title: "", due_date: "" });
+      await refresh();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível criar o lembrete"));
+    }
   };
-  const toggleTask = async (t) => { await api.patch(`/tasks/${t.id}/toggle`); await loadSub(id); };
-  const deleteTask = async (tid) => { await api.delete(`/tasks/${tid}`); await loadSub(id); };
+  const toggleTask = async (t) => {
+    try {
+      await api.patch(`/tasks/${t.id}/toggle`);
+      await loadSub(id);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível atualizar o lembrete"));
+    }
+  };
+  const deleteTask = async (tid) => {
+    try {
+      await api.delete(`/tasks/${tid}`);
+      await loadSub(id);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível eliminar o lembrete"));
+    }
+  };
 
   // Load template (autofill by supplier / reminder) when supplier or reminder toggled
   const loadTemplate = async (supplierId, reminder) => {

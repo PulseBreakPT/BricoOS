@@ -20,8 +20,20 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
   const handleSave = () => {
     const name = window.prompt("Nome para esta área de trabalho:");
     if (!name || !name.trim()) return;
-    saveWorkspace(name.trim());
-    toast.success(`Área de trabalho "${name.trim()}" guardada`);
+    const trimmed = name.trim();
+    const clash = workspaces.some(
+      (w) => w.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (clash && !window.confirm(`Já existe uma área de trabalho "${trimmed}". Substituir?`)) {
+      return;
+    }
+    saveWorkspace(trimmed);
+    toast.success(`Área de trabalho "${trimmed}" guardada`);
+  };
+
+  const handleDelete = (w) => {
+    if (!window.confirm(`Eliminar a área de trabalho "${w.name}"?`)) return;
+    deleteWorkspace(w.id);
   };
 
   return (
@@ -83,7 +95,7 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
                   title="Eliminar"
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteWorkspace(w.id);
+                    handleDelete(w);
                   }}
                   className="shrink-0 rounded p-1 text-slate-300 hover:text-red-600"
                 >

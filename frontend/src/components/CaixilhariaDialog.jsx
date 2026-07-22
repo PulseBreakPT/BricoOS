@@ -16,6 +16,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
   const [catalog, setCatalog] = useState(null);
   const [spec, setSpec] = useState(() => createEmptyCaixilharia());
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [addingSupplier, setAddingSupplier] = useState(false);
 
   const hasSpec = Boolean(note?.caixilharia);
@@ -48,6 +49,11 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
   };
 
   const remove = async () => {
+    if (removing) return; // já há uma remoção em curso
+    // Única ação destrutiva da app sem confirmação antes disto — Suppliers,
+    // Notes, Tasks e TaskGroups pedem sempre confirmação para eliminar.
+    if (!window.confirm("Remover a especificação de caixilharia deste pedido?")) return;
+    setRemoving(true);
     try {
       await api.delete(`/notes/${note.id}/caixilharia`);
       toast.success("Especificação removida");
@@ -55,6 +61,8 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
       onOpenChange(false);
     } catch (e) {
       toast.error(getErrorMessage(e, "Erro ao remover a especificação"));
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -137,8 +145,8 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
               <span className="hidden sm:inline">{hasSpec ? "Guardar alterações" : "Guardar especificação"}</span>
             </Button>
             {hasSpec ? (
-              <Button data-testid="caix-remove" variant="outline" onClick={remove} className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]">
-                <Trash2 className="h-4 w-4" />
+              <Button data-testid="caix-remove" variant="outline" disabled={removing} onClick={remove} className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]">
+                {removing ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             ) : null}
           </div>

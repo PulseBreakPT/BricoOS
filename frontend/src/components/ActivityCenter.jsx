@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, ArrowRight, Mail, Send, FileText, Phone, CircleDot } from "lucide-react";
+import axios from "axios";
+import { Activity, ArrowRight, Mail, Send, FileText, Phone, CircleDot, AlertTriangle } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
@@ -22,15 +23,29 @@ const KIND_ICONS = {
 export default function ActivityCenter({ open, onOpenChange }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!open) return;
+    // Abre/fecha rápido (ex.: clique acidental) cancela o pedido anterior —
+    // sem isto, uma resposta lenta podia aparecer depois de já ter fechado
+    // e reaberto, substituindo a lista pela versão antiga.
+    const controller = new AbortController();
     setLoading(true);
-    api.get("/activity/global")
+    setLoadError(false);
+    api.get("/activity/global", { signal: controller.signal })
       .then(({ data }) => setItems(data.items))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (axios.isCancel(e)) return;
+        // Antes disto, qualquer falha (rede, servidor em baixo) mostrava
+        // silenciosamente "sem atividade registada" — indistinguível de não
+        // haver mesmo nada, quando na verdade o pedido tinha falhado.
+        setItems([]);
+        setLoadError(true);
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [open]);
 
   const openEvent = (ev) => {
@@ -53,6 +68,10 @@ export default function ActivityCenter({ open, onOpenChange }) {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
             <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
+          ) : loadError ? (
+            <p className="flex items-center justify-center gap-2 py-10 text-center text-xs text-muted-foreground">
+              <AlertTriangle className="h-3.5 w-3.5" /> Não foi possível carregar a atividade.
+            </p>
           ) : items.length === 0 ? (
             <p className="py-10 text-center text-xs text-muted-foreground">Ainda sem atividade registada.</p>
           ) : (

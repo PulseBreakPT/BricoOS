@@ -21,32 +21,42 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
   const [loading, setLoading] = useState(false);
   const [linkingId, setLinkingId] = useState(null);
   const debounceRef = useRef(null);
+  const searchSeq = useRef(0);
 
   const open = !!email;
 
   useEffect(() => {
     if (!open) { setQuery(""); setResults([]); return; }
+    // Sequência partilhada com a pesquisa com debounce abaixo — as duas
+    // disparam pedidos a /notes, e sem isto uma resposta desta lista inicial
+    // podia chegar depois de uma pesquisa já escrita e substituí-la.
+    const seq = ++searchSeq.current;
     setLoading(true);
     // Ao abrir, sugere logo os pedidos em aberto mais recentes — a maior
     // parte das vezes é um deles, sem ser preciso escrever nada.
     api.get("/notes", { params: { limit: 15 } })
-      .then(({ data }) => setResults(data.items))
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
+      .then(({ data }) => { if (seq === searchSeq.current) setResults(data.items); })
+      .catch(() => { if (seq === searchSeq.current) setResults([]); })
+      .finally(() => { if (seq === searchSeq.current) setLoading(false); });
   }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      const seq = ++searchSeq.current;
       setLoading(true);
       try {
         const { data } = await api.get("/notes", { params: { search: query || undefined, limit: 15 } });
-        setResults(data.items);
-      } catch {
+        if (seq === searchSeq.current) setResults(data.items);
+      } catch (e) {
+        if (seq !== searchSeq.current) return;
         setResults([]);
+        // Antes disto, uma pesquisa que falhasse (rede, servidor) mostrava a
+        // mesma mensagem de "sem resultados", sem qualquer pista do que correu mal.
+        toast.error(getErrorMessage(e, "Não foi possível pesquisar pedidos"));
       } finally {
-        setLoading(false);
+        if (seq === searchSeq.current) setLoading(false);
       }
     }, 300);
     return () => clearTimeout(debounceRef.current);

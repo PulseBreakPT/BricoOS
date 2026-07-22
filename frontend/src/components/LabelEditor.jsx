@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Tag, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+
+const MAX_LABEL_LENGTH = 40;
+const MAX_LABELS = 20;
 
 // Editor de etiquetas reutilizável — mesmo padrão visual já usado nos
 // pedidos (PedidoDetail), agora também para fornecedores e tarefas:
@@ -9,8 +13,11 @@ export default function LabelEditor({ labels, onChange, testIdPrefix = "label" }
   const [input, setInput] = useState("");
 
   const add = (val) => {
-    const v = (val ?? input).trim();
-    if (!v || labels.includes(v)) { setInput(""); return; }
+    const v = (val ?? input).trim().slice(0, MAX_LABEL_LENGTH);
+    // Comparação sem distinguir maiúsculas/minúsculas — "Urgente" e "urgente"
+    // não podiam continuar a ser aceites como duas etiquetas diferentes.
+    if (!v || labels.some((l) => l.toLowerCase() === v.toLowerCase())) { setInput(""); return; }
+    if (labels.length >= MAX_LABELS) { toast.error(`Máximo de ${MAX_LABELS} etiquetas.`); return; }
     onChange([...labels, v]);
     setInput("");
   };
@@ -29,6 +36,7 @@ export default function LabelEditor({ labels, onChange, testIdPrefix = "label" }
       <Input
         data-testid={`${testIdPrefix}-input`}
         value={input}
+        maxLength={MAX_LABEL_LENGTH}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
         placeholder="+ etiqueta"

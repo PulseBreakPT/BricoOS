@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function compute(a, b, operator) {
   switch (operator) {
@@ -33,11 +33,14 @@ export default function Calculator() {
   const [waitingNew, setWaitingNew] = useState(false);
 
   const inputDigit = (d) => {
-    if (waitingNew) { setDisplay(d); setWaitingNew(false); return; }
+    // Depois de um "Erro" (ex.: divisão por zero), continuar a escrever
+    // dígitos concatenava ao texto do erro ("Erro5") — trata-se como se
+    // estivesse à espera de um número novo.
+    if (waitingNew || display === "Erro") { setDisplay(d); setWaitingNew(false); return; }
     setDisplay((cur) => (cur === "0" ? d : cur + d));
   };
   const inputDot = () => {
-    if (waitingNew) { setDisplay("0."); setWaitingNew(false); return; }
+    if (waitingNew || display === "Erro") { setDisplay("0."); setWaitingNew(false); return; }
     setDisplay((cur) => (cur.includes(".") ? cur : cur + "."));
   };
   const clear = () => { setDisplay("0"); setPrev(null); setOp(null); setWaitingNew(false); };
@@ -66,6 +69,26 @@ export default function Calculator() {
     setOp(null);
     setWaitingNew(true);
   };
+
+  // Uso comum também dá jeito com o teclado físico — desde que o foco não
+  // esteja noutro campo de texto da janela (ex.: um input de outra App).
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key >= "0" && e.key <= "9") { inputDigit(e.key); return; }
+      if (e.key === ".") { inputDot(); return; }
+      if (e.key === "+") { chooseOp("+"); return; }
+      if (e.key === "-") { chooseOp("-"); return; }
+      if (e.key === "*") { chooseOp("×"); return; }
+      if (e.key === "/") { e.preventDefault(); chooseOp("÷"); return; }
+      if (e.key === "Enter" || e.key === "=") { e.preventDefault(); equals(); return; }
+      if (e.key === "Backspace") { backspace(); return; }
+      if (e.key === "Escape") { clear(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   return (
     <div className="mx-auto flex max-w-xs flex-col gap-3">

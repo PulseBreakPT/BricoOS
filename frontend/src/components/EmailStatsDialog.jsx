@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
 
@@ -36,13 +37,24 @@ function BarRow({ label, count, max, colorCls = "bg-blue-400" }) {
 export default function EmailStatsDialog({ open, onOpenChange }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    const controller = new AbortController();
     setLoading(true);
-    api.get("/emails/stats").then(({ data }) => setStats(data))
-      .catch((e) => toast.error(getErrorMessage(e, "Erro ao carregar estatísticas")))
-      .finally(() => setLoading(false));
+    setLoadError(false);
+    api.get("/emails/stats", { signal: controller.signal }).then(({ data }) => setStats(data))
+      .catch((e) => {
+        if (axios.isCancel(e)) return;
+        // Antes disto, uma falha deixava loading=false mas stats=null para
+        // sempre — a condição de render (loading || !stats) ficava presa a
+        // mostrar o spinner indefinidamente, como se ainda estivesse a carregar.
+        toast.error(getErrorMessage(e, "Erro ao carregar estatísticas"));
+        setLoadError(true);
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [open]);
 
   const maxDaily = stats ? Math.max(1, ...stats.daily.map((d) => Math.max(d.received, d.sent))) : 1;
@@ -59,9 +71,13 @@ export default function EmailStatsDialog({ open, onOpenChange }) {
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-          {loading || !stats ? (
+          {loading ? (
             <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>
-          ) : (
+          ) : loadError ? (
+            <p className="flex items-center justify-center gap-2 py-10 text-center text-xs text-muted-foreground">
+              <AlertTriangle className="h-3.5 w-3.5" /> Não foi possível carregar as estatísticas.
+            </p>
+          ) : !stats ? null : (
             <div className="space-y-5">
               <div className="grid grid-cols-1 gap-2 min-[430px]:grid-cols-3">
                 <Tile label="Tempo médio de resposta" value={stats.avg_response_hours != null ? `${stats.avg_response_hours}h` : "—"} />

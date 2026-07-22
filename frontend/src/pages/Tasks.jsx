@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, ListChecks, CalendarDays, Repeat, FolderTree } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Spinner } from "@/components/ui/spinner";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
@@ -32,6 +33,74 @@ function matchesView(t, view) {
   }
 }
 
+// Definido fora de Tasks(): declará-lo lá dentro fazia o React ver um "novo"
+// componente a cada render do pai (ex.: só por marcar uma checkbox), o que
+// desmontava e remontava TODAS as linhas da lista de cada vez — perdia
+// transições, scroll de foco e era um custo de DOM desnecessário.
+function Row({ t, selected, onToggleSelect, onToggle, onOpen, onDelete, deleting, toggling, groupName }) {
+  const c = getCategory(t.category);
+  const p = getTaskPriority(t.priority);
+  const overdue = isOverdue(t.due_date, t.done);
+  const progress = subtaskProgress(t);
+  return (
+    <div
+      data-testid={`task-row-${t.id}`}
+      className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-input card-elevated-hover ${selected ? "border-foreground ring-2 ring-foreground/10" : "border-border"}`}
+    >
+      <Checkbox
+        data-testid={`task-select-${t.id}`}
+        checked={selected}
+        onCheckedChange={onToggleSelect}
+        className="h-4 w-4 rounded-md"
+      />
+      <Checkbox
+        data-testid={`task-toggle-${t.id}`}
+        checked={t.done}
+        disabled={toggling}
+        onCheckedChange={onToggle}
+        className="h-5 w-5 rounded-md transition-transform duration-150 hover:scale-110 active:scale-90"
+      />
+      <button className="min-w-0 flex-1 text-left" onClick={onOpen}>
+        <p className={`text-sm font-semibold text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <CategoryBadge category={t.category} />
+          {groupName ? (
+            <span className="flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+              <FolderTree className="h-3 w-3" /> {groupName}
+            </span>
+          ) : null}
+          {t.priority && t.priority !== "nenhuma" ? (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: p.bg, color: p.color }}>
+              {p.label}
+            </span>
+          ) : null}
+          {t.due_date ? (
+            <span
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                overdue ? "bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)]" : isToday(t.due_date) ? "bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)]" : "bg-[var(--pastel-blue-bg)] text-[color:var(--pastel-blue-text)]"
+              }`}
+            >
+              <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}
+              {t.repeat && t.repeat !== "none" ? <Repeat className="h-3 w-3" /> : null}
+            </span>
+          ) : null}
+          {progress ? (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+              {progress.done}/{progress.total}
+            </span>
+          ) : null}
+          {(t.labels || []).slice(0, 3).map((l) => (
+            <span key={l} className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{l}</span>
+          ))}
+        </div>
+      </button>
+      <button data-testid={`delete-task-${t.id}`} disabled={deleting} onClick={onDelete} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-500 active:scale-90 disabled:opacity-50">
+        {deleting ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [view, setView] = useState("todas");
@@ -41,20 +110,30 @@ export default function Tasks() {
   const [editingTask, setEditingTask] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [togglingIds, setTogglingIds] = useState(() => new Set());
+  const [deletingIds, setDeletingIds] = useState(() => new Set());
+  const loadSeq = useRef(0);
+  const loadGroupsSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const { data } = await api.get("/tasks");
+      if (seq !== loadSeq.current) return;
       setTasks(data);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar tarefas"));
     }
   }, []);
   const loadGroups = useCallback(async () => {
+    const seq = ++loadGroupsSeq.current;
     try {
       const { data } = await api.get("/task-groups");
+      if (seq !== loadGroupsSeq.current) return;
       setGroups(data);
     } catch (e) {
+      if (seq !== loadGroupsSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar grupos"));
     }
   }, []);
@@ -63,23 +142,34 @@ export default function Tasks() {
   const groupsById = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g.name])), [groups]);
 
   const toggle = async (t) => {
+    // Um duplo clique/toque rápido no mesmo checkbox não pode disparar dois
+    // PATCH /toggle concorrentes — numa tarefa recorrente, cada toggle para
+    // "concluída" cria a próxima ocorrência, e dois em corrida criava-a a dobrar.
+    if (togglingIds.has(t.id)) return;
+    setTogglingIds((prev) => new Set(prev).add(t.id));
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
     try {
       await api.patch(`/tasks/${t.id}/toggle`);
-      load(); // recarrega para apanhar a próxima ocorrência de tarefas recorrentes
+      await load(); // recarrega para apanhar a próxima ocorrência de tarefas recorrentes
     } catch (e) {
       setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: t.done } : x)));
       toast.error(getErrorMessage(e, "Erro ao atualizar a tarefa"));
+    } finally {
+      setTogglingIds((prev) => { const next = new Set(prev); next.delete(t.id); return next; });
     }
   };
 
   const remove = async (id) => {
+    if (deletingIds.has(id)) return; // já há uma remoção desta tarefa em curso
+    setDeletingIds((prev) => new Set(prev).add(id));
     try {
       await api.delete(`/tasks/${id}`);
       toast.success("Tarefa movida para a lixeira", { description: "Podes restaurá-la na Lixeira." });
       load();
     } catch (e) {
       toast.error(getErrorMessage(e, "Erro ao mover para a lixeira"));
+    } finally {
+      setDeletingIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
     }
   };
 
@@ -100,9 +190,14 @@ export default function Tasks() {
     // /toggle inverte o estado — só chama para as que ainda não estão
     // concluídas, senão desmarcava por engano as que já o estavam.
     const ids = tasks.filter((t) => selected.has(t.id) && !t.done).map((t) => t.id);
-    await Promise.allSettled(ids.map((id) => api.patch(`/tasks/${id}/toggle`)));
-    toast.success(`${ids.length} tarefa(s) concluída(s)`);
-    clearSelection();
+    const results = await Promise.allSettled(ids.map((id) => api.patch(`/tasks/${id}/toggle`)));
+    const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+    toast[failedIds.length ? "warning" : "success"](
+      failedIds.length ? `${ids.length - failedIds.length} concluída(s), ${failedIds.length} falhou(aram)` : `${ids.length} tarefa(s) concluída(s)`
+    );
+    // Mantém selecionadas só as que falharam, para se poder repetir a ação
+    // exatamente sobre elas em vez de perder essa informação.
+    setSelected(new Set(failedIds));
     load();
     setBulkBusy(false);
   };
@@ -110,9 +205,12 @@ export default function Tasks() {
     const ids = [...selected];
     if (!window.confirm(`Mover ${ids.length} tarefa(s) para a lixeira? Podes restaurá-las depois, na Lixeira.`)) return;
     setBulkBusy(true);
-    await Promise.allSettled(ids.map((id) => api.delete(`/tasks/${id}`)));
-    toast.success(`${ids.length} tarefa(s) movida(s) para a lixeira`);
-    clearSelection();
+    const results = await Promise.allSettled(ids.map((id) => api.delete(`/tasks/${id}`)));
+    const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+    toast[failedIds.length ? "warning" : "success"](
+      failedIds.length ? `${ids.length - failedIds.length} movida(s), ${failedIds.length} falhou(aram)` : `${ids.length} tarefa(s) movida(s) para a lixeira`
+    );
+    setSelected(new Set(failedIds));
     load();
     setBulkBusy(false);
   };
@@ -126,69 +224,6 @@ export default function Tasks() {
   const done = filtered.filter((t) => t.done);
   const allDone = tasks.filter((t) => t.done).length;
   const pct = tasks.length ? Math.round((allDone / tasks.length) * 100) : 0;
-
-  const Row = ({ t }) => {
-    const c = getCategory(t.category);
-    const p = getTaskPriority(t.priority);
-    const overdue = isOverdue(t.due_date, t.done);
-    const progress = subtaskProgress(t);
-    return (
-      <div
-        data-testid={`task-row-${t.id}`}
-        className={`group flex items-center gap-3 rounded-xl border bg-card p-3.5 card-elevated transition-all duration-150 hover:-translate-y-0.5 hover:border-input card-elevated-hover ${selected.has(t.id) ? "border-foreground ring-2 ring-foreground/10" : "border-border"}`}
-      >
-        <Checkbox
-          data-testid={`task-select-${t.id}`}
-          checked={selected.has(t.id)}
-          onCheckedChange={() => toggleSelect(t.id)}
-          className="h-4 w-4 rounded-md"
-        />
-        <Checkbox
-          data-testid={`task-toggle-${t.id}`}
-          checked={t.done}
-          onCheckedChange={() => toggle(t)}
-          className="h-5 w-5 rounded-md transition-transform duration-150 hover:scale-110 active:scale-90"
-        />
-        <button className="min-w-0 flex-1 text-left" onClick={() => openEdit(t)}>
-          <p className={`text-sm font-semibold text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <CategoryBadge category={t.category} />
-            {t.group_id && groupsById[t.group_id] ? (
-              <span className="flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                <FolderTree className="h-3 w-3" /> {groupsById[t.group_id]}
-              </span>
-            ) : null}
-            {t.priority && t.priority !== "nenhuma" ? (
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: p.bg, color: p.color }}>
-                {p.label}
-              </span>
-            ) : null}
-            {t.due_date ? (
-              <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  overdue ? "bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)]" : isToday(t.due_date) ? "bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)]" : "bg-[var(--pastel-blue-bg)] text-[color:var(--pastel-blue-text)]"
-                }`}
-              >
-                <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}
-                {t.repeat && t.repeat !== "none" ? <Repeat className="h-3 w-3" /> : null}
-              </span>
-            ) : null}
-            {progress ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                {progress.done}/{progress.total}
-              </span>
-            ) : null}
-            {(t.labels || []).slice(0, 3).map((l) => (
-              <span key={l} className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{l}</span>
-            ))}
-          </div>
-        </button>
-        <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-500 active:scale-90">
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    );
-  };
 
   return (
     <div>
@@ -279,14 +314,32 @@ export default function Tasks() {
       ) : null}
 
       <div className="mt-5 space-y-2">
-        {pending.map((t) => <Row key={t.id} t={t} />)}
+        {pending.map((t) => (
+          <Row
+            key={t.id} t={t}
+            selected={selected.has(t.id)} onToggleSelect={() => toggleSelect(t.id)}
+            onToggle={() => toggle(t)} toggling={togglingIds.has(t.id)}
+            onOpen={() => openEdit(t)}
+            onDelete={() => remove(t.id)} deleting={deletingIds.has(t.id)}
+            groupName={t.group_id ? groupsById[t.group_id] : null}
+          />
+        ))}
       </div>
 
       {done.length > 0 ? (
         <div className="mt-8">
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Concluídas ({done.length})</p>
           <div className="space-y-2">
-            {done.map((t) => <Row key={t.id} t={t} />)}
+            {done.map((t) => (
+              <Row
+                key={t.id} t={t}
+                selected={selected.has(t.id)} onToggleSelect={() => toggleSelect(t.id)}
+                onToggle={() => toggle(t)} toggling={togglingIds.has(t.id)}
+                onOpen={() => openEdit(t)}
+                onDelete={() => remove(t.id)} deleting={deletingIds.has(t.id)}
+                groupName={t.group_id ? groupsById[t.group_id] : null}
+              />
+            ))}
           </div>
         </div>
       ) : null}

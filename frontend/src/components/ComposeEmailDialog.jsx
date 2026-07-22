@@ -36,6 +36,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
   const [templates, setTemplates] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const fileInputRef = useRef(null);
+  const contactsSeq = useRef(0);
 
   useEffect(() => {
     if (!open) {
@@ -43,13 +44,20 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
       return;
     }
     if (forward) setSubject(forward.subject || "");
-    api.get("/emails/contacts").then(({ data }) => setContacts(data.items)).catch(() => {});
+    const seq = ++contactsSeq.current;
+    api.get("/emails/contacts").then(({ data }) => { if (seq === contactsSeq.current) setContacts(data.items); }).catch(() => {});
     if (!forward) api.get("/email-templates").then(({ data }) => setTemplates(data)).catch(() => {});
   }, [open, forward]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      if (open) api.get("/emails/contacts", { params: { search: to || undefined } }).then(({ data }) => setContacts(data.items)).catch(() => {});
+      if (!open) return;
+      // Sequência própria: uma resposta a uma pesquisa anterior (mais lenta)
+      // não pode substituir a lista já filtrada pela pesquisa mais recente.
+      const seq = ++contactsSeq.current;
+      api.get("/emails/contacts", { params: { search: to || undefined } })
+        .then(({ data }) => { if (seq === contactsSeq.current) setContacts(data.items); })
+        .catch(() => {});
     }, 250);
     return () => clearTimeout(t);
   }, [to, open]);
@@ -57,16 +65,17 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
   const addFiles = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+    // Verifica o tamanho total (a partir do tamanho nativo do ficheiro, sem
+    // custo) antes de codificar tudo em base64 — evita gastar tempo/memória
+    // a codificar um lote obviamente demasiado grande só para o rejeitar depois.
+    const existingTotal = attachments.reduce((sum, a) => sum + a.size, 0);
+    const incomingTotal = files.reduce((sum, f) => sum + f.size, 0);
+    if (existingTotal + incomingTotal > MAX_ATTACHMENT_TOTAL_BYTES) {
+      toast.error("Anexos demasiado grandes (máx. 20 MB no total).");
+      return;
+    }
     const encoded = await Promise.all(files.map(async (f) => ({ filename: f.name, size: f.size, data_b64: await readFileAsBase64(f) })));
-    setAttachments((prev) => {
-      const next = [...prev, ...encoded];
-      const total = next.reduce((sum, a) => sum + a.size, 0);
-      if (total > MAX_ATTACHMENT_TOTAL_BYTES) {
-        toast.error("Anexos demasiado grandes (máx. 20 MB no total).");
-        return prev;
-      }
-      return next;
-    });
+    setAttachments((prev) => [...prev, ...encoded]);
   };
 
   const removeAttachment = (idx) => setAttachments((prev) => prev.filter((_, i) => i !== idx));

@@ -336,6 +336,16 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
   useEffect(() => {
     if (requestedId && analysis?.model_index?.[requestedId]) setSelectedId(requestedId);
   }, [analysis, requestedId]);
+  // Catalog.jsx atualiza este "analysis" em segundo plano (ver loadCatalog);
+  // se o catálogo mudar e leftId/rightId deixarem de existir no novo
+  // model_index, o painel de comparação ficava preso a mostrar "Dados não
+  // encontrados" para sempre, em vez de recair para modelos válidos.
+  useEffect(() => {
+    if (!analysis) return;
+    if (leftId && !analysis.model_index?.[leftId]) setLeftId(ranked[0]?.id || models[0]?.id || "");
+    if (rightId && !analysis.model_index?.[rightId]) setRightId(ranked[1]?.id || models[1]?.id || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis]);
   if (!analysis || !models.length) return null;
   const selected = analysis.model_index?.[selectedId] || models[0];
   const spotlight = ranked.length ? ranked.slice(0, 3) : models.slice(0, 3);

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, Flag } from "lucide-react";
 
+const MAX_LAPS = 50;
+
 function formatElapsed(ms) {
   const totalCs = Math.floor(ms / 10);
   const cs = totalCs % 100;
@@ -35,7 +37,19 @@ export default function Stopwatch() {
   const start = () => { startRef.current = Date.now() - elapsed; setRunning(true); };
   const pause = () => setRunning(false);
   const reset = () => { setRunning(false); setElapsed(0); setLaps([]); };
-  const lap = () => setLaps((cur) => [elapsed, ...cur]);
+  // Cap para não crescer sem limite numa sessão muito longa deixada a
+  // correr (ex.: um turno inteiro com voltas frequentes).
+  const lap = () => setLaps((cur) => [elapsed, ...cur].slice(0, MAX_LAPS));
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.code === "Space") { e.preventDefault(); running ? pause() : start(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   return (
     <div className="mx-auto flex max-w-xs flex-col items-center gap-4">

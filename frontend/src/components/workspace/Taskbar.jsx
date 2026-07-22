@@ -130,6 +130,24 @@ export default function Taskbar({
           />
         ) : null}
 
+        {/* O dock só mostra os primeiros 5 painéis — sem isto, janelas
+            abertas para além do limite ficavam invisíveis e sem qualquer
+            forma de saber que existem, exceto pelo Mission Control. */}
+        {panels.length > 5 ? (
+          <button
+            type="button"
+            data-testid="dock-overflow"
+            onClick={() => {
+              haptics.tap();
+              onOpenMissionControl?.();
+            }}
+            className="os-dock-action flex h-9 shrink-0 items-center justify-center rounded-xl px-2 font-mono text-[10px] font-black text-neutral-500 transition-all hover:-translate-y-0.5 hover:bg-neutral-900/[0.05] hover:text-neutral-900"
+            title={`+${panels.length - 5} janela(s) — abrir Mission Control`}
+          >
+            +{panels.length - 5}
+          </button>
+        ) : null}
+
         {panels.slice(0, 5).map((panel) => {
           const meta = PANEL_TYPES[panel.type];
           if (!meta) return null;

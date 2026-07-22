@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Clock, AlarmClockOff, Zap, X } from "lucide-react";
 import {
@@ -24,17 +24,24 @@ export default function NotificationsBell({ variant = "sidebar" }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState({ items: [], count: 0 });
   const navigate = useNavigate();
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    // Sem isto, um poll de 60 em 60s que respondesse fora de ordem (ex.: uma
+    // chamada disparada ao abrir o painel, mais lenta que o poll seguinte)
+    // podia repor a contagem para um valor já ultrapassado.
+    const seq = ++loadSeq.current;
     try {
       const { data } = await api.get("/notifications");
-      setData(data);
-    } catch { /* ignore */ }
+      if (seq === loadSeq.current) setData(data);
+    } catch { /* ignore — poll de fundo, uma falha isolada não merece alarido */ }
   }, []);
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 60000);
+    // Só vale a pena verificar com a aba visível — poupa pedidos quando a
+    // app fica horas ao fundo numa aba esquecida.
+    const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 60000);
     return () => clearInterval(t);
   }, [load]);
 

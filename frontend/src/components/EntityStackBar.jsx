@@ -10,9 +10,10 @@ export default function EntityStackBar({ rootLabel, frames, onPopTo, onClose }) 
       <button
         type="button"
         data-testid="entity-stack-back"
+        disabled={frames.length === 0}
         onClick={() => onPopTo(frames.length - 2)}
         title="Voltar"
-        className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
       </button>
