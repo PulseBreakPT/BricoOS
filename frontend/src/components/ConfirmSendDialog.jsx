@@ -78,26 +78,32 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {/* PDF anexado */}
-          <a
-            data-testid="confirm-send-pdf"
-            href={withDeviceToken(`${API}/notes/${note.id}/files/${pending.pdf_file_id}`)}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3 transition-colors hover:border-input"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--pastel-red-bg)] text-red-600">
-              <FileText className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-bold text-foreground">{pending.pdf_filename || "Orçamento (PDF)"}</span>
-              <span className="block text-xs text-muted-foreground">
-                {pending.total != null ? `${Number(pending.total).toFixed(2)} € c/ IVA` : ""}
-                {pending.eff_margin_pct != null ? ` · margem final ${Number(pending.eff_margin_pct).toFixed(1)}%` : ""}
-                {" · toca para rever o PDF"}
+          {/* PDF anexado — sem pdf_file_id o link ficava "quebrado" (.../files/undefined) */}
+          {pending.pdf_file_id ? (
+            <a
+              data-testid="confirm-send-pdf"
+              href={withDeviceToken(`${API}/notes/${note.id}/files/${pending.pdf_file_id}`)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3 transition-colors hover:border-input"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--pastel-red-bg)] text-red-600">
+                <FileText className="h-5 w-5" />
               </span>
-            </span>
-          </a>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold text-foreground">{pending.pdf_filename || "Orçamento (PDF)"}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {pending.total != null ? `${Number(pending.total).toFixed(2)} € c/ IVA` : ""}
+                  {pending.eff_margin_pct != null ? ` · margem final ${Number(pending.eff_margin_pct).toFixed(1)}%` : ""}
+                  {" · toca para rever o PDF"}
+                </span>
+              </span>
+            </a>
+          ) : (
+            <div data-testid="confirm-send-pdf-missing" className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted p-3 text-xs text-muted-foreground">
+              <FileText className="h-5 w-5 shrink-0" /> PDF não disponível para pré-visualização.
+            </div>
+          )}
 
           <div className="mt-4 space-y-1.5">
             <Label>Para</Label>

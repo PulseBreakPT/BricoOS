@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import axios from "axios";
 import {
   Plus, Search, SlidersHorizontal, Inbox, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
@@ -150,27 +151,40 @@ export default function Notes() {
   const searchTimer = useRef(null);
   const searchRef = useRef(null);
   const loadSeq = useRef(0);
+  const todaySeq = useRef(0);
+  const metaSeq = useRef(0);
 
   const loadMeta = useCallback(async () => {
+    const seq = ++metaSeq.current;
     try {
       const [s, g, l] = await Promise.all([
         api.get("/suppliers"), api.get("/gmail/status"), api.get("/labels"),
       ]);
+      if (seq !== metaSeq.current) return;
       setSuppliers(s.data); setGmailStatus(g.data); setLabels(l.data);
     } catch (e) {
+      if (seq !== metaSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar fornecedores"));
     }
   }, []);
 
   // Resumo do dia + alertas (antiga página "Hoje"), calculados só para a área ativa.
-  const loadToday = useCallback(async () => {
+  const loadToday = useCallback(async (signal) => {
+    // Sem isto, alternar rapidamente entre "Geral" e "Banda" podia deixar o
+    // resumo de uma área a mostrar os números da outra, se o pedido mais
+    // antigo respondesse depois do mais recente.
+    const seq = ++todaySeq.current;
     try {
-      const { data } = await api.get("/today", { params: { segment } });
+      const { data } = await api.get("/today", { params: { segment }, signal });
+      if (seq !== todaySeq.current) return;
       setToday(data);
-    } catch { /* o painel funciona na mesma sem o resumo */ }
+    } catch (e) {
+      if (axios.isCancel(e) || seq !== todaySeq.current) return;
+      /* o painel funciona na mesma sem o resumo */
+    }
   }, [segment]);
 
-  const loadNotes = useCallback(async () => {
+  const loadNotes = useCallback(async (signal) => {
     // Número de sequência: garante que uma resposta antiga (lenta) nunca
     // sobrepõe o resultado de um filtro mais recente.
     const seq = ++loadSeq.current;
@@ -188,11 +202,11 @@ export default function Notes() {
     if (advSupplier) params.supplier_id = advSupplier;
     if (debounced) params.search = debounced;
     try {
-      const { data } = await api.get("/notes", { params });
+      const { data } = await api.get("/notes", { params, signal });
       if (seq !== loadSeq.current) return;
       setItems(data.items); setTotal(data.total);
     } catch (e) {
-      if (seq !== loadSeq.current) return;
+      if (axios.isCancel(e) || seq !== loadSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar pedidos"));
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -200,8 +214,18 @@ export default function Notes() {
   }, [preset, category, advSupplier, advPriority, sort, debounced, segment]);
 
   useEffect(() => { loadMeta(); }, [loadMeta]);
-  useEffect(() => { loadToday(); }, [loadToday]);
-  useEffect(() => { loadNotes(); }, [loadNotes]);
+  useEffect(() => {
+    // O controller cancela o pedido em trânsito se o filtro mudar de novo
+    // antes de responder — poupa trabalho de rede que já não interessa mostrar.
+    const controller = new AbortController();
+    loadToday(controller.signal);
+    return () => controller.abort();
+  }, [loadToday]);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadNotes(controller.signal);
+    return () => controller.abort();
+  }, [loadNotes]);
 
   // Depois de qualquer ação que mude pedidos, atualiza lista E resumo do dia.
   const reloadAll = useCallback(() => { loadNotes(); loadToday(); }, [loadNotes, loadToday]);
@@ -212,7 +236,10 @@ export default function Notes() {
   const changeSegment = useCallback((seg) => {
     if (seg === segment) return;
     setSegment(seg);
-    setPreset("todos"); setCategory("todos"); setAdvSupplier(""); setAdvPriority(""); setSearch("");
+    // "sort" ficou de fora desta lista durante muito tempo — a área nova
+    // herdava sem querer a ordenação da anterior, ao contrário de todos os
+    // outros filtros, que já eram sempre repostos.
+    setPreset("todos"); setCategory("todos"); setAdvSupplier(""); setAdvPriority(""); setSearch(""); setSort("smart");
     navigate(seg === "band" ? "/?area=band" : "/", { replace: true });
   }, [segment, navigate]);
   // Se a lista encolher (ex.: pedido resolvido), o índice do modo foco não pode ficar fora dela.
@@ -265,7 +292,27 @@ export default function Notes() {
   };
 
   // ---- Quick actions (available on cards, focus mode, without opening) ----
-  const advance = async (note) => {
+  // Guarda partilhada por nota+ação: um duplo clique ou tecla repetida (Enter
+  // no modo foco) não deve disparar duas chamadas concorrentes da mesma ação
+  // sobre o mesmo pedido — sem isto, cada uma das 7 ações tinha de reimplementar
+  // essa proteção à mão.
+  const busyActionsRef = useRef(new Set());
+  const [, bumpBusyActions] = useState(0);
+  const isActionBusy = useCallback((noteId, key) => busyActionsRef.current.has(`${noteId}:${key}`), []);
+  const guardAction = useCallback((key, rawFn) => async (note, ...rest) => {
+    const k = `${note.id}:${key}`;
+    if (busyActionsRef.current.has(k)) return;
+    busyActionsRef.current.add(k);
+    bumpBusyActions((v) => v + 1);
+    try {
+      await rawFn(note, ...rest);
+    } finally {
+      busyActionsRef.current.delete(k);
+      bumpBusyActions((v) => v + 1);
+    }
+  }, []);
+
+  const advance = guardAction("advance", async (note) => {
     if (!note.next_status) return;
     if (getNextActionMode(note) !== "status") {
       openNote(note.id, "orcamentos");
@@ -279,44 +326,44 @@ export default function Notes() {
       toast.success(`Avançado para "${note.next_status_label}"`);
       reloadAll();
     } catch (e) { toast.error(getErrorMessage(e, "Erro ao avançar")); }
-  };
-  const contactClient = async (note) => {
+  });
+  const contactClient = guardAction("contact", async (note) => {
     try {
       await api.post(`/notes/${note.id}/contact-client`, { method: "telefone" });
       toast.success("Registado: cliente contactado");
       reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
-  };
-  const resolve = async (note) => {
+  });
+  const resolve = guardAction("resolve", async (note) => {
     try {
       await api.post(`/notes/${note.id}/resolve`);
       toast.success("Pedido resolvido e arquivado");
       reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
-  };
-  const reopen = async (note) => {
+  });
+  const reopen = guardAction("reopen", async (note) => {
     try {
       await api.post(`/notes/${note.id}/reopen`);
       toast.success("Pedido reaberto");
       reloadAll();
     } catch (e) { toast.error(getErrorMessage(e)); }
-  };
-  const duplicate = async (note) => {
+  });
+  const duplicate = guardAction("duplicate", async (note) => {
     try {
       const { data } = await api.post(`/notes/${note.id}/duplicate`);
       toast.success("Pedido duplicado — altera apenas o necessário");
       reloadAll();
       openNote(data.id);
     } catch (e) { toast.error(getErrorMessage(e)); }
-  };
-  const changeStatus = async (note, status) => {
+  });
+  const changeStatus = guardAction("status", async (note, status) => {
     try {
       await api.patch(`/notes/${note.id}/status`, { status });
       toast.success(`Estado alterado para "${getStatusCfg(status).label}"`);
       reloadAll();
     } catch (e) { toast.error(getErrorMessage(e, "Erro ao mudar de estado")); }
-  };
-  const sendReminder = async (note) => {
+  });
+  const sendReminder = guardAction("reminder", async (note) => {
     if (!note.supplier_id) {
       toast.message("Escolhe o fornecedor no separador Orçamentos.");
       openNote(note.id);
@@ -336,8 +383,8 @@ export default function Notes() {
       toast.error(getErrorMessage(e, "Não foi possível enviar. Verifica o Gmail."));
       openNote(note.id);
     }
-  };
-  const actions = { advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus };
+  });
+  const actions = { advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus, isActionBusy };
 
   // ---- Seleção em grupo — ações sobre vários pedidos de uma vez (lógica base 21) ----
   const toggleSelect = (id) => {
@@ -355,11 +402,14 @@ export default function Notes() {
     setBulkBusy(true);
     const ids = [...selected];
     const results = await Promise.allSettled(ids.map((id) => api.post(`/notes/${id}/resolve`)));
-    const failed = results.filter((r) => r.status === "rejected").length;
-    toast[failed ? "warning" : "success"](
-      failed ? `${ids.length - failed} resolvido(s), ${failed} falhou(aram)` : `${ids.length} pedido(s) resolvido(s)`
+    const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+    toast[failedIds.length ? "warning" : "success"](
+      failedIds.length ? `${ids.length - failedIds.length} resolvido(s), ${failedIds.length} falhou(aram)` : `${ids.length} pedido(s) resolvido(s)`
     );
-    clearSelection();
+    // Só desmarca os que resultaram bem — os que falharam continuam
+    // selecionados, para o utilizador ver exatamente quais tentar de novo
+    // em vez de perder essa informação ao limpar tudo.
+    setSelected(new Set(failedIds));
     reloadAll();
     setBulkBusy(false);
   };
@@ -368,11 +418,11 @@ export default function Notes() {
     if (!window.confirm(`Mover ${ids.length} pedido(s) para a lixeira? Podes restaurá-los depois, na Lixeira.`)) return;
     setBulkBusy(true);
     const results = await Promise.allSettled(ids.map((id) => api.delete(`/notes/${id}`)));
-    const failed = results.filter((r) => r.status === "rejected").length;
-    toast[failed ? "warning" : "success"](
-      failed ? `${ids.length - failed} movido(s), ${failed} falhou(aram)` : `${ids.length} pedido(s) movido(s) para a lixeira`
+    const failedIds = ids.filter((_, i) => results[i].status === "rejected");
+    toast[failedIds.length ? "warning" : "success"](
+      failedIds.length ? `${ids.length - failedIds.length} movido(s), ${failedIds.length} falhou(aram)` : `${ids.length} pedido(s) movido(s) para a lixeira`
     );
-    clearSelection();
+    setSelected(new Set(failedIds));
     reloadAll();
     setBulkBusy(false);
   };
@@ -399,7 +449,9 @@ export default function Notes() {
   }, [items, focusMode, focusIndex, detailOpen]);
 
   const clearFilters = () => {
-    setPreset("todos"); setCategory("todos"); setAdvSupplier(""); setAdvPriority(""); setSort("smart");
+    // Antes disto, "Limpar filtros" deixava o texto da pesquisa por limpar —
+    // parecia ter limpo tudo, mas a lista continuava filtrada por ele.
+    setPreset("todos"); setCategory("todos"); setAdvSupplier(""); setAdvPriority(""); setSort("smart"); setSearch("");
   };
 
   const focusNote = items[focusIndex];
@@ -687,7 +739,7 @@ export default function Notes() {
           ) : null}
         </div>
       ) : kanbanView ? (
-        <PedidoKanban items={items} onOpen={openNote} onMove={changeStatus} />
+        <PedidoKanban items={items} onOpen={openNote} onMove={changeStatus} isActionBusy={isActionBusy} />
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Primeiro carregamento: esqueletos com a silhueta dos cartões
@@ -803,17 +855,17 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Próxima ação sugerida</p>
           <p className="mt-1 text-sm font-semibold text-foreground">{note.next_action || "Concluído"}</p>
           {note.next_status ? (
-            <Button data-testid="focus-advance" onClick={() => actions.advance(note)} className="mt-3 w-full rounded-xl">
-              <Zap className="mr-2 h-4 w-4" /> {getNextActionCta(note)} <span className="ml-1 opacity-70">(Enter)</span>
+            <Button data-testid="focus-advance" disabled={actions.isActionBusy(note.id, "advance")} onClick={() => actions.advance(note)} className="mt-3 w-full rounded-xl">
+              {actions.isActionBusy(note.id, "advance") ? <Spinner className="mr-2 h-4 w-4" /> : <Zap className="mr-2 h-4 w-4" />} {getNextActionCta(note)} <span className="ml-1 opacity-70">(Enter)</span>
             </Button>
           ) : null}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button data-testid="focus-reminder" variant="outline" className="rounded-xl" onClick={() => actions.sendReminder(note)}><Send className="mr-2 h-4 w-4" /> Lembrete</Button>
-          <Button data-testid="focus-contact" variant="outline" className="rounded-xl" onClick={() => actions.contactClient(note)}><PhoneCall className="mr-2 h-4 w-4" /> Contactar</Button>
-          <Button data-testid="focus-resolve" variant="outline" className="rounded-xl" onClick={() => actions.resolve(note)}><CheckCircle2 className="mr-2 h-4 w-4" /> Resolver</Button>
-          <Button data-testid="focus-duplicate" variant="outline" className="rounded-xl" onClick={() => actions.duplicate(note)}><Copy className="mr-2 h-4 w-4" /> Duplicar</Button>
+          <Button data-testid="focus-reminder" variant="outline" disabled={actions.isActionBusy(note.id, "reminder")} className="rounded-xl" onClick={() => actions.sendReminder(note)}><Send className="mr-2 h-4 w-4" /> Lembrete</Button>
+          <Button data-testid="focus-contact" variant="outline" disabled={actions.isActionBusy(note.id, "contact")} className="rounded-xl" onClick={() => actions.contactClient(note)}><PhoneCall className="mr-2 h-4 w-4" /> Contactar</Button>
+          <Button data-testid="focus-resolve" variant="outline" disabled={actions.isActionBusy(note.id, "resolve")} className="rounded-xl" onClick={() => actions.resolve(note)}><CheckCircle2 className="mr-2 h-4 w-4" /> Resolver</Button>
+          <Button data-testid="focus-duplicate" variant="outline" disabled={actions.isActionBusy(note.id, "duplicate")} className="rounded-xl" onClick={() => actions.duplicate(note)}><Copy className="mr-2 h-4 w-4" /> Duplicar</Button>
         </div>
         <button data-testid="focus-open" onClick={onOpen} className="mt-3 w-full text-center text-xs font-semibold text-muted-foreground hover:text-foreground">Abrir pedido completo →</button>
       </div>

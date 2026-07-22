@@ -152,11 +152,16 @@ function getRouteApp(pathname) {
 function SupplierEmailAlert() {
   const [data, setData] = useState({ count: 0, items: [] });
   const navigate = useNavigate();
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    // O intervalo de 45s, o foco da janela e as chamadas explícitas de
+    // openItem/markAll podem sobrepor-se — sem sequência, uma resposta mais
+    // lenta e antiga podia repor a contagem para um valor já ultrapassado.
+    const seq = ++loadSeq.current;
     try {
       const { data: response } = await api.get("/emails/unseen");
-      setData(response);
+      if (seq === loadSeq.current) setData(response);
     } catch {
       /* o sistema volta a tentar na próxima verificação */
     }
@@ -164,7 +169,9 @@ function SupplierEmailAlert() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 45000);
+    // Só vale a pena verificar com a aba visível — poupa pedidos quando a
+    // app fica horas ao fundo numa aba esquecida.
+    const timer = setInterval(() => { if (document.visibilityState === "visible") load(); }, 45000);
     window.addEventListener("focus", load);
     return () => {
       clearInterval(timer);

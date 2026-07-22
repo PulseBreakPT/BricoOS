@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Focus, SquarePlus } from "lucide-react";
 import {
   DropdownMenu,
@@ -57,6 +57,11 @@ export default function DockIcon({
     haptics.tap();
     onOpen();
   };
+
+  // Como o QuickPeek (mesmo padrão de clique/toque longo), limpa o
+  // temporizador pendente se o ícone for desmontado a meio do gesto — ex.:
+  // reordenar o dock enquanto se segura um ícone.
+  useEffect(() => clearTimer, []);
 
   return (
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>

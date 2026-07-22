@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, FileWarning } from "lucide-react";
@@ -7,7 +8,9 @@ import { Download, FileWarning } from "lucide-react";
 export function previewKind(filename, contentType) {
   const ct = (contentType || "").toLowerCase();
   if (ct.startsWith("image/")) return "image";
-  if (ct === "application/pdf") return "pdf";
+  // startsWith em vez de === — um content-type com parâmetros
+  // (ex.: "application/pdf;charset=binary") deixava de ser reconhecido.
+  if (ct.startsWith("application/pdf")) return "pdf";
   const ext = (filename || "").toLowerCase();
   if (/\.(png|jpe?g|gif|webp|bmp|svg)$/.test(ext)) return "image";
   if (ext.endsWith(".pdf")) return "pdf";
@@ -18,8 +21,13 @@ export function previewKind(filename, contentType) {
 // "Descarregar" fica sempre disponível, mesmo quando o tipo não é
 // pré-visualizável embutido.
 export default function AttachmentPreviewDialog({ open, onOpenChange, attachment }) {
+  // Um URL expirado/quebrado antes disto ficava com uma imagem partida ou um
+  // iframe em branco, sem qualquer pista de que algo correu mal.
+  const [previewFailed, setPreviewFailed] = useState(false);
+  useEffect(() => { setPreviewFailed(false); }, [attachment?.url]);
+
   if (!attachment) return null;
-  const kind = previewKind(attachment.filename, attachment.contentType);
+  const kind = previewFailed ? null : previewKind(attachment.filename, attachment.contentType);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="attachment-preview" className="max-w-4xl border-0 bg-transparent p-0 shadow-none">
@@ -34,9 +42,9 @@ export default function AttachmentPreviewDialog({ open, onOpenChange, attachment
           </div>
           <div className="min-h-0 flex-1 overflow-auto bg-muted">
             {kind === "image" ? (
-              <img src={attachment.url} alt={attachment.filename} className="mx-auto max-h-[75vh] w-auto object-contain" />
+              <img src={attachment.url} alt={attachment.filename} onError={() => setPreviewFailed(true)} className="mx-auto max-h-[75vh] w-auto object-contain" />
             ) : kind === "pdf" ? (
-              <iframe title={attachment.filename} src={attachment.url} className="h-[75vh] w-full border-0 bg-card" />
+              <iframe title={attachment.filename} src={attachment.url} onError={() => setPreviewFailed(true)} className="h-[75vh] w-full border-0 bg-card" />
             ) : (
               <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
                 <FileWarning className="h-6 w-6" />

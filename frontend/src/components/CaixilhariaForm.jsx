@@ -25,12 +25,18 @@ export {
 
 // Cache do catálogo — é estático por sessão, não vale a pena repetir o pedido.
 let catalogCache = null;
+let catalogInFlight = null;
 export async function getCaixilhariaCatalog() {
-  if (!catalogCache) {
-    const { data } = await api.get("/caixilharia/catalog");
-    catalogCache = data;
+  if (catalogCache) return catalogCache;
+  // Duas chamadas em quase simultâneo (ex.: o diálogo do pedido e o formulário
+  // dentro dele a montar ao mesmo tempo) partilham o mesmo pedido em vez de
+  // dispararem duas chamadas à API antes da primeira responder.
+  if (!catalogInFlight) {
+    catalogInFlight = api.get("/caixilharia/catalog")
+      .then(({ data }) => { catalogCache = data; return data; })
+      .finally(() => { catalogInFlight = null; });
   }
-  return catalogCache;
+  return catalogInFlight;
 }
 
 const optionLetter = (index) => String.fromCharCode(65 + index);

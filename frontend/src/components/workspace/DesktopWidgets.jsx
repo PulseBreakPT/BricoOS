@@ -60,7 +60,7 @@ export default function DesktopWidgets({ onOpenRoute }) {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       const [t, n, m] = await Promise.allSettled([
         api.get("/tasks"),
         api.get("/notes"),
@@ -80,9 +80,15 @@ export default function DesktopWidgets({ onOpenRoute }) {
       else setNotes([]);
       if (m.status === "fulfilled") setMail(m.value.data);
       else setMail({ count: 0, items: [] });
-    })();
+    };
+    load();
+    // A secretária pode ficar visível horas a fio — sem uma atualização
+    // periódica, os widgets congelavam no instante em que o ambiente de
+    // trabalho foi mostrado pela primeira vez.
+    const timer = setInterval(() => { if (document.visibilityState === "visible") load(); }, 60000);
     return () => {
       alive = false;
+      clearInterval(timer);
     };
   }, []);
 

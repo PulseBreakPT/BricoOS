@@ -14,7 +14,10 @@ function fileUrl(item) {
     : `${API}/emails/${item.email_id}/attachments/${item.id}`;
 }
 
-const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
+// Faltava .svg aqui — o mesmo conjunto de extensões já reconhecido como
+// imagem em AttachmentPreviewDialog.jsx; um SVG entrava pelo ícone genérico
+// e sem a pré-visualização de imagem no QuickPeek.
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 
 // Centro de Downloads — tudo o que entrou ou foi gerado, num único sítio:
 // orçamentos de fornecedor, orçamentos ao cliente, fotos, anexos de email.
@@ -24,17 +27,26 @@ const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 export default function DownloadsCenter() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     api.get("/system/downloads")
       .then(({ data }) => setItems(data.items))
-      .catch((e) => toast.error(getErrorMessage(e, "Erro ao carregar os downloads")))
+      .catch((e) => {
+        toast.error(getErrorMessage(e, "Erro ao carregar os downloads"));
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>;
+  }
+  // Distingue "falhou a carregar" de "não há mesmo nada" — antes disto, uma
+  // falha de rede mostrava a mesma mensagem de lista vazia.
+  if (loadError) {
+    return <p className="py-10 text-center text-xs text-muted-foreground">Não foi possível carregar os downloads.</p>;
   }
   if (items.length === 0) {
     return <p className="py-10 text-center text-xs text-muted-foreground">Ainda sem ficheiros guardados.</p>;

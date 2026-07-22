@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Trash2, Pencil, FolderTree, ListChecks } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
@@ -21,12 +21,17 @@ export default function TaskGroups() {
   const [name, setName] = useState("");
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const { data } = await api.get("/task-groups");
+      if (seq !== loadSeq.current) return;
       setGroups(data);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar grupos"));
     }
   }, []);
@@ -36,11 +41,17 @@ export default function TaskGroups() {
   const openEdit = (g) => { setEditing(g); setName(g.name); setOpen(true); };
 
   const save = async () => {
-    if (!name.trim()) { toast.error("Indica o nome do grupo."); return; }
+    if (saving) return; // Enter repetido não deve disparar dois guardados concorrentes
+    const trimmed = name.trim();
+    if (!trimmed) { toast.error("Indica o nome do grupo."); return; }
+    // Verificação local antes de ir à rede — mesma comparação (case-insensitive)
+    // que o backend já faz, só que instantânea em vez de à espera de um 409.
+    const clash = groups.find((g) => g.id !== editing?.id && g.name.toLowerCase() === trimmed.toLowerCase());
+    if (clash) { toast.error(`Já existe um grupo chamado "${clash.name}".`); return; }
     setSaving(true);
     try {
-      if (editing) await api.put(`/task-groups/${editing.id}`, { name: name.trim() });
-      else await api.post("/task-groups", { name: name.trim() });
+      if (editing) await api.put(`/task-groups/${editing.id}`, { name: trimmed });
+      else await api.post("/task-groups", { name: trimmed });
       toast.success(editing ? "Grupo atualizado" : "Grupo criado");
       setOpen(false);
       load();
@@ -52,13 +63,17 @@ export default function TaskGroups() {
   };
 
   const remove = async (g) => {
+    if (deletingId === g.id) return; // já há uma remoção deste grupo em curso
     if (!window.confirm(`Eliminar o grupo "${g.name}"? As tarefas associadas ficam sem grupo.`)) return;
+    setDeletingId(g.id);
     try {
       await api.delete(`/task-groups/${g.id}`);
       toast.success("Grupo eliminado");
       load();
     } catch (e) {
       toast.error(getErrorMessage(e, "Erro ao eliminar"));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -103,8 +118,8 @@ export default function TaskGroups() {
                 <button data-testid={`edit-taskgroup-${g.id}`} onClick={() => openEdit(g)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-muted hover:text-foreground active:scale-90">
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button data-testid={`delete-taskgroup-${g.id}`} onClick={() => remove(g)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90">
-                  <Trash2 className="h-4 w-4" />
+                <button data-testid={`delete-taskgroup-${g.id}`} disabled={deletingId === g.id} onClick={() => remove(g)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90 disabled:opacity-50">
+                  {deletingId === g.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                 </button>
               </div>
             </div>

@@ -33,6 +33,10 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("O nome do modelo é obrigatório"); return; }
+    // Um modelo com assunto/corpo vazios não dava erro, mas ao ser inserido
+    // em ComposeEmailDialog apagava silenciosamente o que o utilizador já
+    // tinha escrito (applyTemplate substitui sempre subject/body).
+    if (!form.subject.trim() || !form.body.trim()) { toast.error("Preenche o assunto e a mensagem do modelo."); return; }
     setSaving(true);
     try {
       if (editing?.id) await api.put(`/email-templates/${editing.id}`, form);

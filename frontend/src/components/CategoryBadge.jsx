@@ -1,6 +1,18 @@
-import { getCategory, getStatus } from "@/lib/categories";
+import { CATEGORIES, STATUS, getCategory, getStatus } from "@/lib/categories";
+
+// getCategory/getStatus caem sempre num valor por omissão em vez de
+// devolver null — sem isto, uma categoria/estado desconhecido (typo,
+// migração de dados incompleta) mostrava-se silenciosamente como
+// "Construção"/"Aberto", escondendo o problema em vez de o assinalar.
+function warnIfUnknown(map, key, kind) {
+  if (process.env.NODE_ENV !== "production" && key && !map[key]) {
+    // eslint-disable-next-line no-console
+    console.warn(`[CategoryBadge] ${kind} desconhecido: "${key}" — a mostrar o valor por omissão.`);
+  }
+}
 
 export const CategoryBadge = ({ category, size = "sm" }) => {
+  warnIfUnknown(CATEGORIES, category, "categoria");
   const c = getCategory(category);
   const Icon = c.icon;
   const pad = size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs";
@@ -17,6 +29,7 @@ export const CategoryBadge = ({ category, size = "sm" }) => {
 };
 
 export const StatusPill = ({ status }) => {
+  warnIfUnknown(STATUS, status, "estado");
   const s = getStatus(status);
   return (
     <span

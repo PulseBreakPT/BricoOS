@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
@@ -26,12 +26,23 @@ import { toast } from "sonner";
 
 const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", labels: [], contacts: [] };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PHONE_DIGITS = 9;
+const MAX_CONTACTS = 10;
+
+// Reutilizados nas validações do fornecedor e de cada contacto extra — assim
+// o limiar de "telefone incompleto" e o formato de email só existem numa
+// única definição, em vez de espalhados por vários pontos do ficheiro.
+const isValidPhoneDigits = (phone) => (phone || "").replace(/\D/g, "").length >= MIN_PHONE_DIGITS;
+const isValidEmail = (email) => EMAIL_RX.test(email);
 
 // Formato internacional (com indicativo) do PhoneInput → link de WhatsApp.
 // Números antigos sem indicativo assumem Portugal, tal como o "tel:".
 function waLink(phone) {
-  const digits = (phone || "").replace(/\D/g, "");
-  if (!digits) return null;
+  // Números legados/mal formados (menos dígitos do que um telefone real)
+  // geravam um link wa.me quebrado — mais vale não mostrar o atalho do que
+  // mostrar um que dá erro ao abrir.
+  if (!isValidPhoneDigits(phone)) return null;
+  const digits = phone.replace(/\D/g, "");
   return `https://wa.me/${phone.trim().startsWith("+") ? digits : `351${digits}`}`;
 }
 
@@ -65,12 +76,17 @@ export default function Suppliers() {
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const { data } = await api.get("/suppliers");
+      if (seq !== loadSeq.current) return;
       setSuppliers(data);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       toast.error(getErrorMessage(e, "Erro ao carregar fornecedores"));
     }
   }, []);
@@ -85,19 +101,26 @@ export default function Suppliers() {
     setOpen(true);
   };
 
-  const addContact = () => setForm((f) => ({ ...f, contacts: [...(f.contacts || []), { name: "", phone: "", email: "" }] }));
+  const addContact = () => setForm((f) => {
+    if ((f.contacts || []).length >= MAX_CONTACTS) {
+      toast.error(`Máximo de ${MAX_CONTACTS} contactos extra por fornecedor.`);
+      return f;
+    }
+    return { ...f, contacts: [...(f.contacts || []), { name: "", phone: "", email: "" }] };
+  });
   const updateContact = (i, k, v) => setForm((f) => ({
     ...f, contacts: f.contacts.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)),
   }));
   const removeContact = (i) => setForm((f) => ({ ...f, contacts: f.contacts.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
+    if (saving) return; // Enter repetido/duplo clique não deve disparar dois guardados concorrentes
     if (!form.name.trim()) { toast.error("Indica o nome do fornecedor."); return; }
-    if (form.email && !EMAIL_RX.test(form.email.trim())) {
+    if (form.email && !isValidEmail(form.email.trim())) {
       toast.error("O email do fornecedor não parece válido.");
       return;
     }
-    if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
+    if (form.phone && !isValidPhoneDigits(form.phone)) {
       toast.error("O telefone do fornecedor parece incompleto.");
       return;
     }
@@ -105,11 +128,11 @@ export default function Suppliers() {
       .map((c) => ({ name: (c.name || "").trim(), phone: (c.phone || "").trim(), email: (c.email || "").trim() }))
       .filter((c) => c.name || c.phone || c.email);
     for (const c of contacts) {
-      if (c.phone && c.phone.replace(/\D/g, "").length < 9) {
+      if (c.phone && !isValidPhoneDigits(c.phone)) {
         toast.error(`O telefone de ${c.name || "contacto"} parece incompleto.`);
         return;
       }
-      if (c.email && !EMAIL_RX.test(c.email)) {
+      if (c.email && !isValidEmail(c.email)) {
         toast.error(`O email de ${c.name || "contacto"} não parece válido.`);
         return;
       }
@@ -130,7 +153,9 @@ export default function Suppliers() {
   };
 
   const remove = async (s) => {
+    if (deletingId === s.id) return; // já há uma remoção deste fornecedor em curso
     if (!window.confirm(`Mover o fornecedor "${s.name}" para a lixeira? Podes restaurá-lo depois, na Lixeira.`)) return;
+    setDeletingId(s.id);
     try {
       await api.delete(`/suppliers/${s.id}`);
       toast.success("Fornecedor movido para a lixeira");
@@ -153,6 +178,8 @@ export default function Suppliers() {
         return;
       }
       toast.error(getErrorMessage(e, "Erro ao eliminar"));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -176,7 +203,9 @@ export default function Suppliers() {
       <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {suppliers.map((s, idx) => {
           const c = getCategory(s.category);
-          const initials = s.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+          // Um registo antigo/corrompido sem nome não pode derrubar a grelha
+          // inteira — "?" é um resultado degradado, não um crash.
+          const initials = (s.name || "?").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
           return (
             <div
               key={s.id}
@@ -201,8 +230,8 @@ export default function Suppliers() {
                   <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-muted hover:text-foreground active:scale-90">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90">
-                    <Trash2 className="h-4 w-4" />
+                  <button data-testid={`delete-supplier-${s.id}`} disabled={deletingId === s.id} onClick={() => remove(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90 disabled:opacity-50">
+                    {deletingId === s.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
@@ -317,15 +346,15 @@ export default function Suppliers() {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Nome</Label>
-              <Input data-testid="supplier-name" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex.: Alumínios Algarve" />
+              <Input data-testid="supplier-name" value={form.name} onChange={(e) => set("name", e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} placeholder="Ex.: Alumínios Algarve" />
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input data-testid="supplier-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="geral@fornecedor.pt" className="font-mono" />
+              <Input data-testid="supplier-email" value={form.email} onChange={(e) => set("email", e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} placeholder="geral@fornecedor.pt" className="font-mono" />
             </div>
             <div className="space-y-1.5">
               <Label>Telefone principal</Label>
-              <PhoneInput testId="supplier-phone" value={form.phone} onChange={(v) => set("phone", v)} placeholder="912345678" />
+              <PhoneInput testId="supplier-phone" value={form.phone} onChange={(v) => set("phone", v)} onKeyDown={(e) => e.key === "Enter" && save()} placeholder="912345678" />
             </div>
             <div className="space-y-1.5">
               <Label>Secção</Label>

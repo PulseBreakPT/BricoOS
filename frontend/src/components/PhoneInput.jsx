@@ -22,11 +22,19 @@ export const COUNTRY_CODES = [
 
 export const DEFAULT_COUNTRY_CODE = "+351";
 
+// Ordenados uma única vez por comprimento de indicativo (do mais longo para
+// o mais curto) — calcular isto de novo a cada splitPhone() (chamado a cada
+// tecla, via o efeito abaixo) era um sort() desperdiçado sobre uma lista que
+// nunca muda.
+const COUNTRY_CODES_BY_LENGTH = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+const MAX_DIGITS = 15; // limite prático do E.164, generoso para qualquer indicativo suportado
+
 function splitPhone(value) {
-  const v = (value || "").trim();
+  // Um valor não-string (ex.: um número, se algum chamador passar por engano)
+  // fazia .trim() rebentar — normaliza sempre para string primeiro.
+  const v = String(value ?? "").trim();
   if (!v.startsWith("+")) return { country: DEFAULT_COUNTRY_CODE, digits: v };
-  const match = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length)
-    .find((c) => v.startsWith(c.code));
+  const match = COUNTRY_CODES_BY_LENGTH.find((c) => v.startsWith(c.code));
   return match
     ? { country: match.code, digits: v.slice(match.code.length).trim() }
     : { country: DEFAULT_COUNTRY_CODE, digits: v };
@@ -35,7 +43,7 @@ function splitPhone(value) {
 // Campo de telefone com indicativo de país. Guarda sempre o valor combinado
 // (ex.: "+351917100512") no form, para o "tel:" funcionar também com clientes
 // de fora de Portugal.
-export default function PhoneInput({ value, onChange, testId = "input-phone", placeholder = "917100512" }) {
+export default function PhoneInput({ value, onChange, onKeyDown, testId = "input-phone", placeholder = "917100512" }) {
   const [country, setCountry] = useState(DEFAULT_COUNTRY_CODE);
   const [digits, setDigits] = useState("");
   const lastEmitted = useRef();
@@ -69,7 +77,17 @@ export default function PhoneInput({ value, onChange, testId = "input-phone", pl
       <Input
         data-testid={testId}
         value={digits}
-        onChange={(e) => { setDigits(e.target.value); emit(country, e.target.value); }}
+        maxLength={MAX_DIGITS}
+        inputMode="tel"
+        onChange={(e) => {
+          // Só dígitos ficam guardados no valor combinado — sem isto, colar
+          // um número formatado (espaços, hífens) entrava tal e qual no
+          // "tel:" e nas contagens de dígitos usadas para validar noutros sítios.
+          const clean = e.target.value.replace(/\D/g, "").slice(0, MAX_DIGITS);
+          setDigits(clean);
+          emit(country, clean);
+        }}
+        onKeyDown={onKeyDown}
         className="min-w-0 flex-1 font-mono"
         placeholder={placeholder}
       />

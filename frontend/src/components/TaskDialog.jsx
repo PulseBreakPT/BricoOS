@@ -66,6 +66,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   };
 
   const createGroup = async () => {
+    if (creatingGroupBusy) return; // Enter repetido não deve disparar duas criações concorrentes
     if (!newGroupName.trim()) { toast.error("Indica o nome do grupo."); return; }
     setCreatingGroupBusy(true);
     try {
@@ -100,6 +101,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   };
 
   const save = async () => {
+    if (saving) return; // segurar Enter no título não deve disparar dois guardados concorrentes
     if (!form.title.trim()) {
       toast.error("Escreve o título da tarefa.");
       return;

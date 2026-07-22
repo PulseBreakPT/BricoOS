@@ -1,13 +1,16 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Pie, PieChart, Cell } from "recharts";
+import axios from "axios";
+import { toast } from "sonner";
 import {
   ClipboardList, Clock, AlertTriangle, Timer, Mail, ArrowRight, CheckCircle2,
-  Link2, Zap, Trophy, GripVertical, EyeOff, Eye, LayoutGrid,
+  Link2, Zap, Trophy, GripVertical, EyeOff, Eye, LayoutGrid, RefreshCw,
 } from "lucide-react";
-import api, { API } from "@/lib/api";
+import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER } from "@/lib/pedido";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -130,7 +133,10 @@ export default function Dashboard() {
   const [notifs, setNotifs] = useState({ items: [], count: 0 });
   const [gmail, setGmail] = useState({ connected: false, configured: false });
   const [widgetPrefs, setWidgetPrefs] = useState(loadWidgetPrefs);
+  const [loadError, setLoadError] = useState("");
+  const [gmailBusy, setGmailBusy] = useState(false);
   const dragKeyRef = useRef(null);
+  const requestSeq = useRef(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -143,20 +149,53 @@ export default function Dashboard() {
     if (!dragKey || dragKey === targetKey) return;
     setWidgetPrefs((prev) => {
       const next = prev.order.filter((k) => k !== dragKey);
-      next.splice(next.indexOf(targetKey), 0, dragKey);
+      const targetIndex = next.indexOf(targetKey);
+      // Alvo desconhecido (ordem corrompida, chave já não existe) — não
+      // insere às cegas no fim da lista errada, ignora o drop.
+      if (targetIndex === -1) return prev;
+      next.splice(targetIndex, 0, dragKey);
       return { ...prev, order: next };
     });
   };
   const hideWidget = (key) => setWidgetPrefs((prev) => ({ ...prev, hidden: [...prev.hidden, key] }));
   const showWidget = (key) => setWidgetPrefs((prev) => ({ ...prev, hidden: prev.hidden.filter((k) => k !== key) }));
 
-  const load = useCallback(async () => {
-    const [s, n, g] = await Promise.all([
-      api.get("/stats"), api.get("/notifications"), api.get("/gmail/status"),
-    ]);
-    setStats(s.data); setNotifs(n.data); setGmail(g.data);
+  const load = useCallback(async (signal) => {
+    const seq = ++requestSeq.current;
+    try {
+      const [s, n, g] = await Promise.all([
+        api.get("/stats", { signal }), api.get("/notifications", { signal }), api.get("/gmail/status", { signal }),
+      ]);
+      if (seq !== requestSeq.current) return; // resposta ultrapassada por um load() mais recente
+      setStats(s.data); setNotifs(n.data); setGmail(g.data);
+      setLoadError("");
+    } catch (e) {
+      if (axios.isCancel(e) || seq !== requestSeq.current) return;
+      // Antes disto, uma falha em qualquer um dos 3 pedidos (stats, notificações
+      // ou estado do Gmail) rebentava numa promise rejeitada sem apanhar —
+      // o painel ficava em branco para sempre, sem hipótese de tentar de novo.
+      setLoadError(getErrorMessage(e, "Não foi possível carregar o painel."));
+    }
   }, []);
-  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  const disconnectGmail = useCallback(async () => {
+    if (gmailBusy) return; // evita dois cliques rápidos a disparar dois pedidos de disconnect + load
+    setGmailBusy(true);
+    try {
+      await api.post("/gmail/disconnect");
+      await load();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível desligar o Gmail."));
+    } finally {
+      setGmailBusy(false);
+    }
+  }, [gmailBusy, load]);
 
   const today = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   const maxPrio = stats ? Math.max(1, ...Object.values(stats.by_priority)) : 1;
@@ -174,7 +213,16 @@ export default function Dashboard() {
     [pipeline]
   );
 
-  const hiddenWidgets = WIDGETS.filter((w) => widgetPrefs.hidden.includes(w.key));
+  const hiddenWidgets = useMemo(
+    () => WIDGETS.filter((w) => widgetPrefs.hidden.includes(w.key)),
+    [widgetPrefs.hidden],
+  );
+  // Ordem visível final dos widgets — só depende das preferências guardadas,
+  // não precisa de ser recalculada a cada render de stats/notifs/gmail.
+  const orderedWidgets = useMemo(() => {
+    const visible = WIDGETS.filter((w) => widgetPrefs.order.includes(w.key) && !widgetPrefs.hidden.includes(w.key));
+    return widgetPrefs.order.map((key) => visible.find((w) => w.key === key)).filter(Boolean);
+  }, [widgetPrefs.order, widgetPrefs.hidden]);
 
   return (
     <div>
@@ -204,6 +252,15 @@ export default function Dashboard() {
           </DropdownMenu>
         ) : null}
       </div>
+
+      {loadError ? (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-[var(--pastel-red-bg)] p-3 text-sm font-semibold text-[color:var(--pastel-red-text)]">
+          <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 shrink-0" /> {loadError}</span>
+          <Button size="sm" variant="outline" onClick={() => load()} className="h-8 shrink-0 rounded-lg border-red-200 bg-card text-xs text-[color:var(--pastel-red-text)]">
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Tentar novamente
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4">
         <StatCard index={0} testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#7C3AED" />
@@ -341,7 +398,9 @@ export default function Dashboard() {
               {gmail.connected ? (
                 <div className="mt-3">
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-3 text-sm font-medium text-[color:var(--pastel-emerald-text)]"><CheckCircle2 className="h-4 w-4 shrink-0" /><span className="truncate font-mono text-xs">{gmail.email}</span></div>
-                  <Button data-testid="disconnect-gmail-btn" variant="outline" size="sm" onClick={async () => { await api.post("/gmail/disconnect"); load(); }} className="mt-3 w-full rounded-xl">Desligar Gmail</Button>
+                  <Button data-testid="disconnect-gmail-btn" variant="outline" size="sm" disabled={gmailBusy} onClick={disconnectGmail} className="mt-3 w-full rounded-xl">
+                    {gmailBusy ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : null} Desligar Gmail
+                  </Button>
                 </div>
               ) : (
                 <div className="mt-3">
@@ -356,11 +415,9 @@ export default function Dashboard() {
             </div>
           ),
         };
-        const visible = WIDGETS.filter((w) => widgetPrefs.order.includes(w.key) && !widgetPrefs.hidden.includes(w.key));
-        const ordered = widgetPrefs.order.map((key) => visible.find((w) => w.key === key)).filter(Boolean);
         return (
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-flow-dense lg:grid-cols-3">
-            {ordered.map((w) => (
+            {orderedWidgets.map((w) => (
               <DashboardWidget
                 key={w.key}
                 widgetKey={w.key}

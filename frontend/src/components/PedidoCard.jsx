@@ -48,6 +48,10 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
   const st = getStatusCfg(note.status);
   const pr = getPriorityCfg(note.priority);
   const archived = note.archived;
+  // actions.advance já está protegida contra chamadas concorrentes (ver
+  // guardAction em Notes.jsx) — isActionBusy só torna essa proteção visível
+  // aqui, para o botão não parecer sem resposta enquanto o pedido está em curso.
+  const advancing = !!actions.isActionBusy?.(note.id, "advance");
 
   const stop = (fn) => (e) => { e.stopPropagation(); fn(note); };
 
@@ -178,8 +182,8 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
         {note.next_status && !archived ? (
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
             <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground"><span className="font-bold text-foreground">Próximo:</span> {note.next_action}</p>
-            <button data-testid={`advance-${note.id}`} onClick={stop(actions.advance)} className="group/cta inline-flex shrink-0 items-center gap-1 rounded-lg bg-foreground px-2.5 py-1.5 text-xs font-bold text-background shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-md active:scale-95">
-              {getNextActionCta(note)} <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover/cta:translate-x-0.5" />
+            <button data-testid={`advance-${note.id}`} disabled={advancing} onClick={stop(actions.advance)} className="group/cta inline-flex shrink-0 items-center gap-1 rounded-lg bg-foreground px-2.5 py-1.5 text-xs font-bold text-background shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-md active:scale-95 disabled:opacity-60">
+              {getNextActionCta(note)} <ArrowRight className={`h-3.5 w-3.5 transition-transform duration-150 ${advancing ? "animate-pulse" : "group-hover/cta:translate-x-0.5"}`} />
             </button>
           </div>
         ) : null}

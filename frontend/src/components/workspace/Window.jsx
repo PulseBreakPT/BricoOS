@@ -7,7 +7,7 @@ import {
   PanelLeft,
   PanelRight,
 } from "lucide-react";
-import { useWorkspace } from "@/context/WorkspaceContext";
+import { useWorkspace, MIN_PANEL_W, MIN_PANEL_H } from "@/context/WorkspaceContext";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import {
   SIDEBAR_WIDTH,
@@ -16,8 +16,11 @@ import {
   WORKSPACE_GAP,
 } from "@/lib/workspaceLayout";
 
-const MIN_W = 420;
-const MIN_H = 320;
+// MIN_PANEL_W/MIN_PANEL_H vêm do WorkspaceContext — é lá que o reducer
+// também aplica o mesmo mínimo ao RESIZE_PANEL; manter duas constantes
+// locais separadas arriscava as duas divergirem com o tempo.
+const MIN_W = MIN_PANEL_W;
+const MIN_H = MIN_PANEL_H;
 const SPLIT_FRACTIONS = [0.5, 0.33, 0.25];
 
 function getWorkspaceMetrics() {

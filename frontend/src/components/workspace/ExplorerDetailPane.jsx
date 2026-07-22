@@ -44,7 +44,11 @@ function PedidoDetailSection({ item, onNavigate }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get(`/notes/${item.id}/activities`).then(({ data }) => setActivities((data || []).slice(0, 6))).catch(() => setActivities([]));
+    let alive = true;
+    api.get(`/notes/${item.id}/activities`)
+      .then(({ data }) => { if (alive) setActivities((data || []).slice(0, 6)); })
+      .catch(() => { if (alive) setActivities([]); });
+    return () => { alive = false; };
   }, [item.id]);
 
   return (
@@ -144,19 +148,24 @@ function FicheiroDetailSection({ item, onNavigate }) {
   const kind = previewKind(f.filename, f.content_type);
 
   useEffect(() => {
+    let alive = true;
     setVersions(null);
-    if ((f.version_count || 1) <= 1) return;
+    if ((f.version_count || 1) <= 1) return undefined;
     if (f.source === "attachment") {
-      api.get(`/attachments/${f.id}/versions`).then(({ data }) => setVersions(data)).catch(() => setVersions([]));
+      api.get(`/attachments/${f.id}/versions`)
+        .then(({ data }) => { if (alive) setVersions(data); })
+        .catch(() => { if (alive) setVersions([]); });
     } else if (f.source === "note_file" && f.note_id) {
       api.get("/explorer/files", { params: { scope: `note:${f.note_id}` } })
-        .then(({ data }) => setVersions((data.items || []).filter((v) => v.kind_label === f.kind_label).sort((a, b) => a.version - b.version)))
-        .catch(() => setVersions([]));
+        .then(({ data }) => { if (alive) setVersions((data.items || []).filter((v) => v.kind_label === f.kind_label).sort((a, b) => a.version - b.version)); })
+        .catch(() => { if (alive) setVersions([]); });
     }
+    return () => { alive = false; };
   }, [f.id, f.version_count, f.source, f.note_id, f.kind_label]);
 
   const canUploadVersion = f.source === "attachment";
   const uploadNewVersion = async (fileList) => {
+    if (uploading) return;
     const file = fileList?.[0];
     if (!file) return;
     setUploading(true);
@@ -225,18 +234,25 @@ const TRASH_RESTORE = {
 
 function LixeiraDetailSection({ item }) {
   const it = item.data;
+  const [restoring, setRestoring] = useState(false);
   const restore = async () => {
+    if (restoring) return;
+    setRestoring(true);
     try {
       await api.post(TRASH_RESTORE[it.kind](it.id));
       toast.success("Restaurado");
-    } catch (e) { toast.error(getErrorMessage(e, "Não foi possível restaurar")); }
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível restaurar"));
+    } finally {
+      setRestoring(false);
+    }
   };
   return (
     <div className="space-y-3">
       <Field label="Tipo" value={it.kind} />
       <Field label="Detalhe" value={it.sublabel} />
-      <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" onClick={restore}>
-        <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Restaurar
+      <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={restoring} onClick={restore}>
+        {restoring ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <RotateCcw className="mr-1.5 h-3.5 w-3.5" />} Restaurar
       </Button>
     </div>
   );

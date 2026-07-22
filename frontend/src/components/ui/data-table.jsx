@@ -47,6 +47,14 @@ function DataTable({
     initialState: { pagination: { pageSize } },
   })
 
+  // `initialState` só é lido no primeiro render do tanstack table — sem
+  // isto, mudar a prop `pageSize` depois de montado ficava sem efeito
+  // nenhum, uma armadilha comum ao reutilizar este componente.
+  React.useEffect(() => {
+    table.setPageSize(pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize])
+
   return (
     <div className={className}>
       <div className="rounded-md border">

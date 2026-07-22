@@ -9,16 +9,8 @@ import {
 import api from "@/lib/api";
 import { isOverdue, isToday } from "@/lib/taskMeta";
 import { useSystemStatus } from "@/context/SystemStatusContext";
+import { useClock } from "@/hooks/useClock";
 import { timeAgo } from "@/lib/pedido";
-
-function useClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 // Mini-calendário do mês atual desenhado à mão (sem dependências): hoje em
 // destaque e um ponto vermelho nos dias com tarefas por fazer.

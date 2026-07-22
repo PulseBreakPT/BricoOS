@@ -42,6 +42,7 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
   const { openPanel, setActiveContext } = useWorkspace();
   const isDesktop = useIsDesktop();
   const timer = useRef(null);
+  const searchSeq = useRef(0);
 
   useEffect(() => {
     if (!open) { setQ(""); setResults(null); }
@@ -53,13 +54,17 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
     if (term.length < 2) { setResults(null); setLoading(false); return undefined; }
     setLoading(true);
     timer.current = setTimeout(async () => {
+      // Uma pesquisa mais lenta pode ainda estar em curso quando outra mais
+      // recente responde primeiro — sem sequência, a mais lenta podia chegar
+      // depois e substituir resultados já mais atuais.
+      const seq = ++searchSeq.current;
       try {
         const { data } = await api.get("/search", { params: { q: term } });
-        setResults(data);
+        if (seq === searchSeq.current) setResults(data);
       } catch {
-        setResults(null);
+        if (seq === searchSeq.current) setResults(null);
       } finally {
-        setLoading(false);
+        if (seq === searchSeq.current) setLoading(false);
       }
     }, 300);
     return () => clearTimeout(timer.current);

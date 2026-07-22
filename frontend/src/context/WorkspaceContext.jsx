@@ -12,10 +12,17 @@ import {
   SYSTEM_BAR_HEIGHT,
   WORKSPACE_GAP,
 } from "@/lib/workspaceLayout";
+import { PANEL_TYPES } from "@/lib/panelRegistry";
 
 const STORAGE_KEY = "brico_workspace_v1";
 const DEFAULT_W = 880;
 const DEFAULT_H = 600;
+// Fonte única de verdade para o tamanho mínimo de uma janela — Window.jsx
+// importa estas constantes em vez de manter os seus próprios mínimos, para
+// os dois nunca poderem divergir.
+export const MIN_PANEL_W = 420;
+export const MIN_PANEL_H = 320;
+const MAX_SAVED_WORKSPACES = 20;
 
 function loadPersisted() {
   try {
@@ -27,6 +34,36 @@ function loadPersisted() {
   } catch {
     return null;
   }
+}
+
+// Painéis persistidos podem referir-se a um "type" que já não existe no
+// registo (uma app removida, ou o código mudou entretanto) — sem isto, a
+// área de trabalho tentava renderizar um painel fantasma e partia. Também
+// repõe x/y/w/h para números válidos, caso o esquema guardado seja antigo
+// ou tenha sido corrompido (localStorage editado à mão, quota parcial, etc.).
+function sanitizePanels(panels) {
+  if (!Array.isArray(panels)) return [];
+  return panels
+    .filter((p) => p && typeof p.id === "string" && PANEL_TYPES[p.type])
+    .map((p) => ({
+      ...p,
+      x: Number.isFinite(p.x) ? p.x : 0,
+      y: Number.isFinite(p.y) ? p.y : SYSTEM_BAR_HEIGHT + WORKSPACE_GAP,
+      w: Number.isFinite(p.w) ? Math.max(MIN_PANEL_W, p.w) : DEFAULT_W,
+      h: Number.isFinite(p.h) ? Math.max(MIN_PANEL_H, p.h) : DEFAULT_H,
+      minimized: !!p.minimized,
+      maximized: !!p.maximized,
+    }));
+}
+
+// zOrder pode ficar dessincronizado de panels após sanitizePanels() remover
+// entradas inválidas — isto repõe a invariante "todo o painel tem uma
+// posição no zOrder e vice-versa" sem depender de quem chamou.
+function sanitizeZOrder(zOrder, panels) {
+  const ids = new Set(panels.map((p) => p.id));
+  const filtered = (Array.isArray(zOrder) ? zOrder : []).filter((id) => ids.has(id));
+  const missing = panels.map((p) => p.id).filter((id) => !filtered.includes(id));
+  return [...filtered, ...missing];
 }
 
 const initialState = {
@@ -120,15 +157,25 @@ function reducer(state, action) {
     case "MOVE_PANEL":
       return {
         ...state,
-        panels: state.panels.map((p) =>
-          p.id === action.id ? { ...p, x: action.x, y: action.y } : p,
-        ),
+        panels: state.panels.map((p) => {
+          if (p.id !== action.id) return p;
+          // Nunca deixa a janela "perder-se" fora do ecrã: fica sempre pelo
+          // menos uma faixa agarrável visível, mesmo que o dispatch venha de
+          // um caminho que não passou pelo clamp ao vivo do arrasto em Window.jsx.
+          return {
+            ...p,
+            x: Math.max(-(p.w - 80), action.x),
+            y: Math.max(SYSTEM_BAR_HEIGHT, action.y),
+          };
+        }),
       };
     case "RESIZE_PANEL":
       return {
         ...state,
         panels: state.panels.map((p) =>
-          p.id === action.id ? { ...p, w: action.w, h: action.h } : p,
+          p.id === action.id
+            ? { ...p, w: Math.max(MIN_PANEL_W, action.w), h: Math.max(MIN_PANEL_H, action.h) }
+            : p,
         ),
       };
     case "TOGGLE_MINIMIZE":
@@ -180,26 +227,35 @@ function reducer(state, action) {
     case "SAVE_WORKSPACE": {
       const snapshot = {
         id: action.id || `ws-${Date.now().toString(36)}`,
-        name: action.name,
+        // Nome em branco confundia o seletor de áreas de trabalho com várias
+        // entradas sem texto nenhum — cai sempre num nome distinguível.
+        name: (action.name || "").trim() || `Área de trabalho ${state.workspaces.length + 1}`,
         panels: state.panels,
         zOrder: state.zOrder,
       };
       return {
         ...state,
+        // Limite ao número de áreas de trabalho guardadas — sem isto, o
+        // localStorage cresce sem fim ao longo de meses de uso; mantém-se
+        // só as mais recentes.
         workspaces: [
           ...state.workspaces.filter((w) => w.id !== snapshot.id),
           snapshot,
-        ],
+        ].slice(-MAX_SAVED_WORKSPACES),
       };
     }
     case "LOAD_WORKSPACE": {
       const ws = state.workspaces.find((w) => w.id === action.id);
       if (!ws) return state;
+      // Mesma sanitização do arranque — uma área de trabalho guardada há
+      // meses pode referir-se a um tipo de painel entretanto removido.
+      const panels = sanitizePanels(ws.panels);
+      const zOrder = sanitizeZOrder(ws.zOrder, panels);
       return {
         ...state,
-        panels: ws.panels,
-        zOrder: ws.zOrder,
-        activeId: ws.zOrder[ws.zOrder.length - 1] || null,
+        panels,
+        zOrder,
+        activeId: zOrder[zOrder.length - 1] || null,
       };
     }
     case "DELETE_WORKSPACE":
@@ -218,12 +274,16 @@ export function WorkspaceProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState, (init) => {
     const persisted = loadPersisted();
     if (!persisted) return init;
+    const panels = sanitizePanels(persisted.panels);
     return {
       ...init,
-      panels: persisted.panels || [],
-      zOrder: persisted.zOrder || [],
+      panels,
+      zOrder: sanitizeZOrder(persisted.zOrder, panels),
       activeContext: persisted.activeContext || null,
-      workspaces: persisted.workspaces || [],
+      // As áreas de trabalho guardadas só são validadas quando carregadas
+      // (LOAD_WORKSPACE) — sanitizar aqui seria trabalho a mais para
+      // snapshots que talvez nunca cheguem a ser abertos.
+      workspaces: Array.isArray(persisted.workspaces) ? persisted.workspaces : [],
     };
   });
 
@@ -231,25 +291,44 @@ export function WorkspaceProvider({ children }) {
   // do PIN por dispositivo, por isso localStorage chega (mesma lógica do
   // device_token já usado no resto da app).
   const saveTimer = useRef(null);
+  const persistNow = useCallback(() => {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          panels: state.panels,
+          zOrder: state.zOrder,
+          activeContext: state.activeContext,
+          workspaces: state.workspaces,
+        }),
+      );
+    } catch {
+      /* quota cheia ou modo privado — a app continua a funcionar sem persistir */
+    }
+  }, [state.panels, state.zOrder, state.activeContext, state.workspaces]);
+
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            panels: state.panels,
-            zOrder: state.zOrder,
-            activeContext: state.activeContext,
-            workspaces: state.workspaces,
-          }),
-        );
-      } catch {
-        /* quota cheia ou modo privado — a app continua a funcionar sem persistir */
-      }
-    }, 250);
+    saveTimer.current = setTimeout(persistNow, 250);
     return () => clearTimeout(saveTimer.current);
-  }, [state.panels, state.zOrder, state.activeContext, state.workspaces]);
+  }, [persistNow]);
+
+  // O debounce de 250ms perde-se se a aba fechar antes de disparar — grava
+  // de imediato ao sair, para não perder a última janela movida/redimensionada.
+  useEffect(() => {
+    const flush = () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        persistNow();
+      }
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [persistNow]);
 
   const openPanel = useCallback(
     (panelType, opts) =>

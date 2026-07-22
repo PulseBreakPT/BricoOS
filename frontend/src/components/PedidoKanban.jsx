@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { MoreVertical, Phone, AlertTriangle } from "lucide-react";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg, timeAgo } from "@/lib/pedido";
 import {
@@ -21,7 +22,7 @@ function KanbanPeekContent({ note, cfg }) {
   );
 }
 
-function KanbanCard({ note, onOpen, onMove }) {
+function KanbanCard({ note, onOpen, onMove, moving }) {
   const pr = getPriorityCfg(note.priority);
   const stCfg = getStatusCfg(note.status);
   return (
@@ -38,10 +39,11 @@ function KanbanCard({ note, onOpen, onMove }) {
             <DropdownMenuTrigger asChild>
               <button
                 data-testid={`kanban-move-${note.id}`}
+                disabled={moving}
                 onClick={(e) => e.stopPropagation()}
-                className="shrink-0 rounded-lg p-0.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
+                className="shrink-0 rounded-lg p-0.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground disabled:opacity-50"
               >
-                <MoreVertical className="h-4 w-4" />
+                <MoreVertical className={`h-4 w-4 ${moving ? "animate-pulse" : ""}`} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -84,12 +86,20 @@ function KanbanCard({ note, onOpen, onMove }) {
 // Vista Kanban dos pedidos — colunas por estado. Sem drag-and-drop (evita
 // gestos frágeis em ecrãs táteis); mudar de coluna é feito pelo menu "⋮" de
 // cada cartão, que usa o mesmo PATCH /notes/{id}/status de sempre.
-export default function PedidoKanban({ items, onOpen, onMove }) {
+export default function PedidoKanban({ items, onOpen, onMove, isActionBusy }) {
+  // Agrupa uma única vez em vez de filtrar a lista inteira uma vez por
+  // coluna (STATUS_ORDER.length passagens sobre os mesmos "items").
+  const byStatus = useMemo(() => {
+    const groups = {};
+    for (const n of items) (groups[n.status] ||= []).push(n);
+    return groups;
+  }, [items]);
+
   return (
     <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-1 sm:px-1">
       {STATUS_ORDER.map((status) => {
         const cfg = getStatusCfg(status);
-        const notes = items.filter((n) => n.status === status);
+        const notes = byStatus[status] || [];
         return (
           <div key={status} data-testid={`kanban-column-${status}`} className="flex w-64 shrink-0 flex-col rounded-2xl bg-muted sm:w-72">
             <div className="flex items-center gap-2 rounded-t-2xl border-b border-border px-3 py-2.5">
@@ -101,7 +111,7 @@ export default function PedidoKanban({ items, onOpen, onMove }) {
               {notes.length === 0 ? (
                 <p className="p-3 text-center text-[11px] text-muted-foreground">Sem pedidos</p>
               ) : notes.map((note) => (
-                <KanbanCard key={note.id} note={note} onOpen={onOpen} onMove={onMove} />
+                <KanbanCard key={note.id} note={note} onOpen={onOpen} onMove={onMove} moving={!!isActionBusy?.(note.id, "status")} />
               ))}
             </div>
           </div>
