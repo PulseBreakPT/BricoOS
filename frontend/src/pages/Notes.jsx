@@ -741,9 +741,20 @@ export default function Notes() {
           de entrada de página (.animate-page-enter). Assim, o seu
           "position: fixed" prende-se sempre à janela do browser — nunca a um
           ancestral com transform/filter — e mantém-se visível em qualquer
-          scroll, seja qual for a altura da lista. */}
+          scroll, seja qual for a altura da lista. Em mobile fica sempre
+          acima do dock (folga + safe-area); em desktop o posicionamento é
+          gerido por .os-page-fab no index.css, por breakpoint. */}
       {createPortal(
-        <button data-testid="fab-new-note" onClick={openNew} aria-label="Criar novo pedido" title="Criar novo pedido (N)" className="os-page-fab group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-95 lg:h-16 lg:w-16">
+        <button
+          data-testid="fab-new-note"
+          onClick={() => {
+            haptics.tap();
+            openNew();
+          }}
+          aria-label="Criar novo pedido"
+          title="Criar novo pedido (N)"
+          className="os-page-fab group fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 select-none touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-150 will-change-transform hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-90 active:duration-75 lg:h-16 lg:w-16"
+        >
           <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
         </button>,
         document.body,

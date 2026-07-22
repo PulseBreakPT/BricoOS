@@ -299,7 +299,7 @@ export default function Window({ panel, zIndex }) {
     <div
       data-testid={`window-${panel.type}`}
       onPointerDownCapture={() => focusPanel(panel.id)}
-      className={`os-floating-window themed-surface pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-[22px] border bg-white ${isActive ? "elev-window-active border-white/20" : "elev-window border-white/10"}`}
+      className={`os-floating-window themed-surface pointer-events-auto absolute flex animate-window-in flex-col overflow-hidden rounded-[22px] border bg-white ${isActive ? "elev-window-active border-neutral-900/[0.14]" : "elev-window border-neutral-900/[0.08]"}`}
       style={style}
     >
       {/* Barra de título — a moldura grafite da máquina a segurar a folha
@@ -311,17 +311,17 @@ export default function Window({ panel, zIndex }) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onDoubleClick={() => toggleMaximize(panel.id)}
-        className={`os-primary-titlebar flex h-12 shrink-0 cursor-grab items-center gap-2 border-b border-black/40 px-2.5 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
+        className={`os-primary-titlebar flex h-12 shrink-0 cursor-grab items-center gap-2 border-b border-neutral-900/[0.08] px-2.5 transition-opacity duration-200 active:cursor-grabbing ${isActive ? "" : "opacity-75"}`}
       >
         {Icon ? (
-          <span className="os-window-app-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10">
+          <span className="os-window-app-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neutral-900/10">
             <Icon
-              className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}
+              className={`h-3.5 w-3.5 ${isActive ? "text-neutral-900" : "text-[color:var(--chrome-muted)]"}`}
             />
           </span>
         ) : null}
         <p
-          className={`min-w-0 flex-1 truncate text-xs font-bold ${isActive ? "text-white" : "text-[color:var(--chrome-muted)]"}`}
+          className={`min-w-0 flex-1 truncate text-xs font-bold ${isActive ? "text-neutral-900" : "text-[color:var(--chrome-muted)]"}`}
         >
           {meta.title}
         </p>
@@ -331,7 +331,7 @@ export default function Window({ panel, zIndex }) {
           onClick={() => snapTo("left")}
           title="Ancorar à esquerda — toca outra vez para 50% / 33% / 25%"
           aria-label="Ancorar janela à esquerda"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-neutral-900/[0.06] hover:text-neutral-900"
         >
           <PanelLeft className="h-3.5 w-3.5" />
         </button>
@@ -341,11 +341,11 @@ export default function Window({ panel, zIndex }) {
           onClick={() => snapTo("right")}
           title="Ancorar à direita — toca outra vez para 50% / 33% / 25%"
           aria-label="Ancorar janela à direita"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-white/10 hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[color:var(--chrome-muted)] transition-colors hover:bg-neutral-900/[0.06] hover:text-neutral-900"
         >
           <PanelRight className="h-3.5 w-3.5" />
         </button>
-        <span className="mx-0.5 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
+        <span className="mx-0.5 h-5 w-px bg-neutral-900/10" aria-hidden="true" />
         <div className="flex shrink-0 items-center gap-0.5" aria-label="Controlos da janela">
           <button
             data-window-btn

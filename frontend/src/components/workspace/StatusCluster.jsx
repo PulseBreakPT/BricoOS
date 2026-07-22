@@ -23,7 +23,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
     return (
       <div
         data-testid="system-status"
-        className="flex min-w-0 items-center gap-2.5 text-[10px] font-bold text-white/50"
+        className="flex min-w-0 items-center gap-2.5 text-[10px] font-bold text-neutral-500"
       >
         <span
           className="flex items-center gap-1.5"
@@ -40,12 +40,12 @@ export default function StatusCluster({ variant = "sidebar" }) {
             title={`${status.emails_nao_vistos} emails por ver · ${status.pedidos_ativos} pedidos ativos`}
           >
             <Mail className="h-3 w-3" /> {status.emails_nao_vistos}
-            <span className="text-white/20">·</span>
+            <span className="text-neutral-300">·</span>
             <ClipboardList className="h-3 w-3" /> {status.pedidos_ativos}
           </span>
         ) : null}
         <span
-          className="whitespace-nowrap text-right font-mono text-[11px] font-extrabold tabular-nums text-white/90"
+          className="whitespace-nowrap text-right font-mono text-[11px] font-extrabold tabular-nums text-neutral-900"
           title={now.toLocaleDateString("pt-PT", {
             weekday: "long",
             day: "numeric",
@@ -65,7 +65,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
     return (
       <div
         data-testid="desktop-status"
-        className="rounded-2xl border border-white/10 bg-black/25 p-4 text-white shadow-2xl backdrop-blur-xl"
+        className="rounded-2xl border border-neutral-900/[0.08] bg-white/70 p-4 text-neutral-900 shadow-[0_24px_60px_-28px_rgba(16,17,20,0.4)] backdrop-blur-xl"
       >
         <div className="flex items-start justify-between gap-5">
           <div>
@@ -75,7 +75,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
                 minute: "2-digit",
               })}
             </p>
-            <p className="mt-0.5 text-[11px] font-semibold capitalize text-white/45">
+            <p className="mt-0.5 text-[11px] font-semibold capitalize text-neutral-500">
               {now.toLocaleDateString("pt-PT", {
                 weekday: "long",
                 day: "numeric",
@@ -83,23 +83,23 @@ export default function StatusCluster({ variant = "sidebar" }) {
               })}
             </p>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[10px] font-bold text-white/65">
+          <span className="flex items-center gap-1.5 rounded-full border border-neutral-900/10 bg-neutral-900/[0.04] px-2 py-1 text-[10px] font-bold text-neutral-600">
             <span className={`led ${online ? "led-ok" : "led-alert"}`} />{" "}
             {online ? "Sistema online" : "Sem ligação"}
           </span>
         </div>
         {status ? (
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-white/[0.06] p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/35">
+            <div className="rounded-xl bg-neutral-900/[0.04] p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                 <ClipboardList className="h-3 w-3" /> Pedidos
               </div>
               <p className="mt-1 font-mono text-xl font-black tabular-nums">
                 {status.pedidos_ativos}
               </p>
             </div>
-            <div className="rounded-xl bg-white/[0.06] p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/35">
+            <div className="rounded-xl bg-neutral-900/[0.04] p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                 <Mail className="h-3 w-3" /> Por ver
               </div>
               <p className="mt-1 font-mono text-xl font-black tabular-nums">
@@ -120,7 +120,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
       <div className="flex items-center justify-between">
         <span
           data-testid="sidebar-clock"
-          className="font-mono tabular-nums text-white"
+          className="font-mono tabular-nums text-neutral-900"
           title={now.toLocaleDateString("pt-PT", {
             weekday: "long",
             day: "numeric",

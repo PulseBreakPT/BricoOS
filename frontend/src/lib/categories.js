@@ -1,6 +1,6 @@
 import { Hammer, Wrench, Sofa, Flower2 } from "lucide-react";
 
-// bg/text/border usam variáveis CSS (index.css, :root + [data-theme="dark"])
+// bg/text/border usam variáveis CSS (index.css, :root — tema claro único)
 // — os badges de categoria/estado, usados um pouco por toda a app via
 // inline style, trocam de tom sozinhos com o tema. O "accent" fica vivo em
 // hex fixo: só é usado no estado "selecionado" (fundo sólido) e lê bem em

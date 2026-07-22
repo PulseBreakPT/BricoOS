@@ -49,7 +49,6 @@ import MobileHomeSurface from "@/components/workspace/MobileHomeSurface";
 import MobileSystemDock from "@/components/workspace/MobileSystemDock";
 import OperationalRibbon from "@/components/workspace/OperationalRibbon";
 import SystemBar from "@/components/workspace/SystemBar";
-import ThemeToggle from "@/components/workspace/ThemeToggle";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
 
@@ -368,21 +367,10 @@ function MobileNavigation({
   );
 }
 
+/* Atalhos do ambiente de trabalho — apenas ferramentas que NÃO existem no
+   dock (painéis de sistema). As aplicações de rota (Pedidos, Correio, etc.)
+   e o lançador vivem exclusivamente no dock, sem ícones duplicados. */
 const SHORTCUTS = [
-  {
-    kind: "route",
-    target: "/",
-    label: "Pedidos",
-    icon: ClipboardList,
-    color: "from-slate-700 to-black",
-  },
-  {
-    kind: "route",
-    target: "/emails",
-    label: "Correio",
-    icon: Mail,
-    color: "from-sky-500 to-blue-700",
-  },
   {
     kind: "panel",
     target: "explorer",
@@ -399,7 +387,7 @@ const SHORTCUTS = [
   },
 ];
 
-function DesktopSurface({ visible, onOpenRoute, onOpenPanel, onOpenLauncher }) {
+function DesktopSurface({ visible, onOpenPanel }) {
   return (
     <div
       className="os-desktop-surface fixed inset-0 z-0 hidden overflow-hidden lg:block"
@@ -409,23 +397,23 @@ function DesktopSurface({ visible, onOpenRoute, onOpenPanel, onOpenLauncher }) {
         aria-hidden="true"
         className="os-wallpaper-mark absolute left-[44%] top-[46%] -translate-x-1/2 -translate-y-1/2 select-none text-center"
       >
-        <p className="font-heading text-[clamp(4rem,9vw,9rem)] font-black tracking-[-0.08em] text-white/[0.04]">
+        <p className="font-heading text-[clamp(4rem,9vw,9rem)] font-black tracking-[-0.08em] text-neutral-900/[0.05]">
           BRICO/OS
         </p>
-        <p className="-mt-5 text-[9px] font-black uppercase tracking-[0.72em] text-white/[0.11]">
+        <p className="-mt-5 text-[9px] font-black uppercase tracking-[0.72em] text-neutral-900/[0.16]">
           operations workstation
         </p>
       </div>
 
       <div
         aria-hidden="true"
-        className="absolute bottom-28 left-6 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-white/15"
+        className="absolute bottom-28 left-6 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-neutral-900/25"
       >
         Workspace 01 · Grid 48 · PT
       </div>
       <div
         aria-hidden="true"
-        className="absolute right-7 top-20 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-white/15"
+        className="absolute right-7 top-20 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-neutral-900/25"
       >
         Live surface · 2026
       </div>
@@ -439,49 +427,30 @@ function DesktopSurface({ visible, onOpenRoute, onOpenPanel, onOpenLauncher }) {
                 <button
                   type="button"
                   key={`${shortcut.kind}-${shortcut.target}`}
-                  onClick={() =>
-                    shortcut.kind === "route"
-                      ? onOpenRoute(shortcut.target)
-                      : onOpenPanel(shortcut.target)
-                  }
-                  className="group flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2 text-center text-white/80 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:bg-white/10"
+                  onClick={() => onOpenPanel(shortcut.target)}
+                  className="group flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2 text-center text-neutral-700 transition-colors hover:bg-neutral-900/[0.05] hover:text-neutral-900 focus-visible:bg-neutral-900/[0.06]"
                 >
                   <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-[16px] border border-white/20 bg-gradient-to-br ${shortcut.color} text-white shadow-[0_16px_28px_-13px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.22)] transition-transform group-hover:scale-105`}
+                    className={`flex h-12 w-12 items-center justify-center rounded-[16px] border border-white/25 bg-gradient-to-br ${shortcut.color} text-white shadow-[0_16px_28px_-13px_rgba(16,17,20,0.4),inset_0_1px_0_rgba(255,255,255,0.22)] transition-transform group-hover:scale-105`}
                   >
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span className="max-w-full truncate text-[11px] font-bold drop-shadow-md">
+                  <span className="max-w-full truncate text-[11px] font-bold">
                     {shortcut.label}
                   </span>
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={onOpenLauncher}
-              className="group flex w-24 flex-col items-center gap-1.5 rounded-2xl p-2 text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white"
-            >
-              <span className="grid h-12 w-12 grid-cols-2 place-content-center gap-1 rounded-[16px] border border-white/15 bg-white/[0.08] p-3 shadow-xl backdrop-blur-xl">
-                {[0, 1, 2, 3].map((n) => (
-                  <span
-                    key={n}
-                    className={`h-2.5 w-2.5 rounded-[4px] ${n === 0 ? "bg-red-500" : n === 3 ? "bg-amber-400" : "bg-white/70"}`}
-                  />
-                ))}
-              </span>
-              <span className="text-[11px] font-bold">Aplicações</span>
-            </button>
           </div>
 
-          <div className="absolute bottom-32 left-1/2 w-[min(580px,60vw)] -translate-x-1/2 rounded-[28px] border border-white/[0.1] bg-black/20 p-6 text-center text-white shadow-2xl backdrop-blur-2xl animate-fade-up">
-            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/30">
+          <div className="absolute bottom-32 left-1/2 w-[min(580px,60vw)] -translate-x-1/2 rounded-[28px] border border-neutral-900/[0.08] bg-white/70 p-6 text-center text-neutral-900 shadow-[0_30px_80px_-30px_rgba(16,17,20,0.35)] backdrop-blur-2xl animate-fade-up">
+            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-neutral-400">
               Ambiente de trabalho livre
             </p>
             <p className="mt-2 font-heading text-2xl font-extrabold tracking-tight">
               Tudo pronto, Tiago.
             </p>
-            <p className="mx-auto mt-2 max-w-md text-xs font-semibold leading-relaxed text-white/40">
+            <p className="mx-auto mt-2 max-w-md text-xs font-semibold leading-relaxed text-neutral-500">
               Abre uma aplicação no dock ou usa ⌘K para encontrar pedidos,
               clientes e documentos sem sair do teu contexto.
             </p>
@@ -509,38 +478,38 @@ function PrimaryRouteWindow({
   return (
     <main
       data-testid="primary-app-window"
-      className={`os-primary-window themed-surface fixed z-20 hidden flex-col overflow-hidden border border-white/[0.14] bg-white shadow-[0_38px_100px_-30px_rgba(0,0,0,0.82)] lg:flex ${maximized ? "os-primary-window-maximized rounded-[18px]" : "os-primary-window-windowed rounded-[26px]"}`}
+      className={`os-primary-window themed-surface fixed z-20 hidden flex-col overflow-hidden border border-neutral-900/[0.1] bg-white shadow-[0_38px_100px_-30px_rgba(16,17,20,0.4)] lg:flex ${maximized ? "os-primary-window-maximized rounded-[18px]" : "os-primary-window-windowed rounded-[26px]"}`}
     >
       <div
         data-testid="primary-window-titlebar"
-        className="os-primary-titlebar flex h-[52px] shrink-0 items-center border-b border-black/40 px-3.5"
+        className="os-primary-titlebar flex h-[52px] shrink-0 items-center border-b border-neutral-900/[0.08] px-3.5"
       >
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="os-window-app-icon flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 text-white/80">
+          <span className="os-window-app-icon flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-900/10 text-neutral-700">
             <Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-xs font-extrabold text-white/90">
+            <p className="truncate text-xs font-extrabold text-neutral-900">
               {app.title}
             </p>
-            <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.2em] text-white/25">
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.2em] text-neutral-400">
               BRICO OS / {app.shortTitle}
             </p>
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden h-7 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 text-[9px] font-bold text-white/45 xl:flex">
+          <span className="hidden h-7 items-center gap-1.5 rounded-full border border-neutral-900/10 bg-neutral-900/[0.03] px-2.5 text-[9px] font-bold text-neutral-500 xl:flex">
             <span className="led led-ok" /> Sincronizado
           </span>
           <button
             type="button"
             onClick={onOpenSearch}
-            className="flex h-8 items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 text-[10px] font-bold text-white/45 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white/75"
+            className="flex h-8 items-center gap-2 rounded-xl border border-neutral-900/10 bg-white/70 px-3 text-[10px] font-bold text-neutral-500 transition-colors hover:border-neutral-900/20 hover:bg-white hover:text-neutral-800"
           >
             <Search className="h-3 w-3" /> Pesquisar{" "}
             <span className="font-mono text-[8px]">⌘K</span>
           </button>
-          <span className="mx-0.5 h-5 w-px bg-white/[0.09]" aria-hidden="true" />
+          <span className="mx-0.5 h-5 w-px bg-neutral-900/10" aria-hidden="true" />
           <div className="flex items-center gap-0.5" aria-label="Controlos da janela">
             <button
               type="button"
@@ -629,30 +598,30 @@ function AppLauncherOverlay({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="os-launcher-panel w-full max-w-[min(1120px,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] border border-white/15 shadow-[0_50px_140px_-32px_rgba(0,0,0,0.98)] outline-none sm:rounded-[30px]"
+        className="os-launcher-panel w-full max-w-[min(1120px,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] border border-neutral-900/10 shadow-[0_50px_140px_-32px_rgba(16,17,20,0.5)] outline-none sm:rounded-[30px]"
       >
-        <div className="control-deck-header flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
+        <div className="control-deck-header flex items-center justify-between border-b border-neutral-900/[0.08] px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <span className="os-brand-beacon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black text-white">
               <span className="relative z-10">B</span>
             </span>
             <span className="min-w-0">
-              <span className="block font-heading text-lg font-extrabold tracking-tight text-white">
+              <span className="block font-heading text-lg font-extrabold tracking-tight text-neutral-900">
                 Control Deck
               </span>
-              <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.18em] text-white/25">
+              <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.18em] text-neutral-400">
                 Aplicações · ferramentas · turno
               </span>
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-white/25 sm:block">
+            <span className="hidden rounded-full border border-neutral-900/10 bg-neutral-900/[0.03] px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-neutral-400 sm:block">
               Esc para fechar
             </span>
           <button
             type="button"
             onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] text-white/40 transition-colors hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-200"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-900/10 text-neutral-500 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
@@ -773,12 +742,7 @@ function LayoutInner() {
             onOpenTrash={() => setTrashOpen(true)}
             onOpenMissionControl={() => setMissionControlOpen(true)}
           />
-          <DesktopSurface
-            visible={homeVisible}
-            onOpenRoute={openRoute}
-            onOpenPanel={openPanel}
-            onOpenLauncher={() => setLauncherOpen(true)}
-          />
+          <DesktopSurface visible={homeVisible} onOpenPanel={openPanel} />
           <PrimaryRouteWindow
             app={activeRouteApp}
             minimized={homeVisible || primaryMinimized}
@@ -859,7 +823,7 @@ function LayoutInner() {
             </SheetContent>
           </Sheet>
           <header className="mobile-os-header sticky top-0 z-30 p-2 pb-0 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(0,0,0,0.9)]">
+            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(16,17,20,0.3)]">
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
@@ -882,7 +846,6 @@ function LayoutInner() {
                 >
                   <Search className="h-[18px] w-[18px]" />
                 </button>
-                <ThemeToggle variant="mobile" />
                 <NotificationsBell variant="mobile" />
               </div>
             </div>

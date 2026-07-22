@@ -51,12 +51,12 @@ function DockRouteApp({ app, active, onOpen }) {
       aria-label={`Abrir ${meta.title}`}
     >
       <span
-        className={`os-dock-app-icon flex h-11 w-11 items-center justify-center rounded-[15px] border border-white/20 bg-gradient-to-br ${app.gradient} text-white shadow-[0_12px_22px_-10px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_18px_28px_-12px_rgba(0,0,0,0.9)]`}
+        className={`os-dock-app-icon flex h-11 w-11 items-center justify-center rounded-[15px] border border-white/25 bg-gradient-to-br ${app.gradient} text-white shadow-[0_12px_22px_-10px_rgba(16,17,20,0.45),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_18px_28px_-12px_rgba(16,17,20,0.55)]`}
       >
         <Icon className="h-5 w-5" strokeWidth={2} />
       </span>
       <span
-        className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full bg-white transition-all ${active ? "w-4 opacity-100" : "w-1 opacity-0 group-hover:opacity-40"}`}
+        className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full bg-neutral-900 transition-all ${active ? "w-4 opacity-100" : "w-1 opacity-0 group-hover:opacity-40"}`}
       />
       <span className="os-dock-tooltip">{meta.title}</span>
     </button>
@@ -87,7 +87,7 @@ export default function Taskbar({
       data-testid="workspace-taskbar"
       className="pointer-events-none fixed inset-x-0 bottom-3 z-[64] hidden justify-center px-4 lg:flex"
     >
-      <div className="os-dock pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-x-auto overflow-y-hidden rounded-[26px] border border-white/[0.14] px-2.5 py-2 shadow-[0_24px_65px_-20px_rgba(0,0,0,0.92),inset_0_1px_0_rgba(255,255,255,0.13)] backdrop-blur-2xl">
+      <div className="os-dock pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-x-auto overflow-y-hidden rounded-[26px] border border-neutral-900/[0.08] px-2.5 py-2 shadow-[0_24px_65px_-20px_rgba(16,17,20,0.35),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
         <button
           type="button"
           data-testid="dock-launcher"
@@ -95,14 +95,14 @@ export default function Taskbar({
             haptics.tap();
             onOpenLauncher?.();
           }}
-          className="group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] text-white/65 transition-all hover:-translate-y-1 hover:bg-white/10 hover:text-white active:scale-90"
+          className="group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] text-neutral-500 transition-all hover:-translate-y-1 hover:bg-neutral-900/[0.05] hover:text-neutral-900 active:scale-90"
           title="Todas as aplicações"
         >
-          <span className="grid grid-cols-2 gap-[3px] rounded-[11px] border border-white/15 bg-white/[0.08] p-2 shadow-inner transition-transform group-hover:scale-105">
+          <span className="grid grid-cols-2 gap-[3px] rounded-[11px] border border-neutral-900/10 bg-white/85 p-2 shadow-sm transition-transform group-hover:scale-105">
             {[0, 1, 2, 3].map((n) => (
               <span
                 key={n}
-                className={`h-2 w-2 rounded-[3px] ${n === 0 ? "bg-red-500" : n === 3 ? "bg-amber-400" : "bg-white/65"}`}
+                className={`h-2 w-2 rounded-[3px] ${n === 0 ? "bg-red-500" : n === 3 ? "bg-amber-400" : "bg-neutral-400"}`}
               />
             ))}
           </span>
@@ -110,7 +110,7 @@ export default function Taskbar({
         </button>
 
         <span
-          className="mx-1 h-9 w-px shrink-0 bg-white/10"
+          className="mx-1 h-9 w-px shrink-0 bg-neutral-900/10"
           aria-hidden="true"
         />
 
@@ -125,7 +125,7 @@ export default function Taskbar({
 
         {panels.length > 0 ? (
           <span
-            className="mx-1 h-9 w-px shrink-0 bg-white/10"
+            className="mx-1 h-9 w-px shrink-0 bg-neutral-900/10"
             aria-hidden="true"
           />
         ) : null}
@@ -144,16 +144,16 @@ export default function Taskbar({
                 haptics.tap();
                 focusPanel(panel.id);
               }}
-              className="group relative flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl transition-all hover:-translate-y-1 hover:bg-white/[0.08] active:scale-90"
+              className="group relative flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl transition-all hover:-translate-y-1 hover:bg-neutral-900/[0.05] active:scale-90"
               title={`${meta.title}${panel.minimized ? " · minimizada" : " · janela aberta"}`}
             >
               <span
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${active ? "border-white/30 bg-white text-black" : "border-white/10 bg-white/[0.08] text-white/60 group-hover:text-white"}`}
+                className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${active ? "border-neutral-900/20 bg-neutral-900 text-white" : "border-neutral-900/10 bg-white/75 text-neutral-500 group-hover:text-neutral-900"}`}
               >
                 <Icon className="h-4 w-4" />
               </span>
               <span
-                className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full ${panel.minimized ? "w-1 bg-white/35" : active ? "w-4 bg-emerald-400" : "w-1 bg-white/70"}`}
+                className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full ${panel.minimized ? "w-1 bg-neutral-400" : active ? "w-4 bg-emerald-500" : "w-1 bg-neutral-500"}`}
               />
               <span className="os-dock-tooltip">
                 {meta.title}
@@ -168,7 +168,7 @@ export default function Taskbar({
                   haptics.tap();
                   closePanel(panel.id);
                 }}
-                className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-white text-black shadow-md group-hover:flex"
+                className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md group-hover:flex"
               >
                 <X className="h-2.5 w-2.5" />
               </span>
@@ -177,7 +177,7 @@ export default function Taskbar({
         })}
 
         <span
-          className="mx-1 h-9 w-px shrink-0 bg-white/10"
+          className="mx-1 h-9 w-px shrink-0 bg-neutral-900/10"
           aria-hidden="true"
         />
 
@@ -187,7 +187,7 @@ export default function Taskbar({
             haptics.tap();
             onOpenMissionControl?.();
           }}
-          className="os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/55 transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:text-white"
+          className="os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-neutral-500 transition-all hover:-translate-y-0.5 hover:bg-neutral-900/[0.05] hover:text-neutral-900"
           title="Mission Control (F3)"
         >
           <LayoutGrid className="h-[18px] w-[18px]" />
@@ -200,7 +200,7 @@ export default function Taskbar({
             haptics.tap();
             onShowDesktop?.();
           }}
-          className={`os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-white/10 hover:text-white ${homeVisible ? "bg-white text-black shadow-[0_8px_20px_-10px_rgba(255,255,255,0.75)]" : "text-white/55"}`}
+          className={`os-dock-action flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-neutral-900/[0.05] hover:text-neutral-900 ${homeVisible ? "bg-neutral-900 text-white shadow-[0_8px_20px_-10px_rgba(16,17,20,0.6)] hover:bg-neutral-900 hover:text-white" : "text-neutral-500"}`}
           title="Mostrar ambiente de trabalho"
           aria-current={homeVisible ? "page" : undefined}
         >

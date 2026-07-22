@@ -1,4 +1,4 @@
-// bg/text usam variáveis CSS (index.css, :root + [data-theme="dark"]) em
+// bg/text usam variáveis CSS (index.css, :root — tema claro único) em
 // vez de hex fixo — os badges de estado/prioridade, usados em toda a app
 // via inline style, trocam de tom sozinhos ao mudar de tema. O "dot"
 // (pequeno indicador circular) mantém a cor viva: já lê bem em ambos os temas.

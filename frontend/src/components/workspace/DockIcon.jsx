@@ -83,16 +83,16 @@ export default function DockIcon({
           onClick={onClick}
           className={
             isLauncher
-              ? `group relative flex min-w-0 flex-col items-center gap-2 rounded-2xl p-2 text-center transition-all duration-200 hover:-translate-y-1 hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 ${isOpen ? "text-white" : "text-white/70 hover:text-white"}`
-              : `relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:translate-y-0 ${isOpen ? "bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]" : "text-[color:var(--chrome-muted)] hover:bg-white/10 hover:text-white"}`
+              ? `group relative flex min-w-0 flex-col items-center gap-2 rounded-2xl p-2 text-center transition-all duration-200 hover:-translate-y-1 hover:bg-neutral-900/[0.05] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 ${isOpen ? "text-neutral-900" : "text-neutral-600 hover:text-neutral-900"}`
+              : `relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:translate-y-0 ${isOpen ? "bg-neutral-900/[0.08] text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]" : "text-[color:var(--chrome-muted)] hover:bg-neutral-900/[0.06] hover:text-neutral-900"}`
           }
         >
           {isLauncher ? (
             <>
-              <span className="relative flex h-14 w-14 items-center justify-center rounded-[18px] border border-white/15 bg-gradient-to-br from-white/[0.20] to-white/[0.06] text-white shadow-[0_16px_30px_-14px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.20)] transition-transform group-hover:scale-105">
+              <span className="relative flex h-14 w-14 items-center justify-center rounded-[18px] border border-neutral-900/10 bg-gradient-to-br from-white to-neutral-100 text-neutral-800 shadow-[0_16px_30px_-14px_rgba(16,17,20,0.3),inset_0_1px_0_rgba(255,255,255,0.9)] transition-transform group-hover:scale-105">
                 <Icon className="h-6 w-6" strokeWidth={1.9} />
                 {isOpen ? (
-                  <span className="led led-ok absolute -right-0.5 -top-0.5 ring-2 ring-[#151515]" />
+                  <span className="led led-ok absolute -right-0.5 -top-0.5 ring-2 ring-white" />
                 ) : null}
               </span>
               <span className="w-full truncate text-[11px] font-bold">

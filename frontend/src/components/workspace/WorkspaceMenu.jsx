@@ -33,10 +33,10 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
           aria-label="Áreas de trabalho guardadas"
           className={
             variant === "menubar"
-              ? "hidden h-8 items-center gap-1.5 rounded-lg px-2 text-[11px] font-bold text-white/50 transition-colors hover:bg-white/10 hover:text-white 2xl:flex"
+              ? "hidden h-8 items-center gap-1.5 rounded-lg px-2 text-[11px] font-bold text-neutral-500 transition-colors hover:bg-neutral-900/[0.06] hover:text-neutral-900 2xl:flex"
               : variant === "dock"
-                ? "os-dock-action flex h-11 w-11 items-center justify-center rounded-xl text-white/55 transition-all hover:bg-white/10 hover:text-white"
-                : "flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-bold text-[color:var(--chrome-muted)] transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
+                ? "os-dock-action flex h-11 w-11 items-center justify-center rounded-xl text-neutral-500 transition-all hover:bg-neutral-900/[0.05] hover:text-neutral-900"
+                : "flex w-full items-center gap-2 rounded-xl border border-neutral-900/10 bg-white/70 px-3 py-2.5 text-xs font-bold text-[color:var(--chrome-muted)] transition-colors hover:border-neutral-900/20 hover:bg-white hover:text-neutral-900"
           }
         >
           <LayoutTemplate

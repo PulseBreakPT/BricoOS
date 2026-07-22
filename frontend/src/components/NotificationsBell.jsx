@@ -55,7 +55,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
           data-testid="notifications-bell"
           className={`group relative flex items-center justify-center rounded-xl transition-all duration-200 active:scale-90 ${
             variant === "sidebar"
-              ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-card/10 hover:text-white"
+              ? "h-9 w-9 text-[color:var(--chrome-muted)] hover:bg-neutral-900/[0.06] hover:text-neutral-900"
               : "h-10 w-10 text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >

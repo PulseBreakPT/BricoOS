@@ -216,7 +216,7 @@ export default function MobileHomeSurface({
               className="group flex min-w-0 flex-col items-center rounded-[22px] px-1 py-2 text-center transition-colors hover:bg-muted active:scale-95 sm:px-2"
             >
               <span
-                className={`os-home-app-icon flex h-14 w-14 items-center justify-center rounded-[19px] border border-white/25 bg-gradient-to-br ${app.gradient} text-white shadow-[0_16px_28px_-14px_rgba(0,0,0,0.78),inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform group-hover:-translate-y-1 group-hover:scale-105 sm:h-16 sm:w-16 sm:rounded-[21px]`}
+                className={`os-home-app-icon flex h-14 w-14 items-center justify-center rounded-[19px] border border-white/25 bg-gradient-to-br ${app.gradient} text-white shadow-[0_16px_28px_-14px_rgba(16,17,20,0.45),inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform group-hover:-translate-y-1 group-hover:scale-105 sm:h-16 sm:w-16 sm:rounded-[21px]`}
               >
                 <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2} />
               </span>

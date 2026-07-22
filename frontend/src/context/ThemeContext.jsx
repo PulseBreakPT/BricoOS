@@ -1,81 +1,43 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useContext, useMemo } from "react";
+
+/* BRICO OS é exclusivamente light mode. Este contexto mantém a mesma API
+   pública de sempre (useTheme, ThemeProvider, initializeTheme) para que os
+   consumidores (ex.: sonner) continuem a funcionar, mas o tema é fixo. */
 
 const STORAGE_KEY = "brico_os_theme";
 const ThemeContext = createContext(null);
 
-function systemTheme() {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
 export function getInitialTheme() {
-  if (typeof window === "undefined") return "light";
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
-  } catch {
-    /* armazenamento bloqueado: usa a preferência do dispositivo */
-  }
-  return systemTheme();
+  return "light";
 }
 
-export function applyTheme(theme) {
+export function applyTheme() {
   if (typeof document === "undefined") return;
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
+  document.documentElement.dataset.theme = "light";
+  document.documentElement.style.colorScheme = "light";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#08090b" : "#f1f1ee");
+    ?.setAttribute("content", "#f7f6f3");
 }
 
 export function initializeTheme() {
-  const theme = getInitialTheme();
-  applyTheme(theme);
-  return theme;
+  applyTheme();
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* armazenamento bloqueado: o tema fixo já está aplicado */
+  }
+  return "light";
 }
 
-export function ThemeProvider({ children, initialTheme }) {
-  const [theme, setTheme] = useState(() => initialTheme || getInitialTheme());
-
-  useEffect(() => {
-    applyTheme(theme);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      /* o tema continua ativo durante a sessão */
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    const syncTheme = (event) => {
-      if (
-        event.key === STORAGE_KEY &&
-        (event.newValue === "light" || event.newValue === "dark")
-      ) {
-        setTheme(event.newValue);
-      }
-    };
-    window.addEventListener("storage", syncTheme);
-    return () => window.removeEventListener("storage", syncTheme);
-  }, []);
-
-  const toggleTheme = useCallback(
-    () => setTheme((current) => (current === "dark" ? "light" : "dark")),
-    [],
-  );
-
+export function ThemeProvider({ children }) {
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, toggleTheme],
+    () => ({
+      theme: "light",
+      setTheme: () => {},
+      toggleTheme: () => {},
+    }),
+    [],
   );
 
   return (

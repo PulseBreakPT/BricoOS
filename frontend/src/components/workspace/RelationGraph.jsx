@@ -118,15 +118,15 @@ export default function RelationGraph({ rootKind, rootId, rootLabel, onClose }) 
   const expandedGroup = groups.find((g) => g.key === expanded);
 
   return (
-    <div data-testid="relation-graph" className="fixed inset-0 z-[75] flex flex-col items-center justify-center overflow-hidden bg-slate-900/80 p-2 backdrop-blur-sm sm:p-4" onClick={onClose}>
-      <div className="flex w-full max-w-[540px] min-w-0 items-center justify-center gap-2 pb-2 text-white sm:pb-3" onClick={(e) => e.stopPropagation()}>
+    <div data-testid="relation-graph" className="fixed inset-0 z-[75] flex flex-col items-center justify-center overflow-hidden bg-[#f0efeb]/85 p-2 backdrop-blur-md sm:p-4" onClick={onClose}>
+      <div className="flex w-full max-w-[540px] min-w-0 items-center justify-center gap-2 pb-2 text-neutral-900 sm:pb-3" onClick={(e) => e.stopPropagation()}>
         {history.length > 0 ? (
-          <button type="button" data-testid="graph-back" onClick={goBack} className="flex min-h-11 shrink-0 items-center rounded-xl px-3 text-xs font-bold hover:bg-white/10">← Voltar</button>
+          <button type="button" data-testid="graph-back" onClick={goBack} className="flex min-h-11 shrink-0 items-center rounded-xl px-3 text-xs font-bold hover:bg-neutral-900/[0.06]">← Voltar</button>
         ) : null}
         <p className="min-w-0 flex-1 text-center text-sm font-bold leading-tight">{root.label}</p>
-        <button type="button" onClick={onClose} aria-label="Fechar grafo" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-white/10"><X className="h-4 w-4" /></button>
+        <button type="button" onClick={onClose} aria-label="Fechar grafo" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-neutral-900/[0.06]"><X className="h-4 w-4" /></button>
       </div>
-      <div className="relation-graph-canvas themed-surface relative overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relation-graph-canvas themed-surface relative overflow-hidden rounded-2xl border border-neutral-900/10 bg-white shadow-[0_40px_90px_-35px_rgba(16,17,20,0.5)]" onClick={(e) => e.stopPropagation()}>
         {loading ? (
           <div className="flex h-full items-center justify-center"><Spinner className="h-6 w-6 text-slate-400" /></div>
         ) : (
@@ -171,7 +171,7 @@ export default function RelationGraph({ rootKind, rootId, rootLabel, onClose }) 
           </>
         )}
       </div>
-      <p className="mt-2 max-w-[540px] px-3 text-center text-[11px] font-semibold leading-relaxed text-white/60 sm:mt-3 sm:text-xs">Toca num nó único para reenraizar · toca num grupo para expandir · Esc para fechar</p>
+      <p className="mt-2 max-w-[540px] px-3 text-center text-[11px] font-semibold leading-relaxed text-neutral-500 sm:mt-3 sm:text-xs">Toca num nó único para reenraizar · toca num grupo para expandir · Esc para fechar</p>
     </div>
   );
 }

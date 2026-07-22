@@ -3,17 +3,15 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#f1f1ee" />
+        <meta name="theme-color" content="#f7f6f3" />
+        <meta name="color-scheme" content="light" />
         <script>
+          /* BRICO OS é exclusivamente light mode — ignora a preferência do
+             dispositivo e qualquer tema guardado de versões anteriores. */
           try {
-            const savedTheme = localStorage.getItem("brico_os_theme");
-            const theme = savedTheme === "light" || savedTheme === "dark"
-              ? savedTheme
-              : matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light";
-            document.documentElement.dataset.theme = theme;
-            document.documentElement.style.colorScheme = theme;
+            document.documentElement.dataset.theme = "light";
+            document.documentElement.style.colorScheme = "light";
+            localStorage.removeItem("brico_os_theme");
           } catch (_) {}
         </script>
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache" />
