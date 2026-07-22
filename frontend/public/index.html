@@ -14,6 +14,31 @@
             localStorage.removeItem("brico_os_theme");
           } catch (_) {}
         </script>
+        <script>
+          /* Captura do evento de instalação (PWA) o mais cedo possível: o
+             Chrome pode disparar "beforeinstallprompt" ainda antes de o bundle
+             React carregar, e se ninguém estiver à escuta nesse instante o
+             evento perde-se para sempre — deixando o botão "Instalar aplicação"
+             sem forma de abrir o diálogo nativo. Guardamos o evento num global
+             que a app lê quando montar. */
+          (function () {
+            var store = (window.__bricoPWA = window.__bricoPWA || {
+              deferredPrompt: null,
+              bound: false,
+            });
+            if (store.bound) return;
+            store.bound = true;
+            window.addEventListener("beforeinstallprompt", function (e) {
+              e.preventDefault();
+              store.deferredPrompt = e;
+              window.dispatchEvent(new Event("brico:pwa-change"));
+            });
+            window.addEventListener("appinstalled", function () {
+              store.deferredPrompt = null;
+              window.dispatchEvent(new Event("brico:pwa-change"));
+            });
+          })();
+        </script>
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache" />
         <meta name="googlebot" content="noindex, nofollow" />
         <!--
