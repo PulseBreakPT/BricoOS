@@ -7,6 +7,7 @@ import {
   Check,
   CheckCheck,
   ClipboardList,
+  Download,
   FileText,
   FolderDown,
   FolderTree,
@@ -20,6 +21,8 @@ import {
   Palette,
   Plus,
   Search,
+  Share,
+  SquarePlus,
   Trash2,
   Truck,
   User,
@@ -74,6 +77,8 @@ import {
 } from "@/lib/osShell";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { toast } from "sonner";
 
 const ROUTE_APPS = [
   {
@@ -289,6 +294,8 @@ function MobileNavigation({
   onOpenTrash,
 }) {
   const { status } = useSystemStatus();
+  const { showInstallOption, install } = usePwaInstall();
+  const [iosStepsOpen, setIosStepsOpen] = useState(false);
 
   const badgeFor = (path) => {
     if (!status) return 0;
@@ -296,6 +303,19 @@ function MobileNavigation({
     if (path === "/emails") return status.emails_nao_vistos || 0;
     if (path === "/tarefas") return status.tarefas_pendentes || 0;
     return 0;
+  };
+
+  const handleInstall = async () => {
+    haptics.tap();
+    const outcome = await install();
+    if (outcome === "ios-instructions") {
+      setIosStepsOpen((v) => !v);
+    } else if (outcome === "unavailable") {
+      toast.info("Ainda não é possível instalar automaticamente. Recarrega a página ou usa o menu do navegador (⋮) e escolhe \"Instalar aplicação\".");
+    } else if (outcome === "accepted") {
+      setIosStepsOpen(false);
+      toast.success("BRICO OS instalado!");
+    }
   };
 
   return (
@@ -386,6 +406,28 @@ function MobileNavigation({
           <Trash2 className="h-4 w-4" /> Lixeira
         </button>
       </div>
+      {showInstallOption ? (
+        <div className="mt-2">
+          <button
+            type="button"
+            data-testid="mobile-nav-install"
+            onClick={handleInstall}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Download className="h-4 w-4" /> Instalar aplicação
+          </button>
+          {iosStepsOpen ? (
+            <div className="mt-2 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
+              <p className="flex items-center gap-1.5">
+                <Share className="h-3.5 w-3.5 shrink-0" /> 1. Toca em "Partilhar" na barra do Safari
+              </p>
+              <p className="mt-1.5 flex items-center gap-1.5">
+                <SquarePlus className="h-3.5 w-3.5 shrink-0" /> 2. Escolhe "Adicionar ao Ecrã Principal"
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

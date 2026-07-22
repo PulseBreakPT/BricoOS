@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Check,
+  Download,
   Info,
   Lock,
   Palette,
   RotateCw,
+  Share,
+  SquarePlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,6 +31,7 @@ import { useSystemStatus } from "@/context/SystemStatusContext";
 import { getDeviceToken } from "@/lib/deviceAuth";
 import { WALLPAPERS, lockScreen } from "@/lib/osShell";
 import { haptics } from "@/lib/haptics";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 
 const SESSION_START = Date.now();
 
@@ -55,6 +60,20 @@ function AboutRow({ label, value }) {
 export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
   const { status, online } = useSystemStatus();
   const [aboutOpen, setAboutOpen] = useState(false);
+  const { showInstallOption, install } = usePwaInstall();
+  const [iosStepsOpen, setIosStepsOpen] = useState(false);
+
+  const handleInstall = async () => {
+    haptics.tap();
+    const outcome = await install();
+    if (outcome === "ios-instructions") {
+      setIosStepsOpen(true);
+    } else if (outcome === "unavailable") {
+      toast.info("Ainda não é possível instalar automaticamente. Recarrega a página ou usa o menu do navegador (⋮) e escolhe \"Instalar aplicação\".");
+    } else if (outcome === "accepted") {
+      toast.success("BRICO OS instalado!");
+    }
+  };
 
   return (
     <>
@@ -91,6 +110,14 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
           >
             <Info className="mr-2 h-4 w-4" /> Sobre o BRICO OS
           </DropdownMenuItem>
+          {showInstallOption ? (
+            <DropdownMenuItem
+              data-testid="system-menu-install"
+              onClick={handleInstall}
+            >
+              <Download className="mr-2 h-4 w-4" /> Instalar aplicação
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger data-testid="system-menu-wallpaper">
               <Palette className="mr-2 h-4 w-4" /> Fundo do ambiente
@@ -181,6 +208,24 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
           <p className="text-center font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
             ⌘K pesquisar · F3 janelas · ⌘H ambiente de trabalho
           </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={iosStepsOpen} onOpenChange={setIosStepsOpen}>
+        <DialogContent data-testid="pwa-install-ios-dialog" className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">
+              Instalar BRICO OS
+            </DialogTitle>
+          </DialogHeader>
+          <div className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5">
+              <Share className="h-3.5 w-3.5 shrink-0" /> 1. Toca em "Partilhar" na barra do Safari
+            </p>
+            <p className="mt-1.5 flex items-center gap-1.5">
+              <SquarePlus className="h-3.5 w-3.5 shrink-0" /> 2. Escolhe "Adicionar ao Ecrã Principal"
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </>
