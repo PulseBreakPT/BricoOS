@@ -118,6 +118,17 @@ backend:
           comment: "Backend crashava com KeyError MONGO_URL (não existia .env). Criados backend/.env (MONGO_URL, DB_NAME=test_database, CORS_ORIGINS, ACCESS_PIN=250724) e frontend/.env (REACT_APP_BACKEND_URL, WDS_SOCKET_PORT). Verificado: POST /api/auth/verify-pin com 250724 devolve ok:true+token; fluxo completo no browser (teclado do PIN → desktop) funcional."
 
 frontend:
+  - task: "SSS: identidade de SO (boot splash, menu contexto desktop, menu sistema TS c/ Sobre+wallpapers+bloquear, widgets desktop, snap topo, relógio c/ agenda)"
+    implemented: true
+    working: true
+    file: "workspace/BootSplash.jsx, workspace/SystemMenu.jsx, workspace/DesktopWidgets.jsx, lib/osShell.js, Layout.jsx, SystemBar.jsx, StatusCluster.jsx, Window.jsx, index.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Validado via screenshots: boot splash após PIN, widgets (agenda/pedidos/correio) no desktop, menu de contexto (clique direito), menu de sistema TS (Sobre, fundos, bloquear ecrã via clearDeviceToken+evento), agenda no relógio. Snap lateral já existia; adicionado snap ao topo=maximizar. Wallpapers persistidos em localStorage (brico_wallpaper)."
   - task: "Remover botões/ícones duplicados no ambiente de trabalho (desktop e mobile)"
     implemented: true
     working: true

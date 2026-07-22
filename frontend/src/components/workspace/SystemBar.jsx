@@ -1,6 +1,7 @@
 import { Activity, Search, Trash2 } from "lucide-react";
 import NotificationsBell from "@/components/NotificationsBell";
 import StatusCluster from "@/components/workspace/StatusCluster";
+import SystemMenu from "@/components/workspace/SystemMenu";
 
 const systemButton =
   "flex h-9 w-9 items-center justify-center rounded-xl text-neutral-500 transition-all duration-150 hover:bg-neutral-900/[0.06] hover:text-neutral-900 active:scale-90";
@@ -16,6 +17,8 @@ export default function SystemBar({
   onOpenSearch,
   onOpenActivity,
   onOpenTrash,
+  wallpaperId,
+  onWallpaperChange,
 }) {
   const ActiveIcon = activeApp?.icon;
 
@@ -92,14 +95,10 @@ export default function SystemBar({
         <NotificationsBell variant="sidebar" />
         <span className="mx-1 h-5 w-px bg-neutral-900/10" aria-hidden="true" />
         <StatusCluster variant="menubar" />
-        <button
-          type="button"
-          className="ml-1 flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-900/10 bg-gradient-to-br from-slate-100 to-slate-300 text-[9px] font-black text-slate-800 shadow-inner"
-          title="Tiago Silva"
-          aria-label="Perfil de Tiago Silva"
-        >
-          TS
-        </button>
+        <SystemMenu
+          wallpaperId={wallpaperId}
+          onWallpaperChange={onWallpaperChange}
+        />
       </div>
     </header>
   );

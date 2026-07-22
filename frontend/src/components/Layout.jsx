@@ -4,16 +4,21 @@ import {
   Activity,
   BarChart3,
   BookOpenCheck,
+  Check,
   CheckCheck,
   ClipboardList,
   FileText,
   FolderDown,
   FolderTree,
+  LayoutGrid,
   ListChecks,
+  Lock,
   Mail,
   Maximize2,
   Minus,
   MonitorUp,
+  Palette,
+  Plus,
   Search,
   Trash2,
   Truck,
@@ -48,6 +53,25 @@ import MobileHomeSurface from "@/components/workspace/MobileHomeSurface";
 import MobileSystemDock from "@/components/workspace/MobileSystemDock";
 import OperationalRibbon from "@/components/workspace/OperationalRibbon";
 import SystemBar from "@/components/workspace/SystemBar";
+import BootSplash from "@/components/workspace/BootSplash";
+import DesktopWidgets from "@/components/workspace/DesktopWidgets";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from "@/components/ui/context-menu";
+import {
+  WALLPAPERS,
+  getWallpaperId,
+  persistWallpaperId,
+  wallpaperStyle,
+  lockScreen,
+} from "@/lib/osShell";
 import { PANEL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
 
@@ -386,12 +410,22 @@ const SHORTCUTS = [
   },
 ];
 
-function DesktopSurface({ visible, onOpenPanel }) {
+function DesktopSurface({
+  visible,
+  onOpenPanel,
+  onOpenRoute,
+  onMissionControl,
+  wallpaperId,
+  onWallpaperChange,
+}) {
   return (
-    <div
-      className="os-desktop-surface fixed inset-0 z-0 hidden overflow-hidden lg:block"
-      aria-hidden={!visible}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="os-desktop-surface fixed inset-0 z-0 hidden overflow-hidden lg:block"
+          aria-hidden={!visible}
+          style={wallpaperStyle(wallpaperId)}
+        >
       <div
         aria-hidden="true"
         className="os-wallpaper-mark absolute left-[44%] top-[46%] -translate-x-1/2 -translate-y-1/2 select-none text-center"
@@ -442,21 +476,68 @@ function DesktopSurface({ visible, onOpenPanel }) {
             })}
           </div>
 
-          <div className="absolute bottom-32 left-1/2 w-[min(580px,60vw)] -translate-x-1/2 rounded-[28px] border border-neutral-900/[0.08] bg-white/70 p-6 text-center text-neutral-900 shadow-[0_30px_80px_-30px_rgba(16,17,20,0.35)] backdrop-blur-2xl animate-fade-up">
-            <p className="text-[9px] font-black uppercase tracking-[0.28em] text-neutral-400">
-              Ambiente de trabalho livre
-            </p>
-            <p className="mt-2 font-heading text-2xl font-extrabold tracking-tight">
-              Tudo pronto, Tiago.
-            </p>
-            <p className="mx-auto mt-2 max-w-md text-xs font-semibold leading-relaxed text-neutral-500">
-              Abre uma aplicação no dock ou usa ⌘K para encontrar pedidos,
-              clientes e documentos sem sair do teu contexto.
-            </p>
-          </div>
+          <DesktopWidgets onOpenRoute={onOpenRoute} />
         </>
       ) : null}
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-60" data-testid="desktop-context-menu">
+        <ContextMenuItem
+          data-testid="ctx-new-pedido"
+          onClick={() => onOpenRoute?.("/?new=1")}
+        >
+          <Plus className="mr-2 h-4 w-4" /> Novo pedido
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onOpenRoute?.("/tarefas")}>
+          <ListChecks className="mr-2 h-4 w-4" /> Nova tarefa
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => onOpenPanel("explorer")}>
+          <FolderTree className="mr-2 h-4 w-4" /> Abrir Explorador
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onOpenPanel("downloads")}>
+          <FolderDown className="mr-2 h-4 w-4" /> Abrir Downloads
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={onMissionControl}>
+          <LayoutGrid className="mr-2 h-4 w-4" /> Ver todas as janelas
+          <span className="ml-auto font-mono text-[9px] font-bold text-muted-foreground">
+            F3
+          </span>
+        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Palette className="mr-2 h-4 w-4" /> Fundo do ambiente
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-52">
+            {WALLPAPERS.map((wp) => (
+              <ContextMenuItem
+                key={wp.id}
+                data-testid={`ctx-wallpaper-${wp.id}`}
+                onClick={() => onWallpaperChange?.(wp.id)}
+              >
+                <span
+                  className="mr-2 h-4 w-6 shrink-0 rounded border border-neutral-900/10"
+                  style={{ background: wp.swatch }}
+                />
+                <span className="flex-1">{wp.name}</span>
+                {wallpaperId === wp.id ? (
+                  <Check className="h-3.5 w-3.5 text-red-600" />
+                ) : null}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          data-testid="ctx-lock"
+          onClick={lockScreen}
+          className="text-red-600 focus:text-red-600"
+        >
+          <Lock className="mr-2 h-4 w-4" /> Bloquear ecrã
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -642,6 +723,7 @@ function LayoutInner() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [missionControlOpen, setMissionControlOpen] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
+  const [wallpaperId, setWallpaperId] = useState(() => getWallpaperId());
   const [homeVisible, setHomeVisible] = useState(true);
   const [primaryMinimized, setPrimaryMinimized] = useState(true);
   const [primaryMaximized, setPrimaryMaximized] = useState(false);
@@ -723,6 +805,11 @@ function LayoutInner() {
     showDesktop();
   }, [showDesktop]);
 
+  const changeWallpaper = useCallback((id) => {
+    setWallpaperId(id);
+    persistWallpaperId(id);
+  }, []);
+
   return (
     <div
       className={
@@ -731,6 +818,7 @@ function LayoutInner() {
           : "min-h-screen bg-background text-foreground"
       }
     >
+      <BootSplash />
       {isDesktop ? (
         <>
           <SystemBar
@@ -738,8 +826,17 @@ function LayoutInner() {
             onOpenSearch={() => setPaletteOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
             onOpenTrash={() => setTrashOpen(true)}
+            wallpaperId={wallpaperId}
+            onWallpaperChange={changeWallpaper}
           />
-          <DesktopSurface visible={homeVisible} onOpenPanel={openPanel} />
+          <DesktopSurface
+            visible={homeVisible}
+            onOpenPanel={openPanel}
+            onOpenRoute={openRoute}
+            onMissionControl={() => setMissionControlOpen(true)}
+            wallpaperId={wallpaperId}
+            onWallpaperChange={changeWallpaper}
+          />
           <PrimaryRouteWindow
             app={activeRouteApp}
             minimized={homeVisible || primaryMinimized}

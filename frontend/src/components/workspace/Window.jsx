@@ -175,21 +175,24 @@ export default function Window({ panel, zIndex }) {
       // ecrã (gesto normal de sistema operativo) — largar em qualquer outro
       // ponto só confirma a posição do arrasto, como já era. A margem
       // esquerda útil começa na margem segura do ambiente de trabalho.
+      const { systemBarHeight } = getWorkspaceMetrics();
       const nearLeftEdge = e.clientX <= SIDEBAR_WIDTH + 24;
       const nearRightEdge = e.clientX >= window.innerWidth - 24;
+      const nearTopEdge = e.clientY <= systemBarHeight + 8;
       setTransient((t) => {
         if (t) movePanel(panel.id, t.x, t.y);
         return null;
       });
       if (nearLeftEdge) snapTo("left");
       else if (nearRightEdge) snapTo("right");
+      else if (nearTopEdge && !panel.maximized) toggleMaximize(panel.id);
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         /* já libertado */
       }
     },
-    [panel.id, movePanel, snapTo],
+    [panel.id, panel.maximized, movePanel, snapTo, toggleMaximize],
   );
 
   const onResizePointerDown = useCallback(

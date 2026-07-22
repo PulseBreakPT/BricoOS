@@ -1599,6 +1599,61 @@ code {
   }
 }
 
+/* ---------- Boot splash (arranque do BRICO OS) ---------- */
+.os-boot-splash {
+  background:
+    radial-gradient(
+      900px 500px at 50% -10%,
+      rgba(217, 68, 38, 0.16),
+      transparent 60%
+    ),
+    var(--chrome-deep, #16171b);
+  transition: opacity 0.45s ease;
+}
+
+.os-boot-splash-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.os-boot-bar-fill {
+  width: 0;
+  animation: os-boot-progress 1.35s ease-out forwards;
+}
+
+@keyframes os-boot-progress {
+  0% {
+    width: 0;
+  }
+  55% {
+    width: 62%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+/* ---------- Widgets do ambiente de trabalho ---------- */
+.os-widget-deck {
+  position: absolute;
+  bottom: 122px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: min(1060px, 78vw);
+}
+
+@media (min-width: 1536px) {
+  /* Centra o deck na área útil (descontando o rail LiveOps à direita). */
+  .os-widget-deck {
+    right: calc(var(--os-liveops-width) + var(--os-shell-gap) * 2);
+    width: min(
+      1020px,
+      calc(100vw - var(--os-liveops-width) - var(--os-shell-gap) * 4 - 4rem)
+    );
+  }
+}
+
 .mobile-workspace,
 .mobile-workspace *,
 .themed-surface,
