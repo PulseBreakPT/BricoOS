@@ -587,7 +587,6 @@ class NoteIn(BaseModel):
     supplier_id: str = ""
     sla_days: int = DEFAULT_SLA_DAYS
     reminder_interval_days: int = 3
-    favorite: bool = False
 
     @field_validator("status")
     @classmethod
@@ -643,7 +642,6 @@ class NotePatch(BaseModel):
     supplier_id: Optional[str] = None
     sla_days: Optional[int] = None
     reminder_interval_days: Optional[int] = None
-    favorite: Optional[bool] = None
 
     @field_validator("status")
     @classmethod
@@ -779,6 +777,7 @@ class TaskIn(BaseModel):
     subtasks: List[SubtaskItem] = []
     labels: List[str] = []
     note_id: str = ""
+    group_id: str = ""
 
     @field_validator("priority")
     @classmethod
@@ -800,6 +799,7 @@ class TaskPatch(BaseModel):
     repeat: Optional[str] = None
     subtasks: Optional[List[SubtaskItem]] = None
     labels: Optional[List[str]] = None
+    group_id: Optional[str] = None
 
     @field_validator("priority")
     @classmethod
@@ -810,6 +810,19 @@ class TaskPatch(BaseModel):
     @classmethod
     def _v_repeat(cls, v):
         return _check_choice(v, TASK_REPEATS, "Repetição")
+
+
+class TaskGroupIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O nome do grupo é obrigatório")
+        return v
 
 
 class CaixilhariaItem(BaseModel):
@@ -1092,7 +1105,7 @@ async def segment_clause(segment):
 async def list_notes(
     search: Optional[str] = None, status: Optional[str] = None, priority: Optional[str] = None,
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
-    favorite: Optional[bool] = None, overdue: Optional[bool] = None, archived: Optional[bool] = None,
+    overdue: Optional[bool] = None, archived: Optional[bool] = None,
     waiting: Optional[str] = None, reminder_due: Optional[bool] = None, callback: Optional[bool] = None,
     segment: Optional[str] = None, sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
@@ -1108,8 +1121,6 @@ async def list_notes(
         q["supplier_id"] = supplier_id
     if label:
         q["labels"] = label
-    if favorite:
-        q["favorite"] = True
     if search:
         rx = {"$regex": re.escape(search), "$options": "i"}
         q["$or"] = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"email": rx},
@@ -1379,7 +1390,7 @@ async def duplicate_note(note_id: str):
                                         "category", "measurements", "quantity", "color", "reference", "supplier_id"]}
     doc.update({"id": str(uuid.uuid4()), "labels": list(src.get("labels", [])), "priority": src.get("priority", "media"),
                 "status": "novo", "sla_days": src.get("sla_days", DEFAULT_SLA_DAYS),
-                "reminder_interval_days": src.get("reminder_interval_days", 3), "favorite": False,
+                "reminder_interval_days": src.get("reminder_interval_days", 3),
                 "archived": False, "created_by": AUTHOR, "last_supplier_sent_at": "", "last_client_contact_at": "",
                 "last_client_reply_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
@@ -1788,6 +1799,56 @@ def _next_due_date(due_date: str, repeat: str) -> Optional[str]:
     return d.strftime("%Y-%m-%d")
 
 
+async def _task_group_name_taken(name, exclude_id=None):
+    q = {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    return await db.task_groups.find_one(q, {"_id": 0, "id": 1})
+
+
+@api_router.get("/task-groups")
+async def list_task_groups():
+    groups = await db.task_groups.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
+    counts = {}
+    async for t in db.tasks.find({}, {"_id": 0, "group_id": 1}):
+        gid = t.get("group_id")
+        if gid:
+            counts[gid] = counts.get(gid, 0) + 1
+    for g in groups:
+        g["tasks_count"] = counts.get(g["id"], 0)
+    return groups
+
+
+@api_router.post("/task-groups")
+async def create_task_group(payload: TaskGroupIn):
+    if await _task_group_name_taken(payload.name):
+        raise HTTPException(status_code=409, detail=f'Já existe um grupo chamado "{payload.name}".')
+    doc = payload.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    await db.task_groups.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/task-groups/{group_id}")
+async def update_task_group(group_id: str, payload: TaskGroupIn):
+    if await _task_group_name_taken(payload.name, exclude_id=group_id):
+        raise HTTPException(status_code=409, detail=f'Já existe um grupo chamado "{payload.name}".')
+    res = await db.task_groups.update_one({"id": group_id}, {"$set": payload.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Grupo não encontrado")
+    return await db.task_groups.find_one({"id": group_id}, {"_id": 0})
+
+
+@api_router.delete("/task-groups/{group_id}")
+async def delete_task_group(group_id: str):
+    if not await db.task_groups.find_one({"id": group_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Grupo não encontrado")
+    await db.tasks.update_many({"group_id": group_id}, {"$set": {"group_id": ""}})
+    await db.task_groups.delete_one({"id": group_id})
+    return {"ok": True}
+
+
 @api_router.get("/tasks")
 async def list_tasks(note_id: Optional[str] = None):
     q = {"note_id": note_id} if note_id else {}
@@ -1845,7 +1906,8 @@ async def toggle_task(task_id: str):
             next_doc = {
                 "id": str(uuid.uuid4()), "title": task["title"], "category": task.get("category", "construcao"),
                 "done": False, "priority": task.get("priority", "nenhuma"), "due_date": next_date,
-                "repeat": task["repeat"], "note_id": task.get("note_id", ""), "created_at": now_iso(),
+                "repeat": task["repeat"], "note_id": task.get("note_id", ""),
+                "group_id": task.get("group_id", ""), "created_at": now_iso(),
                 "subtasks": [{"id": str(uuid.uuid4()), "title": st["title"], "done": False}
                              for st in task.get("subtasks", [])],
             }
@@ -5047,7 +5109,7 @@ async def seed_notas_telemovel():
     base = {"email": "", "details": "", "measurements": "", "quantity": "", "color": "",
             "reference": "", "status": "novo", "priority": "media", "labels": [],
             "supplier_id": "", "sla_days": DEFAULT_SLA_DAYS, "reminder_interval_days": 3,
-            "favorite": False, "created_by": AUTHOR, "archived": False,
+            "created_by": AUTHOR, "archived": False,
             "last_supplier_sent_at": "", "last_client_contact_at": "",
             "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
             "client_no_answer_count": 0, "supplier_no_answer_count": 0,
@@ -5093,7 +5155,7 @@ async def seed_pedidos_whatsapp():
     base = {"phone": "", "email": "", "details": "", "measurements": "", "quantity": "", "color": "",
             "reference": "", "status": "novo", "priority": "media", "labels": [],
             "supplier_id": "", "sla_days": DEFAULT_SLA_DAYS, "reminder_interval_days": 3,
-            "favorite": False, "created_by": AUTHOR, "archived": False,
+            "created_by": AUTHOR, "archived": False,
             "last_supplier_sent_at": "", "last_client_contact_at": "", "last_client_reply_at": "",
             "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
             "client_no_answer_count": 0, "supplier_no_answer_count": 0,
@@ -5109,12 +5171,12 @@ async def seed_pedidos_whatsapp():
 
 
 async def ensure_indexes():
-    for f in ["status", "priority", "category", "created_at", "supplier_id", "favorite", "archived"]:
+    for f in ["status", "priority", "category", "created_at", "supplier_id", "archived"]:
         try:
             await db.notes.create_index(f)
         except Exception:
             pass
-    for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("quotes", "note_id"),
+    for coll, field in [("activities", "note_id"), ("tasks", "note_id"), ("tasks", "group_id"), ("quotes", "note_id"),
                         ("received_emails", "note_id"), ("received_emails", "seen"),
                         ("received_emails", "matched"), ("received_emails", "received_at"),
                         ("received_emails", "reply_kind"), ("notes", "email"),

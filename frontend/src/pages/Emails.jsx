@@ -26,7 +26,6 @@ import EmailTemplatesDialog from "@/components/EmailTemplatesDialog";
 import EmailRulesDialog from "@/components/EmailRulesDialog";
 import EmailStatsDialog from "@/components/EmailStatsDialog";
 import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
-import FavoriteToggle from "@/components/FavoriteToggle";
 import { ListSkeleton } from "@/components/LoadingSkeletons";
 import TaskDialog from "@/components/TaskDialog";
 import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
@@ -394,10 +393,6 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                 checked={selected.has(m.id)}
                 onCheckedChange={() => toggleSelect(m.id)}
                 className="mt-2.5 shrink-0"
-              />
-              <FavoriteToggle
-                className="mt-1"
-                item={{ kind: "email", id: m.id, label: m.supplier_name || m.from_name || m.from_email, sublabel: m.subject || "(sem assunto)", to: "/emails" }}
               />
               <div className="min-w-0 flex-1">
               <button onClick={() => openItem(m)} className="flex w-full items-start gap-3 text-left">

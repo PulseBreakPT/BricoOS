@@ -265,16 +265,6 @@ export default function Notes() {
   };
 
   // ---- Quick actions (available on cards, focus mode, without opening) ----
-  const toggleFav = async (note) => {
-    setItems((prev) => prev.map((n) => (n.id === note.id ? { ...n, favorite: !n.favorite } : n)));
-    try {
-      await api.put(`/notes/${note.id}`, { favorite: !note.favorite });
-    } catch (e) {
-      // Reverte a alteração otimista se o servidor recusar.
-      setItems((prev) => prev.map((n) => (n.id === note.id ? { ...n, favorite: note.favorite } : n)));
-      toast.error(getErrorMessage(e, "Erro ao marcar favorito"));
-    }
-  };
   const advance = async (note) => {
     if (!note.next_status) return;
     if (getNextActionMode(note) !== "status") {
@@ -347,7 +337,7 @@ export default function Notes() {
       openNote(note.id);
     }
   };
-  const actions = { toggleFav, advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus };
+  const actions = { advance, contactClient, resolve, reopen, duplicate, sendReminder, changeStatus };
 
   // ---- Seleção em grupo — ações sobre vários pedidos de uma vez (lógica base 21) ----
   const toggleSelect = (id) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Trash2, ListChecks, CalendarDays, Repeat, SlidersHorizontal } from "lucide-react";
+import { Plus, Trash2, ListChecks, CalendarDays, Repeat, SlidersHorizontal, FolderTree } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,12 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
-import FavoriteToggle from "@/components/FavoriteToggle";
 import { toast } from "sonner";
 import {
   getTaskPriority, TASK_PRIORITIES, isOverdue, isToday, isNext7Days, formatDue, smartTaskSort, subtaskProgress,
 } from "@/lib/taskMeta";
+
+const NEW_GROUP_VALUE = "__new__";
 
 const SMART_VIEWS = [
   { key: "todas", label: "Todas" },
@@ -42,6 +43,11 @@ export default function Tasks() {
   const [title, setTitle] = useState("");
   const [addCategory, setAddCategory] = useState("construcao");
   const [addPriority, setAddPriority] = useState("nenhuma");
+  const [addGroupId, setAddGroupId] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [creatingGroupBusy, setCreatingGroupBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
@@ -55,12 +61,49 @@ export default function Tasks() {
       toast.error(getErrorMessage(e, "Erro ao carregar tarefas"));
     }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  const loadGroups = useCallback(async () => {
+    try {
+      const { data } = await api.get("/task-groups");
+      setGroups(data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar grupos"));
+    }
+  }, []);
+  useEffect(() => { load(); loadGroups(); }, [load, loadGroups]);
+
+  const groupsById = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g.name])), [groups]);
+
+  const onAddGroupChange = (v) => {
+    if (v === NEW_GROUP_VALUE) {
+      setCreatingGroup(true);
+      setNewGroupName("");
+      return;
+    }
+    setAddGroupId(v);
+  };
+
+  const createGroup = async () => {
+    if (!newGroupName.trim()) { toast.error("Indica o nome do grupo."); return; }
+    setCreatingGroupBusy(true);
+    try {
+      const { data } = await api.post("/task-groups", { name: newGroupName.trim() });
+      setGroups((g) => [...g, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setAddGroupId(data.id);
+      setCreatingGroup(false);
+      setNewGroupName("");
+      toast.success("Grupo criado");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao criar grupo"));
+    } finally {
+      setCreatingGroupBusy(false);
+    }
+  };
 
   const add = async () => {
     if (!title.trim()) { toast.error("Escreve a tarefa."); return; }
+    if (!addGroupId) { toast.error("Escolhe ou cria um grupo para a tarefa."); return; }
     try {
-      await api.post("/tasks", { title: title.trim(), category: addCategory, priority: addPriority });
+      await api.post("/tasks", { title: title.trim(), category: addCategory, priority: addPriority, group_id: addGroupId });
       setTitle("");
       toast.success("Tarefa adicionada");
       load();
@@ -160,6 +203,11 @@ export default function Tasks() {
           <p className={`text-sm font-semibold text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <CategoryBadge category={t.category} />
+            {t.group_id && groupsById[t.group_id] ? (
+              <span className="flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                <FolderTree className="h-3 w-3" /> {groupsById[t.group_id]}
+              </span>
+            ) : null}
             {t.priority && t.priority !== "nenhuma" ? (
               <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: p.bg, color: p.color }}>
                 {p.label}
@@ -185,7 +233,6 @@ export default function Tasks() {
             ))}
           </div>
         </button>
-        <FavoriteToggle item={{ kind: "tarefa", id: t.id, label: t.title, sublabel: t.due_date ? formatDue(t.due_date) : "", to: "/tarefas" }} />
         <button data-testid={`delete-task-${t.id}`} onClick={() => remove(t.id)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-500 active:scale-90">
           <Trash2 className="h-4 w-4" />
         </button>
@@ -228,6 +275,15 @@ export default function Tasks() {
             placeholder="Nova tarefa..."
             className="h-11 flex-1 rounded-xl"
           />
+          {!creatingGroup ? (
+            <Select value={addGroupId || undefined} onValueChange={onAddGroupChange}>
+              <SelectTrigger data-testid="task-group-select" className="h-11 rounded-xl sm:w-40"><SelectValue placeholder="Grupo..." /></SelectTrigger>
+              <SelectContent>
+                {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                <SelectItem value={NEW_GROUP_VALUE}>+ Criar novo grupo</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
           <Select value={addCategory} onValueChange={setAddCategory}>
             <SelectTrigger data-testid="task-category-select" className="h-11 rounded-xl sm:w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -253,6 +309,25 @@ export default function Tasks() {
             <SlidersHorizontal className="h-4 w-4" />
           </Button>
         </div>
+        {creatingGroup ? (
+          <div className="mt-2 flex gap-2">
+            <Input
+              data-testid="task-new-group-name"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createGroup(); } }}
+              placeholder="Nome do novo grupo"
+              className="h-11 flex-1 rounded-xl"
+              autoFocus
+            />
+            <Button type="button" variant="outline" disabled={creatingGroupBusy} onClick={createGroup} className="h-11 shrink-0 rounded-xl px-3">
+              Criar
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setCreatingGroup(false)} className="h-11 shrink-0 rounded-xl px-3">
+              Cancelar
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Smart views */}
@@ -344,7 +419,7 @@ export default function Tasks() {
         </Empty>
       ) : null}
 
-      <TaskDialog open={dialogOpen} onOpenChange={setDialogOpen} task={editingTask} onSaved={load} />
+      <TaskDialog open={dialogOpen} onOpenChange={setDialogOpen} task={editingTask} onSaved={() => { load(); loadGroups(); }} />
     </div>
   );
 }

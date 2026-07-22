@@ -46,7 +46,6 @@ import {
   SystemStatusProvider,
   useSystemStatus,
 } from "@/context/SystemStatusContext";
-import { FavoritesProvider } from "@/context/FavoritesContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
@@ -111,6 +110,13 @@ const ROUTE_APPS = [
     testid: "nav-tarefas",
   },
   {
+    path: "/grupos-tarefas",
+    title: "Grupos de Tarefas",
+    shortTitle: "Grupos",
+    icon: FolderTree,
+    testid: "nav-grupos-tarefas",
+  },
+  {
     path: "/estatisticas",
     title: "Centro de Análise",
     shortTitle: "Estatísticas",
@@ -130,7 +136,7 @@ const NAV_GROUPS = [
   { label: "Operação", items: ROUTE_APPS.slice(0, 3) },
   {
     label: "Organização",
-    items: [ROUTE_APPS[3], ROUTE_APPS[5], ROUTE_APPS[4]],
+    items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[6], ROUTE_APPS[5]],
   },
 ];
 
@@ -1029,12 +1035,10 @@ function LayoutInner() {
 
 export default function Layout() {
   return (
-    <FavoritesProvider>
-      <WorkspaceProvider>
-        <SystemStatusProvider>
-          <LayoutInner />
-        </SystemStatusProvider>
-      </WorkspaceProvider>
-    </FavoritesProvider>
+    <WorkspaceProvider>
+      <SystemStatusProvider>
+        <LayoutInner />
+      </SystemStatusProvider>
+    </WorkspaceProvider>
   );
 }

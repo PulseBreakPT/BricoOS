@@ -19,23 +19,67 @@ import LabelEditor from "@/components/LabelEditor";
 import AttachmentManager from "@/components/AttachmentManager";
 
 const emptyForm = {
-  title: "", category: "construcao", priority: "nenhuma", due_date: "", repeat: "none", subtasks: [], labels: [],
+  title: "", category: "construcao", priority: "nenhuma", due_date: "", repeat: "none", subtasks: [], labels: [], group_id: "",
 };
+
+const NEW_GROUP_VALUE = "__new__";
 
 export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   const isEdit = Boolean(task && task.id);
   const [form, setForm] = useState(emptyForm);
   const [newSubtask, setNewSubtask] = useState("");
   const [saving, setSaving] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [creatingGroupBusy, setCreatingGroupBusy] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const loadGroups = async () => {
+    try {
+      const { data } = await api.get("/task-groups");
+      setGroups(data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao carregar grupos"));
+    }
+  };
 
   useEffect(() => {
     if (open) {
       setForm(task ? { ...emptyForm, ...task } : emptyForm);
       setNewSubtask("");
+      setCreatingGroup(false);
+      setNewGroupName("");
+      loadGroups();
     }
   }, [open, task]);
+
+  const onGroupChange = (v) => {
+    if (v === NEW_GROUP_VALUE) {
+      setCreatingGroup(true);
+      setNewGroupName("");
+      return;
+    }
+    set("group_id", v);
+  };
+
+  const createGroup = async () => {
+    if (!newGroupName.trim()) { toast.error("Indica o nome do grupo."); return; }
+    setCreatingGroupBusy(true);
+    try {
+      const { data } = await api.post("/task-groups", { name: newGroupName.trim() });
+      setGroups((g) => [...g, data].sort((a, b) => a.name.localeCompare(b.name)));
+      set("group_id", data.id);
+      setCreatingGroup(false);
+      setNewGroupName("");
+      toast.success("Grupo criado");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Erro ao criar grupo"));
+    } finally {
+      setCreatingGroupBusy(false);
+    }
+  };
 
   const addSubtask = () => {
     if (!newSubtask.trim()) return;
@@ -57,6 +101,10 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
   const save = async () => {
     if (!form.title.trim()) {
       toast.error("Escreve o título da tarefa.");
+      return;
+    }
+    if (!form.group_id) {
+      toast.error("Escolhe ou cria um grupo para a tarefa.");
       return;
     }
     setSaving(true);
@@ -108,6 +156,36 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
             onChange={(e) => set("title", e.target.value)}
             placeholder="Ex.: Ligar ao fornecedor de tintas"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Grupo</Label>
+          {creatingGroup ? (
+            <div className="flex gap-2">
+              <Input
+                data-testid="task-dialog-new-group-name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createGroup(); } }}
+                placeholder="Nome do novo grupo"
+                autoFocus
+              />
+              <Button type="button" variant="outline" disabled={creatingGroupBusy} onClick={createGroup} className="h-9 shrink-0 px-3">
+                {creatingGroupBusy ? <Spinner className="h-4 w-4" /> : "Criar"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setCreatingGroup(false)} className="h-9 shrink-0 px-3">
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Select value={form.group_id || undefined} onValueChange={onGroupChange}>
+              <SelectTrigger data-testid="task-dialog-group"><SelectValue placeholder="Escolhe um grupo..." /></SelectTrigger>
+              <SelectContent>
+                {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                <SelectItem value={NEW_GROUP_VALUE}>+ Criar novo grupo</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
