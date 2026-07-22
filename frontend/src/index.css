@@ -339,34 +339,6 @@ a,
   opacity: 1;
 }
 
-.os-brand-beacon {
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background:
-    radial-gradient(
-      circle at 72% 22%,
-      rgba(255, 231, 178, 0.85),
-      transparent 20%
-    ),
-    linear-gradient(145deg, #be1820 0%, #ef3c2f 52%, #f2b84b 100%);
-  box-shadow:
-    0 8px 22px -9px rgba(230, 49, 42, 0.95),
-    inset 0 1px 0 rgba(255, 255, 255, 0.36),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.28);
-}
-
-.os-brand-beacon::before {
-  content: "";
-  position: absolute;
-  width: 130%;
-  height: 45%;
-  left: -15%;
-  top: -8%;
-  transform: rotate(-18deg);
-  background: rgba(255, 255, 255, 0.22);
-  filter: blur(4px);
-}
-
 /* Papel de parede do desktop — luz ambiente do BRICO OS: branco dominante
    ao centro, com brilhos difusos de sinal (vermelho) e worklight (amarelo)
    presos aos cantos. Discretos por defeito; nunca por cima do conteúdo. */
