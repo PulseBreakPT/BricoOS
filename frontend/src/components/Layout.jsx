@@ -247,10 +247,10 @@ function MobileBrand({ activeApp }) {
         <span className="relative z-10">B</span>
       </span>
       <div className="mobile-brand-copy min-w-0 leading-tight">
-        <p className="truncate font-heading text-sm font-extrabold text-white">
+        <p className="truncate font-heading text-sm font-extrabold text-foreground">
           BRICO OS
         </p>
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/35">
+        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
           {activeApp?.shortTitle || "Sistema da loja"}
         </p>
       </div>
@@ -859,13 +859,13 @@ function LayoutInner() {
             </SheetContent>
           </Sheet>
           <header className="mobile-os-header sticky top-0 z-30 p-2 pb-0 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-white/[0.11] px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(0,0,0,0.9)]">
+            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(0,0,0,0.9)]">
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
                   data-testid="mobile-nav-btn"
                   onClick={() => setMobileNavOpen(true)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   aria-label="Abrir menu"
                 >
                   <Menu className="h-5 w-5" />
@@ -877,7 +877,7 @@ function LayoutInner() {
                   type="button"
                   data-testid="mobile-search-btn"
                   onClick={() => setPaletteOpen(true)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   aria-label="Pesquisar"
                 >
                   <Search className="h-[18px] w-[18px]" />

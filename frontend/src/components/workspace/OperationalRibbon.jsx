@@ -55,16 +55,16 @@ export default function OperationalRibbon({
       aria-label="Estado operacional da loja"
       className={
         mobile
-          ? "os-ops-ribbon os-ops-ribbon-mobile mt-2 flex h-11 items-stretch overflow-hidden rounded-[17px] border border-white/[0.1] text-white"
+          ? "os-ops-ribbon os-ops-ribbon-mobile mt-2 flex h-11 items-stretch overflow-hidden rounded-[17px] border border-border bg-card text-foreground"
           : "os-ops-ribbon hidden h-9 shrink-0 items-stretch border-b border-black/45 text-white xl:flex"
       }
     >
       <div
-        className={`${mobile ? "w-[36%] min-w-0 px-3" : "min-w-[210px] px-4"} flex items-center gap-2 border-r border-white/[0.07]`}
+        className={`${mobile ? "w-[36%] min-w-0 px-3" : "min-w-[210px] px-4"} flex items-center gap-2 border-r ${mobile ? "border-border" : "border-white/[0.07]"}`}
       >
         <span className={`led ${online ? "led-ok" : "led-alert"}`} />
         <span className="min-w-0 leading-none">
-          <span className="block truncate text-[9px] font-black uppercase tracking-[0.16em] text-white/75">
+          <span className={`block truncate text-[9px] font-black uppercase tracking-[0.16em] ${mobile ? "text-foreground/75" : "text-white/75"}`}>
             {app?.shortTitle || "Secretária"}
           </span>
           {!mobile ? (
@@ -72,7 +72,7 @@ export default function OperationalRibbon({
               Shift A · Workspace 01
             </span>
           ) : (
-            <span className="mt-1 block truncate font-mono text-[7px] font-bold uppercase tracking-[0.14em] text-white/25">
+            <span className="mt-1 block truncate font-mono text-[7px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
               Operação ao vivo
             </span>
           )}
@@ -88,14 +88,14 @@ export default function OperationalRibbon({
               type="button"
               key={signal.key}
               onClick={() => openSignal(signal.route)}
-              className="group flex min-w-0 flex-1 items-center justify-center gap-1.5 border-r border-white/[0.07] px-2 transition-colors hover:bg-white/[0.075] focus-visible:bg-white/10 active:bg-white/[0.12] last:border-r-0"
+              className={`group flex min-w-0 flex-1 items-center justify-center gap-1.5 border-r px-2 transition-colors last:border-r-0 ${mobile ? "border-border hover:bg-muted focus-visible:bg-muted active:bg-accent" : "border-white/[0.07] hover:bg-white/[0.075] focus-visible:bg-white/10 active:bg-white/[0.12]"}`}
               aria-label={`${signal.label}: ${value} ${signal.compactLabel}`}
             >
-              <Icon className="hidden h-3 w-3 shrink-0 text-white/30 transition-colors group-hover:text-white/65 2xl:block" />
-              <span className="font-mono text-[11px] font-black tabular-nums text-white/90">
+              <Icon className={`hidden h-3 w-3 shrink-0 transition-colors 2xl:block ${mobile ? "text-muted-foreground group-hover:text-foreground" : "text-white/30 group-hover:text-white/65"}`} />
+              <span className={`font-mono text-[11px] font-black tabular-nums ${mobile ? "text-foreground" : "text-white/90"}`}>
                 {value}
               </span>
-              <span className="hidden truncate text-[8px] font-extrabold uppercase tracking-[0.08em] text-white/25 2xl:block">
+              <span className={`hidden truncate text-[8px] font-extrabold uppercase tracking-[0.08em] 2xl:block ${mobile ? "text-muted-foreground" : "text-white/25"}`}>
                 {signal.label}
               </span>
             </button>

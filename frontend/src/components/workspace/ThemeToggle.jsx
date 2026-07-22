@@ -18,7 +18,7 @@ export default function ThemeToggle({ variant = "desktop" }) {
       }}
       className={
         variant === "mobile"
-          ? "theme-toggle flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white/55 transition-all hover:bg-white/10 hover:text-white active:scale-90"
+          ? "theme-toggle flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-90"
           : "theme-toggle flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/55 transition-all duration-150 hover:bg-white/10 hover:text-white active:scale-90"
       }
       title={nextLabel}
