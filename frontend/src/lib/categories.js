@@ -1,40 +1,45 @@
 import { Hammer, Wrench, Sofa, Flower2 } from "lucide-react";
 
+// bg/text/border usam variáveis CSS (index.css, :root + [data-theme="dark"])
+// — os badges de categoria/estado, usados um pouco por toda a app via
+// inline style, trocam de tom sozinhos com o tema. O "accent" fica vivo em
+// hex fixo: só é usado no estado "selecionado" (fundo sólido) e lê bem em
+// ambos os temas.
 export const CATEGORIES = {
   construcao: {
     key: "construcao",
     label: "Construção",
     icon: Hammer,
-    bg: "#FFEDD5",
-    text: "#C2410C",
-    border: "#FDBA74",
+    bg: "var(--badge-construcao-bg)",
+    text: "var(--badge-construcao-text)",
+    border: "var(--badge-construcao-border)",
     accent: "#EA580C",
   },
   bricolage: {
     key: "bricolage",
     label: "Bricolagem",
     icon: Wrench,
-    bg: "#DBEAFE",
-    text: "#1D4ED8",
-    border: "#BFDBFE",
+    bg: "var(--badge-bricolage-bg)",
+    text: "var(--badge-bricolage-text)",
+    border: "var(--badge-bricolage-border)",
     accent: "#2563EB",
   },
   decoracao: {
     key: "decoracao",
     label: "Decoração",
     icon: Sofa,
-    bg: "#F3E8FF",
-    text: "#7E22CE",
-    border: "#E9D5FF",
+    bg: "var(--badge-decoracao-bg)",
+    text: "var(--badge-decoracao-text)",
+    border: "var(--badge-decoracao-border)",
     accent: "#9333EA",
   },
   jardim: {
     key: "jardim",
     label: "Jardim",
     icon: Flower2,
-    bg: "#DCFCE7",
-    text: "#15803D",
-    border: "#BBF7D0",
+    bg: "var(--badge-jardim-bg)",
+    text: "var(--badge-jardim-text)",
+    border: "var(--badge-jardim-border)",
     accent: "#16A34A",
   },
 };
@@ -42,10 +47,10 @@ export const CATEGORIES = {
 export const CATEGORY_LIST = Object.values(CATEGORIES);
 
 export const STATUS = {
-  aberto: { label: "Aberto", color: "#0369A1", bg: "#E0F2FE" },
-  preco_pedido: { label: "Preço pedido", color: "#B45309", bg: "#FEF3C7" },
-  preco_recebido: { label: "Preço recebido", color: "#1D4ED8", bg: "#DBEAFE" },
-  concluido: { label: "Concluído", color: "#15803D", bg: "#DCFCE7" },
+  aberto: { label: "Aberto", color: "var(--badge-aberto-text)", bg: "var(--badge-aberto-bg)" },
+  preco_pedido: { label: "Preço pedido", color: "var(--badge-preco_pedido-text)", bg: "var(--badge-preco_pedido-bg)" },
+  preco_recebido: { label: "Preço recebido", color: "var(--badge-preco_recebido-text)", bg: "var(--badge-preco_recebido-bg)" },
+  concluido: { label: "Concluído", color: "var(--badge-concluido-text)", bg: "var(--badge-concluido-bg)" },
 };
 
 export const getCategory = (key) => CATEGORIES[key] || CATEGORIES.construcao;

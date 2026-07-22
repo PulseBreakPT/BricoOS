@@ -125,6 +125,61 @@ a,
     --sidebar-accent-foreground: 45 12% 92%;
     --sidebar-border: 228 6% 18%;
     --sidebar-ring: 0 72% 46%;
+
+    /* --- Etiquetas de estado/prioridade/categoria — papel claro -----
+       Consumidas via var() em inline style (lib/pedido.js,
+       lib/categories.js) para que os badges usados em toda a app
+       (Pedidos, Tarefas, Fornecedores, Kanban, Explorador) troquem de
+       tom sozinhos ao mudar de tema, sem qualquer alteração de código. */
+    --badge-novo-bg: #ecfccb; --badge-novo-text: #4d7c0f;
+    --badge-pendente-bg: #fef3c7; --badge-pendente-text: #b45309;
+    --badge-em_preparacao-bg: #e0e7ff; --badge-em_preparacao-text: #4338ca;
+    --badge-enviado_fornecedor-bg: #dbeafe; --badge-enviado_fornecedor-text: #1d4ed8;
+    --badge-aguarda_fornecedor-bg: #cffafe; --badge-aguarda_fornecedor-text: #0e7490;
+    --badge-orcamento_recebido-bg: #ede9fe; --badge-orcamento_recebido-text: #6d28d9;
+    --badge-aguarda_cliente-bg: #ffedd5; --badge-aguarda_cliente-text: #c2410c;
+    --badge-aprovado-bg: #dcfce7; --badge-aprovado-text: #15803d;
+    --badge-rejeitado-bg: #ffe4e6; --badge-rejeitado-text: #be123c;
+    --badge-encomendado-bg: #ccfbf1; --badge-encomendado-text: #0f766e;
+    --badge-concluido-bg: #d1fae5; --badge-concluido-text: #166534;
+    --badge-cancelado-bg: #fce7f3; --badge-cancelado-text: #be185d;
+
+    --badge-urgente-bg: #fee2e2; --badge-urgente-text: #b91c1c;
+    --badge-alta-bg: #ffedd5; --badge-alta-text: #c2410c;
+    --badge-media-bg: #fef9c3; --badge-media-text: #a16207;
+    --badge-baixa-bg: #dcfce7; --badge-baixa-text: #15803d;
+
+    --badge-construcao-bg: #ffedd5; --badge-construcao-text: #c2410c; --badge-construcao-border: #fdba74;
+    --badge-bricolage-bg: #dbeafe; --badge-bricolage-text: #1d4ed8; --badge-bricolage-border: #bfdbfe;
+    --badge-decoracao-bg: #f3e8ff; --badge-decoracao-text: #7e22ce; --badge-decoracao-border: #e9d5ff;
+    --badge-jardim-bg: #dcfce7; --badge-jardim-text: #15803d; --badge-jardim-border: #bbf7d0;
+
+    --badge-aberto-bg: #e0f2fe; --badge-aberto-text: #0369a1;
+    --badge-preco_pedido-bg: #fef3c7; --badge-preco_pedido-text: #b45309;
+    --badge-preco_recebido-bg: #dbeafe; --badge-preco_recebido-text: #1d4ed8;
+
+    /* --- Tons de resumo (chips do dia em Pedidos) ------------------ */
+    --tone-slate-bg: #f1f5f9; --tone-slate-text: #334155;
+    --tone-blue-bg: #dbeafe; --tone-blue-text: #1d4ed8;
+    --tone-amber-bg: #fef3c7; --tone-amber-text: #b45309;
+    --tone-red-bg: #fee2e2; --tone-red-text: #b91c1c;
+    --tone-green-bg: #d1fae5; --tone-green-text: #047857;
+    --tone-purple-bg: #f3e8ff; --tone-purple-text: #7e22ce;
+
+    --pastel-emerald-bg: #d1fae5; --pastel-emerald-text: #065f46;
+    --pastel-amber-bg: #fef3c7; --pastel-amber-text: #92400e;
+    --pastel-blue-bg: #dbeafe; --pastel-blue-text: #1e40af;
+    --pastel-purple-bg: #f3e8ff; --pastel-purple-text: #6b21a8;
+    --pastel-red-bg: #fee2e2; --pastel-red-text: #991b1b;
+    --pastel-rose-bg: #ffe4e6; --pastel-rose-text: #9f1239;
+    --pastel-orange-bg: #ffedd5; --pastel-orange-text: #9a3412;
+    --pastel-sky-bg: #e0f2fe; --pastel-sky-text: #075985;
+    --pastel-violet-bg: #ede9fe; --pastel-violet-text: #5b21b6;
+    --pastel-green-bg: #dcfce7; --pastel-green-text: #166534;
+    --pastel-indigo-bg: #e0e7ff; --pastel-indigo-text: #3730a3;
+    --pastel-teal-bg: #ccfbf1; --pastel-teal-text: #115e59;
+    --pastel-cyan-bg: #cffafe; --pastel-cyan-text: #155e75;
+    --pastel-pink-bg: #fce7f3; --pastel-pink-text: #9d174d;
   }
 
   [data-theme="dark"] {
@@ -157,6 +212,58 @@ a,
       0 3px 8px rgba(0, 0, 0, 0.48), 0 26px 64px -18px rgba(0, 0, 0, 0.82);
     --shadow-e4:
       0 5px 12px rgba(0, 0, 0, 0.58), 0 42px 96px -20px rgba(0, 0, 0, 0.9);
+
+    /* --- Etiquetas de estado/prioridade/categoria — papel escuro ---
+       Fundo translúcido escuro + texto claro em vez de pastel sólido,
+       para não "brilharem" fora de tom no papel escuro. */
+    --badge-novo-bg: rgba(132, 204, 22, 0.16); --badge-novo-text: #a3e635;
+    --badge-pendente-bg: rgba(217, 119, 6, 0.16); --badge-pendente-text: #fbbf24;
+    --badge-em_preparacao-bg: rgba(99, 102, 241, 0.16); --badge-em_preparacao-text: #a5b4fc;
+    --badge-enviado_fornecedor-bg: rgba(37, 99, 235, 0.16); --badge-enviado_fornecedor-text: #93c5fd;
+    --badge-aguarda_fornecedor-bg: rgba(6, 182, 212, 0.16); --badge-aguarda_fornecedor-text: #67e8f9;
+    --badge-orcamento_recebido-bg: rgba(139, 92, 246, 0.16); --badge-orcamento_recebido-text: #c4b5fd;
+    --badge-aguarda_cliente-bg: rgba(234, 88, 12, 0.16); --badge-aguarda_cliente-text: #fdba74;
+    --badge-aprovado-bg: rgba(34, 197, 94, 0.16); --badge-aprovado-text: #86efac;
+    --badge-rejeitado-bg: rgba(244, 63, 94, 0.16); --badge-rejeitado-text: #fda4af;
+    --badge-encomendado-bg: rgba(20, 184, 166, 0.16); --badge-encomendado-text: #5eead4;
+    --badge-concluido-bg: rgba(22, 163, 74, 0.16); --badge-concluido-text: #86efac;
+    --badge-cancelado-bg: rgba(236, 72, 153, 0.16); --badge-cancelado-text: #f9a8d4;
+
+    --badge-urgente-bg: rgba(220, 38, 38, 0.18); --badge-urgente-text: #fca5a5;
+    --badge-alta-bg: rgba(234, 88, 12, 0.16); --badge-alta-text: #fdba74;
+    --badge-media-bg: rgba(234, 179, 8, 0.16); --badge-media-text: #fde047;
+    --badge-baixa-bg: rgba(34, 197, 94, 0.16); --badge-baixa-text: #86efac;
+
+    --badge-construcao-bg: rgba(234, 88, 12, 0.16); --badge-construcao-text: #fdba74; --badge-construcao-border: rgba(234, 88, 12, 0.4);
+    --badge-bricolage-bg: rgba(37, 99, 235, 0.16); --badge-bricolage-text: #93c5fd; --badge-bricolage-border: rgba(37, 99, 235, 0.4);
+    --badge-decoracao-bg: rgba(147, 51, 234, 0.16); --badge-decoracao-text: #d8b4fe; --badge-decoracao-border: rgba(147, 51, 234, 0.4);
+    --badge-jardim-bg: rgba(22, 163, 74, 0.16); --badge-jardim-text: #86efac; --badge-jardim-border: rgba(22, 163, 74, 0.4);
+
+    --badge-aberto-bg: rgba(3, 105, 161, 0.18); --badge-aberto-text: #7dd3fc;
+    --badge-preco_pedido-bg: rgba(217, 119, 6, 0.16); --badge-preco_pedido-text: #fbbf24;
+    --badge-preco_recebido-bg: rgba(37, 99, 235, 0.16); --badge-preco_recebido-text: #93c5fd;
+
+    --tone-slate-bg: rgba(255, 255, 255, 0.08); --tone-slate-text: #cbd5e1;
+    --tone-blue-bg: rgba(37, 99, 235, 0.16); --tone-blue-text: #93c5fd;
+    --tone-amber-bg: rgba(217, 119, 6, 0.16); --tone-amber-text: #fbbf24;
+    --tone-red-bg: rgba(220, 38, 38, 0.18); --tone-red-text: #fca5a5;
+    --tone-green-bg: rgba(22, 163, 74, 0.16); --tone-green-text: #86efac;
+    --tone-purple-bg: rgba(147, 51, 234, 0.16); --tone-purple-text: #d8b4fe;
+
+    --pastel-emerald-bg: rgba(16, 185, 129, 0.16); --pastel-emerald-text: #6ee7b7;
+    --pastel-amber-bg: rgba(245, 158, 11, 0.16); --pastel-amber-text: #fcd34d;
+    --pastel-blue-bg: rgba(59, 130, 246, 0.16); --pastel-blue-text: #93c5fd;
+    --pastel-purple-bg: rgba(168, 85, 247, 0.16); --pastel-purple-text: #d8b4fe;
+    --pastel-red-bg: rgba(239, 68, 68, 0.16); --pastel-red-text: #fca5a5;
+    --pastel-rose-bg: rgba(244, 63, 94, 0.16); --pastel-rose-text: #fda4af;
+    --pastel-orange-bg: rgba(249, 115, 22, 0.16); --pastel-orange-text: #fdba74;
+    --pastel-sky-bg: rgba(14, 165, 233, 0.16); --pastel-sky-text: #7dd3fc;
+    --pastel-violet-bg: rgba(139, 92, 246, 0.16); --pastel-violet-text: #c4b5fd;
+    --pastel-green-bg: rgba(34, 197, 94, 0.16); --pastel-green-text: #86efac;
+    --pastel-indigo-bg: rgba(99, 102, 241, 0.16); --pastel-indigo-text: #a5b4fc;
+    --pastel-teal-bg: rgba(20, 184, 166, 0.16); --pastel-teal-text: #5eead4;
+    --pastel-cyan-bg: rgba(6, 182, 212, 0.16); --pastel-cyan-text: #67e8f9;
+    --pastel-pink-bg: rgba(236, 72, 153, 0.16); --pastel-pink-text: #f9a8d4;
   }
 }
 

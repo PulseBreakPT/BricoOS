@@ -40,10 +40,10 @@ function PhoneActions({ phone }) {
   if (!wa) return null;
   return (
     <span className="flex shrink-0 items-center gap-1">
-      <a href={`tel:${phone}`} title="Ligar" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+      <a href={`tel:${phone}`} title="Ligar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
         <Phone className="h-3.5 w-3.5" />
       </a>
-      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600">
+      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-muted-foreground hover:bg-[var(--pastel-emerald-bg)] hover:text-emerald-600">
         <MessageCircle className="h-3.5 w-3.5" />
       </a>
     </span>
@@ -53,7 +53,7 @@ function PhoneActions({ phone }) {
 function EmailAction({ email }) {
   if (!email) return null;
   return (
-    <a href={`mailto:${email}`} title="Enviar email" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+    <a href={`mailto:${email}`} title="Enviar email" className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
       <Mail className="h-3.5 w-3.5" />
     </a>
   );
@@ -161,8 +161,8 @@ export default function Suppliers() {
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <p className="kicker">Contactos</p>
-          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Fornecedores</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Fornecedores</h1>
+          <p className="text-sm text-muted-foreground">
             {suppliers.length > 0
               ? `${suppliers.length} contacto${suppliers.length === 1 ? "" : "s"} pronto${suppliers.length === 1 ? "" : "s"} a receber pedidos de orçamento.`
               : "Para onde enviar os pedidos de orçamento."}
@@ -181,7 +181,7 @@ export default function Suppliers() {
             <div
               key={s.id}
               data-testid={`supplier-card-${s.id}`}
-              className="group relative animate-fade-up overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 sm:p-5"
+              className="group relative animate-fade-up overflow-hidden rounded-2xl border border-border bg-card p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 hover:border-input sm:p-5"
               style={{ "--stagger-i": Math.min(idx, 8) }}
             >
               <div className="flex items-start justify-between gap-3">
@@ -193,40 +193,40 @@ export default function Suppliers() {
                     {initials}
                   </span>
                   <div className="min-w-0">
-                    <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-slate-900">{s.name}</h3>
+                    <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-foreground">{s.name}</h3>
                     {s.category ? <div className="mt-1"><CategoryBadge category={s.category} /></div> : null}
                   </div>
                 </div>
                 <div className="flex gap-1">
                   <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
-                  <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-slate-400 transition-all duration-150 hover:scale-110 hover:bg-slate-100 hover:text-slate-700 active:scale-90">
+                  <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-muted hover:text-foreground active:scale-90">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-slate-400 transition-all duration-150 hover:scale-110 hover:bg-red-50 hover:text-red-600 active:scale-90">
+                  <button data-testid={`delete-supplier-${s.id}`} onClick={() => remove(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
               <div className="mt-3 space-y-1.5 text-sm">
-                <p className="flex items-center justify-between gap-2 text-slate-600">
+                <p className="flex items-center justify-between gap-2 text-muted-foreground">
                   <span className="flex min-w-0 items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     {s.email ? <span className="truncate font-mono text-xs">{s.email}</span> : <span className="text-xs text-red-400">Sem email definido</span>}
                   </span>
                   <EmailAction email={s.email} />
                 </p>
                 {s.phone ? (
-                  <p className="flex items-center justify-between gap-2 text-slate-600">
+                  <p className="flex items-center justify-between gap-2 text-muted-foreground">
                     <span className="flex min-w-0 items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" /> <span className="truncate font-mono text-xs">{s.phone}</span>
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate font-mono text-xs">{s.phone}</span>
                     </span>
                     <PhoneActions phone={s.phone} />
                   </p>
                 ) : null}
                 {(s.contacts || []).filter((c) => c.phone || c.email).map((c, i) => (
-                  <p key={i} className="flex items-center justify-between gap-2 text-slate-600">
+                  <p key={i} className="flex items-center justify-between gap-2 text-muted-foreground">
                     <span className="flex min-w-0 items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate text-xs">
                         {c.name ? <span className="font-semibold">{c.name}</span> : null}{c.name && (c.phone || c.email) ? " · " : ""}
                         {c.phone ? <span className="font-mono">{c.phone}</span> : null}
@@ -240,11 +240,11 @@ export default function Suppliers() {
                     </span>
                   </p>
                 ))}
-                {s.notes ? <p className="pt-1 text-xs text-slate-400">{s.notes}</p> : null}
+                {s.notes ? <p className="pt-1 text-xs text-muted-foreground">{s.notes}</p> : null}
                 {(s.labels || []).length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {s.labels.slice(0, 4).map((l) => (
-                      <span key={l} className="inline-flex items-center rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{l}</span>
+                      <span key={l} className="inline-flex items-center rounded-full bg-foreground/5 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{l}</span>
                     ))}
                   </div>
                 ) : null}
@@ -252,12 +252,12 @@ export default function Suppliers() {
               {(s.open_notes > 0 || s.quotes_given > 0) ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {s.open_notes > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-blue-bg)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--pastel-blue-text)]">
                       <ClipboardList className="h-3 w-3" /> {s.open_notes} pedido{s.open_notes === 1 ? "" : "s"} em aberto
                     </span>
                   ) : null}
                   {s.quotes_given > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-emerald-bg)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--pastel-emerald-text)]">
                       <Receipt className="h-3 w-3" /> {s.quotes_approved}/{s.quotes_given} orçamento{s.quotes_given === 1 ? "" : "s"} aprovado{s.quotes_approved === 1 ? "" : "s"}
                     </span>
                   ) : null}
@@ -269,21 +269,21 @@ export default function Suppliers() {
       </div>
 
       {suppliers.length === 0 ? (
-        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-slate-200 bg-white/60 px-6 py-14">
+        <Empty className="mt-10 rounded-3xl border-2 border-dashed border-border bg-card/60 px-6 py-14">
           <EmptyMedia>
             <div className="relative">
-              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-slate-200/60 blur-xl" />
-              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-red-600">
+              <div className="absolute inset-0 animate-float-slow rounded-3xl bg-muted/60 blur-xl" />
+              <div className="card-elevated relative flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-gradient-to-br from-white to-slate-50 text-red-600">
                 <Truck className="h-7 w-7" />
               </div>
             </div>
           </EmptyMedia>
           <EmptyHeader className="max-w-xs gap-1">
-            <EmptyTitle className="font-heading font-extrabold text-slate-900">Ainda sem fornecedores</EmptyTitle>
-            <EmptyDescription className="text-slate-500">Adiciona o primeiro contacto para começar a pedir orçamentos num clique.</EmptyDescription>
+            <EmptyTitle className="font-heading font-extrabold text-foreground">Ainda sem fornecedores</EmptyTitle>
+            <EmptyDescription className="text-muted-foreground">Adiciona o primeiro contacto para começar a pedir orçamentos num clique.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
+            <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
               <Plus className="h-4 w-4" strokeWidth={2.6} /> Adicionar fornecedor
             </button>
           </EmptyContent>
@@ -343,11 +343,11 @@ export default function Suppliers() {
                 </Button>
               </div>
               {(form.contacts || []).length === 0 ? (
-                <p className="text-xs text-slate-400">Ex.: número/email pessoal da Camila, do Jorge, etc.</p>
+                <p className="text-xs text-muted-foreground">Ex.: número/email pessoal da Camila, do Jorge, etc.</p>
               ) : (
                 <div className="space-y-2">
                   {form.contacts.map((c, i) => (
-                    <div key={i} className="flex items-start gap-2 rounded-xl border border-slate-200 p-2">
+                    <div key={i} className="flex items-start gap-2 rounded-xl border border-border p-2">
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Input
                           data-testid={`supplier-contact-name-${i}`}
@@ -374,7 +374,7 @@ export default function Suppliers() {
                         type="button"
                         data-testid={`remove-supplier-contact-${i}`}
                         onClick={() => removeContact(i)}
-                        className="mt-1 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-red-500"
+                        className="mt-1 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-red-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

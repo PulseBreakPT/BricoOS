@@ -39,7 +39,7 @@ export default function Stopwatch() {
 
   return (
     <div className="mx-auto flex max-w-xs flex-col items-center gap-4">
-      <p data-testid="stopwatch-display" className="font-mono text-4xl font-black tabular-nums text-slate-900">{formatElapsed(elapsed)}</p>
+      <p data-testid="stopwatch-display" className="font-mono text-4xl font-black tabular-nums text-foreground">{formatElapsed(elapsed)}</p>
       <div className="flex gap-2">
         {running ? (
           <button type="button" data-testid="stopwatch-pause" onClick={pause} className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-500 text-white hover:bg-amber-600">
@@ -50,17 +50,17 @@ export default function Stopwatch() {
             <Play className="h-4 w-4" />
           </button>
         )}
-        <button type="button" data-testid="stopwatch-lap" onClick={lap} disabled={!running} className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30">
+        <button type="button" data-testid="stopwatch-lap" onClick={lap} disabled={!running} className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30">
           <Flag className="h-4 w-4" />
         </button>
-        <button type="button" data-testid="stopwatch-reset" onClick={reset} className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">
+        <button type="button" data-testid="stopwatch-reset" onClick={reset} className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted">
           <RotateCcw className="h-4 w-4" />
         </button>
       </div>
       {laps.length > 0 ? (
         <div className="max-h-40 w-full space-y-1 overflow-y-auto">
           {laps.map((l, i) => (
-            <div key={i} className="flex justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-mono text-slate-600">
+            <div key={i} className="flex justify-between rounded-lg bg-muted px-3 py-1.5 text-xs font-mono text-muted-foreground">
               <span>Volta {laps.length - i}</span><span>{formatElapsed(l)}</span>
             </div>
           ))}

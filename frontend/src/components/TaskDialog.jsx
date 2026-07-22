@@ -95,7 +95,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
           <DialogTitle className="font-heading text-xl font-bold tracking-tight">
             {isEdit ? "Editar tarefa" : "Nova tarefa"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-slate-500">
+          <DialogDescription className="text-sm text-muted-foreground">
             Prazo, prioridade, repetição e subtarefas.
           </DialogDescription>
         </DialogHeader>
@@ -163,10 +163,10 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
           <Label>Subtarefas</Label>
           <div className="space-y-1.5">
             {(form.subtasks || []).map((s, idx) => (
-              <div key={s.id || idx} data-testid={`task-dialog-subtask-${idx}`} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5">
+              <div key={s.id || idx} data-testid={`task-dialog-subtask-${idx}`} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
                 <Checkbox checked={s.done} onCheckedChange={() => toggleSubtask(idx)} className="h-4 w-4" />
-                <span className={`flex-1 text-sm ${s.done ? "text-slate-400 line-through" : "text-slate-700"}`}>{s.title}</span>
-                <button onClick={() => removeSubtask(idx)} aria-label={`Remover subtarefa ${s.title}`} title="Remover subtarefa" className="text-slate-300 hover:text-red-500">
+                <span className={`flex-1 text-sm ${s.done ? "text-muted-foreground line-through" : "text-foreground"}`}>{s.title}</span>
+                <button onClick={() => removeSubtask(idx)} aria-label={`Remover subtarefa ${s.title}`} title="Remover subtarefa" className="text-muted-foreground hover:text-red-500">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -209,7 +209,7 @@ export default function TaskDialog({ open, onOpenChange, task, onSaved }) {
               data-testid="task-dialog-delete"
               variant="outline"
               onClick={remove}
-              className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]"
             >
               <Trash2 className="mr-1.5 h-4 w-4" /> Eliminar
             </Button>

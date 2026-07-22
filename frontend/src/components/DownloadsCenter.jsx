@@ -35,15 +35,15 @@ export default function DownloadsCenter() {
   }, []);
 
   if (loading) {
-    return <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-slate-400" /></div>;
+    return <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-muted-foreground" /></div>;
   }
   if (items.length === 0) {
-    return <p className="py-10 text-center text-xs text-slate-400">Ainda sem ficheiros guardados.</p>;
+    return <p className="py-10 text-center text-xs text-muted-foreground">Ainda sem ficheiros guardados.</p>;
   }
 
   return (
     <div className="space-y-1.5">
-      <p className="mb-2 text-xs text-slate-400">
+      <p className="mb-2 text-xs text-muted-foreground">
         {items.length} ficheiro{items.length === 1 ? "" : "s"} — orçamentos, fotos e anexos de email, tudo num só lugar.
       </p>
       {items.map((it) => {
@@ -54,36 +54,36 @@ export default function DownloadsCenter() {
             key={`${it.source}-${it.id}`}
             as="div"
             data-testid={`download-item-${it.id}`}
-            className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5"
+            className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5"
             renderPeek={() => (
               isImage ? (
                 <div className="space-y-2">
-                  <img src={withDeviceToken(fileUrl(it))} alt={it.filename} className="max-h-56 w-full rounded-lg bg-slate-50 object-contain" />
-                  <p className="truncate text-xs font-bold text-slate-900">{it.filename}</p>
-                  <p className="truncate text-[11px] text-slate-400">
+                  <img src={withDeviceToken(fileUrl(it))} alt={it.filename} className="max-h-56 w-full rounded-lg bg-muted object-contain" />
+                  <p className="truncate text-xs font-bold text-foreground">{it.filename}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
                     {it.kind_label}{it.note_label ? ` · ${it.note_label}` : ""} · {timeAgo(it.created_at)}
                   </p>
                 </div>
               ) : (
                 <div className="flex items-start gap-2.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-900">{it.filename}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-slate-400">{it.kind_label}{it.note_label ? ` · ${it.note_label}` : ""}</p>
-                    <p className="text-[11px] text-slate-400">{timeAgo(it.created_at)}</p>
+                    <p className="truncate text-xs font-bold text-foreground">{it.filename}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{it.kind_label}{it.note_label ? ` · ${it.note_label}` : ""}</p>
+                    <p className="text-[11px] text-muted-foreground">{timeAgo(it.created_at)}</p>
                   </div>
                 </div>
               )
             )}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <Icon className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-slate-900">{it.filename}</p>
-              <p className="truncate text-[11px] text-slate-400">
+              <p className="truncate text-xs font-bold text-foreground">{it.filename}</p>
+              <p className="truncate text-[11px] text-muted-foreground">
                 {it.kind_label}{it.note_label ? ` · ${it.note_label}` : ""} · {timeAgo(it.created_at)}
               </p>
             </div>
@@ -99,7 +99,7 @@ export default function DownloadsCenter() {
                   type="button"
                   title="Abrir pedido"
                   onClick={() => navigate(`/?open=${it.note_id}`)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
@@ -109,7 +109,7 @@ export default function DownloadsCenter() {
                 target="_blank"
                 rel="noreferrer"
                 title="Descarregar"
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <Download className="h-3.5 w-3.5" />
               </a>

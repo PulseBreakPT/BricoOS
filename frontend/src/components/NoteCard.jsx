@@ -15,7 +15,7 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
       transition={{ duration: 0.25 }}
       data-testid={`note-card-${note.id}`}
       onClick={() => onOpen(note)}
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60 active:scale-[0.99]"
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-input hover:shadow-lg hover:shadow-slate-200/60 active:scale-[0.99]"
     >
       <span className="absolute inset-y-0 left-0 w-1.5 transition-all duration-200 group-hover:w-2" style={{ backgroundColor: c.accent }} />
       <div className="flex items-start gap-3 pl-2">
@@ -31,7 +31,7 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <h3
-              className={`truncate font-heading text-base font-extrabold tracking-tight text-slate-900 ${
+              className={`truncate font-heading text-base font-extrabold tracking-tight text-foreground ${
                 note.done ? "line-through opacity-50" : ""
               }`}
             >
@@ -43,22 +43,22 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
                 e.stopPropagation();
                 onToggleFavorite(note);
               }}
-              className="shrink-0 rounded-lg p-1 text-slate-300 transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90"
+              className="shrink-0 rounded-lg p-1 text-muted-foreground transition-transform duration-150 hover:scale-125 hover:text-amber-400 active:scale-90"
             >
               <Star key={note.favorite} className={`h-4 w-4 ${note.favorite ? "fill-amber-400 text-amber-400 animate-pop" : ""}`} />
             </button>
           </div>
 
           {note.phone ? (
-            <p className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-slate-500">
+            <p className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
               <Phone className="h-3 w-3" /> {note.phone}
             </p>
           ) : null}
 
-          <p className="mt-2 line-clamp-2 text-sm text-slate-600">{note.description}</p>
+          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{note.description}</p>
 
           {note.measurements ? (
-            <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-semibold text-slate-700">
+            <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 font-mono text-xs font-semibold text-foreground">
               <Ruler className="h-3 w-3" /> {note.measurements}
             </div>
           ) : null}
@@ -66,7 +66,7 @@ export default function NoteCard({ note, onOpen, onToggleDone, onToggleFavorite 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <CategoryBadge category={note.category} />
             <StatusPill status={note.status} />
-            <ChevronRight className="ml-auto h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-500" />
+            <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
           </div>
         </div>
       </div>

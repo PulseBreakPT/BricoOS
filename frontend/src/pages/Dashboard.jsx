@@ -48,7 +48,7 @@ function DashboardWidget({ widgetKey, title, wide, onDragStartKey, onDropOnKey, 
       className={`group relative ${wide ? "lg:col-span-2" : ""}`}
     >
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <span title="Arrastar para reordenar" className="cursor-grab rounded-md bg-white/90 p-1 text-slate-400 shadow-sm">
+        <span title="Arrastar para reordenar" className="cursor-grab rounded-md bg-card/90 p-1 text-muted-foreground shadow-sm">
           <GripVertical className="h-3.5 w-3.5" />
         </span>
         <button
@@ -56,7 +56,7 @@ function DashboardWidget({ widgetKey, title, wide, onDragStartKey, onDropOnKey, 
           data-testid={`dashboard-widget-hide-${widgetKey}`}
           title={`Ocultar "${title}"`}
           onClick={() => onHide(widgetKey)}
-          className="rounded-md bg-white/90 p-1 text-slate-400 shadow-sm hover:bg-red-50 hover:text-red-500"
+          className="rounded-md bg-card/90 p-1 text-muted-foreground shadow-sm hover:bg-[var(--pastel-red-bg)] hover:text-red-500"
         >
           <EyeOff className="h-3.5 w-3.5" />
         </button>
@@ -91,7 +91,7 @@ function CountUp({ value }) {
 const StatCard = ({ icon: Icon, label, value, accent, testid, danger, index = 0 }) => (
   <div
     data-testid={testid}
-    className={`group relative animate-fade-up overflow-hidden rounded-2xl border bg-white p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-slate-200/90 hover:border-slate-300"}`}
+    className={`group relative animate-fade-up overflow-hidden rounded-2xl border bg-card p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-border hover:border-input"}`}
     style={{ "--stagger-i": index }}
   >
     {/* Barra de sinal — mesma linguagem dos alertas: margem vermelha =
@@ -110,20 +110,20 @@ const StatCard = ({ icon: Icon, label, value, accent, testid, danger, index = 0 
     >
       <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
     </div>
-    <p className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-slate-900 sm:mt-4 sm:text-4xl">
+    <p className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-foreground sm:mt-4 sm:text-4xl">
       <CountUp value={value} />
     </p>
-    <p className="mt-0.5 text-xs font-semibold text-slate-500 sm:text-sm">{label}</p>
+    <p className="mt-0.5 text-xs font-semibold text-muted-foreground sm:text-sm">{label}</p>
   </div>
 );
 
 const SEV_ICON = {
-  high: { bg: "bg-red-100 text-red-600", ring: "border-red-100 bg-red-50/60" },
-  medium: { bg: "bg-amber-100 text-amber-600", ring: "border-amber-100 bg-amber-50/60" },
-  low: { bg: "bg-blue-100 text-blue-600", ring: "border-blue-100 bg-blue-50/60" },
+  high: { bg: "bg-[var(--pastel-red-bg)] text-red-600", ring: "border-red-100 bg-[var(--pastel-red-bg)]" },
+  medium: { bg: "bg-[var(--pastel-amber-bg)] text-amber-600", ring: "border-amber-100 bg-[var(--pastel-amber-bg)]" },
+  low: { bg: "bg-[var(--pastel-blue-bg)] text-blue-600", ring: "border-blue-100 bg-[var(--pastel-blue-bg)]" },
 };
 
-const MEDALS = ["bg-amber-100 text-amber-700", "bg-slate-200 text-slate-600", "bg-orange-100 text-orange-700"];
+const MEDALS = ["bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)]", "bg-muted text-muted-foreground", "bg-[var(--pastel-orange-bg)] text-[color:var(--pastel-orange-text)]"];
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -181,15 +181,15 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <p className="kicker capitalize">{today}</p>
-          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Painel da loja</h1>
-          <p className="text-sm text-slate-500">A fotografia do momento: pedidos, prazos e fornecedores em tempo real.</p>
+          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Painel da loja</h1>
+          <p className="text-sm text-muted-foreground">A fotografia do momento: pedidos, prazos e fornecedores em tempo real.</p>
         </div>
         {hiddenWidgets.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 data-testid="dashboard-hidden-widgets-btn"
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 shadow-sm hover:border-slate-300 hover:text-slate-900"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground shadow-sm hover:border-input hover:text-foreground"
               >
                 <LayoutGrid className="h-3.5 w-3.5" /> Widgets ocultos ({hiddenWidgets.length})
               </button>
@@ -215,19 +215,19 @@ export default function Dashboard() {
       {(() => {
         const bodies = {
           alerts: (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated sm:p-6">
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-slate-900">
-                  Precisa de atenção {notifs.count > 0 ? <span className="ml-1 rounded-full bg-red-100 px-2 py-0.5 align-middle font-mono text-xs font-bold text-red-700">{notifs.count}</span> : null}
+                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                  Precisa de atenção {notifs.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-red-text)]">{notifs.count}</span> : null}
                 </h2>
-                <Link to="/" data-testid="link-ver-pedidos" className="group inline-flex items-center gap-1 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
+                <Link to="/" data-testid="link-ver-pedidos" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
                   Ver pedidos <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                 </Link>
               </div>
               <div className="mt-4 space-y-2">
                 {notifs.items.length === 0 ? (
-                  <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-semibold text-emerald-700">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100"><CheckCircle2 className="h-4 w-4" /></span>
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-[var(--pastel-emerald-bg)] p-4 text-sm font-semibold text-[color:var(--pastel-emerald-text)]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--pastel-emerald-bg)]"><CheckCircle2 className="h-4 w-4" /></span>
                     Tudo em dia. Nenhum pedido esquecido!
                   </div>
                 ) : notifs.items.slice(0, 6).map((n) => {
@@ -239,10 +239,10 @@ export default function Dashboard() {
                         {n.kind === "urgent" ? <Zap className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{n.title}</p>
-                        <p className="truncate text-xs text-slate-500">{n.message}</p>
+                        <p className="truncate text-sm font-bold text-foreground">{n.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">{n.message}</p>
                       </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-500" />
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1 group-hover:text-muted-foreground" />
                     </button>
                   );
                 })}
@@ -250,13 +250,13 @@ export default function Dashboard() {
             </div>
           ),
           pipeline: (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated sm:p-6">
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-baseline justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-slate-900">Pipeline por estado</h2>
-                {pipelineTotal > 0 ? <span className="font-mono text-xs font-bold tabular-nums text-slate-400">{pipelineTotal} no total</span> : null}
+                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">Pipeline por estado</h2>
+                {pipelineTotal > 0 ? <span className="font-mono text-xs font-bold tabular-nums text-muted-foreground">{pipelineTotal} no total</span> : null}
               </div>
               {pipeline.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-400">Sem dados.</p>
+                <p className="mt-4 text-sm text-muted-foreground">Sem dados.</p>
               ) : (
                 <>
                   {/* Donut — proporção de cada estado, com tooltip ao passar o rato/tocar */}
@@ -277,10 +277,10 @@ export default function Dashboard() {
                     {pipeline.map((s) => {
                       const cfg = getStatusCfg(s);
                       return (
-                        <div key={s} data-testid={`pipeline-${s}`} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+                        <div key={s} data-testid={`pipeline-${s}`} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-input hover:shadow-md">
                           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.dot }} />
-                          <span className="text-xs font-semibold text-slate-600">{cfg.label}</span>
-                          <span className="font-mono text-sm font-bold tabular-nums text-slate-900">{stats.by_status[s]}</span>
+                          <span className="text-xs font-semibold text-muted-foreground">{cfg.label}</span>
+                          <span className="font-mono text-sm font-bold tabular-nums text-foreground">{stats.by_status[s]}</span>
                         </div>
                       );
                     })}
@@ -290,18 +290,18 @@ export default function Dashboard() {
             </div>
           ),
           suppliers: (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated sm:p-6">
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600"><Trophy className="h-4 w-4" /></span>
-                <h2 className="font-heading text-base font-extrabold text-slate-900">Fornecedores mais rápidos</h2>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--pastel-amber-bg)] text-amber-600"><Trophy className="h-4 w-4" /></span>
+                <h2 className="font-heading text-base font-extrabold text-foreground">Fornecedores mais rápidos</h2>
               </div>
               <div className="mt-3 space-y-2">
                 {(stats?.fastest_suppliers || []).length === 0 ? (
-                  <p className="text-sm text-slate-400">Ainda sem dados de resposta — chegam com os primeiros orçamentos.</p>
+                  <p className="text-sm text-muted-foreground">Ainda sem dados de resposta — chegam com os primeiros orçamentos.</p>
                 ) : stats.fastest_suppliers.map((f, i) => (
-                  <div key={f.supplier} data-testid={`fast-supplier-${i}`} className="flex items-center gap-2.5 rounded-xl bg-slate-50 p-2.5 transition-all duration-150 hover:translate-x-1 hover:bg-slate-100">
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-bold ${MEDALS[i] || "bg-slate-100 text-slate-500"}`}>{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">{f.supplier}</span>
+                  <div key={f.supplier} data-testid={`fast-supplier-${i}`} className="flex items-center gap-2.5 rounded-xl bg-muted p-2.5 transition-all duration-150 hover:translate-x-1 hover:bg-muted">
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-bold ${MEDALS[i] || "bg-muted text-muted-foreground"}`}>{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{f.supplier}</span>
                     <span className="font-mono text-xs font-bold tabular-nums text-emerald-600">{formatHours(f.avg_hours)}</span>
                   </div>
                 ))}
@@ -309,8 +309,8 @@ export default function Dashboard() {
             </div>
           ),
           priorities: (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated sm:p-6">
-              <h2 className="font-heading text-base font-extrabold text-slate-900">Por prioridade</h2>
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
+              <h2 className="font-heading text-base font-extrabold text-foreground">Por prioridade</h2>
               <div className="mt-4 space-y-3">
                 {PRIORITY_ORDER.map((p) => {
                   const cfg = getPriorityCfg(p);
@@ -318,12 +318,12 @@ export default function Dashboard() {
                   return (
                     <div key={p} data-testid={`prio-stat-${p}`}>
                       <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                        <span className="flex items-center gap-1.5 font-semibold text-foreground">
                           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />{cfg.label}
                         </span>
-                        <span className="font-mono font-bold tabular-nums text-slate-900">{val}</span>
+                        <span className="font-mono font-bold tabular-nums text-foreground">{val}</span>
                       </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(val / maxPrio) * 100}%`, backgroundColor: cfg.dot }} />
                       </div>
                     </div>
@@ -333,23 +333,23 @@ export default function Dashboard() {
             </div>
           ),
           gmail: (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 card-elevated sm:p-6">
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><Mail className="h-4 w-4" /></span>
-                <h2 className="font-heading text-base font-extrabold text-slate-900">Envio de emails</h2>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Mail className="h-4 w-4" /></span>
+                <h2 className="font-heading text-base font-extrabold text-foreground">Envio de emails</h2>
               </div>
               {gmail.connected ? (
                 <div className="mt-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" /><span className="truncate font-mono text-xs">{gmail.email}</span></div>
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-3 text-sm font-medium text-[color:var(--pastel-emerald-text)]"><CheckCircle2 className="h-4 w-4 shrink-0" /><span className="truncate font-mono text-xs">{gmail.email}</span></div>
                   <Button data-testid="disconnect-gmail-btn" variant="outline" size="sm" onClick={async () => { await api.post("/gmail/disconnect"); load(); }} className="mt-3 w-full rounded-xl">Desligar Gmail</Button>
                 </div>
               ) : (
                 <div className="mt-3">
-                  <p className="text-sm text-slate-500">Liga o Gmail da loja para enviar pedidos de orçamento automaticamente.</p>
+                  <p className="text-sm text-muted-foreground">Liga o Gmail da loja para enviar pedidos de orçamento automaticamente.</p>
                   {gmail.configured ? (
                     <Button data-testid="connect-gmail-btn" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-3 w-full rounded-xl"><Link2 className="mr-2 h-4 w-4" /> Ligar Gmail</Button>
                   ) : (
-                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Credenciais Google por configurar no servidor.</div>
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-xs text-[color:var(--pastel-amber-text)]">Credenciais Google por configurar no servidor.</div>
                   )}
                 </div>
               )}

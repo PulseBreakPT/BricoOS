@@ -79,9 +79,9 @@ const QUICK_LOG_OPTIONS = [
 ];
 
 const QUICK_LOG_TONES = {
-  red: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-  amber: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
-  green: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+  red: "border-red-200 bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]",
+  amber: "border-amber-200 bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)] hover:bg-[var(--pastel-amber-bg)]",
+  green: "border-emerald-200 bg-[var(--pastel-emerald-bg)] text-[color:var(--pastel-emerald-text)] hover:bg-[var(--pastel-emerald-bg)]",
 };
 
 export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = "detalhes", initialCreateMode = "choice", suppliers, gmailStatus, labelsList, onChanged, aiEnabled, initialData }) {
@@ -764,40 +764,40 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       return (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-background">
               <Building2 className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-heading text-base font-extrabold text-slate-900">{s.name}</p>
-              <p className="text-xs text-slate-400">Fornecedor</p>
+              <p className="truncate font-heading text-base font-extrabold text-foreground">{s.name}</p>
+              <p className="text-xs text-muted-foreground">Fornecedor</p>
             </div>
             <FavoriteToggle item={{ kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", to: "/fornecedores" }} />
           </div>
-          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm">
+          <div className="space-y-2 rounded-2xl border border-border bg-muted/60 p-4 text-sm">
             {s.email ? (
-              <a href={`mailto:${s.email}`} className="flex items-center gap-2 font-mono text-xs text-slate-700 hover:underline">
-                <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {s.email}
+              <a href={`mailto:${s.email}`} className="flex items-center gap-2 font-mono text-xs text-foreground hover:underline">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {s.email}
               </a>
             ) : <p className="text-xs text-red-400">Sem email definido</p>}
             {s.phone ? (
-              <a href={`tel:${s.phone}`} className="flex items-center gap-2 font-mono text-xs text-slate-700 hover:underline">
-                <PhoneCall className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {s.phone}
+              <a href={`tel:${s.phone}`} className="flex items-center gap-2 font-mono text-xs text-foreground hover:underline">
+                <PhoneCall className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {s.phone}
               </a>
             ) : null}
           </div>
           {(s.contacts || []).filter((c) => c.name || c.phone || c.email).length > 0 ? (
             <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contactos</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contactos</p>
               {s.contacts.filter((c) => c.name || c.phone || c.email).map((c, i) => (
-                <div key={i} className="rounded-xl border border-slate-200 bg-white p-2.5 text-xs">
-                  {c.name ? <span className="font-bold text-slate-900">{c.name}</span> : null}
-                  {c.phone ? <span className="ml-2 font-mono text-slate-500">{c.phone}</span> : null}
-                  {c.email ? <span className="ml-2 font-mono text-slate-500">{c.email}</span> : null}
+                <div key={i} className="rounded-xl border border-border bg-card p-2.5 text-xs">
+                  {c.name ? <span className="font-bold text-foreground">{c.name}</span> : null}
+                  {c.phone ? <span className="ml-2 font-mono text-muted-foreground">{c.phone}</span> : null}
+                  {c.email ? <span className="ml-2 font-mono text-muted-foreground">{c.email}</span> : null}
                 </div>
               ))}
             </div>
           ) : null}
-          {s.notes ? <p className="text-xs text-slate-500">{s.notes}</p> : null}
+          {s.notes ? <p className="text-xs text-muted-foreground">{s.notes}</p> : null}
         </div>
       );
     }
@@ -807,9 +807,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       return (
         <div className="space-y-3">
           <div>
-            <p className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</p>
-            <p className="text-xs text-slate-500">{m.subject || "(sem assunto)"}</p>
-            <p className="text-[11px] text-slate-400">{timeAgo(m.received_at)}</p>
+            <p className="text-sm font-bold text-foreground">{m.supplier_name || m.from_name || m.from_email}</p>
+            <p className="text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</p>
+            <p className="text-[11px] text-muted-foreground">{timeAgo(m.received_at)}</p>
           </div>
           {supplierOfEmail ? (
             <Button
@@ -823,11 +823,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           ) : null}
           {m.body_html ? (
             <div
-              className="max-h-[50vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 font-sans text-xs text-slate-700 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500"
+              className="max-h-[50vh] overflow-y-auto rounded-lg border border-border bg-card p-3 font-sans text-xs text-foreground [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground"
               dangerouslySetInnerHTML={{ __html: m.body_html }}
             />
           ) : (
-            <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+            <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-sans text-xs text-foreground">{m.body || "(sem texto)"}</pre>
           )}
           {(m.attachments || []).length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
@@ -840,7 +840,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     label: a.filename,
                     data: { url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename, contentType: a.content_type },
                   })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold text-foreground hover:border-red-300 hover:text-[color:var(--pastel-red-text)]"
                 >
                   <FileText className="h-3.5 w-3.5" /> {a.filename}
                 </button>
@@ -860,13 +860,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <Download className="mr-1.5 h-3.5 w-3.5" /> Descarregar
             </Button>
           </a>
-          <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-slate-100">
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-muted">
             {kind === "image" ? (
               <img src={a.url} alt={a.filename} className="mx-auto max-h-[65vh] w-auto object-contain" />
             ) : kind === "pdf" ? (
-              <iframe title={a.filename} src={a.url} className="h-[65vh] w-full border-0 bg-white" />
+              <iframe title={a.filename} src={a.url} className="h-[65vh] w-full border-0 bg-card" />
             ) : (
-              <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+              <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
                 <FileWarning className="h-6 w-6" />
                 Pré-visualização não disponível para este tipo de ficheiro.
               </div>
@@ -885,7 +885,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl xl:max-w-6xl" : "sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl"}`}
       >
         {/* Header (fixed) */}
-        <DialogHeader className="shrink-0 space-y-0 border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
@@ -893,26 +893,26 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   ? (createMode === "band" ? "Pedido à medida — BandAluminios" : "Novo pedido de orçamento")
                   : (form.customer_name || "Pedido")}
               </DialogTitle>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                 {isCreate
                   ? (createMode === "choice"
                     ? "Escolhe o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
                   : (form.phone
-                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-slate-900 hover:underline">{form.phone}</a>
+                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-foreground hover:underline">{form.phone}</a>
                     : "Sem telefone")}
-                {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-slate-400"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
+                {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
                 {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
               {!isCreate && note ? (
-                <p className="mt-0.5 text-[10px] text-slate-400" title={`Atualizado ${timeAgo(note.updated_at)}`}>
+                <p className="mt-0.5 text-[10px] text-muted-foreground" title={`Atualizado ${timeAgo(note.updated_at)}`}>
                   Criado {formatDateTime(note.created_at)} · atualizado {formatDateTime(note.updated_at)}
                 </p>
               ) : null}
             </div>
             {!isCreate && note ? (
-              <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-slate-300 hover:text-amber-400">
+              <button data-testid="detail-fav" onClick={toggleFav} className="mr-6 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-amber-400">
                 <Star className={`h-5 w-5 ${note.favorite ? "fill-amber-400 text-amber-400" : ""}`} />
               </button>
             ) : null}
@@ -949,7 +949,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {note.archived ? (
                 <Button data-testid="detail-reopen" size="sm" variant="outline" onClick={reopenNote} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">Reabrir</Button>
               ) : (
-                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 w-full rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 sm:w-auto sm:shrink-0">
+                <Button data-testid="detail-resolve" size="sm" variant="outline" onClick={resolveNote} className="h-9 w-full rounded-lg border-emerald-200 text-[color:var(--pastel-emerald-text)] hover:bg-[var(--pastel-emerald-bg)] sm:w-auto sm:shrink-0">
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Resolver
                 </Button>
               )}
@@ -971,12 +971,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </Button>
                 </>
               ) : (
-                <Button data-testid="detail-edit" size="sm" variant="outline" onClick={() => setEditMode(true)} className="h-9 w-full rounded-lg border-slate-300 font-bold sm:w-auto sm:shrink-0">
+                <Button data-testid="detail-edit" size="sm" variant="outline" onClick={() => setEditMode(true)} className="h-9 w-full rounded-lg border-border font-bold sm:w-auto sm:shrink-0">
                   <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
                 </Button>
               )}
 
-              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-red-200 text-red-600 hover:bg-red-50 sm:ml-auto sm:w-auto sm:shrink-0">
+              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] sm:ml-auto sm:w-auto sm:shrink-0">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -985,7 +985,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
         {/* Next action banner */}
         {!isCreate && note?.next_action ? (
-          <div className={`shrink-0 border-b px-4 py-2.5 text-xs sm:px-6 ${note.is_overdue ? "border-red-100 bg-red-50 text-red-700" : "border-blue-100 bg-blue-50 text-blue-700"}`}>
+          <div className={`shrink-0 border-b px-4 py-2.5 text-xs sm:px-6 ${note.is_overdue ? "border-red-100 bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)]" : "border-blue-100 bg-[var(--pastel-blue-bg)] text-[color:var(--pastel-blue-text)]"}`}>
             <span className="font-bold">{note.is_overdue ? `Atrasado ${note.waiting_days}d · ` : "Próxima ação: "}</span>
             {note.next_action}
           </div>
@@ -996,34 +996,34 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           <div ref={contentScrollRef} className="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-3 pb-0 sm:px-6 sm:pt-5">
             {createMode === "choice" ? (
               <div className="space-y-3">
-                <p className="text-sm font-bold text-slate-900">O que precisa de pedir?</p>
+                <p className="text-sm font-bold text-foreground">O que precisa de pedir?</p>
                 <button
                   data-testid="create-mode-band"
                   onClick={() => { setCreateMode("band"); setCreateStep(0); }}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground hover:bg-muted"
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-background">
                     <Frame className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-slate-900">Caixilharia à medida — BandAluminios</span>
-                    <span className="block text-xs text-slate-500">Janelas, portas, portadas e redes mosquiteiras com medidas, para pedir cotação ao fornecedor</span>
+                    <span className="block text-sm font-bold text-foreground">Caixilharia à medida — BandAluminios</span>
+                    <span className="block text-xs text-muted-foreground">Janelas, portas, portadas e redes mosquiteiras com medidas, para pedir cotação ao fornecedor</span>
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
                 <button
                   data-testid="create-mode-normal"
                   onClick={() => { setCreateMode("normal"); setCreateStep(0); }}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground hover:bg-muted"
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
                     <Store className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-slate-900">Pedido normal de loja</span>
-                    <span className="block text-xs text-slate-500">Qualquer outro artigo: preço, encomenda ou disponibilidade junto de um fornecedor</span>
+                    <span className="block text-sm font-bold text-foreground">Pedido normal de loja</span>
+                    <span className="block text-xs text-muted-foreground">Qualquer outro artigo: preço, encomenda ou disponibilidade junto de um fornecedor</span>
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               </div>
             ) : (
@@ -1032,11 +1032,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {createSteps.map((label, i) => (
                     <div key={label} className="flex items-center gap-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-emerald-500 text-white" : i === createStep ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-emerald-500 text-white" : i === createStep ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
                         {i < createStep ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </span>
-                      <span className={`text-xs font-semibold ${i === createStep ? "text-slate-900" : "text-slate-400"}`}>{label}</span>
-                      {i < createSteps.length - 1 ? <span className="h-px w-4 bg-slate-200" /> : null}
+                      <span className={`text-xs font-semibold ${i === createStep ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                      {i < createSteps.length - 1 ? <span className="h-px w-4 bg-muted" /> : null}
                     </div>
                   ))}
                 </div>
@@ -1045,7 +1045,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {createStep === 0 ? (
                   <>
                     {dupWarn.length > 0 ? (
-                      <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-sm text-[color:var(--pastel-amber-text)]">
                         <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
                         <ul className="mt-1.5 space-y-1">
                           {dupWarn.map((d) => (
@@ -1103,8 +1103,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {/* Passo 3 (normal) — Confirmar */}
                 {createMode === "normal" && createStep === 2 ? (
                   <>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600">
-                      <p><span className="font-bold text-slate-900">{form.customer_name || "Sem nome"}</span>{form.phone ? ` · ${form.phone}` : ""}</p>
+                    <div className="rounded-xl border border-border bg-muted/60 p-3 text-xs text-muted-foreground">
+                      <p><span className="font-bold text-foreground">{form.customer_name || "Sem nome"}</span>{form.phone ? ` · ${form.phone}` : ""}</p>
                       <p className="mt-0.5">{form.description}{form.quantity ? ` — ${form.quantity}` : ""}</p>
                     </div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1134,11 +1134,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {/* Passo 2 (BandAluminios) — Caixilharia */}
                 {createMode === "band" && createStep === 1 ? (
                   !caixCatalog ? (
-                    <div className="flex justify-center py-10"><Spinner className="h-6 w-6 text-slate-400" /></div>
+                    <div className="flex justify-center py-10"><Spinner className="h-6 w-6 text-muted-foreground" /></div>
                   ) : (
                     <>
                       <CaixilhariaForm catalog={caixCatalog} spec={caixSpec} onChange={setCaixSpec} />
-                      <p className="mt-3 flex items-start gap-1.5 text-[11px] text-slate-400">
+                      <p className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
                         <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                         Ao criar, o fornecedor BandAluminios é associado automaticamente e o email fica pronto na aba «Orçamentos».
                       </p>
@@ -1147,7 +1147,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 ) : null}
 
                 {/* Navegação */}
-                <div className="sticky bottom-0 z-20 -mx-3 mt-6 flex gap-2 border-t border-slate-200 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:px-6 sm:pb-4">
+                <div className="sticky bottom-0 z-20 -mx-3 mt-6 flex gap-2 border-t border-border bg-card/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:px-6 sm:pb-4">
                   <Button data-testid="wizard-back" variant="outline" onClick={wizardBack} className="rounded-xl">
                     <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
                   </Button>
@@ -1182,7 +1182,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           </div>
         ) : (
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-          <div className="shrink-0 border-b border-slate-100 px-4 pt-2.5 sm:px-6 sm:pt-3">
+          <div className="shrink-0 border-b border-border px-4 pt-2.5 sm:px-6 sm:pt-3">
             {/* No telemóvel as tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
             <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-5">
               <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="shrink-0 text-xs">Detalhes</TabsTrigger>
@@ -1278,14 +1278,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="mt-4 space-y-1.5">
                   <Label>Caixilharia à medida</Label>
                   {note?.caixilharia ? (
-                    <div data-testid="caixilharia-summary" className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                    <div data-testid="caixilharia-summary" className="rounded-xl border border-border bg-muted/60 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-                            <Frame className="h-4 w-4 shrink-0 text-slate-500" />
+                          <p className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                            <Frame className="h-4 w-4 shrink-0 text-muted-foreground" />
                             {note.caixilharia.display?.produto || "Caixilharia à medida"}
                           </p>
-                          <p className="mt-0.5 text-xs text-slate-500">
+                          <p className="mt-0.5 text-xs text-muted-foreground">
                             {note.caixilharia.display?.element_count
                               ? `${note.caixilharia.display.element_count} elemento(s) · ${note.caixilharia.display.option_count} opção(ões) · `
                               : ""}
@@ -1293,7 +1293,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                             {note.caixilharia.data_entrega ? ` · entrega ${note.caixilharia.data_entrega}` : ""}
                           </p>
                           {note.caixilharia.display?.comparison_count ? (
-                            <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            <span className="mt-1 inline-flex rounded-full bg-[var(--pastel-blue-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-blue-text)]">
                               {note.caixilharia.display.comparison_count} comparação(ões) de material
                             </span>
                           ) : null}
@@ -1304,14 +1304,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       </div>
                       <div className="mt-2 space-y-2">
                         {(note.caixilharia.display?.lines || []).map((line, index) => (
-                          <div key={line.id || index} className="rounded-lg bg-white p-2 text-xs text-slate-600">
-                            <p className="font-mono font-semibold text-slate-700">
+                          <div key={line.id || index} className="rounded-lg bg-card p-2 text-xs text-muted-foreground">
+                            <p className="font-mono font-semibold text-foreground">
                               {index + 1}. {line.produto} — {line.quantidade} un — {line.largura_mm} × {line.altura_mm} mm
                               {line.sentido_abertura ? ` — ${line.sentido_abertura}` : ""}
                             </p>
                             <div className="mt-1 flex flex-wrap gap-1">
                               {(line.opcoes || []).map((option, optionIndex) => (
-                                <span key={option.id || optionIndex} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                <span key={option.id || optionIndex} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                                   {String.fromCharCode(65 + optionIndex)} · {option.label}
                                 </span>
                               ))}
@@ -1319,7 +1319,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           </div>
                         ))}
                         {!note.caixilharia.display?.lines?.length ? (note.caixilharia.itens || []).map((item, index) => (
-                          <p key={index} className="font-mono text-xs text-slate-600">
+                          <p key={index} className="font-mono text-xs text-muted-foreground">
                             {item.quantidade} un — {item.largura_mm} × {item.altura_mm} mm{item.sentido_abertura ? ` — ${item.sentido_abertura}` : ""}
                           </p>
                         )) : null}
@@ -1332,14 +1332,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <SectionTitle title="Etiquetas" />
               <div className="mt-3 space-y-1.5">
                 {form.labels.length === 0 && !editMode ? (
-                  <p className="text-sm italic text-slate-400">Sem etiquetas.</p>
+                  <p className="text-sm italic text-muted-foreground">Sem etiquetas.</p>
                 ) : (
                   <div className="flex flex-wrap items-center gap-1.5">
                     {form.labels.map((l) => (
-                      <span key={l} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                      <span key={l} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
                         <Tag className="h-3 w-3" /> {l}
                         {editMode ? (
-                          <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
+                          <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-muted-foreground hover:text-red-500"><X className="h-3 w-3" /></button>
                         ) : null}
                       </span>
                     ))}
@@ -1358,7 +1358,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {editMode ? (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {(labelsList || []).filter((l) => !form.labels.includes(l)).slice(0, 6).map((l) => (
-                      <button key={l} data-testid={`suggest-label-${l}`} onClick={() => addLabel(l)} className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-[11px] text-slate-500 hover:border-slate-400 hover:text-slate-700">+ {l}</button>
+                      <button key={l} data-testid={`suggest-label-${l}`} onClick={() => addLabel(l)} className="rounded-full border border-dashed border-border px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-input hover:text-foreground">+ {l}</button>
                     ))}
                   </div>
                 ) : null}
@@ -1411,7 +1411,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </Button>
                 </div>
               ) : (
-                <Button data-testid="detalhes-edit-btn" variant="outline" onClick={() => setEditMode(true)} className="mt-6 w-full rounded-xl border-slate-300 font-bold">
+                <Button data-testid="detalhes-edit-btn" variant="outline" onClick={() => setEditMode(true)} className="mt-6 w-full rounded-xl border-border font-bold">
                   <Pencil className="mr-2 h-4 w-4" /> Editar pedido
                 </Button>
               )}
@@ -1419,13 +1419,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
             {/* ORCAMENTOS */}
             <TabsContent value="orcamentos" className="mt-0 focus-visible:outline-none">
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+              <section className="rounded-2xl border border-border bg-muted/60 p-4 sm:p-5">
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-slate-700" />
-                  <h4 className="font-heading text-sm font-extrabold text-slate-900">Pedir preço a fornecedor</h4>
+                  <Mail className="h-4 w-4 text-foreground" />
+                  <h4 className="font-heading text-sm font-extrabold text-foreground">Pedir preço a fornecedor</h4>
                 </div>
                 {!gmailStatus?.connected ? (
-                  <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-sm text-[color:var(--pastel-amber-text)]">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div>
                       <p className="font-semibold">Gmail não ligado</p>
@@ -1436,7 +1436,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-medium text-emerald-700">
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-2.5 text-xs font-medium text-[color:var(--pastel-emerald-text)]">
                     <CheckCircle2 className="h-4 w-4" /> Ligado como {gmailStatus.email}
                   </div>
                 )}
@@ -1448,7 +1448,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         type="button"
                         data-testid="open-supplier-frame"
                         onClick={() => pushFrame({ kind: "fornecedor", label: selectedSupplier.name, data: selectedSupplier })}
-                        className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-900 hover:underline"
+                        className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground hover:underline"
                       >
                         <Building2 className="h-3 w-3" /> Ver ficha
                       </button>
@@ -1467,7 +1467,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <p className="text-xs text-red-500">Este fornecedor não tem email.</p>
                   ) : null}
                 </div>
-                <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600">
+                <label className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Checkbox data-testid="reminder-checkbox" checked={isReminder} onCheckedChange={(v) => { setIsReminder(!!v); loadTemplate(emailSupplier, !!v); }} /> Enviar como lembrete
                 </label>
                 <div className="mt-3 space-y-1.5">
@@ -1490,10 +1490,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
               {/* Respostas recebidas — fornecedor ou cliente (IMAP, só leitura) */}
               {gmailStatus?.method === "smtp" || receivedEmails.length > 0 ? (
-                <section data-testid="received-emails-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                <section data-testid="received-emails-panel" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-2">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
-                      <Inbox className="h-4 w-4 text-slate-700" /> Respostas recebidas
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-foreground">
+                      <Inbox className="h-4 w-4 text-foreground" /> Respostas recebidas
                     </h4>
                     {gmailStatus?.method === "smtp" ? (
                       <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-8 shrink-0 rounded-lg text-xs">
@@ -1502,7 +1502,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     ) : null}
                   </div>
                   {receivedEmails.length === 0 ? (
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       Ainda sem respostas. A caixa de entrada é verificada automaticamente — quando o fornecedor ou o
                       cliente responderem, a mensagem aparece aqui (e uma resposta do fornecedor avança o estado
                       sozinho para «Orçamento recebido»).
@@ -1510,33 +1510,33 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   ) : (
                     <div className="mt-3 space-y-2">
                       {receivedEmails.map((m) => (
-                        <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-border bg-muted/60 p-3">
                           <summary className="flex cursor-pointer select-none items-center gap-1">
                             <span className="min-w-0 flex-1">
-                              <span className="text-sm font-bold text-slate-900">{m.supplier_name || m.from_name || m.from_email}</span>
+                              <span className="text-sm font-bold text-foreground">{m.supplier_name || m.from_name || m.from_email}</span>
                               {m.reply_kind === "client" ? (
-                                <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cliente</span>
+                                <span className="ml-2 inline-flex rounded-full bg-[var(--pastel-emerald-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-emerald-text)]">Cliente</span>
                               ) : null}
-                              <span className="ml-2 text-xs text-slate-500">{m.subject || "(sem assunto)"}</span>
-                              <span className="ml-2 text-[11px] text-slate-400">{timeAgo(m.received_at)}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</span>
+                              <span className="ml-2 text-[11px] text-muted-foreground">{timeAgo(m.received_at)}</span>
                             </span>
                             <button
                               type="button"
                               data-testid={`open-email-frame-${m.id}`}
                               title="Abrir em pilha"
                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); pushFrame({ kind: "email", label: m.subject || "Email", data: m }); }}
-                              className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                              className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                             >
                               <ArrowUpRight className="h-3.5 w-3.5" />
                             </button>
                           </summary>
                           {m.body_html ? (
                             <div
-                              className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-white p-3 font-sans text-xs text-slate-700 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500"
+                              className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-card p-3 font-sans text-xs text-foreground [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground"
                               dangerouslySetInnerHTML={{ __html: m.body_html }}
                             />
                           ) : (
-                            <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white p-3 font-sans text-xs text-slate-700">{m.body || "(sem texto)"}</pre>
+                            <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-card p-3 font-sans text-xs text-foreground">{m.body || "(sem texto)"}</pre>
                           )}
                           {(m.attachments || []).length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1545,7 +1545,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   key={a.id}
                                   type="button"
                                   onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename })}
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-700"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold text-foreground hover:border-red-300 hover:text-[color:var(--pastel-red-text)]"
                                 >
                                   <FileText className="h-3.5 w-3.5" /> {a.filename}
                                 </button>
@@ -1561,13 +1561,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
               {/* Email + PDF prontos — confirmação a um clique, sem sair do pedido */}
               {note?.pending_client_send ? (
-                <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 sm:p-5">
+                <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-emerald-300 bg-[var(--pastel-emerald-bg)] p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-emerald-900">
+                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-[color:var(--pastel-emerald-text)]">
                         <Send className="h-4 w-4 text-emerald-600" /> Pronto para enviar ao cliente
                       </h4>
-                      <p className="mt-0.5 text-xs text-emerald-800/80">
+                      <p className="mt-0.5 text-xs text-[color:var(--pastel-emerald-text)]/80">
                         {note.pending_client_send.pdf_filename || "PDF"} anexado
                         {note.pending_client_send.total != null ? ` · ${Number(note.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
                         {note.pending_client_send.eff_margin_pct != null ? ` · margem ${Number(note.pending_client_send.eff_margin_pct).toFixed(1)}%` : ""}
@@ -1586,14 +1586,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               ) : null}
 
               {/* Orçamento do fornecedor (PDF) → PDF de venda ao cliente */}
-              <section data-testid="supplier-pdf-panel" className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+              <section data-testid="supplier-pdf-panel" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-slate-700" />
-                      <h4 className="font-heading text-sm font-extrabold text-slate-900">Orçamento do fornecedor (PDF)</h4>
+                      <FileText className="h-4 w-4 text-foreground" />
+                      <h4 className="font-heading text-sm font-extrabold text-foreground">Orçamento do fornecedor (PDF)</h4>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Envia o PDF da BandAluminios: a app lê as linhas, sugere preços de venda e gera o PDF com a marca da loja para entregar ao cliente.
                     </p>
                   </div>
@@ -1631,13 +1631,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         </AttachmentDescription>
                       </AttachmentContent>
                     </Attachment>
-                    <p className="mt-2 text-[11px] text-slate-400">
+                    <p className="mt-2 text-[11px] text-muted-foreground">
                       Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — a margem é ajustável linha a linha; o coeficiente e o preço final recalculam-se sozinhos com a fórmula exata da loja.
                     </p>
 
                     <div className="mt-3 space-y-3">
                       {sq.items.map((i) => (
-                        <div key={i.n} data-testid={`sq-item-${i.n}`} className={`rounded-xl border p-3 ${i.include === false ? "border-slate-200 opacity-50" : "border-slate-200"}`}>
+                        <div key={i.n} data-testid={`sq-item-${i.n}`} className={`rounded-xl border p-3 ${i.include === false ? "border-border opacity-50" : "border-border"}`}>
                           <div className="flex items-start gap-3">
                             <Checkbox
                               data-testid={`sq-include-${i.n}`}
@@ -1646,7 +1646,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                               className="mt-1 h-5 w-5 rounded-md"
                             />
                             {i.image_b64 ? (
-                              <img src={`data:image/png;base64,${i.image_b64}`} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-100 object-contain" />
+                              <img src={`data:image/png;base64,${i.image_b64}`} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-border object-contain" />
                             ) : null}
                             <div className="min-w-0 flex-1">
                               <Textarea
@@ -1657,31 +1657,31 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                 className="text-xs"
                               />
                               <div className="mt-2 flex flex-wrap items-end gap-3">
-                                <label className="text-[11px] font-semibold text-slate-500">
+                                <label className="text-[11px] font-semibold text-muted-foreground">
                                   Qtd.
                                   <Input data-testid={`sq-qty-${i.n}`} type="number" min="1" value={i.qty} onChange={(e) => setSqItem(i.n, { qty: e.target.value })} className="mt-0.5 h-8 w-16 rounded-lg font-mono text-xs" />
                                 </label>
-                                <label className="text-[11px] font-semibold text-slate-500">
+                                <label className="text-[11px] font-semibold text-muted-foreground">
                                   Margem %
                                   <Input data-testid={`sq-margin-${i.n}`} type="number" min="0" max={MAX_MARGIN_PCT} step="0.5" value={i.margin_pct ?? 18} onChange={(e) => applyItemMargin(i.n, e.target.value)} className="mt-0.5 h-8 w-20 rounded-lg font-mono text-xs" />
                                 </label>
-                                <label className="text-[11px] font-semibold text-slate-500" title="Calculado automaticamente pela mesma fórmula do software da loja — nunca editável.">
+                                <label className="text-[11px] font-semibold text-muted-foreground" title="Calculado automaticamente pela mesma fórmula do software da loja — nunca editável.">
                                   Coeficiente
-                                  <span data-testid={`sq-coef-${i.n}`} className="mt-0.5 flex h-8 w-16 items-center rounded-lg bg-slate-100 px-2 font-mono text-xs text-slate-500">
+                                  <span data-testid={`sq-coef-${i.n}`} className="mt-0.5 flex h-8 w-16 items-center rounded-lg bg-muted px-2 font-mono text-xs text-muted-foreground">
                                     {(i.coefficient ?? priceCoefficient(i.margin_pct ?? 18))?.toFixed(3) ?? "—"}
                                   </span>
                                 </label>
-                                <label className="text-[11px] font-semibold text-slate-500" title="Preço final — calculado automaticamente a partir da margem, nunca editável.">
+                                <label className="text-[11px] font-semibold text-muted-foreground" title="Preço final — calculado automaticamente a partir da margem, nunca editável.">
                                   PVP/ud. (€, c/ IVA)
-                                  <span data-testid={`sq-price-${i.n}`} className="mt-0.5 flex h-8 w-24 items-center rounded-lg bg-slate-100 px-2 font-mono text-xs font-bold text-slate-700">
+                                  <span data-testid={`sq-price-${i.n}`} className="mt-0.5 flex h-8 w-24 items-center rounded-lg bg-muted px-2 font-mono text-xs font-bold text-foreground">
                                     {Number(i.client_price || 0).toFixed(2)} €
                                   </span>
                                 </label>
-                                <p className="ml-auto text-[11px] text-slate-400">
-                                  <span data-testid={`sq-material-${i.n}`} className="mr-1.5 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{i.material_label || "Alumínio"}</span>
+                                <p className="ml-auto text-[11px] text-muted-foreground">
+                                  <span data-testid={`sq-material-${i.n}`} className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">{i.material_label || "Alumínio"}</span>
                                   Custo: <span className="font-mono">{i.supplier_unit_price != null ? Number(i.supplier_unit_price).toFixed(2) : "—"} €</span> s/ IVA
                                   <span className="mx-1.5">·</span>
-                                  Total: <span className="font-mono font-bold text-slate-700">{(((parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1))).toFixed(2)} €</span>
+                                  Total: <span className="font-mono font-bold text-foreground">{(((parseFloat(i.client_price) || 0) * (parseInt(i.qty, 10) || 1))).toFixed(2)} €</span>
                                   {itemEffMargin(i) != null ? (
                                     <>
                                       <span className="mx-1.5">·</span>
@@ -1696,12 +1696,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       ))}
                     </div>
 
-                    <div className="card-elevated mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="card-elevated mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted p-3">
                       <div>
-                        <p className="text-sm font-bold text-slate-900">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal text-slate-500">c/ IVA</span></p>
+                        <p className="text-sm font-bold text-foreground">TOTAL ORÇAMENTO <span className="font-mono">{sqTotal.toFixed(2)} €</span> <span className="text-xs font-normal text-muted-foreground">c/ IVA</span></p>
                         {sqEffMargin != null ? (
-                          <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] text-slate-500">
-                            Margem final: <span className="font-mono font-bold text-slate-700">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
+                          <p data-testid="sq-eff-margin-total" className="mt-0.5 text-[11px] text-muted-foreground">
+                            Margem final: <span className="font-mono font-bold text-foreground">{sqEffMargin.toFixed(1)}%</span> — o valor a reportar
                           </p>
                         ) : null}
                       </div>
@@ -1710,7 +1710,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           <a
                             data-testid="sq-download-last"
                             href={withDeviceToken(`${API}/notes/${id}/files/${sq.client_pdf_file_id}`)}
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                            className="inline-flex items-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
                           >
                             <Download className="mr-1.5 h-3.5 w-3.5" /> Último PDF
                           </a>
@@ -1732,24 +1732,24 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               </section>
 
               {quotes.length > 0 ? (
-                <section data-testid="client-email-panel" className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 sm:p-5">
+                <section data-testid="client-email-panel" className="mt-6 rounded-2xl border border-blue-200 bg-[var(--pastel-blue-bg)] p-4 sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Send className="h-4 w-4 text-blue-700" />
-                        <h4 className="font-heading text-sm font-extrabold text-slate-900">Responder ao cliente</h4>
+                        <Send className="h-4 w-4 text-[color:var(--pastel-blue-text)]" />
+                        <h4 className="font-heading text-sm font-extrabold text-foreground">Responder ao cliente</h4>
                       </div>
-                      <p className="mt-1 text-xs text-slate-600">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
                     </div>
                     {clientTemplateLoading ? <Spinner className="h-4 w-4 shrink-0 text-blue-500" /> : null}
                   </div>
 
                   {!form.email ? (
-                    <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-800">
+                    <button type="button" onClick={() => setTab("detalhes")} className="mt-3 w-full rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-left text-xs text-[color:var(--pastel-amber-text)]">
                       <span className="font-bold">Falta o email do cliente.</span> Toca aqui para o adicionar nos Detalhes.
                     </button>
                   ) : (
-                    <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 font-mono text-xs text-slate-600">Para: {form.email}</p>
+                    <p className="mt-3 rounded-lg bg-card/80 px-3 py-2 font-mono text-xs text-muted-foreground">Para: {form.email}</p>
                   )}
 
                   <div className="mt-3 space-y-1.5">
@@ -1758,7 +1758,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </div>
                   <div className="mt-3 space-y-1.5">
                     <Label>Mensagem</Label>
-                    <Textarea data-testid="client-email-body" value={clientEmailData.body} onChange={(e) => setClientEmailData((d) => ({ ...d, body: e.target.value }))} rows={7} className="bg-white font-mono text-xs" />
+                    <Textarea data-testid="client-email-body" value={clientEmailData.body} onChange={(e) => setClientEmailData((d) => ({ ...d, body: e.target.value }))} rows={7} className="bg-card font-mono text-xs" />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {gmailStatus?.connected ? (
@@ -1766,13 +1766,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         {sendingClient ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />} Enviar por email
                       </Button>
                     ) : null}
-                    <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-white" : "bg-blue-700 hover:bg-blue-800"}`}>
+                    <Button data-testid="open-client-email" variant={gmailStatus?.connected ? "outline" : "default"} onClick={openClientEmail} disabled={!form.email || clientTemplateLoading} className={`rounded-xl ${gmailStatus?.connected ? "bg-card" : "bg-blue-700 hover:bg-blue-800"}`}>
                       <Mail className="mr-2 h-4 w-4" /> Abrir no email
                     </Button>
-                    <Button data-testid="copy-client-email" variant="outline" onClick={copyClientEmail} disabled={!clientEmailData.body} className="rounded-xl bg-white">
+                    <Button data-testid="copy-client-email" variant="outline" onClick={copyClientEmail} disabled={!clientEmailData.body} className="rounded-xl bg-card">
                       <Copy className="mr-2 h-4 w-4" /> Copiar resposta
                     </Button>
-                    <Button data-testid="register-client-email" variant="ghost" onClick={registerClientEmail} disabled={!clientEmailData.body} className="rounded-xl text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800">
+                    <Button data-testid="register-client-email" variant="ghost" onClick={registerClientEmail} disabled={!clientEmailData.body} className="rounded-xl text-[color:var(--pastel-emerald-text)] hover:bg-[var(--pastel-emerald-bg)] hover:text-[color:var(--pastel-emerald-text)]">
                       <CheckCircle2 className="mr-2 h-4 w-4" /> Registar envio
                     </Button>
                   </div>
@@ -1786,10 +1786,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <section data-testid="photos-panel">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-slate-900">
-                      <Camera className="h-4 w-4 text-slate-700" /> Fotos do pedido
+                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-foreground">
+                      <Camera className="h-4 w-4 text-foreground" /> Fotos do pedido
                     </h4>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Fotos do local, do vão, de danos ou de referência — até {MAX_PHOTOS_PER_NOTE} por pedido.
                     </p>
                   </div>
@@ -1815,7 +1815,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
 
                 {photos.length === 0 ? (
-                  <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-12 text-center text-slate-400">
+                  <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
                     <Camera className="h-8 w-8" />
                     <p className="mt-3 text-sm font-semibold">Sem fotos ainda.</p>
                     <p className="mt-0.5 text-xs">Toca em "Adicionar fotos" para tirar ou escolher uma foto.</p>
@@ -1826,7 +1826,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <div
                         key={p.id}
                         data-testid={`photo-thumb-${p.id}`}
-                        className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                        className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                       >
                         <button
                           type="button"
@@ -1858,17 +1858,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
             {/* CRONOLOGIA */}
             <TabsContent value="cronologia" className="mt-0 focus-visible:outline-none">
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Registo rápido</p>
+              <section className="rounded-2xl border border-border bg-muted/60 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Registo rápido</p>
                 {(note?.client_no_answer_count > 0 || note?.supplier_no_answer_count > 0) ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {note?.client_no_answer_count > 0 ? (
-                      <span data-testid="client-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                      <span data-testid="client-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]">
                         <PhoneMissed className="h-3 w-3" /> Cliente sem resposta ({note.client_no_answer_count}×)
                       </span>
                     ) : null}
                     {note?.supplier_no_answer_count > 0 ? (
-                      <span data-testid="supplier-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                      <span data-testid="supplier-no-answer-count" className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]">
                         <PhoneMissed className="h-3 w-3" /> Fornecedor sem resposta ({note.supplier_no_answer_count}×)
                       </span>
                     ) : null}
@@ -1903,14 +1903,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     const Icon = ACT_ICONS[a.type] || Sparkles;
                     return (
                       <Message key={a.id} data-testid={`activity-${a.id}`} className="pb-5">
-                        {i < activities.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-slate-200" /> : null}
-                        <MessageAvatar className="z-10 h-8 w-8 min-w-8 self-start bg-slate-100 text-slate-600">
+                        {i < activities.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-muted" /> : null}
+                        <MessageAvatar className="z-10 h-8 w-8 min-w-8 self-start bg-muted text-muted-foreground">
                           <Icon className="h-4 w-4" />
                         </MessageAvatar>
                         <MessageContent className="gap-0.5 pt-0.5">
-                          <p className="text-sm text-slate-800">{a.message}</p>
-                          <p className="text-xs text-slate-400">
-                            {a.author} · {formatDateTime(a.created_at)} <span className="text-slate-300">({timeAgo(a.created_at)})</span>
+                          <p className="text-sm text-foreground">{a.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.author} · {formatDateTime(a.created_at)} <span className="text-muted-foreground">({timeAgo(a.created_at)})</span>
                           </p>
                         </MessageContent>
                       </Message>
@@ -1922,28 +1922,28 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
             {/* TAREFAS / LEMBRETES */}
             <TabsContent value="tarefas" className="mt-0 focus-visible:outline-none">
-              <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row">
+              <div className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/60 p-4 sm:flex-row">
                 <Input data-testid="note-task-title" value={newTask.title} onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))} placeholder="Novo lembrete..." className="flex-1" />
                 <Input data-testid="note-task-date" type="date" value={newTask.due_date} onChange={(e) => setNewTask((t) => ({ ...t, due_date: e.target.value }))} className="sm:w-44" />
                 <Button data-testid="add-note-task-btn" onClick={addTask} className="rounded-xl"><Plus className="mr-1 h-4 w-4" /> Adicionar</Button>
               </div>
               <div className="mt-4 space-y-2">
                 {tasks.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-slate-400">Sem lembretes para este pedido.</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground">Sem lembretes para este pedido.</p>
                 ) : tasks.map((t) => {
                   const overdue = t.due_date && !t.done && new Date(t.due_date) < new Date(new Date().toDateString());
                   return (
-                    <div key={t.id} data-testid={`note-task-${t.id}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                    <div key={t.id} data-testid={`note-task-${t.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                       <Checkbox data-testid={`note-task-toggle-${t.id}`} checked={t.done} onCheckedChange={() => toggleTask(t)} className="h-5 w-5 rounded-md" />
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium text-slate-900 ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
+                        <p className={`text-sm font-medium text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
                         {t.due_date ? (
-                          <p className={`mt-0.5 flex items-center gap-1 text-xs ${overdue ? "font-semibold text-red-600" : "text-slate-400"}`}>
+                          <p className={`mt-0.5 flex items-center gap-1 text-xs ${overdue ? "font-semibold text-red-600" : "text-muted-foreground"}`}>
                             <Calendar className="h-3 w-3" /> {new Date(t.due_date).toLocaleDateString("pt-PT")}{overdue ? " · em atraso" : ""}
                           </p>
                         ) : null}
                       </div>
-                      <button data-testid={`delete-note-task-${t.id}`} onClick={() => deleteTask(t.id)} className="rounded-lg p-1 text-slate-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button data-testid={`delete-note-task-${t.id}`} onClick={() => deleteTask(t.id)} className="rounded-lg p-1 text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   );
                 })}
@@ -1965,16 +1965,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       <Dialog open={!!lightboxPhoto} onOpenChange={(v) => { if (!v) setLightboxPhoto(null); }}>
         <DialogContent data-testid="photo-lightbox" className="max-w-3xl border-0 bg-transparent p-0 shadow-none">
           {lightboxPhoto ? (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-              <div className="bg-slate-100">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+              <div className="bg-muted">
                 <img
                   src={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
                   alt={lightboxPhoto.filename}
                   className="max-h-[75vh] w-full object-contain"
                 />
               </div>
-              <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-white p-3">
-                <p className="truncate text-xs font-medium text-slate-600">{lightboxPhoto.filename}</p>
+              <div className="flex items-center justify-between gap-2 border-t border-border bg-card p-3">
+                <p className="truncate text-xs font-medium text-muted-foreground">{lightboxPhoto.filename}</p>
                 <div className="flex shrink-0 gap-1.5">
                   <a
                     href={withDeviceToken(`${API}/notes/${id}/files/${lightboxPhoto.id}`)}
@@ -2024,13 +2024,13 @@ function ViewField({ label, value, mono = false, link = null, multiline = false 
   const content = empty ? "—" : value;
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       {link && !empty ? (
-        <a href={link} className={`block text-sm font-semibold text-slate-900 hover:underline ${mono ? "font-mono" : ""}`}>
+        <a href={link} className={`block text-sm font-semibold text-foreground hover:underline ${mono ? "font-mono" : ""}`}>
           {content}
         </a>
       ) : (
-        <p className={`text-sm font-semibold text-slate-900 ${multiline ? "whitespace-pre-wrap" : "truncate"} ${mono ? "font-mono" : ""} ${empty ? "font-normal italic text-slate-400" : ""}`}>
+        <p className={`text-sm font-semibold text-foreground ${multiline ? "whitespace-pre-wrap" : "truncate"} ${mono ? "font-mono" : ""} ${empty ? "font-normal italic text-muted-foreground" : ""}`}>
           {content}
         </p>
       )}
@@ -2042,9 +2042,9 @@ function ViewField({ label, value, mono = false, link = null, multiline = false 
 function SectionTitle({ title, first = false }) {
   return (
     <div className={`flex items-center gap-3 ${first ? "" : "mt-5 sm:mt-6"}`}>
-      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
-      <h3 className="shrink-0 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">{title}</h3>
-      <span aria-hidden className="flex-1 border-t-2 border-dashed border-slate-200" />
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
+      <h3 className="shrink-0 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">{title}</h3>
+      <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
     </div>
   );
 }

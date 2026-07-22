@@ -30,13 +30,13 @@ export default function Scratchpad() {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">Guardado só neste dispositivo — não fica ligado a nenhum pedido.</p>
+        <p className="text-xs text-muted-foreground">Guardado só neste dispositivo — não fica ligado a nenhum pedido.</p>
         <button
           type="button"
           data-testid="scratchpad-clear"
           onClick={clear}
           disabled={!text}
-          className="flex shrink-0 items-center gap-1 text-xs font-bold text-slate-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex shrink-0 items-center gap-1 text-xs font-bold text-muted-foreground hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
         >
           <Trash2 className="h-3.5 w-3.5" /> Limpar
         </button>
@@ -47,7 +47,7 @@ export default function Scratchpad() {
         onChange={(e) => setText(e.target.value)}
         placeholder="Escreve aqui…"
         autoFocus
-        className="min-h-[240px] flex-1 resize-none rounded-xl border border-slate-200 p-3 text-sm text-slate-700 outline-none focus:border-slate-400"
+        className="min-h-[240px] flex-1 resize-none rounded-xl border border-border p-3 text-sm text-foreground outline-none focus:border-border"
       />
     </div>
   );

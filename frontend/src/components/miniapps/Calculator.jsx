@@ -69,31 +69,31 @@ export default function Calculator() {
 
   return (
     <div className="mx-auto flex max-w-xs flex-col gap-3">
-      <div data-testid="calc-display" className="overflow-x-auto rounded-2xl bg-slate-900 px-4 py-5 text-right font-mono text-3xl font-bold text-white">
+      <div data-testid="calc-display" className="overflow-x-auto rounded-2xl bg-foreground px-4 py-5 text-right font-mono text-3xl font-bold text-background">
         {display}
       </div>
       <div className="grid grid-cols-4 gap-2">
-        <Btn label="C" onClick={clear} className="bg-slate-200 text-slate-700 hover:bg-slate-300" />
-        <Btn label="±" onClick={toggleSign} className="bg-slate-200 text-slate-700 hover:bg-slate-300" />
-        <Btn label="%" onClick={percent} className="bg-slate-200 text-slate-700 hover:bg-slate-300" />
+        <Btn label="C" onClick={clear} className="bg-muted text-foreground hover:bg-slate-300" />
+        <Btn label="±" onClick={toggleSign} className="bg-muted text-foreground hover:bg-slate-300" />
+        <Btn label="%" onClick={percent} className="bg-muted text-foreground hover:bg-slate-300" />
         <Btn label="÷" onClick={() => chooseOp("÷")} className="bg-red-600 text-white hover:bg-red-700" />
-        <Btn label="7" onClick={() => inputDigit("7")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="8" onClick={() => inputDigit("8")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="9" onClick={() => inputDigit("9")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
+        <Btn label="7" onClick={() => inputDigit("7")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="8" onClick={() => inputDigit("8")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="9" onClick={() => inputDigit("9")} className="bg-muted text-foreground hover:bg-muted" />
         <Btn label="×" onClick={() => chooseOp("×")} className="bg-red-600 text-white hover:bg-red-700" />
-        <Btn label="4" onClick={() => inputDigit("4")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="5" onClick={() => inputDigit("5")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="6" onClick={() => inputDigit("6")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
+        <Btn label="4" onClick={() => inputDigit("4")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="5" onClick={() => inputDigit("5")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="6" onClick={() => inputDigit("6")} className="bg-muted text-foreground hover:bg-muted" />
         <Btn label="−" onClick={() => chooseOp("-")} className="bg-red-600 text-white hover:bg-red-700" />
-        <Btn label="1" onClick={() => inputDigit("1")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="2" onClick={() => inputDigit("2")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="3" onClick={() => inputDigit("3")} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
+        <Btn label="1" onClick={() => inputDigit("1")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="2" onClick={() => inputDigit("2")} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="3" onClick={() => inputDigit("3")} className="bg-muted text-foreground hover:bg-muted" />
         <Btn label="+" onClick={() => chooseOp("+")} className="bg-red-600 text-white hover:bg-red-700" />
-        <Btn label="0" onClick={() => inputDigit("0")} className="col-span-2 bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="." onClick={inputDot} className="bg-slate-100 text-slate-900 hover:bg-slate-200" />
-        <Btn label="=" onClick={equals} className="bg-slate-900 text-white hover:bg-slate-800" />
+        <Btn label="0" onClick={() => inputDigit("0")} className="col-span-2 bg-muted text-foreground hover:bg-muted" />
+        <Btn label="." onClick={inputDot} className="bg-muted text-foreground hover:bg-muted" />
+        <Btn label="=" onClick={equals} className="bg-foreground text-background hover:bg-foreground" />
       </div>
-      <button type="button" data-testid="calc-backspace" onClick={backspace} className="self-end text-xs font-bold text-slate-400 hover:text-slate-700">
+      <button type="button" data-testid="calc-backspace" onClick={backspace} className="self-end text-xs font-bold text-muted-foreground hover:text-foreground">
         ⌫ Apagar último dígito
       </button>
     </div>

@@ -14,9 +14,9 @@ function KanbanPeekContent({ note, cfg }) {
       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: cfg.bg, color: cfg.text }}>
         <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />{cfg.label}
       </span>
-      {note.description ? <p className="line-clamp-3 text-xs text-slate-600">{note.description}</p> : null}
-      {last ? <p className="text-xs text-slate-500">{last.message} <span className="text-slate-400">· {timeAgo(last.created_at)}</span></p> : null}
-      {note.next_action ? <p className="text-xs font-semibold text-slate-700">Próximo: {note.next_action}</p> : null}
+      {note.description ? <p className="line-clamp-3 text-xs text-muted-foreground">{note.description}</p> : null}
+      {last ? <p className="text-xs text-muted-foreground">{last.message} <span className="text-muted-foreground">· {timeAgo(last.created_at)}</span></p> : null}
+      {note.next_action ? <p className="text-xs font-semibold text-foreground">Próximo: {note.next_action}</p> : null}
     </div>
   );
 }
@@ -28,10 +28,10 @@ function KanbanCard({ note, onOpen, onMove }) {
     <div
       data-testid={`kanban-card-${note.id}`}
       onClick={() => onOpen(note.id)}
-      className="group relative cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md"
+      className="group relative cursor-pointer overflow-hidden rounded-xl border border-border bg-card p-3 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md"
     >
         <div className="flex items-start justify-between gap-1.5">
-          <QuickPeekTrigger as="p" className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900" renderPeek={() => <KanbanPeekContent note={note} cfg={stCfg} />}>
+          <QuickPeekTrigger as="p" className="min-w-0 flex-1 truncate text-sm font-bold text-foreground" renderPeek={() => <KanbanPeekContent note={note} cfg={stCfg} />}>
             {note.customer_name || "Sem nome"}
           </QuickPeekTrigger>
           <DropdownMenu>
@@ -39,7 +39,7 @@ function KanbanCard({ note, onOpen, onMove }) {
               <button
                 data-testid={`kanban-move-${note.id}`}
                 onClick={(e) => e.stopPropagation()}
-                className="shrink-0 rounded-lg p-0.5 text-slate-300 hover:bg-slate-100 hover:text-slate-600"
+                className="shrink-0 rounded-lg p-0.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -56,14 +56,14 @@ function KanbanCard({ note, onOpen, onMove }) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {note.description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{note.description}</p> : null}
+        {note.description ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{note.description}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={note.category} />
           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: pr.bg, color: pr.text }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pr.dot }} />{pr.label}
           </span>
           {note.is_overdue ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-red-text)]">
               <AlertTriangle className="h-3 w-3" /> {note.waiting_days}d
             </span>
           ) : null}
@@ -72,7 +72,7 @@ function KanbanCard({ note, onOpen, onMove }) {
           <a
             href={`tel:${note.phone}`}
             onClick={(e) => e.stopPropagation()}
-            className="mt-1.5 flex w-fit items-center gap-1 font-mono text-[11px] text-slate-400 hover:text-slate-700 hover:underline"
+            className="mt-1.5 flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground hover:underline"
           >
             <Phone className="h-3 w-3" /> {note.phone}
           </a>
@@ -91,15 +91,15 @@ export default function PedidoKanban({ items, onOpen, onMove }) {
         const cfg = getStatusCfg(status);
         const notes = items.filter((n) => n.status === status);
         return (
-          <div key={status} data-testid={`kanban-column-${status}`} className="flex w-64 shrink-0 flex-col rounded-2xl bg-slate-50 sm:w-72">
-            <div className="flex items-center gap-2 rounded-t-2xl border-b border-slate-200 px-3 py-2.5">
+          <div key={status} data-testid={`kanban-column-${status}`} className="flex w-64 shrink-0 flex-col rounded-2xl bg-muted sm:w-72">
+            <div className="flex items-center gap-2 rounded-t-2xl border-b border-border px-3 py-2.5">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cfg.dot }} />
-              <p className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide text-slate-600">{cfg.label}</p>
-              <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-400">{notes.length}</span>
+              <p className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide text-muted-foreground">{cfg.label}</p>
+              <span className="shrink-0 rounded-full bg-card px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{notes.length}</span>
             </div>
             <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto p-2">
               {notes.length === 0 ? (
-                <p className="p-3 text-center text-[11px] text-slate-300">Sem pedidos</p>
+                <p className="p-3 text-center text-[11px] text-muted-foreground">Sem pedidos</p>
               ) : notes.map((note) => (
                 <KanbanCard key={note.id} note={note} onOpen={onOpen} onMove={onMove} />
               ))}
