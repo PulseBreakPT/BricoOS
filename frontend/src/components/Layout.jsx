@@ -282,11 +282,11 @@ function MobileNavigation({
       <button
         type="button"
         onClick={onOpenSearch}
-        className="mt-5 flex min-h-12 items-center gap-2 rounded-2xl border border-white/10 bg-black/35 px-3.5 text-left text-sm text-white/50 transition-colors hover:border-white/20 hover:bg-white/[0.07] hover:text-white/75"
+        className="mt-5 flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-muted px-3.5 text-left text-sm text-muted-foreground transition-colors hover:border-input hover:bg-accent hover:text-foreground"
       >
         <Search className="h-4 w-4" />{" "}
         <span className="flex-1">Pesquisar tudo</span>
-        <Kbd className="border-white/10 bg-white/10 text-[9px] text-white/40">
+        <Kbd className="border-border bg-muted text-[9px] text-muted-foreground">
           ⌘K
         </Kbd>
       </button>
@@ -296,7 +296,7 @@ function MobileNavigation({
           haptics.tap();
           onShowHome?.();
         }}
-        className={`mt-3 flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 text-left text-sm font-bold transition-colors ${homeVisible ? "border-white bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "border-white/10 bg-white/[0.05] text-white/65 hover:bg-white/10 hover:text-white"}`}
+        className={`mt-3 flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 text-left text-sm font-bold transition-colors ${homeVisible ? "border-foreground bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"}`}
       >
         <MonitorUp
           className={`h-[18px] w-[18px] ${homeVisible ? "text-red-600" : ""}`}
@@ -323,7 +323,7 @@ function MobileNavigation({
                       onNavigate?.(item.path);
                     }}
                     className={({ isActive }) =>
-                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive && !homeVisible ? "bg-white text-black shadow-[0_12px_28px_-14px_rgba(255,255,255,0.45)]" : "text-white/55 hover:bg-white/[0.07] hover:text-white"}`
+                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive && !homeVisible ? "bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`
                     }
                   >
                     {({ isActive }) => (
@@ -334,7 +334,7 @@ function MobileNavigation({
                         <span className="flex-1">{item.shortTitle}</span>
                         {count ? (
                           <span
-                            className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] font-black ${isActive && !homeVisible ? "bg-red-600 text-white" : "bg-white/10 text-white/60"}`}
+                            className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] font-black ${isActive && !homeVisible ? "bg-red-600 text-white" : "bg-muted text-muted-foreground"}`}
                           >
                             {count > 99 ? "99+" : count}
                           </span>
@@ -352,14 +352,14 @@ function MobileNavigation({
         <button
           type="button"
           onClick={onOpenActivity}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-bold text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Activity className="h-4 w-4" /> Atividade
         </button>
         <button
           type="button"
           onClick={onOpenTrash}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-bold text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Trash2 className="h-4 w-4" /> Lixeira
         </button>
@@ -824,7 +824,7 @@ function LayoutInner() {
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetContent
               side="left"
-              className="os-mobile-drawer os-chrome flex w-[86vw] max-w-sm flex-col gap-0 border-r border-white/[0.08] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pr-10 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white"
+              className="os-mobile-drawer os-chrome flex w-[86vw] max-w-sm flex-col gap-0 border-r border-border p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pr-10 pt-[calc(1.5rem+env(safe-area-inset-top))]"
             >
               <SheetTitle className="sr-only">
                 Aplicações e ferramentas

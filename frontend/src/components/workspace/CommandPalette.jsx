@@ -89,9 +89,9 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="command-palette" className="command-palette-dialog elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-black/15 p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-white">
+      <DialogContent data-testid="command-palette" className="command-palette-dialog elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-border p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-foreground">
         {/* Visor de comando — faixa grafite da máquina com o campo embutido. */}
-        <div className="os-chrome flex items-center gap-2.5 border-b border-black/40 py-3 pl-4 pr-14 sm:pr-12">
+        <div className="os-chrome flex items-center gap-2.5 border-b border-border py-3 pl-4 pr-14 sm:pr-12">
           <Search className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" />
           <Input
             data-testid="command-palette-input"
@@ -99,7 +99,7 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Pesquisar pedidos, emails, fornecedores, tarefas…"
-            className="h-9 border-0 bg-transparent px-0 text-white shadow-none placeholder:text-[color:var(--chrome-faint)] focus-visible:ring-0"
+            className="h-9 border-0 bg-transparent px-0 text-foreground shadow-none placeholder:text-[color:var(--chrome-faint)] focus-visible:ring-0"
           />
           {loading ? <Spinner className="h-4 w-4 shrink-0 text-[color:var(--chrome-muted)]" /> : <span className="led led-ok shrink-0" title="Pronto a pesquisar" />}
         </div>
