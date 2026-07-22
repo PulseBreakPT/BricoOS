@@ -87,7 +87,7 @@ export default function DesktopOperationsRail({
     <aside
       data-testid="desktop-operations-rail"
       aria-label="Pulso da loja"
-      className="os-liveops-rail fixed bottom-[98px] right-4 top-[72px] z-[18] hidden w-[284px] flex-col overflow-hidden rounded-[26px] border border-white/[0.12] text-white shadow-[0_30px_90px_-28px_rgba(0,0,0,0.9)] 2xl:flex"
+      className="os-liveops-rail fixed z-[18] hidden flex-col overflow-hidden rounded-[26px] border border-white/[0.12] text-white shadow-[0_30px_90px_-28px_rgba(0,0,0,0.9)] 2xl:flex"
     >
       <div className="relative border-b border-white/[0.08] px-5 pb-5 pt-4">
         <div className="flex items-center justify-between">

@@ -16,6 +16,7 @@ export default function DesktopWorkspace({
   onOpenLauncher,
   onShowDesktop,
   onOpenRoute,
+  homeVisible,
   primaryWindow,
 }) {
   const { panels, zOrder } = useWorkspace();
@@ -57,6 +58,7 @@ export default function DesktopWorkspace({
         onOpenMissionControl={() => onMissionControlOpenChange(true)}
         onShowDesktop={onShowDesktop}
         onOpenRoute={onOpenRoute}
+        homeVisible={homeVisible}
       />
       <MissionControl
         open={missionControlOpen}

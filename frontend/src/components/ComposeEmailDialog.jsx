@@ -144,7 +144,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
           {!forward && templates.length > 0 ? (
             <div className="mt-3">
               <Select onValueChange={applyTemplate}>
-                <SelectTrigger data-testid="compose-template-select" className="h-9 w-auto min-w-[200px] text-xs">
+                <SelectTrigger data-testid="compose-template-select" className="h-9 min-w-0 flex-1 text-xs sm:w-auto sm:min-w-[200px] sm:flex-none">
                   <SelectValue placeholder="Inserir modelo..." />
                 </SelectTrigger>
                 <SelectContent>

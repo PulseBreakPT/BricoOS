@@ -11,3 +11,4 @@ export const SIDEBAR_WIDTH = 0;
 export const SYSTEM_BAR_HEIGHT = 60;
 export const TASKBAR_RESERVE = 88;
 export const WORKSPACE_GAP = 12;
+

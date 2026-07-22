@@ -68,16 +68,16 @@ export default function InstallPwaBanner() {
 
     return (
         <div
-            className="fixed inset-x-0 z-40 flex justify-center px-4 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-6"
+            className="fixed inset-x-0 z-40 flex justify-center px-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] sm:px-4 lg:bottom-[6.75rem]"
             data-testid="pwa-install-banner"
         >
-            <div className="flex w-full max-w-sm flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/40 animate-in fade-in-0 slide-in-from-bottom-2">
+            <div className="themed-surface flex w-full max-w-sm flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/40 animate-in fade-in-0 slide-in-from-bottom-2">
                 <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                         <Download className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">Instalar Brico Assistente</p>
+                        <p className="truncate text-sm font-bold text-slate-900">Instalar BRICO OS</p>
                         <p className="truncate text-xs text-slate-500">Acesso mais rápido, direto do ecrã principal.</p>
                     </div>
                     <button
@@ -85,7 +85,7 @@ export default function InstallPwaBanner() {
                         data-testid="pwa-install-dismiss"
                         onClick={dismiss}
                         aria-label="Dispensar"
-                        className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                     >
                         <X className="h-4 w-4" />
                     </button>

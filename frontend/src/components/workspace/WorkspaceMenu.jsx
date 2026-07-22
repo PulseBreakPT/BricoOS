@@ -101,3 +101,4 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
     </DropdownMenu>
   );
 }
+

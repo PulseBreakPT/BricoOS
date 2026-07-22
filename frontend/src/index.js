@@ -4,6 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 import { register as registerServiceWorker } from "@/serviceWorkerRegistration";
+import {
+  initializeTheme,
+  ThemeProvider,
+} from "@/context/ThemeContext";
+
+const initialTheme = initializeTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,9 +23,11 @@ const queryClient = new QueryClient({
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ThemeProvider initialTheme={initialTheme}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );
 
