@@ -12,7 +12,6 @@ import {
   ListChecks,
   Mail,
   Maximize2,
-  Menu,
   Minus,
   MonitorUp,
   Search,
@@ -468,7 +467,6 @@ function PrimaryRouteWindow({
   onClose,
   onMinimize,
   onToggleMaximize,
-  onOpenSearch,
   onOpenRoute,
   children,
 }) {
@@ -501,14 +499,6 @@ function PrimaryRouteWindow({
           <span className="hidden h-7 items-center gap-1.5 rounded-full border border-neutral-900/10 bg-neutral-900/[0.03] px-2.5 text-[9px] font-bold text-neutral-500 xl:flex">
             <span className="led led-ok" /> Sincronizado
           </span>
-          <button
-            type="button"
-            onClick={onOpenSearch}
-            className="flex h-8 items-center gap-2 rounded-xl border border-neutral-900/10 bg-white/70 px-3 text-[10px] font-bold text-neutral-500 transition-colors hover:border-neutral-900/20 hover:bg-white hover:text-neutral-800"
-          >
-            <Search className="h-3 w-3" /> Pesquisar{" "}
-            <span className="font-mono text-[8px]">⌘K</span>
-          </button>
           <span className="mx-0.5 h-5 w-px bg-neutral-900/10" aria-hidden="true" />
           <div className="flex items-center gap-0.5" aria-label="Controlos da janela">
             <button
@@ -701,6 +691,15 @@ function LayoutInner() {
     if (isDesktop) setMobileNavOpen(false);
   }, [isDesktop]);
 
+  // Sinaliza ao CSS quando a janela principal está maximizada (o rail
+  // LiveOps esconde-se) para o botão + e a faixa de sinais se reposicionarem
+  // corretamente em ecrãs largos.
+  useEffect(() => {
+    const maxed = isDesktop && primaryMaximized;
+    document.body.classList.toggle("os-window-max", maxed);
+    return () => document.body.classList.remove("os-window-max");
+  }, [isDesktop, primaryMaximized]);
+
   useEffect(() => {
     const currentLocation = `${location.pathname}${location.search}`;
     if (lastLocation.current === currentLocation) return;
@@ -736,11 +735,9 @@ function LayoutInner() {
         <>
           <SystemBar
             activeApp={activeSystemApp}
-            onOpenLauncher={() => setLauncherOpen(true)}
             onOpenSearch={() => setPaletteOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
             onOpenTrash={() => setTrashOpen(true)}
-            onOpenMissionControl={() => setMissionControlOpen(true)}
           />
           <DesktopSurface visible={homeVisible} onOpenPanel={openPanel} />
           <PrimaryRouteWindow
@@ -750,7 +747,6 @@ function LayoutInner() {
             onClose={showDesktopNow}
             onMinimize={showDesktopNow}
             onToggleMaximize={() => setPrimaryMaximized((value) => !value)}
-            onOpenSearch={() => setPaletteOpen(true)}
             onOpenRoute={openRoute}
           >
             <SupplierEmailAlert />
@@ -762,8 +758,6 @@ function LayoutInner() {
             app={homeVisible ? null : activeRouteApp}
             visible={!primaryMaximized}
             onOpenRoute={openRoute}
-            onOpenActivity={() => setActivityOpen(true)}
-            onOpenSearch={() => setPaletteOpen(true)}
           />
           <DesktopWorkspace
             missionControlOpen={missionControlOpen}
@@ -823,19 +817,8 @@ function LayoutInner() {
             </SheetContent>
           </Sheet>
           <header className="mobile-os-header sticky top-0 z-30 p-2 pb-0 pt-[calc(0.5rem+env(safe-area-inset-top))]">
-            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-2.5 py-2 shadow-[0_16px_38px_-18px_rgba(16,17,20,0.3)]">
-              <div className="flex min-w-0 items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="mobile-nav-btn"
-                  onClick={() => setMobileNavOpen(true)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label="Abrir menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-                <MobileBrand activeApp={homeVisible ? null : activeRouteApp} />
-              </div>
+            <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-3 py-2 shadow-[0_16px_38px_-18px_rgba(16,17,20,0.3)]">
+              <MobileBrand activeApp={homeVisible ? null : activeRouteApp} />
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
@@ -861,9 +844,7 @@ function LayoutInner() {
             {homeVisible ? (
               <MobileHomeSurface
                 onOpenRoute={openRoute}
-                onOpenSearch={() => setPaletteOpen(true)}
                 onOpenActivity={() => setActivityOpen(true)}
-                onOpenLauncher={() => setMobileNavOpen(true)}
               />
             ) : (
               <div

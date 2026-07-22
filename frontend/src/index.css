@@ -1469,7 +1469,9 @@ code {
   overflow-wrap: anywhere;
 }
 
-.os-shell {
+/* Variáveis do shell em :root para também servirem elementos em portal no
+   <body> (ex.: o botão + das páginas), mantendo tudo alinhado à janela. */
+:root {
   --os-shell-gap: clamp(12px, 1vw, 22px);
   --os-window-top: 72px;
   --os-window-bottom: 98px;
@@ -1505,14 +1507,50 @@ code {
 
 @media (min-width: 1024px) {
   .os-page-fab {
-    right: 1.75rem;
+    right: calc(var(--os-shell-gap, 16px) + 0.9rem);
     bottom: 7.15rem;
   }
 }
 
-@media (min-width: 1536px) {
+/* Ecrãs de altura reduzida (portáteis pequenos/landscape): o + encolhe a
+   folga para não invadir a área de conteúdo. */
+@media (min-width: 1024px) and (max-height: 620px) {
   .os-page-fab {
-    right: calc(clamp(284px, 18vw, 390px) + 2.25rem);
+    bottom: 6.4rem;
+  }
+}
+
+/* Telemóveis em landscape: mantém o + acima do dock sem roubar altura útil. */
+@media (max-width: 1023px) and (max-height: 480px) {
+  .os-page-fab {
+    bottom: calc(5.4rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1536px) {
+  /* O rail LiveOps ocupa a direita: o + encosta à margem interior da janela
+     principal, calculado com as mesmas variáveis do layout (nada fixo). */
+  .os-page-fab {
+    right: calc(
+      var(--os-liveops-width, 390px) + var(--os-shell-gap, 22px) +
+        var(--os-shell-gap, 22px) + 1.1rem
+    );
+  }
+
+  /* Janela maximizada: o rail esconde-se, o + regressa à margem direita. */
+  body.os-window-max .os-page-fab {
+    right: calc(var(--os-shell-gap, 22px) + 0.9rem);
+  }
+
+  /* A faixa de sinais dentro da janela duplicaria as métricas do rail
+     LiveOps neste tamanho — cede o lugar ao rail e só regressa quando a
+     janela está maximizada (rail escondido). */
+  .os-ops-ribbon-desktop {
+    display: none;
+  }
+
+  body.os-window-max .os-ops-ribbon-desktop {
+    display: flex;
   }
 }
 
@@ -1529,7 +1567,7 @@ code {
     font-size: 18px;
   }
 
-  .os-shell {
+  :root {
     --os-shell-gap: clamp(18px, 1vw, 30px);
     --os-window-top: 84px;
     --os-window-bottom: 116px;
@@ -1552,7 +1590,7 @@ code {
     font-size: 20px;
   }
 
-  .os-shell {
+  :root {
     --os-window-top: 94px;
     --os-window-bottom: 132px;
     --os-max-window-top: 80px;

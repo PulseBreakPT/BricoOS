@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Mail, Phone, MessageCircle, Trash2, Pencil, Truck, Receipt, ClipboardList } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
+import { haptics } from "@/lib/haptics";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -295,10 +296,13 @@ export default function Suppliers() {
       {createPortal(
         <button
           data-testid="fab-new-supplier"
-          onClick={openNew}
+          onClick={() => {
+            haptics.tap();
+            openNew();
+          }}
           aria-label="Novo fornecedor"
           title="Novo fornecedor"
-          className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-1 active:scale-95 sm:hidden"
+          className="group fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 select-none touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-black text-white shadow-[0_16px_35px_-8px_rgba(15,23,42,0.55)] ring-1 ring-black/10 transition-all duration-150 will-change-transform hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/50 active:scale-90 active:duration-75 sm:hidden"
         >
           <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
         </button>,

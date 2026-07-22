@@ -101,3 +101,58 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Remover ícones/botões duplicados no ambiente de trabalho; melhorar responsividade do botão + em desktop e mobile. Depois: criar ficheiros .env para o PIN funcionar."
+
+backend:
+  - task: "Criar ficheiros .env (MONGO_URL, DB_NAME, ACCESS_PIN) para o backend arrancar e o PIN validar"
+    implemented: true
+    working: true
+    file: "backend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Backend crashava com KeyError MONGO_URL (não existia .env). Criados backend/.env (MONGO_URL, DB_NAME=test_database, CORS_ORIGINS, ACCESS_PIN=250724) e frontend/.env (REACT_APP_BACKEND_URL, WDS_SOCKET_PORT). Verificado: POST /api/auth/verify-pin com 250724 devolve ok:true+token; fluxo completo no browser (teclado do PIN → desktop) funcional."
+
+frontend:
+  - task: "Remover botões/ícones duplicados no ambiente de trabalho (desktop e mobile)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/Layout.jsx, workspace/SystemBar.jsx, workspace/DesktopOperationsRail.jsx, workspace/MobileHomeSurface.jsx, workspace/OperationalRibbon.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Launcher/Mission Control/Espaços agora só no dock; pesquisa só na SystemBar (removida da titlebar da janela e do rail); atividade só na SystemBar (removida do rail); ribbon de sinais cede lugar ao rail a 2xl (regressa com janela maximizada via body.os-window-max); mobile: drawer abre só pelo 'Mais' do dock (hambúrguer, 'Ver todas' e 'Abrir Control Deck' removidos), pesquisa só no header. Validado com screenshot no desktop após login por PIN."
+  - task: "Melhorar responsividade do botão + (FAB) em desktop e mobile"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Notes.jsx, frontend/src/pages/Suppliers.jsx, frontend/src/index.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Variáveis --os-* movidas para :root (FAB em portal no body passa a vê-las); posição a 2xl calculada com var(--os-liveops-width) (corrige >3000px); body.os-window-max reposiciona o + quando a janela maximiza (rail escondido); regras para ecrãs baixos/landscape; focus ring, touch-manipulation e haptics; corrigido import em falta de haptics em Notes.jsx (crash ao clicar no +)."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: "PIN de acesso: 250724 (ver /app/memory/test_credentials.md). Toda a API exige X-Device-Token exceto /api/auth/*, /api/oauth/*, /api/gmail/connect."

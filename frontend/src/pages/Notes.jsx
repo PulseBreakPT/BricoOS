@@ -10,6 +10,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import api, { getErrorMessage } from "@/lib/api";
+import { haptics } from "@/lib/haptics";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
 import {
   PRIORITY_ORDER, PRIORITY_CONFIG, getStatusCfg, getPriorityCfg,
@@ -753,7 +754,7 @@ export default function Notes() {
           }}
           aria-label="Criar novo pedido"
           title="Criar novo pedido (N)"
-          className="os-page-fab group fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 select-none touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-150 will-change-transform hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] active:scale-90 active:duration-75 lg:h-16 lg:w-16"
+          className="os-page-fab group fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex h-14 w-14 select-none touch-manipulation items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-red-800 text-white shadow-[0_16px_35px_-8px_rgba(217,38,38,0.5)] ring-1 ring-white/15 transition-all duration-150 will-change-transform hover:-translate-y-1 hover:shadow-[0_22px_50px_-8px_rgba(217,38,38,0.6)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-400/50 active:scale-90 active:duration-75 sm:h-[3.75rem] sm:w-[3.75rem] lg:h-16 lg:w-16"
         >
           <Plus className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90" strokeWidth={2.4} />
         </button>,

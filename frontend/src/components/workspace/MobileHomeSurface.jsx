@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
-  ArrowUpRight,
   BarChart3,
   BookOpenCheck,
   ClipboardList,
-  Command,
   ListChecks,
   Mail,
-  Search,
   Truck,
 } from "lucide-react";
 import { useSystemStatus } from "@/context/SystemStatusContext";
@@ -82,12 +79,7 @@ function greetingFor(hour) {
   return "Boa noite";
 }
 
-export default function MobileHomeSurface({
-  onOpenRoute,
-  onOpenSearch,
-  onOpenActivity,
-  onOpenLauncher,
-}) {
+export default function MobileHomeSurface({ onOpenRoute, onOpenActivity }) {
   const now = useClock();
   const { status, online } = useSystemStatus();
 
@@ -145,20 +137,11 @@ export default function MobileHomeSurface({
           </p>
         </div>
 
-        <div className="relative mt-6 grid grid-cols-2 gap-2 sm:max-w-md">
-          <button
-            type="button"
-            onClick={onOpenSearch}
-            className="flex min-h-12 min-w-0 items-center gap-2 rounded-2xl border border-border bg-muted px-3 text-left text-xs font-extrabold text-foreground/75 transition-colors hover:bg-accent hover:text-foreground active:scale-[0.98]"
-          >
-            <Search className="h-4 w-4 shrink-0" />
-            <span className="min-w-0 flex-1">Pesquisar</span>
-            <Command className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
-          </button>
+        <div className="relative mt-6 sm:max-w-md">
           <button
             type="button"
             onClick={onOpenActivity}
-            className="flex min-h-12 min-w-0 items-center gap-2 rounded-2xl border border-border bg-muted px-3 text-left text-xs font-extrabold text-foreground/75 transition-colors hover:bg-accent hover:text-foreground active:scale-[0.98]"
+            className="flex min-h-12 w-full min-w-0 items-center gap-2 rounded-2xl border border-border bg-muted px-3 text-left text-xs font-extrabold text-foreground/75 transition-colors hover:bg-accent hover:text-foreground active:scale-[0.98] sm:max-w-xs"
           >
             <Activity className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1">Atividade</span>
@@ -189,20 +172,11 @@ export default function MobileHomeSurface({
         ))}
       </div>
 
-      <div className="mt-7 flex items-end justify-between gap-4 px-1 sm:mt-9">
-        <div>
-          <p className="kicker">Aplicações</p>
-          <h2 className="mt-2 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
-            Bancada de trabalho
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenLauncher}
-          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2.5 text-[10px] font-extrabold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          Ver todas <ArrowUpRight className="h-3.5 w-3.5" />
-        </button>
+      <div className="mt-7 px-1 sm:mt-9">
+        <p className="kicker">Aplicações</p>
+        <h2 className="mt-2 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+          Bancada de trabalho
+        </h2>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-5 sm:grid-cols-6 sm:gap-4 lg:grid-cols-6">
@@ -231,7 +205,7 @@ export default function MobileHomeSurface({
         })}
       </div>
 
-      <div className="themed-surface mt-7 flex flex-col gap-4 rounded-[24px] border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+      <div className="themed-surface mt-7 flex items-center justify-between gap-4 rounded-[24px] border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
             <span className="led led-ok" /> Turno operacional
@@ -245,13 +219,9 @@ export default function MobileHomeSurface({
               : "Não existem alertas críticos neste momento."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenLauncher}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-xs font-extrabold text-background shadow-lg transition-transform hover:-translate-y-0.5 active:scale-95 sm:w-auto"
-        >
-          Abrir Control Deck <ArrowUpRight className="h-4 w-4" />
-        </button>
+        <span className="hidden shrink-0 rounded-full border border-border bg-muted px-3 py-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:block">
+          {online ? "Ao vivo" : "Offline"}
+        </span>
       </div>
     </section>
   );

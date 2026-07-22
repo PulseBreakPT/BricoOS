@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
-  ArrowUpRight,
   ClipboardList,
   Command,
   ListChecks,
   Mail,
-  Search,
   Sparkles,
 } from "lucide-react";
 import { useSystemStatus } from "@/context/SystemStatusContext";
@@ -60,8 +57,6 @@ export default function DesktopOperationsRail({
   app,
   visible = true,
   onOpenRoute,
-  onOpenActivity,
-  onOpenSearch,
 }) {
   const now = useClock();
   const { status, online } = useSystemStatus();
@@ -157,51 +152,6 @@ export default function DesktopOperationsRail({
           })}
         </div>
 
-        <div className="mt-5 flex items-center justify-between px-1.5">
-          <p className="engraved">Foco agora</p>
-          <span className="font-mono text-[9px] font-bold text-neutral-400">
-            {attentionTotal} sinais
-          </span>
-        </div>
-        <div className="mt-2 space-y-1.5">
-          <button
-            type="button"
-            onClick={() => onOpenRoute?.("/")}
-            className="os-liveops-focus group flex w-full items-center gap-3 rounded-2xl border border-neutral-900/[0.08] px-3 py-3 text-left transition-all hover:border-red-300 hover:bg-neutral-900/[0.04] active:scale-[0.98]"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-300 ring-1 ring-red-400/20">
-              <ClipboardList className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[11px] font-extrabold text-neutral-800">
-                Pedidos em andamento
-              </span>
-              <span className="mt-0.5 block truncate text-[9px] font-semibold text-neutral-400">
-                Retomar a operação principal
-              </span>
-            </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-neutral-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-neutral-600" />
-          </button>
-          <button
-            type="button"
-            onClick={onOpenActivity}
-            className="os-liveops-focus group flex w-full items-center gap-3 rounded-2xl border border-neutral-900/[0.08] px-3 py-3 text-left transition-all hover:border-amber-300 hover:bg-neutral-900/[0.04] active:scale-[0.98]"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-300/10 text-amber-200 ring-1 ring-amber-200/15">
-              <Activity className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[11px] font-extrabold text-neutral-800">
-                Linha de atividade
-              </span>
-              <span className="mt-0.5 block truncate text-[9px] font-semibold text-neutral-400">
-                Mudanças, emails e documentos
-              </span>
-            </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-neutral-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-neutral-600" />
-          </button>
-        </div>
-
         <div className="mt-5 rounded-2xl border border-neutral-900/[0.08] bg-neutral-900/[0.04] p-3.5">
           <div className="flex items-center justify-between">
             <p className="engraved">Espaço ativo</p>
@@ -215,20 +165,11 @@ export default function DesktopOperationsRail({
             <span className="h-1 w-1 rounded-full bg-neutral-300" />
             <span>Sincronizado</span>
           </div>
+          <div className="mt-3 flex items-center justify-between border-t border-neutral-900/[0.08] pt-3 font-mono text-[9px] font-bold text-neutral-400">
+            <span>{attentionTotal} sinais em foco</span>
+            <span>⌘K pesquisar</span>
+          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto] gap-2 border-t border-neutral-900/[0.08] p-3.5">
-        <button
-          type="button"
-          onClick={onOpenSearch}
-          className="flex h-11 items-center gap-2 rounded-xl border border-neutral-900/[0.09] bg-neutral-900/[0.04] px-3 text-[10px] font-extrabold text-neutral-500 transition-colors hover:bg-neutral-900/[0.06] hover:text-neutral-900"
-        >
-          <Search className="h-3.5 w-3.5" /> Comando rápido
-        </button>
-        <span className="flex h-11 min-w-11 items-center justify-center rounded-xl border border-neutral-900/[0.08] bg-neutral-900/[0.04] font-mono text-[9px] font-black text-neutral-400">
-          ⌘K
-        </span>
       </div>
     </aside>
   );

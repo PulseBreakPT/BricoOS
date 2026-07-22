@@ -56,7 +56,7 @@ export default function OperationalRibbon({
       className={
         mobile
           ? "os-ops-ribbon os-ops-ribbon-mobile mt-2 flex h-11 items-stretch overflow-hidden rounded-[17px] border border-border bg-card text-foreground"
-          : "os-ops-ribbon hidden h-9 shrink-0 items-stretch border-b border-neutral-900/[0.08] text-neutral-900 xl:flex"
+          : "os-ops-ribbon os-ops-ribbon-desktop hidden h-9 shrink-0 items-stretch border-b border-neutral-900/[0.08] text-neutral-900 xl:flex"
       }
     >
       <div
