@@ -54,7 +54,10 @@ try:
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
-    from quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
+    from quote_validation import (
+        build_quality_report, confidence_score, detect_urgency_signals,
+        diff_quote_versions, diff_summary_text, duplicate_medidas,
+    )
     import correio_semanal
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
@@ -77,7 +80,10 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
-    from .quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
+    from .quote_validation import (
+        build_quality_report, confidence_score, detect_urgency_signals,
+        diff_quote_versions, diff_summary_text, duplicate_medidas,
+    )
     from . import correio_semanal
 
 from google_auth_oauthlib.flow import Flow
@@ -292,6 +298,29 @@ def callback_due(note, now, side):
     return last is None or (now - last) >= timedelta(hours=CALLBACK_RETRY_HOURS)
 
 
+def _priority_score(note):
+    """Motor de prioridades: um número (não guardado, recalculado sempre
+    que o pedido passa por enrich_note — ou seja, sempre que é lido) que
+    combina a prioridade escolhida pela pessoa com sinais objetivos
+    (atraso, tempo de espera, problemas de leitura no último orçamento
+    importado). Serve só para ordenar (sort=urgency) — nunca substitui ou
+    sobrepõe a prioridade manual guardada em note.priority."""
+    score = (3 - PRIORITY_RANK.get(note.get("priority"), 2)) * 30.0
+    if note.get("is_overdue"):
+        score += 50
+    score += min(note.get("waiting_days", 0) or 0, 30)
+    sq = note.get("supplier_quote") or {}
+    qr = sq.get("quality_report") or {}
+    if qr.get("status") == "error":
+        score += 15
+    elif qr.get("status") == "warning":
+        score += 5
+    diff = sq.get("diff_since_previous")
+    if diff and diff.get("has_changes"):
+        score += 10
+    return round(score, 1)
+
+
 def enrich_note(note, now=None):
     now = now or datetime.now(timezone.utc)
     status = note.get("status", "novo")
@@ -305,6 +334,12 @@ def enrich_note(note, now=None):
     days = max((now - ref).days, 0) if ref else 0
     note["waiting_days"] = days
     note["is_overdue"] = (status in WAITING_SUPPLIER or status in FORGOTTEN_STATUSES) and days >= sla
+    # Prazo previsto de resposta: mesma referência usada para "waiting_days"
+    # (o SLA conta a partir da última mudança de estado), só que como data
+    # concreta em vez de "há X dias" — mais fácil de mostrar num calendário
+    # ou de comparar com "hoje".
+    note["expected_reply_date"] = (ref + timedelta(days=sla)).date().isoformat() if ref else None
+    note["priority_score"] = _priority_score(note)
     sup = parse_dt(note.get("last_supplier_sent_at"))
     cli = parse_dt(note.get("last_client_contact_at"))
     note["days_since_supplier"] = (now - sup).days if sup else None
@@ -1149,6 +1184,8 @@ async def list_notes(
         docs = [d for d in docs if d.get("needs_callback")]
     if sort == "priority":
         docs.sort(key=lambda d: (PRIORITY_RANK.get(d.get("priority"), 2), d.get("created_at")))
+    elif sort == "urgency":
+        docs.sort(key=lambda d: -d.get("priority_score", 0))
     elif sort == "deadline":
         docs.sort(key=lambda d: -d.get("waiting_days", 0))
     elif sort == "customer":
@@ -2540,17 +2577,32 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
     Levanta ValueError se o PDF não for reconhecido.
 
     Centro de Validação Automática: antes de guardar, confere a qualidade da
-    leitura (imagens, preços, descrições, totais — ver quote_validation) e,
+    leitura (imagens, preços, descrições, totais — ver quote_validation),
+    deteta se o mesmo ficheiro já tinha sido importado (evita duplicados) e,
     se já havia uma versão anterior do orçamento para este pedido, compara
-    artigo a artigo (adicionados, removidos, alterados) e guarda a versão
-    anterior no histórico. Nada disto bloqueia a importação — só fica
-    registado para a pessoa decidir com informação completa."""
+    artigo a artigo (adicionados, removidos, alterados), conta a revisão e
+    guarda a versão anterior no histórico. Nada disto bloqueia a importação
+    nem muda a prioridade sozinho — só fica registado/etiquetado para a
+    pessoa decidir com informação completa."""
+    content_hash = hashlib.sha256(data).hexdigest()
+    dup = await db.note_files.find_one(
+        {"note_id": note_id, "kind": "supplier_pdf", "content_hash": content_hash}, {"_id": 0, "id": 1})
+    if dup:
+        await log_activity(note_id, "updated",
+                           f"PDF do fornecedor recebido, mas é idêntico a um já importado — não "
+                           f"reprocessado{source_label}.", {"file_id": dup["id"]})
+        current = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_quote": 1})
+        return (current or {}).get("supplier_quote")
+
     parsed = parse_supplier_pdf(data)
     quality_report = build_quality_report(parsed)
+    confidence = confidence_score(quality_report)
+    dup_medidas = duplicate_medidas(parsed["items"])
+
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
-        "filename": filename or "orcamento_fornecedor.pdf",
+        "filename": filename or "orcamento_fornecedor.pdf", "content_hash": content_hash,
         "content_b64": base64.b64encode(data).decode(), "created_at": now_iso()})
     for item in parsed["items"]:
         material = detect_material(item.get("description"))
@@ -2561,24 +2613,48 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         item["coefficient"] = coefficient_for_margin(item["margin_pct"])
         item["include"] = True
 
-    prev = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_quote": 1, "supplier_quote_history": 1})
-    prev_quote = (prev or {}).get("supplier_quote")
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    prev_quote = (n or {}).get("supplier_quote")
     quote_diff = None
     extra_set = {}
     if prev_quote:
         quote_diff = diff_quote_versions(prev_quote.get("items"), parsed["items"])
-        history = list((prev or {}).get("supplier_quote_history") or [])
+        history = list((n or {}).get("supplier_quote_history") or [])
         history.append({k: prev_quote.get(k) for k in (
             "quote_number", "date", "obra", "total", "source_file_id", "imported_at")})
         extra_set["supplier_quote_history"] = history[-SUPPLIER_QUOTE_HISTORY_LIMIT:]
+    # Contagem de revisões: campo próprio, nunca aparado (ao contrário do
+    # array de histórico acima, que só guarda as últimas
+    # SUPPLIER_QUOTE_HISTORY_LIMIT versões em detalhe) — para continuar
+    # correta depois da 6ª importação do mesmo orçamento.
+    revision_number = ((n or {}).get("supplier_quote_revision_count") or 0) + 1
+    extra_set["supplier_quote_revision_count"] = revision_number
+
+    urgency_hits = detect_urgency_signals(
+        (n or {}).get("description"), (n or {}).get("details"),
+        *[i.get("description") for i in parsed["items"]])
 
     supplier_quote = {**parsed,
                       "margin_rules": {"pvc": margin_for_material("pvc"),
                                        "aluminio": margin_for_material("aluminio")},
                       "source_file_id": file_id, "imported_at": now_iso(),
-                      "quality_report": quality_report, "diff_since_previous": quote_diff}
-    await db.notes.update_one({"id": note_id}, {"$set": {
-        "supplier_quote": supplier_quote, "updated_at": now_iso(), **extra_set}})
+                      "quality_report": quality_report, "diff_since_previous": quote_diff,
+                      "confidence_score": confidence, "revision_number": revision_number,
+                      "duplicate_medidas": dup_medidas}
+
+    # Etiquetas automáticas — só acrescenta (nunca remove uma etiqueta posta
+    # à mão) e nunca mexe em note.priority sozinho, mesmo quando deteta
+    # sinais de urgência: fica assinalado para uma pessoa decidir.
+    auto_labels = sorted({i.get("material_label") for i in parsed["items"] if i.get("material_label")})
+    if quality_report["status"] != "ok":
+        auto_labels.append("revisão necessária")
+    if urgency_hits:
+        auto_labels.append("possível urgência")
+
+    update_ops = {"$set": {"supplier_quote": supplier_quote, "updated_at": now_iso(), **extra_set}}
+    if auto_labels:
+        update_ops["$addToSet"] = {"labels": {"$each": auto_labels}}
+    await db.notes.update_one({"id": note_id}, update_ops)
 
     quality_note = ""
     if quality_report["status"] != "ok":
@@ -2586,9 +2662,14 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         quality_note = f" — ⚠ verificar: {'; '.join(problems)}"
     await log_activity(note_id, "updated",
                        f"Orçamento do fornecedor importado ({supplier_quote['quote_number']}, "
-                       f"{len(parsed['items'])} linha(s)){source_label}{quality_note}", {"file_id": file_id})
+                       f"{len(parsed['items'])} linha(s), revisão {revision_number}, confiança "
+                       f"{confidence}%){source_label}{quality_note}", {"file_id": file_id})
     if quote_diff and quote_diff["has_changes"]:
         await log_activity(note_id, "updated", diff_summary_text(quote_diff), {"diff": quote_diff})
+    if urgency_hits:
+        await log_activity(note_id, "updated",
+                           f"Possível urgência detetada no texto do orçamento (\"{urgency_hits[0]}\") "
+                           f"— confirme a prioridade.", {"urgency_hits": urgency_hits})
 
     # O total do fornecedor entra no fluxo normal de orçamentos recebidos
     # (muda o estado e alimenta as estatísticas de resposta).
@@ -2657,7 +2738,10 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
             # importação) antes de confirmar o envio — ver ConfirmSendDialog.
             "source_file_id": supplier_quote.get("source_file_id") or "",
             "quality_report": supplier_quote.get("quality_report"),
-            "diff_since_previous": supplier_quote.get("diff_since_previous")},
+            "diff_since_previous": supplier_quote.get("diff_since_previous"),
+            "confidence_score": supplier_quote.get("confidence_score"),
+            "revision_number": supplier_quote.get("revision_number"),
+            "duplicate_medidas": supplier_quote.get("duplicate_medidas")},
         "updated_at": now_iso()}})
     return pdf_bytes, filename, file_id
 
@@ -4561,6 +4645,48 @@ async def today(segment: Optional[str] = None):
                 "waiting_client": len(waiting_client), "reminder_due": len(reminder_due),
                 "follow_up": len(follow_up_calls), "to_confirm": len(to_confirm)},
             "summary": summary, "potential_value": st["potential_value"]}
+
+
+SEVERITY_RANK = {"error": 2, "warning": 1, "info": 0}
+
+
+@api_router.get("/notes/needs-review")
+async def notes_needs_review():
+    """Centro de Exceções + Centro de Decisões: reúne, numa lista só, todos
+    os pedidos cujo orçamento do fornecedor precisa de atenção humana —
+    leitura do PDF incompleta (quality_report), artigos alterados desde a
+    última versão, ou já pronto para o cliente mas ainda por confirmar o
+    envio. Ao contrário de percorrer a lista toda de pedidos à procura de
+    problemas, só aparece aqui quem realmente precisa de uma decisão."""
+    notes = await db.notes.find(
+        {"archived": {"$ne": True}, "supplier_quote": {"$exists": True, "$ne": None}},
+        {"_id": 0}).to_list(2000)
+    now = datetime.now(timezone.utc)
+    out = []
+    for n in notes:
+        sq = n.get("supplier_quote") or {}
+        qr = sq.get("quality_report") or {}
+        diff = sq.get("diff_since_previous") or {}
+        reasons = []
+        if qr.get("status") and qr["status"] != "ok":
+            reasons.append({"kind": "quality", "severity": qr["status"],
+                            "label": "Problemas na leitura do PDF do fornecedor"})
+        if diff.get("has_changes"):
+            reasons.append({"kind": "changed", "severity": "warning",
+                            "label": "Orçamento alterado desde a última versão"})
+        if n.get("pending_client_send"):
+            reasons.append({"kind": "pending_send", "severity": "info",
+                            "label": "Pronto a enviar — falta confirmar"})
+        if not reasons:
+            continue
+        en = enrich_note(dict(n), now)
+        out.append({
+            "id": en["id"], "customer_name": en.get("customer_name") or "Cliente",
+            "quote_number": sq.get("quote_number"), "confidence_score": sq.get("confidence_score"),
+            "waiting_days": en.get("waiting_days"), "reasons": reasons,
+            "severity_rank": max((SEVERITY_RANK.get(r["severity"], 0) for r in reasons), default=0)})
+    out.sort(key=lambda d: (-d["severity_rank"], -(d.get("waiting_days") or 0)))
+    return {"items": out, "count": len(out)}
 
 
 # ---------- Assistant endpoints (preflight, history, learning, batches) ----------
