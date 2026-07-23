@@ -13,6 +13,13 @@ não texto simples — para o resumo ser rápido de ler em vez de uma parede de
 texto. Todo o texto extraído do PDF passa por html.escape antes de entrar em
 qualquer tag; as únicas tags no output são as que este módulo escreve, nunca
 HTML vindo do PDF (que nem sequer tem HTML — é só texto).
+
+A extração estruturada (extract_structured, usada para tarefas sugeridas e
+comparação semanal) classifica cada secção pelo mesmo motor partilhado que
+os Anexos_Edição usam — classification_rules.py e extraction_patterns.py —
+para a "lógica base" ser realmente uma só nos dois lados, como pedido: uma
+secção sobre uma campanha e um ficheiro de campanha dentro do zip caem na
+mesma categoria, com o mesmo motor de gravidade (severity.py).
 """
 
 import re
@@ -21,6 +28,15 @@ from collections import Counter
 from html import escape as html_escape
 
 import fitz  # PyMuPDF
+
+try:
+    import classification_rules as clsrules
+    import extraction_patterns
+    import severity as severity_engine
+except ImportError:  # Permite também executar como módulo: python -m backend.server
+    from . import classification_rules as clsrules
+    from . import extraction_patterns
+    from . import severity as severity_engine
 
 _TOC_ENTRY_RE = re.compile(r"^\s*(\d{2})\.\s*(.+?)\s*$")
 _PAGE_MARK_RE = re.compile(r"^\s*P\.(\d+)\s*$")
@@ -212,12 +228,18 @@ def _adhesion_info(text):
     return True, sorted(set(_EMAIL_RE.findall(text)))
 
 
-def extract_structured(pdf_bytes_list, subject):
+def extract_structured(pdf_bytes_list, subject, rules=None):
     """Extração estruturada (não HTML) do mesmo boletim que build_digest
     resume — usada para sugerir tarefas, comparar com a semana anterior e
     guardar histórico. Orientada pelo conteúdo de cada página (marcador
     P.N + índice + as 3 caixas fixas), nunca por um número de página fixo:
-    uma secção nova, numa posição nunca vista, é lida da mesma forma."""
+    uma secção nova, numa posição nunca vista, é lida da mesma forma.
+
+    `rules` é o dicionário de categorias/palavras-chave carregado da base
+    de dados (classification_rules.load_rules) — partilhado com o
+    anexos_edicao.py. Sem ele, usa a semente predefinida (útil para testes
+    isolados deste módulo)."""
+    rules = rules if rules is not None else clsrules.DEFAULT_KEYWORDS
     all_pages = []
     for pdf_bytes in pdf_bytes_list:
         all_pages.extend(_pages_text(pdf_bytes))
@@ -244,18 +266,34 @@ def extract_structured(pdf_bytes_list, subject):
         else:
             seen_titles.add(title)
         requires_adhesion, adhesion_emails = _adhesion_info(page_text)
-        sections.append({
+        category = clsrules.classify(f"{title} {page_text}", rules)
+        section = {
             "page": i + 1, "title": title, "department": _page_department(page_text),
-            "checked_actions": actions,
+            "category": category, "checked_actions": actions,
             "deadline_mentions": _extract_facts(page_text),
             "mea_mentions": sorted({m.group(0).strip() for m in _MEA_RE.finditer(page_text)}),
             "requires_adhesion_email": requires_adhesion, "adhesion_emails": adhesion_emails,
             "text": " ".join(p for _, p in paragraphs)[:2000],
-        })
+        }
+        section["severity"] = severity_engine.classify_severity(
+            category, page_text, requires_adhesion=requires_adhesion)
+        facts = extraction_patterns.extract_facts(page_text)
+        if facts:
+            section["facts"] = facts
+        if category == "outro":
+            section["fingerprint"] = clsrules.unclassified_fingerprint(page_text)
+        sections.append(section)
+
+    by_category = Counter(s["category"] for s in sections)
+    by_severity = Counter(s["severity"] for s in sections)
+    unclassified = [{"title": s["title"], "fingerprint": s["fingerprint"]}
+                     for s in sections if s.get("fingerprint")]
 
     return {**header, "subject": _clean_subject_title(subject), "sections": sections,
             "deadlines_calendar": deadlines_calendar,
-            "section_titles": [s["title"] for s in sections]}
+            "section_titles": [s["title"] for s in sections],
+            "by_category": dict(by_category), "by_severity": dict(by_severity),
+            "unclassified_fingerprints": unclassified}
 
 
 def diff_digest_versions(prev, new):

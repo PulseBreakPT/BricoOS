@@ -61,6 +61,9 @@ try:
     )
     import correio_semanal
     import anexos_edicao
+    import classification_rules
+    import severity as severity_engine
+    import edition_summary
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -88,6 +91,9 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     )
     from . import correio_semanal
     from . import anexos_edicao
+    from . import classification_rules
+    from . import severity as severity_engine
+    from . import edition_summary
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -1914,6 +1920,33 @@ async def accept_task_suggestion(task_id: str):
     return t
 
 
+class AcceptNewCategoryIn(BaseModel):
+    category: str
+
+
+@api_router.post("/tasks/{task_id}/accept-new-category")
+async def accept_new_category(task_id: str, payload: AcceptNewCategoryIn):
+    """Confirma uma sugestão de categoria nova (ver server.py:
+    _suggest_new_categories) — a categoria e as suas palavras-chave ficam
+    gravadas em classification_rules (base de dados, nunca código) e
+    aplicam-se já à próxima edição do Correio Semanal/Anexos_Edição
+    processada, sem precisar de deploy nenhum."""
+    t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not t or t.get("kind") != "new_category_suggestion":
+        raise HTTPException(status_code=404, detail="Sugestão de categoria não encontrada")
+    category = (payload.category or "").strip()
+    if not category:
+        raise HTTPException(status_code=400, detail="Indique um nome para a categoria")
+    rules = await classification_rules.learn_new_category(
+        db, category, t.get("category_keywords") or [], source=t.get("source", ""))
+    if t.get("category_signature"):
+        await db.category_suggestions.update_one(
+            {"signature": t["category_signature"]},
+            {"$set": {"status": "accepted", "accepted_as": category, "updated_at": now_iso()}})
+    await db.tasks.delete_one({"id": task_id})
+    return {"category": category, "keywords": rules.get(category, [])}
+
+
 @api_router.post("/tasks")
 async def create_task(payload: TaskIn):
     doc = _with_subtask_ids(payload.model_dump())
@@ -3367,6 +3400,67 @@ async def _summarize_correio_semanal(subject, pdf_bytes_list):
         return ""
 
 
+CATEGORY_SUGGESTION_THRESHOLD = 2  # nº de edições distintas com o mesmo padrão antes de sugerir
+
+
+async def _suggest_new_categories(fingerprints, source, edition_ref):
+    """A resposta determinística a "o sistema reconhece um tipo de
+    documento novo e cria a categoria sozinho": um documento que não bata
+    com nenhuma categoria conhecida fica em "outro" com uma "impressão
+    digital" das suas palavras mais distintivas (ver
+    classification_rules.unclassified_fingerprint). Se o mesmo padrão
+    aparecer em CATEGORY_SUGGESTION_THRESHOLD edições diferentes, é sinal
+    de que é mesmo um tipo de documento recorrente — sugere-se uma
+    categoria nova a um humano (POST /tasks/{id}/accept-new-category);
+    assim que aceite, fica gravada na base de dados (nunca no código) e
+    passa a aplicar-se sozinha a partir da próxima edição. Sem qualquer
+    ocorrência repetida, não há sinal nenhum para propor — esse é o limite
+    honesto de um motor sem IA."""
+    if not fingerprints:
+        return 0
+    created = 0
+    for item in fingerprints:
+        fp = item.get("fingerprint") or []
+        if len(fp) < 2:
+            continue
+        signature = "+".join(sorted(fp[:4]))
+        doc = await db.category_suggestions.find_one({"signature": signature})
+        example = {"source": source, "edition_ref": edition_ref, "label": item.get("path") or item.get("title")}
+        if doc:
+            if doc.get("status") != "pending" or edition_ref in {e.get("edition_ref") for e in doc.get("examples", [])}:
+                continue  # já decidido, ou a mesma edição já contou (evita inflar por reprocessamento)
+            await db.category_suggestions.update_one(
+                {"signature": signature},
+                {"$inc": {"occurrences": 1}, "$push": {"examples": example}, "$set": {"updated_at": now_iso()}})
+            occurrences = doc.get("occurrences", 1) + 1
+        else:
+            await db.category_suggestions.insert_one({
+                "id": str(uuid.uuid4()), "signature": signature, "keywords": fp[:6], "status": "pending",
+                "occurrences": 1, "examples": [example], "created_at": now_iso(), "updated_at": now_iso()})
+            occurrences = 1
+        if occurrences < CATEGORY_SUGGESTION_THRESHOLD:
+            continue
+        exists = await db.tasks.find_one({"suggested": True, "kind": "new_category_suggestion",
+                                           "category_signature": signature})
+        if exists:
+            continue
+        await db.tasks.insert_one({
+            "id": str(uuid.uuid4()), "category": "construcao", "done": False, "priority": "baixa",
+            "due_date": "", "repeat": "none", "subtasks": [], "labels": ["categoria-nova"],
+            "note_id": "", "group_id": "",
+            # csn_number/edition_number seguem o mesmo campo que o painel de
+            # tarefas sugeridas usa para filtrar por edição (ver
+            # SuggestedTasksPanel no frontend) — sem isto a sugestão nunca
+            # apareceria em lado nenhum.
+            "csn_number": edition_ref if source == "correio_semanal" else "",
+            "edition_number": edition_ref if source == "anexos_edicao" else "",
+            "title": f"[Categoria nova?] Documentos recorrentes não reconhecidos: {', '.join(fp[:4])}",
+            "created_at": now_iso(), "suggested": True, "source": source, "kind": "new_category_suggestion",
+            "category_signature": signature, "category_keywords": fp[:6]})
+        created += 1
+    return created
+
+
 async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
     """Complementa o resumo em HTML com dados estruturados: guarda um
     "digest" desta edição, compara com a edição anterior (se houver) e
@@ -3374,9 +3468,15 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
     marcado, ou um rascunho de email quando a secção pede uma resposta de
     adesão/não adesão. Nunca cria uma tarefa já confirmada nem envia
     nada sozinho — fica marcada como sugestão (suggested=True) até
-    alguém aceitar, mesmo padrão de aprovação usado no resto da app."""
+    alguém aceitar, mesmo padrão de aprovação usado no resto da app.
+
+    A classificação por secção usa as regras partilhadas com o
+    Anexos_Edição (classification_rules.load_rules) — a prioridade da
+    tarefa sugerida segue a gravidade calculada por severity.py, em vez de
+    ser sempre "média"."""
+    rules = await classification_rules.load_rules(db)
     try:
-        structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject)
+        structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject, rules)
     except Exception as e:
         logger.error(f"Extração estruturada do Correio Semanal falhou: {e}")
         return None
@@ -3398,17 +3498,18 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
     base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
                  "repeat": "none", "subtasks": [], "labels": ["correio-semanal"], "note_id": "", "group_id": ""}
     for section in structured["sections"]:
+        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(section.get("severity"), "media")
         for action in section.get("checked_actions") or []:
             exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
                                                "source_page": section["page"], "kind": "task", "action": action})
             if exists:
                 continue
             await db.tasks.insert_one({
-                **base_task, "id": str(uuid.uuid4()),
+                **base_task, "id": str(uuid.uuid4()), "priority": priority,
                 "title": f"[Correio Semanal {structured['csn_number']}] {action}: {section['title']}",
                 "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
                 "csn_number": structured["csn_number"], "source_page": section["page"],
-                "kind": "task", "action": action})
+                "kind": "task", "action": action, "severity": section.get("severity")})
             created += 1
         if section.get("requires_adhesion_email") and section.get("adhesion_emails"):
             exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
@@ -3418,14 +3519,18 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
             to = ",".join(section["adhesion_emails"])
             mailto = f"mailto:{to}?subject={urllib.parse.quote(section['title'])}"
             await db.tasks.insert_one({
-                **base_task, "id": str(uuid.uuid4()),
+                **base_task, "id": str(uuid.uuid4()), "priority": priority,
                 "title": f"[Correio Semanal {structured['csn_number']}] Responder por email: {section['title']}",
                 "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
                 "csn_number": structured["csn_number"], "source_page": section["page"],
-                "kind": "email_draft", "mailto": mailto, "recipients": section["adhesion_emails"]})
+                "kind": "email_draft", "mailto": mailto, "recipients": section["adhesion_emails"],
+                "severity": section.get("severity")})
             created += 1
 
-    return {"digest": structured, "diff": diff, "suggested_tasks_created": created}
+    created += await _suggest_new_categories(structured.get("unclassified_fingerprints"),
+                                              source="correio_semanal", edition_ref=structured["csn_number"])
+
+    return {"digest": structured, "diff": diff, "suggested_tasks_created": created, "prev_digest": prev}
 
 
 ANEXOS_EDICAO_ACTIONABLE = {
@@ -3443,9 +3548,14 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
     — compara com a edição anterior (novos/removidos/atualizados, preços
     alterados, produtos novos/descontinuados) e sugere tarefas a partir do
     que precisar de ação. Sempre como sugestão (suggested=True), nunca
-    confirmada nem enviada sozinha."""
+    confirmada nem enviada sozinha.
+
+    A classificação usa as mesmas regras partilhadas com o correio_semanal
+    (classification_rules.load_rules) e a prioridade da tarefa sugerida
+    segue a gravidade calculada por severity.py."""
+    rules = await classification_rules.load_rules(db)
     try:
-        processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename)
+        processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename, rules)
     except Exception as e:
         logger.error(f"Processamento do Anexos_Edição falhou: {e}")
         return None
@@ -3477,14 +3587,19 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
                                            "source_path": f["path"]})
         if exists:
             continue
+        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(f.get("severity"), "media")
         await db.tasks.insert_one({
-            **base_task, "id": str(uuid.uuid4()),
+            **base_task, "id": str(uuid.uuid4()), "priority": priority,
             "title": f"[Anexos Edição {processed['edition_number']}] {verb}: {filename}",
             "created_at": now_iso(), "suggested": True, "source": "anexos_edicao",
-            "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task"})
+            "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task",
+            "severity": f.get("severity")})
         created += 1
 
-    return {"processed": processed, "diff": diff, "suggested_tasks_created": created}
+    created += await _suggest_new_categories(processed.get("unclassified_fingerprints"),
+                                              source="anexos_edicao", edition_ref=processed["edition_number"])
+
+    return {"processed": processed, "diff": diff, "suggested_tasks_created": created, "prev_processed": prev}
 
 
 def _imap_fetch_since(last_uid):
@@ -3765,6 +3880,24 @@ async def poll_supplier_replies():
                 fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
                 anexos_result = await _process_anexos_edicao(
                     zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
+        edition_summary_result = None
+        if correio_semanal_result or anexos_result:
+            # Resumo único da edição — junta o que veio do boletim com o
+            # que veio do zip (um dos dois pode faltar) no formato pedido:
+            # nº de documentos, assuntos novos, alterações, tarefas
+            # criadas, campanhas iniciadas/terminadas, prazos desta
+            # semana, incidências críticas, informativos e erros.
+            edition_summary_result = edition_summary.build_summary(
+                (correio_semanal_result or {}).get("digest"),
+                (anexos_result or {}).get("processed"),
+                (correio_semanal_result or {}).get("diff"),
+                (anexos_result or {}).get("diff"),
+                (correio_semanal_result or {}).get("prev_digest"),
+                (anexos_result or {}).get("prev_processed"))
+            edition_summary_result["stats"]["tarefas_criadas"] = (
+                ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
+                + ((anexos_result or {}).get("suggested_tasks_created") or 0))
+            edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -3787,6 +3920,7 @@ async def poll_supplier_replies():
             } if anexos_result else None,
             "anexos_edicao_diff": (anexos_result or {}).get("diff"),
             "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
+            "edition_summary": edition_summary_result,
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -5548,7 +5682,9 @@ async def ensure_indexes():
                         ("email_attachments", "email_id"),
                         ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
                         ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
-                        ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number")]:
+                        ("category_suggestions", "signature"), ("category_suggestions", "status"),
+                        ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
+                        ("tasks", "category_signature")]:
         try:
             await db[coll].create_index(field)
         except Exception:

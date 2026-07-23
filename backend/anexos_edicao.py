@@ -8,6 +8,12 @@ que reconhecer por palavra-chave (cabeçalhos de coluna em Excel, termos no
 texto de um PDF); um layout genuinely novo, sem nenhuma palavra-chave
 conhecida, fica arquivado e classificado como "outro" em vez de ficar sem
 dados — nunca falha nem é ignorado, só não é decomposto em campos.
+
+A classificação por categoria e a deteção de factos (EAN, preços,
+contactos, ...) usam os motores partilhados classification_rules.py e
+extraction_patterns.py — a mesma lógica que serve o correio_semanal.py,
+para o "aprender sozinho" (categorias novas guardadas na base de dados,
+nunca no código) funcionar da mesma forma nos dois lados.
 """
 
 import hashlib
@@ -19,6 +25,15 @@ from collections import Counter
 
 import fitz  # PyMuPDF
 import openpyxl
+
+try:
+    import classification_rules as clsrules
+    import extraction_patterns
+    import severity as severity_engine
+except ImportError:  # Permite também executar como módulo: python -m backend.server
+    from . import classification_rules as clsrules
+    from . import extraction_patterns
+    from . import severity as severity_engine
 
 MAX_ROWS_PER_SHEET = 1000
 HEADER_SCAN_ROWS = 15
@@ -77,58 +92,12 @@ def detect_file_kind(path, data):
 
 
 # ---------- Classificação por conteúdo (nunca pelo nome do ficheiro) ----------
-CATEGORIES = ("tabela_precos", "nota_encomenda", "incidencia", "lista_limpeza",
-              "dossier_gama", "planograma", "campanha", "catalogo", "outro")
-
-# Cada categoria tem palavras-chave (já sem acentos, em minúsculas) — a
-# categoria escolhida é a que tiver mais acertos no texto/cabeçalhos
-# encontrados. PT + ES, porque alguns anexos de fornecedor vêm em espanhol
-# (confirmado em amostras reais — "PROPUESTA", "TARIFA GENERAL").
-_CATEGORY_KEYWORDS = {
-    "incidencia": ("incidente", "nao servido", "artigo suprimido", "recolha", "bloqueio de venda"),
-    "lista_limpeza": ("limpar ficheiro", "artigos a limpar", "artigo suprimido/ limpar"),
-    "nota_encomenda": ("nota de encomenda", "reserva", "pdv n", "data limite de resposta"),
-    "tabela_precos": ("tabela de preco", "tabela de precio", "tarifa", "propuesta", "pvp",
-                       "preco cessao", "lista de precos", "sobretaxa", "ddd"),
-    "dossier_gama": ("dossier de gama", "dossier gama", "ficha tecnica", "caracteristicas tecnicas"),
-    "planograma": ("planograma", "implantacao", "exposicao"),
-    "campanha": ("campanha", "oportunidade comercial", "condicoes da acao", "regulamento",
-                 "adesao", "nao adesao"),
-    "catalogo": ("catalogo", "folheto", "imperdivel"),
-}
-
-
-_TITLE_CHARS = 200
-
-
-def _keyword_scores(folded_text):
-    """Nº de palavras-chave DISTINTAS (não ocorrências) por categoria — um
-    termo genérico repetido dezenas de vezes num documento comprido (ex.:
-    "rutura" numa garantia, "pvp" em cada linha de produto) não deve pesar
-    mais do que a frase que o próprio documento usa para se identificar."""
-    scores = Counter()
-    for cat, keywords in _CATEGORY_KEYWORDS.items():
-        for kw in keywords:
-            if kw in folded_text:
-                scores[cat] += 1
-    return scores
-
-
-def _classify(text_or_keywords):
-    """Devolve a categoria mais provável, ou "outro" se nada bater certo —
-    nunca falha, só fica menos específico. Os documentos reais desta
-    fonte quase sempre dizem o que são logo no título ("DOSSIER DE GAMA
-    ...", "NOTA DE ENCOMENDA", "CATÁLOGO ...") — por isso o título pesa
-    sozinho primeiro; só se não decidir nada é que se cai para a
-    frequência de palavras-chave no resto do texto, que é mais ruidosa."""
-    folded = _fold(text_or_keywords)
-    title_scores = _keyword_scores(folded[:_TITLE_CHARS])
-    if title_scores:
-        return title_scores.most_common(1)[0][0]
-    body_scores = _keyword_scores(folded)
-    if not body_scores:
-        return "outro"
-    return body_scores.most_common(1)[0][0]
+# As categorias e as palavras-chave já não vivem aqui — ver
+# classification_rules.py: ficam na base de dados, partilhadas com o
+# correio_semanal.py, e podem crescer sem alterar código nenhum (ver
+# classification_rules.learn_new_category). `rules` é sempre o dicionário
+# devolvido por classification_rules.load_rules(db), carregado uma vez por
+# email em server.py e passado como parâmetro até aqui.
 
 
 # ---------- Excel: deteção flexível de cabeçalho (por palavra-chave, não posição) ----------
@@ -246,7 +215,7 @@ def _structural_category(sheets):
     return None
 
 
-def extract_xlsx(data):
+def extract_xlsx(data, rules):
     try:
         wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except Exception as e:
@@ -259,18 +228,26 @@ def extract_xlsx(data):
         sheets.append(info)
         classify_text.append(ws.title)
         classify_text.append(info.get("sample_text", ""))
-    category = _classify(" ".join(classify_text))
+    joined = " ".join(classify_text)
+    category = clsrules.classify(joined, rules)
     if category == "outro":
         category = _structural_category(sheets) or category
-    return {"sheets": sheets, "category": category}
+    facts = extraction_patterns.extract_facts(joined)
+    result = {"sheets": sheets, "category": category}
+    if facts:
+        result["facts"] = facts
+    if category == "outro":
+        result["fingerprint"] = clsrules.unclassified_fingerprint(joined)
+    return result
 
 
 # ---------- PDF: reaproveita a mesma extração de texto de correio_semanal.py ----------
 _FACT_CONTACT_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+|\b2\d{2}\s?\d{3}\s?\d{3}\b")
 _FACT_DEADLINE_RE = re.compile(r"DATA LIMITE DE (RESPOSTA|ENCOMENDA)[:_\s]*", re.IGNORECASE)
+_ADHESION_RE = re.compile(r"N[ÃA]O\s+ADES[ÃA]O|ADES[ÃA]O", re.IGNORECASE)
 
 
-def extract_pdf(data):
+def extract_pdf(data, rules):
     try:
         doc = fitz.open(stream=data, filetype="pdf")
     except Exception as e:
@@ -282,22 +259,33 @@ def extract_pdf(data):
     if avg_chars < MIN_TEXT_CHARS_PER_PAGE:
         return {"page_count": page_count, "likely_image_pdf": True, "category": "outro",
                 "text_chars": len(full_text)}
-    category = _classify(full_text)
+    category = clsrules.classify(full_text, rules)
     deadlines = sorted(set(m.group(0).strip() for m in _FACT_DEADLINE_RE.finditer(full_text)))
     contacts = sorted(set(_FACT_CONTACT_RE.findall(full_text)))
-    return {"page_count": page_count, "likely_image_pdf": False, "category": category,
-            "text_chars": len(full_text), "deadline_mentions": deadlines, "contacts": contacts,
-            "excerpt": re.sub(r"\s+", " ", full_text).strip()[:600]}
+    result = {"page_count": page_count, "likely_image_pdf": False, "category": category,
+              "text_chars": len(full_text), "deadline_mentions": deadlines, "contacts": contacts,
+              "excerpt": re.sub(r"\s+", " ", full_text).strip()[:600]}
+    facts = extraction_patterns.extract_facts(full_text)
+    if facts:
+        result["facts"] = facts
+    if category == "outro":
+        result["fingerprint"] = clsrules.unclassified_fingerprint(full_text)
+    return result
 
 
 _EDITION_RE = re.compile(r"(\d{3,4})")
 
 
-def process_zip(zip_bytes, zip_filename=""):
+def process_zip(zip_bytes, zip_filename="", rules=None):
     """Ponto de entrada: descompacta (incl. zips aninhados), classifica e
     extrai cada ficheiro pelo conteúdo. Devolve a lista de ficheiros
     processados + um resumo — nunca lança exceção por um ficheiro
-    individual falhar (fica marcado com "error", os restantes continuam)."""
+    individual falhar (fica marcado com "error", os restantes continuam).
+
+    `rules` é o dicionário de categorias/palavras-chave carregado da base
+    de dados (classification_rules.load_rules) — se não for passado, usa
+    a semente predefinida (útil para testes isolados deste módulo)."""
+    rules = rules if rules is not None else clsrules.DEFAULT_KEYWORDS
     edition_m = _EDITION_RE.search(zip_filename or "")
     edition_number = edition_m.group(1) if edition_m else None
 
@@ -307,11 +295,11 @@ def process_zip(zip_bytes, zip_filename=""):
                  "kind": detect_file_kind(path, data)}
         try:
             if entry["kind"] == "xlsx":
-                extracted = extract_xlsx(data)
+                extracted = extract_xlsx(data, rules)
                 entry["category"] = extracted.pop("category", "outro")
                 entry["extracted"] = extracted
             elif entry["kind"] == "pdf":
-                extracted = extract_pdf(data)
+                extracted = extract_pdf(data, rules)
                 entry["category"] = extracted.get("category", "outro")
                 entry["extracted"] = extracted
             else:
@@ -321,20 +309,34 @@ def process_zip(zip_bytes, zip_filename=""):
             entry["category"] = "outro"
             entry["extracted"] = {}
             entry["error"] = str(e)
+        if entry["kind"] == "xlsx":
+            sample_text = " ".join(s.get("sample_text", "") for s in entry["extracted"].get("sheets", []))
+        else:
+            sample_text = entry["extracted"].get("excerpt") or ""
+        requires_adhesion = bool(_ADHESION_RE.search(sample_text)) if sample_text else False
+        entry["severity"] = severity_engine.classify_severity(
+            entry["category"], sample_text, requires_adhesion=requires_adhesion)
         files.append(entry)
 
     by_category = Counter(f["category"] for f in files)
+    by_severity = Counter(f["severity"] for f in files)
+    errors = sum(1 for f in files if f.get("error"))
+    unclassified = [{"path": f["path"], "fingerprint": f["extracted"]["fingerprint"]}
+                     for f in files if f["category"] == "outro" and f["extracted"].get("fingerprint")]
     return {
         "edition_number": edition_number,
         "zip_filename": zip_filename,
         "file_count": len(files),
         "files": files,
         "by_category": dict(by_category),
+        "by_severity": dict(by_severity),
+        "error_count": errors,
+        "unclassified_fingerprints": unclassified,
     }
 
 
 # ---------- Comparação entre edições ----------
-def _price_index(processed):
+def price_index(processed):
     """{ean_ou_itm: {"preco", "descricao", "path"}} — juntando TODAS as
     tabelas de preços da edição, não um ficheiro em concreto: os nomes dos
     ficheiros de preços mudam de semana para semana, o que se mantém
@@ -389,7 +391,7 @@ def diff_edicao_versions(prev, new):
         p for p in (set(new_by_path) & set(prev_by_path))
         if new_by_path[p]["content_hash"] != prev_by_path[p]["content_hash"])
 
-    prev_prices, new_prices = _price_index(prev), _price_index(new)
+    prev_prices, new_prices = price_index(prev), price_index(new)
     price_changes = []
     for key, new_info in new_prices.items():
         old_info = prev_prices.get(key)
