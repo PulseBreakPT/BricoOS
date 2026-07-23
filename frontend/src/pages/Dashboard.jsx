@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import {
   ClipboardList, Clock, AlertTriangle, Timer, Mail, ArrowRight, CheckCircle2,
-  Link2, Zap, Trophy, GripVertical, EyeOff, Eye, LayoutGrid, RefreshCw,
+  Link2, Zap, Trophy, GripVertical, EyeOff, Eye, LayoutGrid, RefreshCw, ShieldAlert,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER } from "@/lib/pedido";
@@ -22,6 +22,7 @@ const WIDGET_PREFS_KEY = "brico_dashboard_widgets_v1";
 // aproxima a disposição original em duas colunas mesmo sem posições fixas).
 const WIDGETS = [
   { key: "alerts", title: "Precisa de atenção", wide: true },
+  { key: "needs_review", title: "Precisa de decisão", wide: true },
   { key: "pipeline", title: "Pipeline por estado", wide: true },
   { key: "suppliers", title: "Fornecedores mais rápidos", wide: false },
   { key: "priorities", title: "Por prioridade", wide: false },
@@ -131,6 +132,7 @@ const MEDALS = ["bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [notifs, setNotifs] = useState({ items: [], count: 0 });
+  const [needsReview, setNeedsReview] = useState({ items: [], count: 0 });
   const [gmail, setGmail] = useState({ connected: false, configured: false });
   const [widgetPrefs, setWidgetPrefs] = useState(loadWidgetPrefs);
   const [loadError, setLoadError] = useState("");
@@ -163,11 +165,12 @@ export default function Dashboard() {
   const load = useCallback(async (signal) => {
     const seq = ++requestSeq.current;
     try {
-      const [s, n, g] = await Promise.all([
+      const [s, n, g, nr] = await Promise.all([
         api.get("/stats", { signal }), api.get("/notifications", { signal }), api.get("/gmail/status", { signal }),
+        api.get("/notes/needs-review", { signal }),
       ]);
       if (seq !== requestSeq.current) return; // resposta ultrapassada por um load() mais recente
-      setStats(s.data); setNotifs(n.data); setGmail(g.data);
+      setStats(s.data); setNotifs(n.data); setGmail(g.data); setNeedsReview(nr.data);
       setLoadError("");
     } catch (e) {
       if (axios.isCancel(e) || seq !== requestSeq.current) return;
@@ -300,6 +303,48 @@ export default function Dashboard() {
                         <p className="truncate text-xs text-muted-foreground">{n.message}</p>
                       </div>
                       <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1 group-hover:text-muted-foreground" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ),
+          needs_review: (
+            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                  Precisa de decisão {needsReview.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-amber-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-amber-text)]">{needsReview.count}</span> : null}
+                </h2>
+                <Link to="/" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+                  Ver pedidos <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Orçamentos de fornecedor com leitura incompleta, alterados desde a última versão, ou prontos a enviar mas por confirmar.
+              </p>
+              <div className="mt-4 space-y-2">
+                {needsReview.items.length === 0 ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-[var(--pastel-emerald-bg)] p-4 text-sm font-semibold text-[color:var(--pastel-emerald-text)]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--pastel-emerald-bg)]"><CheckCircle2 className="h-4 w-4" /></span>
+                    Nada à espera de decisão.
+                  </div>
+                ) : needsReview.items.slice(0, 6).map((n) => {
+                  const tone = n.severity_rank >= 2
+                    ? { ring: "border-red-100 bg-[var(--pastel-red-bg)]", bg: "bg-[var(--pastel-red-bg)] text-red-600" }
+                    : n.severity_rank === 1
+                    ? { ring: "border-amber-100 bg-[var(--pastel-amber-bg)]", bg: "bg-[var(--pastel-amber-bg)] text-amber-600" }
+                    : { ring: "border-blue-100 bg-[var(--pastel-blue-bg)]", bg: "bg-[var(--pastel-blue-bg)] text-blue-600" };
+                  return (
+                    <button key={n.id} data-testid={`dash-needs-review-${n.id}`} onClick={() => navigate(`/?open=${n.id}`)}
+                      className={`group flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${tone.ring}`}>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110 ${tone.bg}`}>
+                        <ShieldAlert className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-foreground">{n.customer_name}{n.quote_number ? ` · ${n.quote_number}` : ""}</p>
+                        <p className="truncate text-xs text-muted-foreground">{n.reasons.map((r) => r.label).join(" · ")}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
                     </button>
                   );
                 })}
