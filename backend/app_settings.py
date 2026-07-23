@@ -23,6 +23,7 @@ SETTINGS_DEFAULTS = {
         "quote_quality_issue": True, "quote_changed": True, "anexos_incidencia_critica": True,
         "client_new_note": True, "task_urgent": True, "deadline_approaching": True,
         "processing_error": True, "document_read_failure": True, "price_change": True,
+        "task_reminder": True, "tasks_overdue_digest": True,
     },
     "material_margins": {
         "pvc": 15.0, "aluminio": 18.0, "portada": 18.0, "rede": 18.0, "desconhecido": 20.0,

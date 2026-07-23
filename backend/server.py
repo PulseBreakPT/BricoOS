@@ -151,7 +151,8 @@ AUTO_GREETING = True
 VALID_CATEGORIES = ["construcao", "bricolage", "decoracao", "jardim"]
 TASK_PRIORITIES = ["nenhuma", "baixa", "media", "alta"]
 TASK_PRIORITY_RANK = {"alta": 0, "media": 1, "baixa": 2, "nenhuma": 3}
-TASK_REPEATS = ["none", "daily", "weekly", "monthly"]
+TASK_REPEATS = ["none", "daily", "weekly", "monthly", "yearly"]
+TASK_STATUSES = ["todo", "in_progress", "done", "archived"]
 EMAIL_PRIORITIES = ["alta", "normal", "baixa"]
 EMAIL_PRIORITY_RANK = {"alta": 0, "normal": 1, "baixa": 2}
 EMAIL_CATEGORIES = ["orcamento", "reclamacao", "duvida", "urgente", "outro"]
@@ -304,6 +305,19 @@ async def log_activity(note_id, type_, message, meta=None):
     await db.activities.insert_one({
         "id": str(uuid.uuid4()), "note_id": note_id, "type": type_, "message": message,
         "author": AUTHOR, "created_at": now_iso(), "meta": meta or {}})
+
+
+async def log_task_activity(task_id, type_, message, actor=None):
+    """Histórico próprio das tarefas (db.task_history) — nunca usa AUTHOR
+    como valor por omissão, ao contrário de log_activity: a app não tem
+    contas por pessoa, por isso "sem autor" é um estado legítimo e mais
+    honesto do que atribuir sempre ao mesmo nome fixo. `actor` vem do
+    cabeçalho X-Actor-Name (ver lib/api.js + lib/activeCollaborator.js),
+    só preenchido quando alguém escolheu explicitamente "quem está a usar
+    este aparelho"."""
+    await db.task_history.insert_one({
+        "id": str(uuid.uuid4()), "task_id": task_id, "type": type_, "message": message,
+        "actor": actor or None, "created_at": now_iso()})
 
 
 # Depois de uma chamada falhada, só volta a pedir nova tentativa passado este
@@ -833,11 +847,17 @@ class TaskIn(BaseModel):
     done: bool = False
     priority: str = "nenhuma"
     due_date: str = ""
+    due_time: str = ""
     repeat: str = "none"
     subtasks: List[SubtaskItem] = []
     labels: List[str] = []
     note_id: str = ""
     group_id: str = ""
+    assignee_id: str = ""
+    depends_on: List[str] = []
+    pinned: bool = False
+    remind_minutes_before: Optional[int] = None
+    notes: str = ""
 
     @field_validator("priority")
     @classmethod
@@ -856,10 +876,16 @@ class TaskPatch(BaseModel):
     category: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[str] = None
+    due_time: Optional[str] = None
     repeat: Optional[str] = None
     subtasks: Optional[List[SubtaskItem]] = None
     labels: Optional[List[str]] = None
     group_id: Optional[str] = None
+    assignee_id: Optional[str] = None
+    depends_on: Optional[List[str]] = None
+    pinned: Optional[bool] = None
+    remind_minutes_before: Optional[int] = None
+    notes: Optional[str] = None
 
     @field_validator("priority")
     @classmethod
@@ -882,6 +908,72 @@ class TaskGroupIn(BaseModel):
         v = (v or "").strip()
         if not v:
             raise ValueError("O nome do grupo é obrigatório")
+        return v
+
+
+class CollaboratorIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O nome do colaborador é obrigatório")
+        return v
+
+
+class TaskTemplateIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str
+    title: str
+    category: str = "construcao"
+    priority: str = "nenhuma"
+    repeat: str = "none"
+    subtasks: List[SubtaskItem] = []
+    labels: List[str] = []
+    pinned: bool = False
+    daily_trigger_time: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O nome do modelo é obrigatório")
+        return v
+
+    @field_validator("title")
+    @classmethod
+    def _v_title(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("O título da tarefa é obrigatório")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def _v_category(cls, v):
+        return _check_choice(v, VALID_CATEGORIES, "Secção")
+
+    @field_validator("priority")
+    @classmethod
+    def _v_priority(cls, v):
+        return _check_choice(v, TASK_PRIORITIES, "Prioridade")
+
+    @field_validator("repeat")
+    @classmethod
+    def _v_repeat(cls, v):
+        return _check_choice(v, TASK_REPEATS, "Repetição")
+
+    @field_validator("daily_trigger_time")
+    @classmethod
+    def _v_trigger(cls, v):
+        if not v:
+            return None
+        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError('Hora inválida (usa "HH:MM")')
         return v
 
 
@@ -1856,6 +1948,13 @@ def _next_due_date(due_date: str, repeat: str) -> Optional[str]:
         day = min(d.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
                           31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
         d = d.replace(year=year, month=month, day=day)
+    elif repeat == "yearly":
+        year = d.year + 1
+        try:
+            d = d.replace(year=year)
+        except ValueError:
+            # 29 de fevereiro num ano não bissexto — recua para 28.
+            d = d.replace(year=year, day=28)
     else:
         return None
     return d.strftime("%Y-%m-%d")
@@ -1911,8 +2010,192 @@ async def delete_task_group(group_id: str):
     return {"ok": True}
 
 
+# ---------- Colaboradores (atribuição de tarefas por nome) ----------
+# Mesmo padrão de task-groups (nome único, sem distinguir maiúsculas/
+# minúsculas) — geridos em Definições, não numa página própria (ver
+# CollaboratorsSection em Settings.jsx). As tarefas guardam assignee_id
+# (não o nome em texto) para que renomear um colaborador atualize
+# automaticamente todas as tarefas já atribuídas.
+async def _collaborator_name_taken(name, exclude_id=None):
+    q = {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    return await db.collaborators.find_one(q, {"_id": 0, "id": 1})
+
+
+@api_router.get("/collaborators")
+async def list_collaborators():
+    collaborators = await db.collaborators.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    counts = {}
+    async for t in db.tasks.find({"assignee_id": {"$ne": ""}}, {"_id": 0, "assignee_id": 1}):
+        aid = t.get("assignee_id")
+        if aid:
+            counts[aid] = counts.get(aid, 0) + 1
+    for c in collaborators:
+        c["tasks_count"] = counts.get(c["id"], 0)
+    return collaborators
+
+
+@api_router.post("/collaborators")
+async def create_collaborator(payload: CollaboratorIn):
+    if await _collaborator_name_taken(payload.name):
+        raise HTTPException(status_code=409, detail=f'Já existe um colaborador chamado "{payload.name}".')
+    doc = payload.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    await db.collaborators.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/collaborators/{collaborator_id}")
+async def update_collaborator(collaborator_id: str, payload: CollaboratorIn):
+    if await _collaborator_name_taken(payload.name, exclude_id=collaborator_id):
+        raise HTTPException(status_code=409, detail=f'Já existe um colaborador chamado "{payload.name}".')
+    res = await db.collaborators.update_one({"id": collaborator_id}, {"$set": payload.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    return await db.collaborators.find_one({"id": collaborator_id}, {"_id": 0})
+
+
+@api_router.delete("/collaborators/{collaborator_id}")
+async def delete_collaborator(collaborator_id: str):
+    """Não desatribui as tarefas já criadas — assignee_id fica "órfão" de
+    propósito (ver cabeçalho da secção); o frontend mostra "Colaborador
+    removido" para um id que já não existe."""
+    res = await db.collaborators.delete_one({"id": collaborator_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Colaborador não encontrado")
+    return {"ok": True}
+
+
+# ---------- Modelos de tarefas (templates) ----------
+# Modelos fixados (pinned=True) viram botões de criação imediata em
+# Tasks.jsx; um modelo com daily_trigger_time gera sozinho uma tarefa a
+# partir dessa hora, todos os dias (ver _run_daily_template_triggers,
+# dentro de _notification_scan_loop) — sem pré-criar nada: são só dois
+# campos opcionais num modelo normal, não uma funcionalidade à parte.
+@api_router.get("/task-templates")
+async def list_task_templates():
+    return await db.task_templates.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+
+
+@api_router.post("/task-templates")
+async def create_task_template(payload: TaskTemplateIn):
+    doc = _with_subtask_ids(payload.model_dump())
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    await db.task_templates.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/task-templates/{template_id}")
+async def update_task_template(template_id: str, payload: TaskTemplateIn):
+    doc = _with_subtask_ids(payload.model_dump())
+    res = await db.task_templates.update_one({"id": template_id}, {"$set": doc})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Modelo não encontrado")
+    return await db.task_templates.find_one({"id": template_id}, {"_id": 0})
+
+
+@api_router.delete("/task-templates/{template_id}")
+async def delete_task_template(template_id: str):
+    res = await db.task_templates.delete_one({"id": template_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Modelo não encontrado")
+    return {"ok": True}
+
+
+async def _create_task_from_template(tpl, actor=None, source_date=None):
+    doc = {
+        "id": str(uuid.uuid4()), "title": tpl["title"], "category": tpl.get("category", "construcao"),
+        "done": False, "status": "todo", "status_changed_at": now_iso(),
+        "priority": tpl.get("priority", "nenhuma"), "due_date": "", "due_time": "",
+        "repeat": tpl.get("repeat", "none"),
+        "subtasks": [{"id": str(uuid.uuid4()), "title": st["title"], "done": False}
+                     for st in tpl.get("subtasks", [])],
+        "labels": list(tpl.get("labels", [])), "note_id": "", "group_id": "",
+        "assignee_id": "", "depends_on": [], "pinned": False, "notes": "",
+        "created_at": now_iso(), "source_template_id": tpl["id"],
+    }
+    if source_date:
+        doc["source_date"] = source_date
+    await db.tasks.insert_one(dict(doc))
+    await log_task_activity(doc["id"], "created", f'Criada a partir do modelo "{tpl["name"]}"', actor=actor)
+    await _notify_task_urgent(doc)
+    return doc
+
+
+@api_router.post("/task-templates/{template_id}/create-task")
+async def create_task_from_template_endpoint(template_id: str, request: Request):
+    tpl = await db.task_templates.find_one({"id": template_id}, {"_id": 0})
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Modelo não encontrado")
+    actor = request.headers.get("x-actor-name") or None
+    return await _create_task_from_template(tpl, actor=actor)
+
+
+async def _run_daily_template_triggers():
+    """Verifica, a cada ciclo do _notification_scan_loop (poucos minutos),
+    se algum modelo com daily_trigger_time já passou dessa hora hoje e
+    ainda não gerou a tarefa do dia — nunca duplica (dedup por
+    source_template_id + source_date)."""
+    now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    async for tpl in db.task_templates.find({"daily_trigger_time": {"$ne": None}}, {"_id": 0}):
+        trigger_time = tpl.get("daily_trigger_time")
+        if not trigger_time:
+            continue
+        try:
+            hh, mm = trigger_time.split(":")
+            trigger_dt = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+        except (ValueError, TypeError):
+            continue
+        if now < trigger_dt:
+            continue
+        existing = await db.tasks.find_one(
+            {"source_template_id": tpl["id"], "source_date": today}, {"_id": 0, "id": 1})
+        if existing:
+            continue
+        await _create_task_from_template(tpl, source_date=today)
+
+
+@api_router.get("/tasks/stats")
+async def task_stats():
+    """Contagens usadas tanto pelo aviso no topo de Tasks.jsx como pela
+    secção de Dashboard — um único sítio a calcular, para nunca mostrar
+    números diferentes em dois cantos da mesma página."""
+    now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    tasks = await db.tasks.find(
+        {"suggested": {"$ne": True}, "status": {"$ne": "archived"}}, {"_id": 0}).to_list(5000)
+    done_today = pending = in_progress = overdue = 0
+    by_category, by_assignee = {}, {}
+    for t in tasks:
+        status = t.get("status") or ("done" if t.get("done") else "todo")
+        if status == "done":
+            if (t.get("status_changed_at") or "")[:10] == today:
+                done_today += 1
+        elif status == "in_progress":
+            in_progress += 1
+        elif status == "todo":
+            pending += 1
+        due = t.get("due_date")
+        if due and status not in ("done", "archived") and due < today:
+            overdue += 1
+        cat = t.get("category") or "construcao"
+        by_category[cat] = by_category.get(cat, 0) + 1
+        aid = t.get("assignee_id") or ""
+        by_assignee[aid] = by_assignee.get(aid, 0) + 1
+    return {
+        "total": len(tasks), "done_today": done_today, "pending": pending,
+        "in_progress": in_progress, "overdue": overdue,
+        "by_category": by_category, "by_assignee": by_assignee,
+    }
+
+
 @api_router.get("/tasks")
-async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = None):
+async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = None,
+                      status: Optional[str] = None):
     q = {}
     if note_id:
         q["note_id"] = note_id
@@ -1921,6 +2204,12 @@ async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = 
     # (suggested=true), para não intrometer sugestões por confirmar na
     # lista de tarefas já assumidas.
     q["suggested"] = suggested if suggested is not None else {"$ne": True}
+    # Arquivadas ficam de fora da lista normal (mesmo espírito de
+    # "suggested" acima) — só aparecem com ?status=archived, na vista de
+    # Arquivo. Tarefas antigas sem campo `status` (anteriores a esta
+    # funcionalidade) não têm "archived" nenhures, por isso continuam
+    # visíveis por omissão.
+    q["status"] = status if status else {"$ne": "archived"}
     return await db.tasks.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
 
 
@@ -1929,8 +2218,12 @@ async def accept_task_suggestion(task_id: str):
     t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
-    await db.tasks.update_one({"id": task_id}, {"$set": {"suggested": False}})
-    t["suggested"] = False
+    update = {"suggested": False}
+    if not t.get("status"):
+        update["status"] = "done" if t.get("done") else "todo"
+        update["status_changed_at"] = now_iso()
+    await db.tasks.update_one({"id": task_id}, {"$set": update})
+    t.update(update)
     return t
 
 
@@ -1961,7 +2254,6 @@ async def accept_new_category(task_id: str, payload: AcceptNewCategoryIn):
     return {"category": category, "keywords": rules.get(category, [])}
 
 
-@api_router.post("/tasks")
 async def _notify_task_urgent(doc):
     """Tarefa confirmada por uma pessoa (não uma sugestão automática) na
     prioridade mais alta que existe para tarefas — não há nível "urgente"
@@ -1974,12 +2266,16 @@ async def _notify_task_urgent(doc):
         url="/tarefas", task_id=doc["id"], note_id=doc.get("note_id") or None)
 
 
-async def create_task(payload: TaskIn):
+@api_router.post("/tasks")
+async def create_task(payload: TaskIn, request: Request):
     doc = _with_subtask_ids(payload.model_dump())
-    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso(),
+                "status": "todo", "status_changed_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     if doc.get("note_id"):
         await log_activity(doc["note_id"], "task_added", f"Lembrete criado: {doc['title']}")
+    actor = request.headers.get("x-actor-name") or None
+    await log_task_activity(doc["id"], "created", "Tarefa criada", actor=actor)
     await _notify_task_urgent(doc)
     doc.pop("_id", None)
     return doc
@@ -1991,48 +2287,243 @@ async def note_tasks(note_id: str):
 
 
 @api_router.post("/notes/{note_id}/tasks")
-async def create_note_task(note_id: str, payload: TaskIn):
+async def create_note_task(note_id: str, payload: TaskIn, request: Request):
     doc = _with_subtask_ids(payload.model_dump())
-    doc.update({"note_id": note_id, "id": str(uuid.uuid4()), "created_at": now_iso()})
+    doc.update({"note_id": note_id, "id": str(uuid.uuid4()), "created_at": now_iso(),
+                "status": "todo", "status_changed_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     await log_activity(note_id, "task_added", f"Lembrete criado: {doc['title']}")
+    actor = request.headers.get("x-actor-name") or None
+    await log_task_activity(doc["id"], "created", "Tarefa criada", actor=actor)
     await _notify_task_urgent(doc)
     doc.pop("_id", None)
     return doc
 
 
+_TASK_FIELD_LABELS = {
+    "title": "Título", "category": "Secção", "priority": "Prioridade", "due_date": "Data limite",
+    "due_time": "Hora limite", "repeat": "Repetição", "group_id": "Grupo", "assignee_id": "Colaborador",
+    "depends_on": "Dependências", "pinned": "Fixada", "remind_minutes_before": "Lembrete", "notes": "Notas",
+    "subtasks": "Subtarefas", "labels": "Etiquetas",
+}
+
+
 @api_router.put("/tasks/{task_id}")
-async def update_task(task_id: str, payload: TaskPatch):
+async def update_task(task_id: str, payload: TaskPatch, request: Request):
     current = await db.tasks.find_one({"id": task_id}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if "subtasks" in update:
         update["subtasks"] = _with_subtask_ids({"subtasks": update["subtasks"]})["subtasks"]
+    changed = [k for k in update if current.get(k) != update[k]]
     await db.tasks.update_one({"id": task_id}, {"$set": update})
+    if changed:
+        summary = ", ".join(_TASK_FIELD_LABELS.get(k, k) for k in changed)
+        actor = request.headers.get("x-actor-name") or None
+        await log_task_activity(task_id, "updated", f"Campos alterados: {summary}", actor=actor)
     return await db.tasks.find_one({"id": task_id}, {"_id": 0})
 
 
-@api_router.patch("/tasks/{task_id}/toggle")
-async def toggle_task(task_id: str):
+class TaskBulkPatchIn(BaseModel):
+    ids: List[str] = []
+    patch: Dict[str, Any] = {}
+
+
+class TaskBulkStatusIn(BaseModel):
+    ids: List[str] = []
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def _v_status(cls, v):
+        return _check_choice(v, TASK_STATUSES, "Estado")
+
+
+class TaskBulkLabelIn(BaseModel):
+    ids: List[str] = []
+    label: str
+    action: str = "add"
+
+    @field_validator("action")
+    @classmethod
+    def _v_action(cls, v):
+        return _check_choice(v, ["add", "remove"], "Ação")
+
+
+_TASK_BULK_ALLOWED_FIELDS = {"category", "priority", "assignee_id", "due_date", "due_time"}
+
+
+@api_router.put("/tasks/bulk")
+async def bulk_update_tasks(payload: TaskBulkPatchIn, request: Request):
+    """Edição em lote — só os campos simples (sem lógica de transição de
+    estado, ver /tasks/bulk/status para isso; sem etiquetas, ver
+    /tasks/bulk/labels — adicionar/remover é $addToSet/$pull, não uma
+    substituição direta)."""
+    if not payload.ids:
+        return {"ok": True, "modified": 0}
+    update = {k: v for k, v in (payload.patch or {}).items() if k in _TASK_BULK_ALLOWED_FIELDS}
+    if not update:
+        raise HTTPException(status_code=400, detail="Nenhum campo válido para alterar")
+    if "priority" in update:
+        _check_choice(update["priority"], TASK_PRIORITIES, "Prioridade")
+    if "category" in update:
+        _check_choice(update["category"], VALID_CATEGORIES, "Secção")
+    r = await db.tasks.update_many({"id": {"$in": payload.ids}}, {"$set": update})
+    actor = request.headers.get("x-actor-name") or None
+    summary = ", ".join(_TASK_FIELD_LABELS.get(k, k) for k in update)
+    for task_id in payload.ids:
+        await log_task_activity(task_id, "updated", f"Alteração em lote: {summary}", actor=actor)
+    return {"ok": True, "modified": r.modified_count}
+
+
+@api_router.post("/tasks/bulk/status")
+async def bulk_set_task_status(payload: TaskBulkStatusIn, request: Request):
+    """Passa por _set_task_status uma a uma (não um $set em massa), para
+    manter as regras de transição e a criação da próxima ocorrência de
+    tarefas repetidas ao entrar em "done" — uma tarefa cuja transição não
+    é válida (ex.: já arquivada) é ignorada, não interrompe as restantes."""
+    if not payload.ids:
+        return {"ok": True, "modified": 0}
+    actor = request.headers.get("x-actor-name") or None
+    modified = 0
+    for task_id in payload.ids:
+        try:
+            await _set_task_status(task_id, payload.status, actor=actor)
+            modified += 1
+        except HTTPException:
+            continue
+    return {"ok": True, "modified": modified}
+
+
+@api_router.post("/tasks/bulk/labels")
+async def bulk_update_task_labels(payload: TaskBulkLabelIn, request: Request):
+    label = (payload.label or "").strip()
+    if not payload.ids or not label:
+        return {"ok": True, "modified": 0}
+    op = {"$addToSet": {"labels": label}} if payload.action == "add" else {"$pull": {"labels": label}}
+    r = await db.tasks.update_many({"id": {"$in": payload.ids}}, op)
+    actor = request.headers.get("x-actor-name") or None
+    verb = "adicionada a" if payload.action == "add" else "removida de"
+    for task_id in payload.ids:
+        await log_task_activity(task_id, "updated", f'Etiqueta "{label}" {verb} em lote', actor=actor)
+    return {"ok": True, "modified": r.modified_count}
+
+
+@api_router.get("/tasks/{task_id}/history")
+async def task_history_endpoint(task_id: str):
+    return await db.task_history.find({"task_id": task_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+
+
+@api_router.post("/tasks/{task_id}/duplicate")
+async def duplicate_task(task_id: str, request: Request):
+    """Cópia limpa: reinicia estado/fixação/subtarefas, não copia histórico
+    nem anexos (ficam ligados à tarefa original, não fazem sentido numa
+    cópia que ainda não aconteceu)."""
     task = await db.tasks.find_one({"id": task_id}, {"_id": 0})
     if not task:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
-    new_done = not task.get("done", False)
-    await db.tasks.update_one({"id": task_id}, {"$set": {"done": new_done}})
-    if new_done and task.get("repeat", "none") != "none" and task.get("due_date"):
+    doc = dict(task)
+    new_id = str(uuid.uuid4())
+    doc.update({
+        "id": new_id, "created_at": now_iso(), "status": "todo", "status_changed_at": now_iso(),
+        "done": False, "pinned": False, "suggested": False,
+        "subtasks": [{"id": str(uuid.uuid4()), "title": st.get("title", ""), "done": False}
+                     for st in task.get("subtasks", [])],
+    })
+    doc.pop("source_template_id", None)
+    doc.pop("source_date", None)
+    await db.tasks.insert_one(dict(doc))
+    actor = request.headers.get("x-actor-name") or None
+    await log_task_activity(new_id, "created", f"Duplicada a partir de #{task_id}", actor=actor)
+    await _notify_task_urgent(doc)
+    return doc
+
+
+TASK_STATUS_LABELS = {
+    "todo": "Por fazer", "in_progress": "Em execução", "done": "Concluída", "archived": "Arquivada",
+}
+# Transições permitidas — arquivar só é possível a partir de "done" e nunca
+# é automático (só por ação explícita, ver Tasks.jsx); não há "reabrir" a
+# partir de arquivada, para não ser preciso pensar num estado de vinda.
+_TASK_STATUS_TRANSITIONS = {
+    "todo": {"in_progress", "done"},
+    "in_progress": {"todo", "done"},
+    "done": {"todo", "archived"},
+    "archived": set(),
+}
+
+
+async def _set_task_status(task_id, status, actor=None):
+    """Ponto único de transição de estado — usado por /toggle (atalho
+    done↔todo) e por PATCH /tasks/{id}/status (qualquer transição válida).
+    Mantém `done` sempre sincronizado com `status` (done = status=="done"),
+    para não obrigar a migrar os sítios do código que ainda filtram por
+    `done` (agenda do ambiente de trabalho, etc.). Só ao entrar em "done"
+    é que a próxima ocorrência de uma tarefa repetida é criada — entrar em
+    "in_progress" ou "archived" nunca dispara isso."""
+    task = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    if status not in TASK_STATUSES:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    current = task.get("status") or ("done" if task.get("done") else "todo")
+    if status == current:
+        return task
+    allowed = _TASK_STATUS_TRANSITIONS.get(current, set())
+    if status not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Não é possível mudar de "{TASK_STATUS_LABELS[current]}" para "{TASK_STATUS_LABELS[status]}"')
+    update = {"status": status, "status_changed_at": now_iso(), "done": status == "done"}
+    await db.tasks.update_one({"id": task_id}, {"$set": update})
+    await log_task_activity(
+        task_id, "status_change", f"Estado alterado para {TASK_STATUS_LABELS[status]}", actor=actor)
+    if status == "done" and task.get("repeat", "none") != "none" and task.get("due_date"):
         next_date = _next_due_date(task["due_date"], task["repeat"])
         if next_date:
             next_doc = {
                 "id": str(uuid.uuid4()), "title": task["title"], "category": task.get("category", "construcao"),
-                "done": False, "priority": task.get("priority", "nenhuma"), "due_date": next_date,
-                "repeat": task["repeat"], "note_id": task.get("note_id", ""),
-                "group_id": task.get("group_id", ""), "created_at": now_iso(),
+                "done": False, "status": "todo", "status_changed_at": now_iso(),
+                "priority": task.get("priority", "nenhuma"), "due_date": next_date,
+                "due_time": task.get("due_time", ""), "repeat": task["repeat"],
+                "note_id": task.get("note_id", ""), "group_id": task.get("group_id", ""),
+                "assignee_id": task.get("assignee_id", ""), "labels": task.get("labels", []),
+                "created_at": now_iso(),
                 "subtasks": [{"id": str(uuid.uuid4()), "title": st["title"], "done": False}
                              for st in task.get("subtasks", [])],
             }
             await db.tasks.insert_one(dict(next_doc))
-    return await db.tasks.find_one({"id": task_id}, {"_id": 0})
+            await log_task_activity(
+                next_doc["id"], "created", f"Criada automaticamente pela repetição de #{task_id}", actor=actor)
+    task.update(update)
+    return task
+
+
+class TaskStatusIn(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def _v_status(cls, v):
+        return _check_choice(v, TASK_STATUSES, "Estado")
+
+
+@api_router.patch("/tasks/{task_id}/status")
+async def set_task_status_endpoint(task_id: str, payload: TaskStatusIn, request: Request):
+    actor = request.headers.get("x-actor-name") or None
+    return await _set_task_status(task_id, payload.status, actor=actor)
+
+
+@api_router.patch("/tasks/{task_id}/toggle")
+async def toggle_task(task_id: str, request: Request):
+    task = await db.tasks.find_one({"id": task_id}, {"_id": 0, "status": 1, "done": 1})
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    current = task.get("status") or ("done" if task.get("done") else "todo")
+    target = "todo" if current == "done" else "done"
+    actor = request.headers.get("x-actor-name") or None
+    return await _set_task_status(task_id, target, actor=actor)
 
 
 @api_router.delete("/tasks/{task_id}")
@@ -4743,6 +5234,7 @@ async def create_email_reminder(email_id: str, payload: ReminderIn):
         "id": str(uuid.uuid4()), "title": title, "category": "construcao", "done": False,
         "priority": "media", "due_date": due_date, "repeat": "none",
         "note_id": e.get("note_id") or "", "subtasks": [], "created_at": now_iso(),
+        "status": "todo", "status_changed_at": now_iso(),
     }
     await db.tasks.insert_one(dict(doc))
     if doc["note_id"]:
@@ -5839,7 +6331,8 @@ async def seed_notas_telemovel():
     await db.tasks.insert_one({
         "id": str(uuid.uuid4()), "title": "Trocar preços ripados deli home inativos",
         "category": "construcao", "done": False, "priority": "media", "due_date": "",
-        "repeat": "none", "subtasks": [], "note_id": "", "created_at": now_iso()})
+        "repeat": "none", "subtasks": [], "note_id": "", "created_at": now_iso(),
+        "status": "todo", "status_changed_at": now_iso()})
 
     await db.migrations.insert_one({"id": marker_id, "applied_at": now_iso()})
     logger.info("Seed de notas do telemóvel aplicado: 7 pedidos + 1 tarefa.")
@@ -5902,7 +6395,12 @@ async def ensure_indexes():
                         ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
                         ("category_suggestions", "signature"), ("category_suggestions", "status"),
                         ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
-                        ("tasks", "category_signature"), ("auth_devices", "token"),
+                        ("tasks", "category_signature"), ("tasks", "status"), ("tasks", "assignee_id"),
+                        ("tasks", "pinned"), ("tasks", "priority"), ("tasks", "due_date"),
+                        ("task_history", "task_id"), ("collaborators", "name"),
+                        ("task_templates", "pinned"), ("task_templates", "daily_trigger_time"),
+                        ("tasks", "source_template_id"),
+                        ("auth_devices", "token"),
                         ("auth_devices", "device_id"),
                         ("pushed_alerts", "alert_id"),
                         ("notifications", "status"), ("notifications", "priority"),
@@ -6118,6 +6616,50 @@ async def _sync_alert_notifications():
         await db.pushed_alerts.insert_one({"alert_id": item["id"], "kind": item["kind"], "created_at": now_iso()})
 
 
+async def _check_task_reminders():
+    """Lembretes configuráveis por tarefa (remind_minutes_before) —
+    dispara exatamente uma vez por tarefa quando o momento chega; o
+    dedup_key de create_notification garante isto mesmo correndo a cada
+    poucos minutos, até a tarefa ficar concluída/arquivada (aí sai da
+    consulta e para de ser verificada)."""
+    now = datetime.now(timezone.utc)
+    async for t in db.tasks.find(
+            {"remind_minutes_before": {"$ne": None}, "due_date": {"$ne": ""},
+             "status": {"$nin": ["done", "archived"]}}, {"_id": 0}):
+        remind_before = t.get("remind_minutes_before")
+        if not remind_before or remind_before <= 0:
+            continue
+        try:
+            due_dt = datetime.strptime(
+                f"{t['due_date']} {t.get('due_time') or '00:00'}", "%Y-%m-%d %H:%M"
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        if now < due_dt - timedelta(minutes=remind_before):
+            continue
+        await notifications.create_notification(
+            db, dedup_key=f"task-reminder-{t['id']}", category="task_reminder",
+            title="Lembrete de tarefa", body=t.get("title") or "",
+            url="/tarefas", task_id=t["id"], note_id=t.get("note_id") or None)
+
+
+async def _check_tasks_overdue_digest():
+    """Aviso agregado diário — "existem N tarefas atrasadas" — visível
+    mesmo sem abrir a app, complementar aos lembretes por tarefa (que
+    avisam antes do prazo) e ao indicador visual em Tasks.jsx (que só se
+    vê ao abrir a página)."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    n = await db.tasks.count_documents({
+        "suggested": {"$ne": True}, "status": {"$nin": ["done", "archived"]},
+        "due_date": {"$nin": ["", None], "$lt": today}})
+    if n <= 0:
+        return
+    body = "Existe 1 tarefa atrasada." if n == 1 else f"Existem {n} tarefas atrasadas."
+    await notifications.create_notification(
+        db, dedup_key=f"tasks-overdue-{today}", category="tasks_overdue_digest",
+        title="Tarefas atrasadas", body=body, url="/tarefas")
+
+
 async def _notification_scan_loop():
     """Alertas de estado (pedido parado, urgente, prazo a terminar, ...) —
     cadência configurável (definições → Automação → "Verificar alertas de
@@ -6128,6 +6670,14 @@ async def _notification_scan_loop():
             await _sync_alert_notifications()
         except Exception as e:
             logger.error(f"Sincronização de alertas falhou: {e}")
+        try:
+            await _run_daily_template_triggers()
+        except Exception as e:
+            logger.error(f"Checklists diárias (modelos de tarefas) falharam: {e}")
+        try:
+            await _check_task_reminders()
+        except Exception as e:
+            logger.error(f"Lembretes de tarefas falharam: {e}")
         await _heartbeat("notification_scan")
         await asyncio.sleep(max(NOTIFICATION_SCAN_MINUTES, 1) * 60)
 
@@ -6146,6 +6696,10 @@ async def _daily_maintenance_loop():
                 logger.info(f"Arquivamento automático: {closed} pedido(s) inativo(s) arquivado(s).")
         except Exception as e:
             logger.error(f"Arquivamento automático falhou: {e}")
+        try:
+            await _check_tasks_overdue_digest()
+        except Exception as e:
+            logger.error(f"Aviso diário de tarefas atrasadas falhou: {e}")
         await _heartbeat("daily_maintenance")
         await asyncio.sleep(DAILY_MAINTENANCE_INTERVAL_HOURS * 3600)
 

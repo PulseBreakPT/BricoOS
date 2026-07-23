@@ -65,6 +65,8 @@ CATEGORY_PRIORITY = {
     "waiting_supplier": "alta",
     "document_read_failure": "alta",
     "price_change": "alta",
+    "task_reminder": "alta",
+    "tasks_overdue_digest": "alta",
     "supplier": "media",
     "correio_semanal": "media",
     "forgotten": "media",
