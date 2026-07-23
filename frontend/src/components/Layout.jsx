@@ -36,7 +36,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import BrandMark from "@/components/BrandMark";
-import BrandWordmark from "@/components/BrandWordmark";
 import NotificationsBell from "@/components/NotificationsBell";
 import InstallPwaBanner from "@/components/InstallPwaBanner";
 import ActivityCenter from "@/components/ActivityCenter";
@@ -287,8 +286,10 @@ function MobileBrand({ activeApp }) {
     <div className="flex min-w-0 items-center gap-2.5">
       <BrandMark className="h-9 w-9 rounded-xl" />
       <div className="mobile-brand-copy min-w-0 leading-tight">
-        <BrandWordmark className="h-3.5 max-w-[130px]" />
-        <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="truncate font-heading text-sm font-extrabold text-foreground">
+          BRICO OS
+        </p>
+        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
           {activeApp?.shortTitle || "Sistema da loja"}
         </p>
       </div>
@@ -624,8 +625,8 @@ function PrimaryRouteWindow({
             <p className="truncate text-xs font-extrabold text-neutral-900">
               {app.title}
             </p>
-            <p className="mt-0.5 flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.2em] text-neutral-400">
-              <BrandWordmark className="h-[7px] w-auto" /> / {app.shortTitle}
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.2em] text-neutral-400">
+              BRICO OS / {app.shortTitle}
             </p>
           </div>
         </div>
@@ -678,9 +679,7 @@ function PrimaryRouteWindow({
         <span className="hidden items-center gap-3 font-mono sm:flex">
           <span>⌘K pesquisar</span>
           <span className="text-slate-300">/</span>
-          <span className="inline-flex items-center gap-1">
-            <BrandWordmark className="h-[7px] w-auto" /> · {app.shortTitle}
-          </span>
+          <span>BRICO OS · {app.shortTitle}</span>
         </span>
       </div>
     </main>

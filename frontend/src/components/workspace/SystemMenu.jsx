@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import BrandMark from "@/components/BrandMark";
-import BrandWordmark from "@/components/BrandWordmark";
 import {
   Check,
   Download,
@@ -117,7 +116,7 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
             data-testid="system-menu-about"
             onClick={() => setAboutOpen(true)}
           >
-            <Info className="mr-2 h-4 w-4" /> Sobre o <BrandWordmark className="ml-1 h-3.5 w-auto" />
+            <Info className="mr-2 h-4 w-4" /> Sobre o BRICO OS
           </DropdownMenuItem>
           {showInstallOption ? (
             <DropdownMenuItem
@@ -175,7 +174,9 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
           </DialogHeader>
           <div className="flex flex-col items-center pt-2 text-center">
             <BrandMark className="h-14 w-14 rounded-[18px]" />
-            <BrandWordmark className="mt-4 h-8" />
+            <p className="mt-4 font-heading text-2xl font-black tracking-tight text-foreground">
+              BRICO OS
+            </p>
             <p className="mt-1 text-[9px] font-black uppercase tracking-[0.34em] text-muted-foreground">
               Operations Workstation
             </p>
@@ -220,8 +221,8 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
       <Dialog open={iosStepsOpen} onOpenChange={setIosStepsOpen}>
         <DialogContent data-testid="pwa-install-ios-dialog" className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-1.5 font-heading text-lg font-extrabold tracking-tight">
-              Instalar <BrandWordmark className="h-4 w-auto" />
+            <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">
+              Instalar BRICO OS
             </DialogTitle>
           </DialogHeader>
           <div className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">

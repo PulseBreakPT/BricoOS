@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import AppLauncher from "@/components/workspace/AppLauncher";
-import BrandWordmark from "@/components/BrandWordmark";
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { haptics } from "@/lib/haptics";
@@ -293,9 +292,7 @@ export default function ControlDeck({
 
         <div className="mt-auto pt-5">
           <div className="flex items-center justify-between border-t border-neutral-900/[0.08] pt-4 font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-neutral-300">
-            <span className="inline-flex items-center gap-1">
-              <BrandWordmark className="h-[7px] w-auto opacity-80" /> 2.0
-            </span>
+            <span>BRICO OS 2.0</span>
             <span>{online ? "Sistema estável" : "Modo local"}</span>
           </div>
         </div>

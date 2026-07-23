@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import BrandMark from "@/components/BrandMark";
-import BrandWordmark from "@/components/BrandWordmark";
 
 function alreadyBooted() {
   try {
@@ -42,7 +41,9 @@ export default function BootSplash() {
       className={`os-boot-splash fixed inset-0 z-[120] flex flex-col items-center justify-center ${phase === "fade" ? "os-boot-splash-fade" : ""}`}
     >
       <BrandMark className="h-16 w-16 rounded-[20px]" />
-      <BrandWordmark className="mt-5 h-8" />
+      <p className="mt-5 font-heading text-2xl font-black tracking-tight text-neutral-900">
+        BRICO OS
+      </p>
       <p className="mt-1.5 text-[8px] font-black uppercase tracking-[0.5em] text-neutral-400">
         Operations Workstation
       </p>
@@ -52,8 +53,8 @@ export default function BootSplash() {
       <p className="mt-4 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-neutral-400">
         A preparar a bancada digital
       </p>
-      <p className="absolute bottom-6 flex items-center gap-1 font-mono text-[8px] font-bold uppercase tracking-[0.18em] text-neutral-400/70">
-        <BrandWordmark className="h-[7px] w-auto opacity-70" /> 2.0 · Loja 01
+      <p className="absolute bottom-6 font-mono text-[8px] font-bold uppercase tracking-[0.18em] text-neutral-400/70">
+        BRICO OS 2.0 · Loja 01
       </p>
     </div>
   );
