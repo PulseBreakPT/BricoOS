@@ -5298,6 +5298,26 @@ async def _backfill_correio_semanal_summaries():
         logger.error(f"Resumo automático de Correios Semanais em atraso falhou: {e}")
 
 
+DAILY_MAINTENANCE_INTERVAL_HOURS = 24
+
+
+async def _daily_maintenance_loop():
+    """Arquivamento inteligente (auto_close_inactive) só corria uma vez, no
+    arranque do servidor — um servidor que fica meses sem reiniciar nunca
+    mais arquivava nada sozinho. Este laço corre independentemente da
+    configuração de email (o IMAP pode estar desligado) e repete a cada
+    DAILY_MAINTENANCE_INTERVAL_HOURS."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            closed = await auto_close_inactive()
+            if closed:
+                logger.info(f"Arquivamento automático: {closed} pedido(s) inativo(s) arquivado(s).")
+        except Exception as e:
+            logger.error(f"Arquivamento automático falhou: {e}")
+        await asyncio.sleep(DAILY_MAINTENANCE_INTERVAL_HOURS * 3600)
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -5315,6 +5335,9 @@ async def on_startup():
     backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
     _background_tasks.add(backfill_task)
     backfill_task.add_done_callback(_background_tasks.discard)
+    maintenance_task = asyncio.create_task(_daily_maintenance_loop())
+    _background_tasks.add(maintenance_task)
+    maintenance_task.add_done_callback(_background_tasks.discard)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------
