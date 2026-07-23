@@ -100,7 +100,7 @@ export default function DockIcon({
                   <span className="led led-ok absolute -right-0.5 -top-0.5 ring-2 ring-white" />
                 ) : null}
               </span>
-              <span className="w-full truncate text-[11px] font-bold">
+              <span className="w-full truncate text-[11px] 3xl:text-[13px] font-bold">
                 {meta.title}
               </span>
             </>
@@ -112,7 +112,7 @@ export default function DockIcon({
             <span className="led led-ok absolute -bottom-[3px] left-1/2 h-[3px] w-[3px] -translate-x-1/2" />
           ) : null}
           {count > 1 ? (
-            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] font-black text-white ring-2 ring-[color:var(--chrome)] shadow-[0_0_8px_rgba(217,38,38,0.5)]">
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 font-mono text-[9px] 3xl:text-[11px] font-black text-white ring-2 ring-[color:var(--chrome)] shadow-[0_0_8px_rgba(217,38,38,0.5)]">
               {count}
             </span>
           ) : null}

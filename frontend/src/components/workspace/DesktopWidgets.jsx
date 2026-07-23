@@ -124,7 +124,7 @@ export default function DesktopWidgets({ onOpenRoute }) {
           })}
         </p>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 3xl:gap-5">
         <Widget
           title="Agenda de hoje"
           icon={CalendarDays}

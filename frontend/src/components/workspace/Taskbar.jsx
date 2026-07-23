@@ -141,7 +141,7 @@ export default function Taskbar({
               haptics.tap();
               onOpenMissionControl?.();
             }}
-            className="os-dock-action flex h-9 shrink-0 items-center justify-center rounded-xl px-2 font-mono text-[10px] font-black text-neutral-500 transition-all hover:-translate-y-0.5 hover:bg-neutral-900/[0.05] hover:text-neutral-900"
+            className="os-dock-action flex h-9 shrink-0 items-center justify-center rounded-xl px-2 font-mono text-[10px] 3xl:text-[12px] font-black text-neutral-500 transition-all hover:-translate-y-0.5 hover:bg-neutral-900/[0.05] hover:text-neutral-900"
             title={`+${panels.length - 5} janela(s) — abrir Mission Control`}
           >
             +{panels.length - 5}

@@ -94,7 +94,7 @@ export default function TaskGroups() {
         </Button>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
         {groups.map((g, idx) => (
           <div
             key={g.id}

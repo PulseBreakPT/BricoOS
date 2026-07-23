@@ -25,13 +25,18 @@ const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => (
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "themed-surface fixed z-50 max-w-[calc(100vw-0.5rem)] gap-4 overflow-x-hidden bg-background p-5 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out sm:p-6",
+  // overflow-y-auto + max-h aqui garante que QUALQUER consumidor (há vários:
+  // NotificationsBell, TaskDialog, a gaveta do telemóvel, o novo painel de
+  // ferramentas) tem scroll seguro por omissão, tal como o ui/dialog.jsx já
+  // garante para diálogos — sem isto, cada novo uso tinha de se lembrar de
+  // acrescentar overflow-y-auto manualmente.
+  "themed-surface fixed z-50 flex max-h-[100dvh] max-w-[calc(100vw-0.5rem)] flex-col gap-4 overflow-x-hidden overflow-y-auto bg-background p-5 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out sm:p-6",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        top: "inset-x-0 top-0 max-h-[85dvh] border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
-          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          "inset-x-0 bottom-0 max-h-[85dvh] border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
         left: "inset-y-0 left-0 h-full w-[min(92vw,24rem)] border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
         right:
           "inset-y-0 right-0 h-full w-[min(92vw,24rem)] border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",

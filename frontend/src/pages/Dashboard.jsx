@@ -265,7 +265,7 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4 3xl:gap-6">
         <StatCard index={0} testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#7C3AED" />
         <StatCard index={1} testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#2563EB" />
         <StatCard index={2} testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="#DC2626" danger />
@@ -461,7 +461,7 @@ export default function Dashboard() {
           ),
         };
         return (
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-flow-dense lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-flow-dense lg:grid-cols-3 3xl:grid-cols-4">
             {orderedWidgets.map((w) => (
               <DashboardWidget
                 key={w.key}

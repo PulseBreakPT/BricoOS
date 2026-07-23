@@ -84,7 +84,7 @@ export default function HealthPanel() {
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Atualizar
         </button>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
         <Tile icon={ClipboardList} label="Pedidos ativos" value={data.pedidos_ativos} />
         <Tile icon={Mail} label="Emails por ver" value={data.emails_nao_vistos} />
         <Tile icon={ListChecks} label="Tarefas por fazer" value={data.tarefas_pendentes} />

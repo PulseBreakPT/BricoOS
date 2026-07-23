@@ -61,6 +61,13 @@ export const PANEL_ROUTES = {
   notifications: "/notificacoes",
 };
 
+// Ferramentas que no computador só existem como painel flutuante — no
+// telemóvel abrem dentro de uma folha inferior (ver components/Layout.jsx:
+// MobileToolPanelBody, components/workspace/MobileHomeSurface.jsx), sem
+// duplicar componente nenhum. As páginas normais (notes/emails/tasks/...)
+// já têm rota própria no telemóvel, por isso ficam de fora desta lista.
+export const MOBILE_TOOL_TYPES = ["explorer", "downloads", "calculator", "scratchpad", "stopwatch", "health"];
+
 export function routeMatchesPanelType(pathname, type) {
   const route = PANEL_ROUTES[type];
   if (!route) return false;

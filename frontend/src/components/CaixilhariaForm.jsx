@@ -315,7 +315,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
 
               {/* 2. Medidas — sempre em milímetros */}
               <MiniTitle title="Medidas (mm)" />
-              <div className="mt-2.5 grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="mt-2.5 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 sm:gap-3">
                 <div className="space-y-1.5">
                   <Label>Largura</Label>
                   <Input
@@ -578,7 +578,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Vidro / painéis</Label>
                   <Select value={option.material || "none"} onValueChange={(value) => onSet("material", value === "none" ? "" : value)}>
@@ -600,7 +600,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
                   <span><strong>{catalog.vidros[option.material].benefit}</strong> {catalog.vidros[option.material].typical_use}</span>
                 </p>
               ) : null}
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <OptionSelect
                   label="Quadrícula decorativa"
                   value={option.quadricula}

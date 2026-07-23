@@ -11,6 +11,7 @@ import {
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { useClock } from "@/hooks/useClock";
 import { haptics } from "@/lib/haptics";
+import { PANEL_TYPES, MOBILE_TOOL_TYPES } from "@/lib/panelRegistry";
 
 const HOME_APPS = [
   {
@@ -69,7 +70,7 @@ function greetingFor(hour) {
   return "Boa noite";
 }
 
-export default function MobileHomeSurface({ onOpenRoute, onOpenActivity }) {
+export default function MobileHomeSurface({ onOpenRoute, onOpenActivity, onOpenTool }) {
   const now = useClock();
   const { status, online } = useSystemStatus();
 
@@ -83,6 +84,11 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity }) {
   const openRoute = (path) => {
     haptics.tap();
     onOpenRoute?.(path);
+  };
+
+  const openTool = (type) => {
+    haptics.tap();
+    onOpenTool?.(type);
   };
 
   return (
@@ -192,6 +198,37 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity }) {
               </span>
               <span className="mt-1 hidden max-w-full text-[9px] font-semibold leading-tight text-muted-foreground sm:block">
                 {app.detail}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-7 px-1 sm:mt-9">
+        <p className="kicker">Extras</p>
+        <h2 className="mt-2 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+          Ferramentas
+        </h2>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-5 sm:grid-cols-6 sm:gap-4 lg:grid-cols-6">
+        {MOBILE_TOOL_TYPES.map((type) => {
+          const meta = PANEL_TYPES[type];
+          if (!meta) return null;
+          const Icon = meta.icon;
+          return (
+            <button
+              type="button"
+              key={type}
+              data-testid={`mobile-home-tool-${type}`}
+              onClick={() => openTool(type)}
+              className="group flex min-w-0 flex-col items-center rounded-[22px] px-1 py-2 text-center transition-colors hover:bg-muted active:scale-95 sm:px-2"
+            >
+              <span className="os-home-app-icon flex h-14 w-14 items-center justify-center rounded-[19px] border border-white/25 bg-gradient-to-br from-neutral-600 to-neutral-900 text-white shadow-[0_16px_28px_-14px_rgba(16,17,20,0.45),inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform group-hover:-translate-y-1 group-hover:scale-105 sm:h-16 sm:w-16 sm:rounded-[21px]">
+                <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2} />
+              </span>
+              <span className="mt-2 block max-w-full text-[11px] font-extrabold leading-tight text-foreground sm:text-xs">
+                {meta.title}
               </span>
             </button>
           );
