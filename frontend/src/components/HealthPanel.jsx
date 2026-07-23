@@ -21,6 +21,13 @@ function Tile({ icon: Icon, label, value, tone = "slate" }) {
   );
 }
 
+const LOOP_LABELS = {
+  imap_poll: "Verificação de emails",
+  daily_maintenance: "Arquivamento automático",
+  notification_retry: "Repetição de notificações",
+  notification_scan: "Alertas de pedidos parados/urgentes",
+};
+
 function StatusRow({ ok, label, detail }) {
   return (
     <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs">
@@ -115,6 +122,29 @@ export default function HealthPanel() {
           <StatusRow ok={a.ia_configurada} label="Integração de IA" detail={a.ia_configurada ? "ativa" : "não configurada"} />
         </div>
       </div>
+
+      {data.background_loops?.length ? (
+        <div>
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            <Zap className="h-3.5 w-3.5" /> Processos de fundo
+          </p>
+          <div className="space-y-0.5 rounded-xl border border-border bg-card p-1">
+            {data.background_loops.map((loop) => (
+              <StatusRow
+                key={loop.name}
+                ok={loop.status === "disabled" || !loop.stale}
+                label={LOOP_LABELS[loop.name] || loop.name}
+                detail={
+                  loop.status === "disabled" ? "desativado"
+                    : loop.status === "unknown" ? "ainda não correu"
+                      : loop.stale ? "parado — a reiniciar sozinho"
+                        : `ativo · ${timeAgo(loop.last_heartbeat)}`
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

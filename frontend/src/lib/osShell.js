@@ -1,3 +1,4 @@
+import api from "@/lib/api";
 import { clearDeviceToken } from "@/lib/deviceAuth";
 
 // Fundos do ambiente de trabalho — gradientes/texturas leves geradas em CSS
@@ -76,6 +77,11 @@ export function lockScreen() {
   } catch {
     /* sem sessionStorage */
   }
+  // Best effort — avisa o servidor para pausar as notificações push deste
+  // dispositivo até ao próximo PIN certo (ver POST /auth/lock). Usa o token
+  // ainda válido; se falhar por falta de rede, o bloqueio local acontece
+  // na mesma, não faz sentido bloquear o utilizador por causa disto.
+  api.post("/auth/lock").catch(() => {});
   clearDeviceToken();
   window.dispatchEvent(new Event("brico-auth-required"));
 }

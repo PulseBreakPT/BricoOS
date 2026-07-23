@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Bell, Download, Lock, RotateCw, Share, Smartphone, SquarePlus,
+  Bell, Download, Lock, Monitor, RotateCw, Share, Smartphone, SquarePlus, Tablet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -247,17 +247,25 @@ function ChangePinSection() {
 
 // Lista dos dispositivos já verificados por PIN (db.auth_devices), com
 // opção de revogar o acesso a qualquer um deles menos o atual.
-function DevicesSection() {
+const DEVICE_TYPE_ICON = {
+  iPhone: Smartphone, Android: Smartphone, iPad: Tablet,
+  Windows: Monitor, macOS: Monitor, Linux: Monitor,
+};
+
+// Notificações por dispositivo, não por conta: cada aparelho decide para
+// si próprio se quer receber (desligado por omissão), e essa decisão pode
+// ser revista à distância a partir desta página — sem depender de o
+// utilizador estar sentado nesse aparelho.
+function DevicesSection({ push, onTogglePush }) {
   const [devices, setDevices] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = () => {
     api.get("/auth/devices")
-      .then(({ data }) => { if (!cancelled) setDevices(data); })
-      .catch(() => { if (!cancelled) setDevices([]); });
-    return () => { cancelled = true; };
-  }, []);
+      .then(({ data }) => setDevices(data))
+      .catch(() => setDevices([]));
+  };
+  useEffect(load, []);
 
   const handleRevoke = async (d) => {
     if (!window.confirm(`Revogar o acesso deste dispositivo (${d.ip || "IP desconhecido"})?`)) return;
@@ -273,35 +281,64 @@ function DevicesSection() {
     }
   };
 
+  const handleTogglePush = async (d, enabled) => {
+    if (d.is_current) {
+      // Só o próprio browser pode criar/destruir a subscrição técnica —
+      // reutiliza o fluxo já existente (pede permissão se for preciso).
+      await onTogglePush?.(enabled);
+      load();
+      return;
+    }
+    setBusyId(d.id);
+    try {
+      await api.post(`/auth/devices/${d.id}/push`, { enabled });
+      setDevices((list) => list.map((x) => (x.id === d.id ? { ...x, push_enabled: enabled } : x)));
+      toast.success(enabled ? "Notificações ativadas nesse dispositivo" : "Notificações desativadas nesse dispositivo");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Não foi possível alterar"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
-    <SettingsSection title="Dispositivos verificados" description="Todos os dispositivos que já introduziram o PIN de acesso.">
+    <SettingsSection title="Dispositivos" description="Notificações desligadas por omissão em cada dispositivo — ativa só onde queres mesmo recebê-las.">
       {devices === null ? (
         <div className="p-4 text-sm text-muted-foreground">A carregar…</div>
       ) : devices.length === 0 ? (
         <div className="p-4 text-sm text-muted-foreground">Nenhum dispositivo verificado.</div>
       ) : (
-        devices.map((d) => (
-          <SettingsRow
-            key={d.id}
-            icon={Smartphone}
-            label={d.is_current ? "Este dispositivo" : (d.user_agent ? d.user_agent.slice(0, 40) : "Dispositivo")}
-            description={`${d.ip || "IP desconhecido"}${d.has_push ? " · notificações ativas" : ""}`}
-            control={
-              d.is_current ? (
-                <span className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">Atual</span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busyId === d.id}
-                  onClick={() => handleRevoke(d)}
-                  className="rounded-xl border border-red-200 bg-[var(--pastel-red-bg)] px-3 py-1.5 text-xs font-bold text-[color:var(--pastel-red-text)] transition-colors hover:opacity-90 disabled:opacity-40"
-                >
-                  Revogar
-                </button>
-              )
-            }
-          />
-        ))
+        devices.map((d) => {
+          const Icon = DEVICE_TYPE_ICON[d.device_type] || Smartphone;
+          const pushOn = d.is_current ? push?.subscribed : d.push_enabled;
+          return (
+            <SettingsRow
+              key={d.id}
+              icon={Icon}
+              label={d.is_current ? `Este dispositivo · ${d.device_type}` : d.device_type}
+              description={`${d.ip || "IP desconhecido"} · ${pushOn ? "notificações ativas" : "notificações desligadas"}`}
+              control={
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={Boolean(pushOn)}
+                    disabled={busyId === d.id || (d.is_current && (push?.busy || push?.checking))}
+                    onCheckedChange={(checked) => handleTogglePush(d, checked)}
+                  />
+                  {!d.is_current ? (
+                    <button
+                      type="button"
+                      disabled={busyId === d.id}
+                      onClick={() => handleRevoke(d)}
+                      className="rounded-xl border border-red-200 bg-[var(--pastel-red-bg)] px-2.5 py-1.5 text-xs font-bold text-[color:var(--pastel-red-text)] transition-colors hover:opacity-90 disabled:opacity-40"
+                    >
+                      Remover
+                    </button>
+                  ) : null}
+                </div>
+              }
+            />
+          );
+        })
       )}
     </SettingsSection>
   );
@@ -419,6 +456,12 @@ export default function Settings() {
           { key: "quote_quality_issue", label: "Problema de qualidade no orçamento do fornecedor", type: "switch" },
           { key: "quote_changed", label: "Orçamento do fornecedor atualizado", type: "switch" },
           { key: "anexos_incidencia_critica", label: "Incidência crítica no Anexos_Edição", type: "switch" },
+          { key: "client_new_note", label: "Novo pedido de cliente", type: "switch" },
+          { key: "task_urgent", label: "Tarefa urgente criada", type: "switch" },
+          { key: "deadline_approaching", label: "Prazo prestes a terminar", type: "switch" },
+          { key: "document_read_failure", label: "Falha na leitura de um documento", type: "switch" },
+          { key: "processing_error", label: "Erro de processamento", type: "switch" },
+          { key: "price_change", label: "Alteração importante de preços", type: "switch" },
         ]}
       />
 
@@ -463,6 +506,9 @@ export default function Settings() {
           { key: "reminder_interval_days", label: "Intervalo padrão entre lembretes", type: "number", suffix: "dias" },
           { key: "category_suggestion_threshold", label: "Edições repetidas antes de sugerir categoria nova", type: "number" },
           { key: "supplier_quote_history_limit", label: "Versões do orçamento guardadas no histórico", type: "number" },
+          { key: "deadline_warning_days", label: "Avisar antes do prazo terminar", type: "number", suffix: "dias" },
+          { key: "price_change_alert_pct", label: "Variação de preço que gera alerta", type: "number", suffix: "%" },
+          { key: "notification_scan_minutes", label: "Verificar alertas de pedidos parados/urgentes a cada", type: "number", suffix: "min" },
         ]}
       />
 
@@ -478,7 +524,7 @@ export default function Settings() {
       />
 
       <ChangePinSection />
-      <DevicesSection />
+      <DevicesSection push={push} onTogglePush={handleTogglePush} />
 
       <SettingsFieldsCard
         group="upload_limits"

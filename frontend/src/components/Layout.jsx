@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   BarChart3,
+  Bell,
   BookOpenCheck,
   Check,
   CheckCheck,
@@ -139,6 +140,13 @@ const ROUTE_APPS = [
     icon: SettingsIcon,
     testid: "nav-definicoes",
   },
+  {
+    path: "/notificacoes",
+    title: "Notificações",
+    shortTitle: "Notificações",
+    icon: Bell,
+    testid: "nav-notificacoes",
+  },
 ];
 
 const NAV_GROUPS = [
@@ -147,7 +155,7 @@ const NAV_GROUPS = [
     label: "Organização",
     items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[6], ROUTE_APPS[5]],
   },
-  { label: "Sistema", items: [ROUTE_APPS[7]] },
+  { label: "Sistema", items: [ROUTE_APPS[7], ROUTE_APPS[8]] },
 ];
 
 function getRouteApp(pathname) {
@@ -808,6 +816,21 @@ function LayoutInner() {
     // janelas persistidas de um turno anterior.
     showDesktop();
   }, [showDesktop]);
+
+  useEffect(() => {
+    // Tocar numa notificação push abre a app com ?n=<id> (ver
+    // service-worker.js: notificationclick) — o SW não tem acesso ao
+    // token de dispositivo, por isso é aqui, já autenticados, que se
+    // confirma a leitura. Remove o parâmetro da URL a seguir, para não
+    // ficar visível nem repetir a marcação num refresh.
+    const params = new URLSearchParams(location.search);
+    const notificationId = params.get("n");
+    if (!notificationId) return;
+    api.post(`/notifications/${notificationId}/read`).catch(() => {});
+    params.delete("n");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   useEffect(() => {
     const onKey = (event) => {
