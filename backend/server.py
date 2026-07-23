@@ -60,6 +60,7 @@ try:
         diff_quote_versions, diff_summary_text, duplicate_medidas,
     )
     import correio_semanal
+    import anexos_edicao
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -86,6 +87,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         diff_quote_versions, diff_summary_text, duplicate_medidas,
     )
     from . import correio_semanal
+    from . import anexos_edicao
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -2563,6 +2565,9 @@ async def add_quote(note_id: str, payload: QuoteIn):
 BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
 MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
 MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
+# O Anexos_Edição.zip do Correio Semanal (dossiers e planogramas incluídos)
+# ronda facilmente os 20 MB — bem acima do limite de um PDF de fornecedor.
+MAX_ANEXOS_ZIP_BYTES = 30 * 1024 * 1024
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_PHOTOS_PER_NOTE = 30
 
@@ -3304,15 +3309,24 @@ def _email_body_html(msg, plain_fallback):
 
 
 def _email_pdf_attachments(msg):
-    """Extrai anexos PDF (máx. 5, até MAX_SUPPLIER_PDF_BYTES cada)."""
+    """Extrai anexos PDF e ZIP (máx. 5 no total) — PDF até
+    MAX_SUPPLIER_PDF_BYTES, ZIP até MAX_ANEXOS_ZIP_BYTES (o
+    Anexos_Edição.zip do Correio Semanal chega a rondar os 20 MB)."""
     out = []
     for part in msg.walk():
         filename = _decode_mime_header(part.get_filename() or "")
-        if part.get_content_type() != "application/pdf" and not filename.lower().endswith(".pdf"):
+        content_type = part.get_content_type()
+        is_pdf = content_type == "application/pdf" or filename.lower().endswith(".pdf")
+        is_zip = (
+            content_type in ("application/zip", "application/x-zip-compressed")
+            or filename.lower().endswith(".zip")
+        )
+        if not is_pdf and not is_zip:
             continue
         payload = part.get_payload(decode=True)
-        if payload and len(payload) <= MAX_SUPPLIER_PDF_BYTES:
-            out.append({"filename": filename or "documento.pdf", "data": payload})
+        limit = MAX_ANEXOS_ZIP_BYTES if is_zip else MAX_SUPPLIER_PDF_BYTES
+        if payload and len(payload) <= limit:
+            out.append({"filename": filename or ("anexo.zip" if is_zip else "documento.pdf"), "data": payload})
         if len(out) >= 5:
             break
     return out
@@ -3412,6 +3426,65 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
             created += 1
 
     return {"digest": structured, "diff": diff, "suggested_tasks_created": created}
+
+
+ANEXOS_EDICAO_ACTIONABLE = {
+    "nota_encomenda": "Responder/encomendar",
+    "incidencia": "Rever incidências",
+    "campanha": "Preparar campanha",
+    "planograma": "Atualizar exposição",
+}
+
+
+async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edition=None):
+    """Processa o Anexos_Edição.zip que costuma acompanhar o Correio
+    Semanal: descompacta (incl. zips aninhados), classifica e extrai cada
+    ficheiro pelo próprio conteúdo — nunca pelo nome (ver anexos_edicao.py)
+    — compara com a edição anterior (novos/removidos/atualizados, preços
+    alterados, produtos novos/descontinuados) e sugere tarefas a partir do
+    que precisar de ação. Sempre como sugestão (suggested=True), nunca
+    confirmada nem enviada sozinha."""
+    try:
+        processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename)
+    except Exception as e:
+        logger.error(f"Processamento do Anexos_Edição falhou: {e}")
+        return None
+    if not processed.get("edition_number"):
+        processed["edition_number"] = fallback_edition
+    if not processed.get("edition_number"):
+        return None
+
+    prev_list = await db.anexos_edicoes.find(
+        {"edition_number": {"$ne": processed["edition_number"]}}, {"_id": 0},
+    ).sort("created_at", -1).to_list(1)
+    prev = prev_list[0]["processed"] if prev_list else None
+    diff = anexos_edicao.diff_edicao_versions(prev, processed) if prev else None
+
+    await db.anexos_edicoes.insert_one({
+        "id": str(uuid.uuid4()), "email_id": email_id, "edition_number": processed["edition_number"],
+        "zip_filename": zip_filename, "processed": processed, "diff_since_previous": diff,
+        "created_at": now_iso()})
+
+    created = 0
+    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
+                 "repeat": "none", "subtasks": [], "labels": ["anexos-edicao"], "note_id": "", "group_id": ""}
+    for f in processed.get("files", []):
+        verb = ANEXOS_EDICAO_ACTIONABLE.get(f["category"])
+        if not verb:
+            continue
+        filename = f["path"].rsplit("/", 1)[-1]
+        exists = await db.tasks.find_one({"suggested": True, "edition_number": processed["edition_number"],
+                                           "source_path": f["path"]})
+        if exists:
+            continue
+        await db.tasks.insert_one({
+            **base_task, "id": str(uuid.uuid4()),
+            "title": f"[Anexos Edição {processed['edition_number']}] {verb}: {filename}",
+            "created_at": now_iso(), "suggested": True, "source": "anexos_edicao",
+            "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task"})
+        created += 1
+
+    return {"processed": processed, "diff": diff, "suggested_tasks_created": created}
 
 
 def _imap_fetch_since(last_uid):
@@ -3675,11 +3748,23 @@ async def poll_supplier_replies():
             classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         correio_semanal_summary = ""
         correio_semanal_result = None
+        anexos_result = None
         att_filenames = [att["filename"] for att in m.get("attachments", [])]
         if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
-            pdf_bytes_list = [att["data"] for att in m["attachments"]]
-            correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
-            correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
+            # O boletim e o pacote de anexos (Anexos_Edição.zip) chegam no
+            # mesmo email mas são processados por módulos diferentes — só o
+            # PDF vai para o resumo do Correio Semanal, só o zip para o
+            # anexos_edicao.
+            pdf_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".pdf")]
+            zip_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".zip")]
+            if pdf_atts:
+                pdf_bytes_list = [a["data"] for a in pdf_atts]
+                correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
+                correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
+            if zip_atts:
+                fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
+                anexos_result = await _process_anexos_edicao(
+                    zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -3687,13 +3772,21 @@ async def poll_supplier_replies():
             "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "body_html": m.get("body_html") or "",
-            "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
+            "attachments": attachments_meta,
+            "has_pdf": any(a["filename"].lower().endswith(".pdf") for a in attachments_meta),
             **classification,
             "correio_semanal_summary": correio_semanal_summary,
             "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
             "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
             "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
             "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
+            "anexos_edicao_number": (anexos_result or {}).get("processed", {}).get("edition_number") or "",
+            "anexos_edicao_summary": {
+                "file_count": (anexos_result or {}).get("processed", {}).get("file_count"),
+                "by_category": (anexos_result or {}).get("processed", {}).get("by_category"),
+            } if anexos_result else None,
+            "anexos_edicao_diff": (anexos_result or {}).get("diff"),
+            "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -3714,8 +3807,11 @@ async def poll_supplier_replies():
                 # PDF da BandAluminios em anexo → analisa e gera automaticamente
                 # o PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
                 # enviado sem confirmação explícita do utilizador.
-                if m.get("attachments"):
-                    first = m["attachments"][0]
+                # (m["attachments"] pode agora incluir também .zip — ver
+                # _email_pdf_attachments — por isso filtra-se só o PDF.)
+                supplier_pdf_atts = [a for a in m.get("attachments", []) if a["filename"].lower().endswith(".pdf")]
+                if supplier_pdf_atts:
+                    first = supplier_pdf_atts[0]
                     try:
                         supplier_quote = await _apply_supplier_pdf(
                             note_id, first["data"], first["filename"], source_label=" (recebido por email)")
@@ -5451,7 +5547,8 @@ async def ensure_indexes():
                         ("sent_emails", "message_id"),
                         ("email_attachments", "email_id"),
                         ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
-                        ("tasks", "suggested"), ("tasks", "csn_number")]:
+                        ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
+                        ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number")]:
         try:
             await db[coll].create_index(field)
         except Exception:

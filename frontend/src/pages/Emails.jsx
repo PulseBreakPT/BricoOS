@@ -210,6 +210,78 @@ function CorreioSemanalTasksPanel({ csnNumber }) {
   );
 }
 
+const ANEXOS_CATEGORY_LABELS = {
+  tabela_precos: "tabela(s) de preços", nota_encomenda: "nota(s) de encomenda",
+  incidencia: "incidência(s)", lista_limpeza: "lista(s) de limpeza",
+  dossier_gama: "dossier(s) de gama", planograma: "planograma(s)",
+  campanha: "campanha(s)", catalogo: "catálogo(s)", outro: "outro(s)",
+};
+
+// Tarefas sugeridas a partir do Anexos_Edição.zip (notas de encomenda,
+// incidências, campanhas, planogramas) — mesmo mecanismo de aceitar/
+// dispensar do CorreioSemanalTasksPanel, mas filtrado por edição em vez de
+// número do Correio Semanal.
+function AnexosEdicaoTasksPanel({ editionNumber }) {
+  const [tasks, setTasks] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.get("/tasks", { params: { suggested: true } })
+      .then(({ data }) => { if (alive) setTasks((data || []).filter((t) => t.edition_number === editionNumber)); })
+      .catch(() => { if (alive) setTasks([]); });
+    return () => { alive = false; };
+  }, [editionNumber]);
+
+  const accept = async (id) => {
+    setBusyId(id);
+    try {
+      await api.post(`/tasks/${id}/accept-suggestion`);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      toast.success("Tarefa aceite — já está na lista de tarefas.");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível aceitar a tarefa"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const dismiss = async (id) => {
+    setBusyId(id);
+    try {
+      await api.delete(`/tasks/${id}`);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível dispensar a sugestão"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!tasks || tasks.length === 0) return null;
+  return (
+    <div className="mb-2 rounded-lg border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-3">
+      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-emerald-text)]">
+        <ListChecks className="h-3.5 w-3.5" /> Tarefas sugeridas dos anexos ({tasks.length})
+      </p>
+      <div className="space-y-1.5">
+        {tasks.map((t) => (
+          <div key={t.id} data-testid={`anexos-suggested-task-${t.id}`} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{t.title}</span>
+            <button type="button" disabled={busyId === t.id} onClick={() => accept(t.id)}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Check className="h-3 w-3" /> Aceitar
+            </button>
+            <button type="button" disabled={busyId === t.id} onClick={() => dismiss(t.id)}
+              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
+              <Trash2 className="h-3 w-3" /> Dispensar
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Caixa de entrada — TODOS os emails recebidos, mesmo sem relação com um
 // pedido (esses ficam com etiqueta "Sem pedido associado").
 function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
@@ -532,6 +604,38 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                   ) : null}
                   {m.correio_semanal_csn_number ? (
                     <CorreioSemanalTasksPanel csnNumber={m.correio_semanal_csn_number} />
+                  ) : null}
+                  {m.anexos_edicao_number ? (
+                    <div className="mb-2 rounded-lg border border-violet-200 bg-[var(--pastel-violet-bg)] p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-violet-text)]">
+                        <FileStack className="h-3.5 w-3.5" /> Anexos da Edição Nº{m.anexos_edicao_number}
+                      </p>
+                      <p className="mb-1 text-[11px] text-foreground/80">
+                        {m.anexos_edicao_summary?.file_count ?? 0} ficheiro(s) processado(s)
+                        {m.anexos_edicao_summary?.by_category
+                          ? " · " + Object.entries(m.anexos_edicao_summary.by_category)
+                              .map(([k, v]) => `${v} ${ANEXOS_CATEGORY_LABELS[k] || k}`).join(", ")
+                          : ""}
+                      </p>
+                      {m.anexos_edicao_diff ? (
+                        m.anexos_edicao_diff.has_changes ? (
+                          <div className="space-y-1 text-[11px] text-foreground/80">
+                            <p>Desde a edição Nº{m.anexos_edicao_diff.prev_edition}:</p>
+                            {m.anexos_edicao_diff.new_files?.length ? <p>🆕 {m.anexos_edicao_diff.new_files.length} ficheiro(s) novo(s)</p> : null}
+                            {m.anexos_edicao_diff.removed_files?.length ? <p>❌ {m.anexos_edicao_diff.removed_files.length} ficheiro(s) removido(s)</p> : null}
+                            {m.anexos_edicao_diff.updated_files?.length ? <p>✏️ {m.anexos_edicao_diff.updated_files.length} ficheiro(s) atualizado(s)</p> : null}
+                            {m.anexos_edicao_diff.price_changes_count ? <p>💶 {m.anexos_edicao_diff.price_changes_count} alteração(ões) de preço</p> : null}
+                            {m.anexos_edicao_diff.new_products_count ? <p>🟢 {m.anexos_edicao_diff.new_products_count} produto(s) novo(s)</p> : null}
+                            {m.anexos_edicao_diff.discontinued_products_count ? <p>🔴 {m.anexos_edicao_diff.discontinued_products_count} produto(s) descontinuado(s)</p> : null}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-foreground/80">Sem alterações desde a edição anterior.</p>
+                        )
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {m.anexos_edicao_number ? (
+                    <AnexosEdicaoTasksPanel editionNumber={m.anexos_edicao_number} />
                   ) : null}
                   {m.correio_semanal_summary ? (
                     <div className="mb-2 rounded-lg border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">

@@ -30,3 +30,7 @@ google-api-python-client>=2.190.0
 pymupdf>=1.26
 reportlab>=4.1
 python-multipart>=0.0.9
+
+# Leitura das folhas Excel dentro do Anexos_Edição.zip do Correio Semanal
+# (anexos_edicao.py) — só a biblioteca de leitura, nunca pandas/numpy.
+openpyxl>=3.1
