@@ -18,6 +18,7 @@ import imaplib
 import smtplib
 import warnings
 import mimetypes
+import urllib.parse
 import email as email_lib
 import nh3
 from email import encoders as email_encoders
@@ -1889,9 +1890,26 @@ async def delete_task_group(group_id: str):
 
 
 @api_router.get("/tasks")
-async def list_tasks(note_id: Optional[str] = None):
-    q = {"note_id": note_id} if note_id else {}
+async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = None):
+    q = {}
+    if note_id:
+        q["note_id"] = note_id
+    # Tarefas sugeridas pelo Correio Semanal ficam de fora da lista normal
+    # até serem aceites — só aparecem quando pedidas explicitamente
+    # (suggested=true), para não intrometer sugestões por confirmar na
+    # lista de tarefas já assumidas.
+    q["suggested"] = suggested if suggested is not None else {"$ne": True}
     return await db.tasks.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+
+@api_router.post("/tasks/{task_id}/accept-suggestion")
+async def accept_task_suggestion(task_id: str):
+    t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    await db.tasks.update_one({"id": task_id}, {"$set": {"suggested": False}})
+    t["suggested"] = False
+    return t
 
 
 @api_router.post("/tasks")
@@ -3335,6 +3353,67 @@ async def _summarize_correio_semanal(subject, pdf_bytes_list):
         return ""
 
 
+async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
+    """Complementa o resumo em HTML com dados estruturados: guarda um
+    "digest" desta edição, compara com a edição anterior (se houver) e
+    sugere tarefas a partir das secções com "A Encomendar"/"A Fazer"
+    marcado, ou um rascunho de email quando a secção pede uma resposta de
+    adesão/não adesão. Nunca cria uma tarefa já confirmada nem envia
+    nada sozinho — fica marcada como sugestão (suggested=True) até
+    alguém aceitar, mesmo padrão de aprovação usado no resto da app."""
+    try:
+        structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject)
+    except Exception as e:
+        logger.error(f"Extração estruturada do Correio Semanal falhou: {e}")
+        return None
+    if not structured or not structured.get("csn_number"):
+        return None
+
+    prev_list = await db.correio_semanal_digests.find(
+        {"csn_number": {"$ne": structured["csn_number"]}}, {"_id": 0},
+    ).sort("created_at", -1).to_list(1)
+    prev = (prev_list[0]["structured"] if prev_list else None)
+    diff = correio_semanal.diff_digest_versions(prev, structured) if prev else None
+
+    await db.correio_semanal_digests.insert_one({
+        "id": str(uuid.uuid4()), "email_id": email_id, "csn_number": structured["csn_number"],
+        "week_label": structured.get("week_label"), "issue_date": structured.get("issue_date"),
+        "structured": structured, "diff_since_previous": diff, "created_at": now_iso()})
+
+    created = 0
+    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
+                 "repeat": "none", "subtasks": [], "labels": ["correio-semanal"], "note_id": "", "group_id": ""}
+    for section in structured["sections"]:
+        for action in section.get("checked_actions") or []:
+            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
+                                               "source_page": section["page"], "kind": "task", "action": action})
+            if exists:
+                continue
+            await db.tasks.insert_one({
+                **base_task, "id": str(uuid.uuid4()),
+                "title": f"[Correio Semanal {structured['csn_number']}] {action}: {section['title']}",
+                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
+                "csn_number": structured["csn_number"], "source_page": section["page"],
+                "kind": "task", "action": action})
+            created += 1
+        if section.get("requires_adhesion_email") and section.get("adhesion_emails"):
+            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
+                                               "source_page": section["page"], "kind": "email_draft"})
+            if exists:
+                continue
+            to = ",".join(section["adhesion_emails"])
+            mailto = f"mailto:{to}?subject={urllib.parse.quote(section['title'])}"
+            await db.tasks.insert_one({
+                **base_task, "id": str(uuid.uuid4()),
+                "title": f"[Correio Semanal {structured['csn_number']}] Responder por email: {section['title']}",
+                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
+                "csn_number": structured["csn_number"], "source_page": section["page"],
+                "kind": "email_draft", "mailto": mailto, "recipients": section["adhesion_emails"]})
+            created += 1
+
+    return {"digest": structured, "diff": diff, "suggested_tasks_created": created}
+
+
 def _imap_fetch_since(last_uid):
     box = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
     try:
@@ -3595,10 +3674,12 @@ async def poll_supplier_replies():
             classification["priority"] = rules_result["priority_override"]
             classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         correio_semanal_summary = ""
+        correio_semanal_result = None
         att_filenames = [att["filename"] for att in m.get("attachments", [])]
         if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
             pdf_bytes_list = [att["data"] for att in m["attachments"]]
             correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
+            correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -3610,6 +3691,9 @@ async def poll_supplier_replies():
             **classification,
             "correio_semanal_summary": correio_semanal_summary,
             "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
+            "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
+            "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
+            "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -5365,7 +5449,9 @@ async def ensure_indexes():
                         ("received_emails", "reply_kind"), ("notes", "email"),
                         ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
                         ("sent_emails", "message_id"),
-                        ("email_attachments", "email_id")]:
+                        ("email_attachments", "email_id"),
+                        ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
+                        ("tasks", "suggested"), ("tasks", "csn_number")]:
         try:
             await db[coll].create_index(field)
         except Exception:

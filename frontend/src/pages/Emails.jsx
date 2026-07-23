@@ -6,7 +6,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X,
   BellRing, Forward, BarChart3, FileStack, MessagesSquare,
-  MoreHorizontal, ListChecks, Link2, Unlink2,
+  MoreHorizontal, ListChecks, Link2, Unlink2, FileDiff, Check, Trash2, MailPlus,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -137,6 +137,76 @@ function EmptyState({ icon: Icon, text }) {
       </EmptyMedia>
       <EmptyDescription className="text-sm font-semibold text-muted-foreground">{text}</EmptyDescription>
     </Empty>
+  );
+}
+
+// Tarefas sugeridas a partir de um Correio Semanal (secções "A Encomendar"/
+// "A Fazer" marcadas, ou pedidos de adesão/não adesão por email) — nunca
+// entram na lista de tarefas normal sozinhas, ficam aqui para aceitar ou
+// dispensar uma a uma.
+function CorreioSemanalTasksPanel({ csnNumber }) {
+  const [tasks, setTasks] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.get("/tasks", { params: { suggested: true } })
+      .then(({ data }) => { if (alive) setTasks((data || []).filter((t) => t.csn_number === csnNumber)); })
+      .catch(() => { if (alive) setTasks([]); });
+    return () => { alive = false; };
+  }, [csnNumber]);
+
+  const accept = async (id) => {
+    setBusyId(id);
+    try {
+      await api.post(`/tasks/${id}/accept-suggestion`);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      toast.success("Tarefa aceite — já está na lista de tarefas.");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível aceitar a tarefa"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const dismiss = async (id) => {
+    setBusyId(id);
+    try {
+      await api.delete(`/tasks/${id}`);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível dispensar a sugestão"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!tasks || tasks.length === 0) return null;
+  return (
+    <div className="mb-2 rounded-lg border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-3">
+      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-emerald-text)]">
+        <ListChecks className="h-3.5 w-3.5" /> Tarefas sugeridas ({tasks.length})
+      </p>
+      <div className="space-y-1.5">
+        {tasks.map((t) => (
+          <div key={t.id} data-testid={`csn-suggested-task-${t.id}`} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{t.title}</span>
+            {t.kind === "email_draft" ? (
+              <a href={t.mailto} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground">
+                <MailPlus className="h-3 w-3" /> Abrir rascunho
+              </a>
+            ) : null}
+            <button type="button" disabled={busyId === t.id} onClick={() => accept(t.id)}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Check className="h-3 w-3" /> Aceitar
+            </button>
+            <button type="button" disabled={busyId === t.id} onClick={() => dismiss(t.id)}
+              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
+              <Trash2 className="h-3 w-3" /> Dispensar
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -443,6 +513,26 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               </button>
               {expanded === m.id ? (
                 <div className="mt-3 border-t border-border pt-3">
+                  {m.correio_semanal_diff ? (
+                    <div className="mb-2 rounded-lg border border-amber-200 bg-[var(--pastel-amber-bg)] p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-amber-text)]">
+                        <FileDiff className="h-3.5 w-3.5" /> Alterações desde o Correio Semanal Nº{m.correio_semanal_diff.prev_csn_number}
+                      </p>
+                      {m.correio_semanal_diff.has_changes ? (
+                        <div className="space-y-1 text-[11px] text-foreground/80">
+                          {m.correio_semanal_diff.added_sections?.length ? <p>🆕 Novos assuntos: {m.correio_semanal_diff.added_sections.join(", ")}</p> : null}
+                          {m.correio_semanal_diff.removed_sections?.length ? <p>❌ Assuntos que saíram: {m.correio_semanal_diff.removed_sections.join(", ")}</p> : null}
+                          {m.correio_semanal_diff.added_deadlines?.length ? <p>📅 Novos prazos: {m.correio_semanal_diff.added_deadlines.join("; ")}</p> : null}
+                          {m.correio_semanal_diff.removed_deadlines?.length ? <p>✅ Prazos que já saíram da lista: {m.correio_semanal_diff.removed_deadlines.join("; ")}</p> : null}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-foreground/80">Sem alterações estruturais desde a edição anterior.</p>
+                      )}
+                    </div>
+                  ) : null}
+                  {m.correio_semanal_csn_number ? (
+                    <CorreioSemanalTasksPanel csnNumber={m.correio_semanal_csn_number} />
+                  ) : null}
                   {m.correio_semanal_summary ? (
                     <div className="mb-2 rounded-lg border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
                       <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-blue-text)]">
