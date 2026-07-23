@@ -2,6 +2,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import BrandMark from "@/components/BrandMark";
 import {
+  Bell,
+  BellOff,
   Check,
   Download,
   Info,
@@ -33,6 +35,7 @@ import { getDeviceToken } from "@/lib/deviceAuth";
 import { WALLPAPERS, lockScreen } from "@/lib/osShell";
 import { haptics } from "@/lib/haptics";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const SESSION_START = Date.now();
 
@@ -61,9 +64,10 @@ function AboutRow({ label, value }) {
 export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
   const { status, online } = useSystemStatus();
   const [aboutOpen, setAboutOpen] = useState(false);
-  const { showInstallOption, install } = usePwaInstall();
+  const { showInstallOption, install, isStandalone, isIos } = usePwaInstall();
   const [iosStepsOpen, setIosStepsOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const push = usePushNotifications();
 
   const handleInstall = async () => {
     if (installing) return;
@@ -80,6 +84,29 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
       }
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleTogglePush = async () => {
+    if (push.busy) return;
+    haptics.tap();
+    if (push.subscribed) {
+      await push.unsubscribe();
+      toast.info("Notificações desativadas neste dispositivo.");
+      return;
+    }
+    if (isIos && !isStandalone) {
+      toast.info("No iPhone/iPad, instala primeiro o BRICO OS no ecrã principal — as notificações só funcionam depois de instalada.");
+      return;
+    }
+    const result = await push.subscribe();
+    if (result.ok) {
+      toast.success("Notificações ativadas — vais receber um aviso quando chegar um email novo.");
+      push.sendTest();
+    } else if (result.reason === "denied") {
+      toast.error("Permissão de notificações recusada. Ativa-a nas definições do browser/telemóvel para este site.");
+    } else {
+      toast.error("Não foi possível ativar as notificações. Tenta novamente.");
     }
   };
 
@@ -125,6 +152,20 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
               onClick={handleInstall}
             >
               <Download className="mr-2 h-4 w-4" /> Instalar aplicação
+            </DropdownMenuItem>
+          ) : null}
+          {push.supported ? (
+            <DropdownMenuItem
+              data-testid="system-menu-push"
+              disabled={push.busy || push.checking}
+              onClick={handleTogglePush}
+            >
+              {push.subscribed ? (
+                <BellOff className="mr-2 h-4 w-4" />
+              ) : (
+                <Bell className="mr-2 h-4 w-4" />
+              )}
+              {push.subscribed ? "Desativar notificações" : "Ativar notificações"}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSub>

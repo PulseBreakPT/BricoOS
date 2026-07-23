@@ -20,8 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY deploy/backend/requirements.production.txt /app/requirements.txt
+# SETUPTOOLS_USE_DISTUTILS=stdlib: o http-ece (dependência do pywebpush, para
+# as notificações push) ainda usa um setup.py com a opção "install_layout" do
+# distutils antigo, que o setuptools mais recente já não reconhece
+# (AttributeError: install_layout) — confirmado a reproduzir e a corrigir
+# com esta variável, que devolve o distutils "clássico" só para o build.
 RUN pip install --upgrade pip setuptools wheel \
-    && pip install -r /app/requirements.txt
+    && SETUPTOOLS_USE_DISTUTILS=stdlib pip install -r /app/requirements.txt
 
 # Integração de IA (opcional): vem do index próprio do Emergent. Se o index
 # estiver indisponível o build NÃO falha — a app arranca na mesma e apenas as

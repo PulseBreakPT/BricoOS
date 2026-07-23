@@ -34,3 +34,7 @@ python-multipart>=0.0.9
 # Leitura das folhas Excel dentro do Anexos_Edição.zip do Correio Semanal
 # (anexos_edicao.py) — só a biblioteca de leitura, nunca pandas/numpy.
 openpyxl>=3.1
+
+# Notificações push (push_notifications.py) — Web Push standard (VAPID),
+# sem depender de nenhum serviço de terceiros (Firebase, etc.).
+pywebpush>=2.0
