@@ -739,6 +739,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     const factor = 10 ** digits;
     return Math.round((value + Number.EPSILON) * factor) / factor;
   };
+  // Preço "redondo" ao cliente: sobe sempre para um valor comercial (nunca
+  // desce, para a margem nunca ficar abaixo da configurada), com o múltiplo
+  // a crescer com o valor do artigo. Espelha backend/quote_pdf.py
+  // (PRICE_ROUND_TIERS): <100€ → euro inteiro · 100–500€ → 5€ · 500–5000€
+  // → 5€ · 5000–20000€ → 10€ · ≥20000€ → 50€.
+  const PRICE_ROUND_TIERS = [[100, 1], [500, 5], [5000, 5], [20000, 10]];
+  const PRICE_ROUND_STEP_ABOVE = 50;
+  const roundUpToStep = (value, step) => (value > 0 && step > 0 ? Math.ceil(value / step) * step : value);
+  const roundCommercial = (value) => {
+    const tier = PRICE_ROUND_TIERS.find(([ceiling]) => value < ceiling);
+    return roundUpToStep(value, tier ? tier[1] : PRICE_ROUND_STEP_ABOVE);
+  };
   const priceCoefficient = (marginPct) => {
     const denom = 1 / (1 + IVA_RATE) - (parseFloat(marginPct) || 0) / 100;
     return denom > 0 ? 1 / denom : null;
@@ -746,7 +758,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const suggestClientPrice = (cost, marginPct) => {
     const coef = priceCoefficient(marginPct);
     if (!cost || cost <= 0 || coef == null) return 0;
-    return roundHalfUp(cost * coef, 2);
+    return roundCommercial(cost * coef);
   };
   const applyItemMargin = (n, pct) => {
     setSq((q) => ({

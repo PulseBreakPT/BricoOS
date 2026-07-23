@@ -11,7 +11,7 @@ import base64
 import io
 import re
 import unicodedata
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 import fitz  # PyMuPDF
 from reportlab.lib import colors
@@ -119,6 +119,45 @@ def _round_half_up(value, ndigits):
     return float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP))
 
 
+# Preço "redondo" ao cliente: em vez de um valor quebrado ao cêntimo
+# (703,28 €), o preço de venda sobe sempre para um valor comercial — nunca
+# desce, para a margem nunca ficar abaixo da configurada. O múltiplo usado
+# cresce com o valor do artigo, para o arredondamento nunca ficar "grosseiro"
+# num artigo barato nem "insignificante" num artigo caro:
+#   < 100 €        → ao euro inteiro
+#   100–500 €      → múltiplos de 5 €
+#   500–5 000 €    → múltiplos de 5 €
+#   5 000–20 000 € → múltiplos de 10 €
+#   ≥ 20 000 €     → múltiplos de 50 €
+# (confirmado com o utilizador: 703,28→705,00 · 697,40→700,00 ·
+# 1014,66→1015,00 · 2493,12→2495,00 · 4981,90→4985,00 · 10047,81→10050,00 ·
+# 24996,15→25000,00)
+PRICE_ROUND_TIERS = [(100, 1), (500, 5), (5000, 5), (20000, 10)]
+PRICE_ROUND_STEP_ABOVE = 50
+
+
+def _price_round_step(value):
+    for ceiling, step in PRICE_ROUND_TIERS:
+        if value < ceiling:
+            return step
+    return PRICE_ROUND_STEP_ABOVE
+
+
+def _round_up_to_step(value, step):
+    if not value or value <= 0 or step <= 0:
+        return value
+    step_d = Decimal(str(step))
+    units = (Decimal(str(value)) / step_d).to_integral_value(rounding=ROUND_CEILING)
+    return float(units * step_d)
+
+
+def round_commercial(value):
+    """Preço redondo ao cliente, escolhendo automaticamente o múltiplo
+    conforme o valor (ver PRICE_ROUND_TIERS) — usado tanto no preço de cada
+    artigo como, opcionalmente, num total."""
+    return _round_up_to_step(value, _price_round_step(value))
+
+
 # Limite teórico da margem para este IVA: quando margem/100 se aproxima de
 # 1/(1+IVA) o coeficiente diverge para infinito (preço de venda infinito).
 # Nunca se deve pedir margens tão altas na loja; usa-se uma margem folgada
@@ -159,14 +198,15 @@ def coefficient_for_margin(margin_pct):
 
 
 def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT):
-    """Preço de venda ao cliente, exatamente como o software oficial da loja:
-    PV_com_IVA = Custo / (1/(1+IVA) - margem), arredondado ao cêntimo com
-    arredondamento comercial (nunca aproximações nem tabelas de coeficientes
-    — a fórmula reproduz os valores oficiais ao cêntimo)."""
+    """Preço de venda ao cliente: PV_com_IVA = Custo / (1/(1+IVA) - margem),
+    depois arredondado para cima a um valor comercial (ver
+    round_commercial) — nunca um valor quebrado ao cêntimo (ex.:
+    703,28 € → 705,00 €). Arredondar para cima nunca deixa a margem final
+    abaixo da configurada (só pode ficar igual ou ligeiramente acima)."""
     if not supplier_unit_price or supplier_unit_price <= 0:
         return 0.0
     exact = supplier_unit_price * price_coefficient(margin_pct)
-    return _round_half_up(exact, 2)
+    return round_commercial(exact)
 
 
 def _header_field(text, pattern):
