@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  Bell, Download, Lock, Monitor, RotateCw, Share, Smartphone, SquarePlus, Tablet,
+  Bell, Download, Lock, Monitor, Pencil, RotateCw, Share, Smartphone, SquarePlus,
+  Tablet, Trash2, UserPlus, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -245,6 +246,119 @@ function ChangePinSection() {
   );
 }
 
+// Colaboradores para atribuição de tarefas (Tasks.jsx) — geridos aqui em
+// vez de numa página própria, para não acrescentar mais uma entrada ao
+// menu por uma lista pequena de manutenção pouco frequente. Apagar um
+// colaborador não desatribui as tarefas já criadas (ver server.py:
+// delete_collaborator) — ficam com um assignee_id "órfão", mostrado como
+// "Colaborador removido" onde for preciso resolver o nome.
+function CollaboratorsSection() {
+  const [collaborators, setCollaborators] = useState(null);
+  const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  const load = () => {
+    api.get("/collaborators")
+      .then(({ data }) => setCollaborators(data))
+      .catch(() => setCollaborators([]));
+  };
+  useEffect(load, []);
+
+  const startEdit = (c) => { setEditingId(c.id); setName(c.name); };
+  const cancelEdit = () => { setEditingId(null); setName(""); };
+
+  const save = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      if (editingId) await api.put(`/collaborators/${editingId}`, { name: trimmed });
+      else await api.post("/collaborators", { name: trimmed });
+      toast.success(editingId ? "Colaborador atualizado" : "Colaborador adicionado");
+      setName(""); setEditingId(null);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Não foi possível guardar"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (c) => {
+    if (!window.confirm(`Remover "${c.name}"? As tarefas já atribuídas mantêm-se, só deixam de mostrar o nome.`)) return;
+    setBusyId(c.id);
+    try {
+      await api.delete(`/collaborators/${c.id}`);
+      toast.success("Colaborador removido");
+      setCollaborators((list) => list.filter((x) => x.id !== c.id));
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Não foi possível remover"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <SettingsSection title="Colaboradores" description="Quem pode ser atribuído a uma tarefa, no módulo de Tarefas.">
+      <div className="flex items-center gap-2 border-b border-border/70 p-4">
+        <Input
+          data-testid="collaborator-name-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={editingId ? "Renomear colaborador" : "Nome do novo colaborador"}
+          className="h-9 flex-1"
+          onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+        />
+        {editingId ? (
+          <button type="button" onClick={cancelEdit} className="rounded-xl border border-border bg-muted px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent">
+            Cancelar
+          </button>
+        ) : null}
+        <button
+          type="button"
+          data-testid="collaborator-save-btn"
+          onClick={save}
+          disabled={saving || !name.trim()}
+          className="flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          <UserPlus className="h-3.5 w-3.5" /> {editingId ? "Guardar" : "Adicionar"}
+        </button>
+      </div>
+      {collaborators === null ? (
+        <div className="p-4 text-sm text-muted-foreground">A carregar…</div>
+      ) : collaborators.length === 0 ? (
+        <div className="p-4 text-sm text-muted-foreground">Ainda sem colaboradores.</div>
+      ) : (
+        collaborators.map((c) => (
+          <SettingsRow
+            key={c.id}
+            icon={Users}
+            label={c.name}
+            description={`${c.tasks_count || 0} tarefa${c.tasks_count === 1 ? "" : "s"} atribuída${c.tasks_count === 1 ? "" : "s"}`}
+            control={
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => startEdit(c)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === c.id}
+                  onClick={() => remove(c)}
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-600 disabled:opacity-40"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            }
+          />
+        ))
+      )}
+    </SettingsSection>
+  );
+}
+
 // Lista dos dispositivos já verificados por PIN (db.auth_devices), com
 // opção de revogar o acesso a qualquer um deles menos o atual.
 const DEVICE_TYPE_ICON = {
@@ -462,6 +576,8 @@ export default function Settings() {
           { key: "document_read_failure", label: "Falha na leitura de um documento", type: "switch" },
           { key: "processing_error", label: "Erro de processamento", type: "switch" },
           { key: "price_change", label: "Alteração importante de preços", type: "switch" },
+          { key: "task_reminder", label: "Lembrete de tarefa", type: "switch" },
+          { key: "tasks_overdue_digest", label: "Aviso diário de tarefas atrasadas", type: "switch" },
         ]}
       />
 
@@ -557,6 +673,8 @@ export default function Settings() {
           },
         ]}
       />
+
+      <CollaboratorsSection />
 
       <SettingsFieldsCard
         group="email_prefs"

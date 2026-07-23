@@ -16,6 +16,31 @@ export const TASK_REPEATS = {
   daily: "Diariamente",
   weekly: "Semanalmente",
   monthly: "Mensalmente",
+  yearly: "Anualmente",
+};
+
+// Ciclo de vida (server.py: TASK_STATUSES) — dimensão separada da
+// prioridade. `done` continua sincronizado pelo servidor por
+// compatibilidade; getTaskStatus() é a forma correta de ler o estado
+// visível (cobre também tarefas antigas sem campo `status`).
+export const TASK_STATUS_LABELS = {
+  todo: "Por fazer", in_progress: "Em execução", done: "Concluída", archived: "Arquivada",
+};
+export const TASK_STATUS_DOT = {
+  todo: "bg-slate-400", in_progress: "bg-blue-500", done: "bg-emerald-500", archived: "bg-violet-500",
+};
+export function getTaskStatus(task) {
+  return task.status || (task.done ? "done" : "todo");
+}
+
+// Espelha server.py: _TASK_STATUS_TRANSITIONS — inclui sempre o próprio
+// estado atual (primeira opção), para o select nunca ficar vazio; arquivada
+// é terminal (sem reabrir por aqui).
+export const TASK_STATUS_TRANSITIONS = {
+  todo: ["todo", "in_progress", "done"],
+  in_progress: ["in_progress", "todo", "done"],
+  done: ["done", "todo", "archived"],
+  archived: ["archived"],
 };
 
 function toLocalDate(dueDate) {
@@ -77,6 +102,28 @@ export function smartTaskSort(a, b) {
   const aRank = TASK_PRIORITY_ORDER.indexOf(a.priority || "nenhuma");
   const bRank = TASK_PRIORITY_ORDER.indexOf(b.priority || "nenhuma");
   return aRank - bRank;
+}
+
+// Ordenação fixa pedida para a lista de tarefas: fixadas, depois em
+// execução (se alguém já começou, está a ser tratada — antes até de uma
+// atrasada), depois atrasadas, hoje, e por prioridade — smartTaskSort
+// continua a desempatar dentro do mesmo nível.
+export function taskListRank(task) {
+  if (task.pinned) return 0;
+  if (getTaskStatus(task) === "in_progress") return 1;
+  if (isOverdue(task.due_date, task.done)) return 2;
+  if (isToday(task.due_date)) return 3;
+  if (task.priority === "alta") return 4;
+  if (task.priority === "media") return 5;
+  if (task.priority === "baixa") return 6;
+  return 7;
+}
+
+export function taskListSort(a, b) {
+  const ra = taskListRank(a);
+  const rb = taskListRank(b);
+  if (ra !== rb) return ra - rb;
+  return smartTaskSort(a, b);
 }
 
 export function subtaskProgress(task) {

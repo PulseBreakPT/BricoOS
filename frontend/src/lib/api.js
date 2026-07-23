@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clearDeviceToken, getDeviceToken } from "@/lib/deviceAuth";
+import { getActiveCollaboratorName } from "@/lib/activeCollaborator";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -9,9 +10,14 @@ const api = axios.create({ baseURL: API, timeout: 20000 });
 // Proteção por PIN: todos os pedidos levam o token do dispositivo; um 401
 // significa que o servidor deixou de reconhecer este dispositivo — o PinGate
 // ouve o evento e volta a mostrar o ecrã do PIN, seja qual for a página.
+// X-Actor-Name (opcional): "quem está a usar este aparelho" (ver
+// activeCollaborator.js) — o backend só o usa para atribuir autor ao
+// histórico das tarefas, nunca para autenticação.
 api.interceptors.request.use((config) => {
   const token = getDeviceToken();
   if (token) config.headers["X-Device-Token"] = token;
+  const actorName = getActiveCollaboratorName();
+  if (actorName) config.headers["X-Actor-Name"] = actorName;
   return config;
 });
 
