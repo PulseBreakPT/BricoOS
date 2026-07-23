@@ -21,6 +21,7 @@ import {
   Palette,
   Plus,
   Search,
+  Settings as SettingsIcon,
   Share,
   SquarePlus,
   Trash2,
@@ -131,6 +132,13 @@ const ROUTE_APPS = [
     icon: BookOpenCheck,
     testid: "nav-catalogo",
   },
+  {
+    path: "/definicoes",
+    title: "Definições",
+    shortTitle: "Definições",
+    icon: SettingsIcon,
+    testid: "nav-definicoes",
+  },
 ];
 
 const NAV_GROUPS = [
@@ -139,6 +147,7 @@ const NAV_GROUPS = [
     label: "Organização",
     items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[6], ROUTE_APPS[5]],
   },
+  { label: "Sistema", items: [ROUTE_APPS[7]] },
 ];
 
 function getRouteApp(pathname) {
