@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { FileText, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, FileText, FileWarning, Send, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -104,6 +104,66 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               <FileText className="h-5 w-5 shrink-0" /> PDF não disponível para pré-visualização.
             </div>
           )}
+
+          {pending.source_file_id ? (
+            <a
+              data-testid="confirm-send-original-pdf"
+              href={withDeviceToken(`${API}/notes/${note.id}/files/${pending.source_file_id}`)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+            >
+              <Eye className="h-3.5 w-3.5" /> Comparar com o PDF original do fornecedor
+            </a>
+          ) : null}
+
+          {pending.quality_report && pending.quality_report.status !== "ok" ? (
+            <div
+              data-testid="confirm-send-quality-report"
+              className={`mt-3 rounded-xl border p-3 ${
+                pending.quality_report.status === "error"
+                  ? "border-red-200 bg-[var(--pastel-red-bg)]"
+                  : "border-amber-200 bg-[var(--pastel-amber-bg)]"
+              }`}
+            >
+              <p className={`flex items-center gap-1.5 text-xs font-extrabold ${
+                pending.quality_report.status === "error" ? "text-red-700" : "text-amber-700"
+              }`}>
+                <AlertTriangle className="h-4 w-4" /> Verificar antes de enviar
+              </p>
+              <ul className="mt-1.5 space-y-1 text-[11px] text-foreground/80">
+                {pending.quality_report.checks.filter((c) => c.status !== "ok").map((c) => (
+                  <li key={c.id} className="flex items-start gap-1.5">
+                    <span className="mt-0.5">{c.status === "error" ? "✕" : "!"}</span>
+                    <span>{c.detail || c.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : pending.quality_report ? (
+            <p data-testid="confirm-send-quality-ok" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Leitura do PDF do fornecedor sem problemas.
+            </p>
+          ) : null}
+
+          {pending.diff_since_previous?.has_changes ? (
+            <div data-testid="confirm-send-diff" className="mt-3 rounded-xl border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
+              <p className="flex items-center gap-1.5 text-xs font-extrabold text-[color:var(--pastel-blue-text)]">
+                <FileWarning className="h-4 w-4" /> Orçamento alterado desde a última importação
+              </p>
+              <ul className="mt-1.5 space-y-1 text-[11px] text-foreground/80">
+                {pending.diff_since_previous.added.map((it) => (
+                  <li key={`add-${it.n}`}>+ Nº {it.n} adicionado — {it.description}</li>
+                ))}
+                {pending.diff_since_previous.removed.map((it) => (
+                  <li key={`rem-${it.n}`}>− Nº {it.n} removido — {it.description}</li>
+                ))}
+                {pending.diff_since_previous.changed.map((it) => (
+                  <li key={`chg-${it.n}`}>~ Nº {it.n} alterado — {it.description}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="mt-4 space-y-1.5">
             <Label>Para</Label>

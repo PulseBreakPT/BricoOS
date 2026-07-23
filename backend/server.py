@@ -54,6 +54,7 @@ try:
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
+    from quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
     import correio_semanal
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
@@ -76,6 +77,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
+    from .quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
     from . import correio_semanal
 
 from google_auth_oauthlib.flow import Flow
@@ -2529,11 +2531,22 @@ def _client_pdf_filename(quote_number):
     return f"Orcamento_{ref}_cliente.pdf"
 
 
+SUPPLIER_QUOTE_HISTORY_LIMIT = 5
+
+
 async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
     """Analisa o PDF do fornecedor, sugere preços de venda e guarda tudo no
     pedido. Usado pelo upload manual e pela receção automática por email.
-    Levanta ValueError se o PDF não for reconhecido."""
+    Levanta ValueError se o PDF não for reconhecido.
+
+    Centro de Validação Automática: antes de guardar, confere a qualidade da
+    leitura (imagens, preços, descrições, totais — ver quote_validation) e,
+    se já havia uma versão anterior do orçamento para este pedido, compara
+    artigo a artigo (adicionados, removidos, alterados) e guarda a versão
+    anterior no histórico. Nada disto bloqueia a importação — só fica
+    registado para a pessoa decidir com informação completa."""
     parsed = parse_supplier_pdf(data)
+    quality_report = build_quality_report(parsed)
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
@@ -2547,15 +2560,36 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
         item["coefficient"] = coefficient_for_margin(item["margin_pct"])
         item["include"] = True
+
+    prev = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_quote": 1, "supplier_quote_history": 1})
+    prev_quote = (prev or {}).get("supplier_quote")
+    quote_diff = None
+    extra_set = {}
+    if prev_quote:
+        quote_diff = diff_quote_versions(prev_quote.get("items"), parsed["items"])
+        history = list((prev or {}).get("supplier_quote_history") or [])
+        history.append({k: prev_quote.get(k) for k in (
+            "quote_number", "date", "obra", "total", "source_file_id", "imported_at")})
+        extra_set["supplier_quote_history"] = history[-SUPPLIER_QUOTE_HISTORY_LIMIT:]
+
     supplier_quote = {**parsed,
                       "margin_rules": {"pvc": margin_for_material("pvc"),
                                        "aluminio": margin_for_material("aluminio")},
-                      "source_file_id": file_id, "imported_at": now_iso()}
+                      "source_file_id": file_id, "imported_at": now_iso(),
+                      "quality_report": quality_report, "diff_since_previous": quote_diff}
     await db.notes.update_one({"id": note_id}, {"$set": {
-        "supplier_quote": supplier_quote, "updated_at": now_iso()}})
+        "supplier_quote": supplier_quote, "updated_at": now_iso(), **extra_set}})
+
+    quality_note = ""
+    if quality_report["status"] != "ok":
+        problems = [c["label"] for c in quality_report["checks"] if c["status"] != "ok"]
+        quality_note = f" — ⚠ verificar: {'; '.join(problems)}"
     await log_activity(note_id, "updated",
                        f"Orçamento do fornecedor importado ({supplier_quote['quote_number']}, "
-                       f"{len(parsed['items'])} linha(s)){source_label}", {"file_id": file_id})
+                       f"{len(parsed['items'])} linha(s)){source_label}{quality_note}", {"file_id": file_id})
+    if quote_diff and quote_diff["has_changes"]:
+        await log_activity(note_id, "updated", diff_summary_text(quote_diff), {"diff": quote_diff})
+
     # O total do fornecedor entra no fluxo normal de orçamentos recebidos
     # (muda o estado e alimenta as estatísticas de resposta).
     if parsed.get("total"):
@@ -2617,7 +2651,13 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
             "obra": obra, "obra_candidates": candidates,
             "to": (n.get("email") or "").strip(), "pdf_file_id": file_id,
             "pdf_filename": filename, "total": round(total, 2),
-            "eff_margin_pct": eff_margin, "created_at": now_iso()},
+            "eff_margin_pct": eff_margin, "created_at": now_iso(),
+            # Levados para o ecrã de aprovação: a pessoa vê exatamente o que
+            # o Centro de Validação encontrou (e o que mudou desde a última
+            # importação) antes de confirmar o envio — ver ConfirmSendDialog.
+            "source_file_id": supplier_quote.get("source_file_id") or "",
+            "quality_report": supplier_quote.get("quality_report"),
+            "diff_since_previous": supplier_quote.get("diff_since_previous")},
         "updated_at": now_iso()}})
     return pdf_bytes, filename, file_id
 
@@ -4403,10 +4443,27 @@ async def build_notifications():
         if n.get("priority") == "urgente":
             out.append({"id": f"{n['id']}-urg", "note_id": n["id"], "kind": "urgent", "severity": "high",
                         "title": f"{cust} · URGENTE", "message": f"Pedido urgente. {NEXT_ACTION.get(status)}", "days": days})
-        if n.get("pending_client_send"):
+        pending_send = n.get("pending_client_send")
+        if pending_send:
             out.append({"id": f"{n['id']}-send", "note_id": n["id"], "kind": "confirm_send", "severity": "high",
                         "title": f"{cust} · orçamento pronto a enviar",
                         "message": "Email e PDF preparados automaticamente — reveja e confirme o envio.", "days": days})
+            # Centro de Validação Automática: mesmo com o PDF já gerado, se a
+            # leitura do PDF do fornecedor ficou incompleta ou o orçamento
+            # mudou desde a última versão, isso tem de aparecer aqui — antes
+            # de alguém carregar em "enviar" às cegas.
+            qr = pending_send.get("quality_report") or {}
+            if qr.get("status") and qr["status"] != "ok":
+                problems = "; ".join(c["label"] for c in qr.get("checks", []) if c["status"] != "ok")
+                out.append({"id": f"{n['id']}-quality", "note_id": n["id"], "kind": "quote_quality_issue",
+                            "severity": "high" if qr["status"] == "error" else "medium",
+                            "title": f"{cust} · confirmar orçamento antes de enviar",
+                            "message": f"Problemas na leitura do PDF do fornecedor: {problems}.", "days": days})
+            diff = pending_send.get("diff_since_previous")
+            if diff and diff.get("has_changes"):
+                out.append({"id": f"{n['id']}-quotediff", "note_id": n["id"], "kind": "quote_changed",
+                            "severity": "medium", "title": f"{cust} · orçamento do fornecedor mudou",
+                            "message": diff_summary_text(diff), "days": days})
         reply = unseen_client_replies.get(n["id"])
         if reply:
             out.append({"id": f"{n['id']}-reply", "note_id": n["id"], "kind": "client_reply", "severity": "high",

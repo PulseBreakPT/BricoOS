@@ -53,6 +53,10 @@ X_QTY_MAX = 380
 X_UNIT_MAX = 460
 X_TOTAL_MAX = 545
 
+# Escala do rasterizado da célula "GRÁFICO" (4x ~= 288 dpi): nítido mesmo
+# impresso, mantendo o ficheiro leve.
+GRAPHIC_RENDER_MATRIX = fitz.Matrix(4, 4)
+
 OBSERVACOES = [
     "ATENÇÃO: Todas as medidas são LARGURA x ALTURA.",
     "ATENÇÃO: Todos os caixilhos estão vistos pelo INTERIOR.",
@@ -249,18 +253,41 @@ def parse_supplier_pdf(pdf_bytes):
             }
             items.append((page, item))
 
-        for info in page.get_image_info(xrefs=True):
-            bbox = info["bbox"]
-            if not (top < bbox[1] < bottom and bbox[0] < X_DESC_MIN):
+        # O desenho de cada caixilho (vidro, aros, travessas, seta de abertura)
+        # não é uma única imagem: é uma foto de fundo (o "vidro") com o resto
+        # traçado por cima em vetor. Extrair só a imagem embutida perdia todo
+        # esse traçado e deixava um retângulo liso. Em vez disso, faz-se o
+        # rasterizado da própria célula "GRÁFICO" da linha (imagem + vetores,
+        # tal como o PDF os desenha) a alta resolução — fica pixel a pixel
+        # igual ao que o fornecedor enviou.
+        #
+        # Para recortar a célula com exatidão (sem cortar o desenho nem
+        # arrastar para dentro o traço da grelha da tabela), usa-se as
+        # próprias linhas horizontais da grelha como fronteiras — não a
+        # posição aproximada do texto. Só quando a grelha não bate certo com
+        # o nº de linhas (formato inesperado) é que se recua para a
+        # aproximação por texto.
+        page_items = [item for pg, item in items if pg is page]
+        row_lines = sorted({
+            round((seg[1].y + seg[2].y) / 2, 1)
+            for d in page.get_drawings() for seg in d["items"]
+            if seg[0] == "l" and abs(seg[1].y - seg[2].y) < 0.5
+            and min(seg[1].x, seg[2].x) < X_NUM_MAX + 5
+            and max(seg[1].x, seg[2].x) > X_TOTAL_MAX - 20
+            and top - 5 <= seg[1].y <= bottom + 5
+        })
+        use_grid = len(row_lines) == len(page_items) + 1
+        for idx, item in enumerate(page_items):
+            y0, y1 = item["y_range"]
+            if use_grid:
+                clip_top, clip_bottom = row_lines[idx] + 1, row_lines[idx + 1] - 1
+            else:
+                clip_top, clip_bottom = y0 + 1, y1 - 1
+            clip = fitz.Rect(X_NUM_MAX, clip_top, X_DESC_MIN, clip_bottom)
+            if clip.width <= 2 or clip.height <= 2:
                 continue
-            center_y = (bbox[1] + bbox[3]) / 2
-            for pg, item in items:
-                if pg is page and item["y_range"][0] - 5 <= center_y <= item["y_range"][1]:
-                    pix = fitz.Pixmap(doc, info["xref"])
-                    if pix.n > 4:
-                        pix = fitz.Pixmap(fitz.csRGB, pix)
-                    item["image_b64"] = base64.b64encode(pix.tobytes("png")).decode()
-                    break
+            pix = page.get_pixmap(clip=clip, matrix=GRAPHIC_RENDER_MATRIX)
+            item["image_b64"] = base64.b64encode(pix.tobytes("png")).decode()
 
     parsed_items = []
     for _, item in items:
