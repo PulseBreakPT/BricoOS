@@ -12,6 +12,7 @@ import TaskGroups from "@/pages/TaskGroups";
 import Catalog from "@/pages/Catalog";
 import Emails from "@/pages/Emails";
 import Settings from "@/pages/Settings";
+import Notifications from "@/pages/Notifications";
 
 // A antiga página "Hoje" fundiu-se com "Pedidos" em "/". Links antigos para
 // /clientes (ex.: ?open=<id> em notificações guardadas) continuam a funcionar.
@@ -39,6 +40,7 @@ function App() {
               <Route path="/grupos-tarefas" element={<TaskGroups />} />
               <Route path="/catalogo-tecnico" element={<Catalog />} />
               <Route path="/definicoes" element={<Settings />} />
+              <Route path="/notificacoes" element={<Notifications />} />
             </Route>
           </Routes>
         </BrowserRouter>

@@ -1,16 +1,18 @@
-"""Notificações push (Web Push) — avisa o telemóvel/computador quando chega
-um email novo, mesmo com a app fechada ou o ecrã bloqueado. Usa o protocolo
-Web Push standard (RFC 8030 + VAPID), suportado nativamente pelo browser,
-sem depender de nenhum serviço de terceiros (Firebase, etc.) — o
-telemóvel só precisa de ter a app instalada (PWA, ver manifest.json) e ter
-aceitado a permissão de notificações.
+"""Notificações push (Web Push) — primitivas de baixo nível para avisar o
+telemóvel/computador, mesmo com a app fechada ou o ecrã bloqueado. Usa o
+protocolo Web Push standard (RFC 8030 + VAPID), suportado nativamente pelo
+browser, sem depender de nenhum serviço de terceiros (Firebase, etc.).
+
+Este módulo só sabe enviar para UM dispositivo (send_to_device) e gerir as
+chaves VAPID — a decisão de A QUEM enviar (preferências por categoria,
+dispositivo elegível, registo persistente, repetição em falhas) está em
+notifications.py (create_notification), o único ponto de entrada usado
+pelo resto da aplicação.
 
 Cada dispositivo já verificado por PIN (db.auth_devices) pode subscrever-se
-a partir do menu de sistema; a subscrição fica gravada no próprio registo
-do dispositivo (campo push_subscription). Quando chega um email novo
-(poll_supplier_replies em server.py), envia-se a notificação a todos os
-dispositivos subscritos; uma subscrição que o browser já invalidou
-(410/404) é removida automaticamente, sem intervenção manual."""
+a partir das definições; a subscrição fica gravada no próprio registo do
+dispositivo (campo push_subscription). Uma subscrição que o browser já
+invalidou (410/404) é removida automaticamente, sem intervenção manual."""
 
 import asyncio
 import base64
@@ -19,11 +21,6 @@ import logging
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from pywebpush import webpush, WebPushException
-
-try:
-    import app_settings
-except ImportError:  # Permite também executar como módulo: python -m backend.server
-    from . import app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -102,37 +99,3 @@ async def send_to_device(db, device, payload, vapid_keys=None):
     except Exception as e:
         logger.warning(f"Falha a enviar notificação push (device={device.get('id')}): {e}")
         return False
-
-
-async def notify_all(db, payload):
-    """Envia a todos os dispositivos com subscrição ativa. Nunca levanta —
-    a falha num dispositivo não pode impedir os outros de receber."""
-    devices = await db.auth_devices.find(
-        {"push_subscription": {"$exists": True}}, {"_id": 0}).to_list(200)
-    if not devices:
-        return 0
-    vapid_keys = await get_vapid_keys(db)
-    sent = 0
-    for device in devices:
-        if await send_to_device(db, device, payload, vapid_keys):
-            sent += 1
-    return sent
-
-
-async def notify_category(db, category, title, body, url="/", tag=None):
-    """Envia só se a categoria estiver ativa nas preferências de
-    notificação (definições → Notificações) — cada uma das 11 categorias
-    (fornecedor, cliente, Correio Semanal, pedido parado, incidência
-    crítica, ...) pode ser ligada/desligada em separado."""
-    prefs = await app_settings.get_group(db, "notification_prefs")
-    if not prefs.get(category, True):
-        return 0
-    return await notify_all(db, {"title": title, "body": body, "url": url, "tag": tag or category})
-
-
-async def notify_new_email(db, subject, from_label, category="unmatched"):
-    """Chamado a cada email novo guardado em received_emails (ver
-    poll_supplier_replies). `category` é uma das chaves de
-    notification_prefs — "supplier"/"client"/"correio_semanal"/"unmatched"."""
-    return await notify_category(
-        db, category, "Novo email", f"{from_label}: {subject or '(sem assunto)'}", url="/emails", tag="email")

@@ -21,6 +21,8 @@ SETTINGS_DEFAULTS = {
         "supplier": True, "client": True, "correio_semanal": True, "unmatched": True,
         "waiting_supplier": True, "forgotten": True, "urgent": True, "reminder_overdue": True,
         "quote_quality_issue": True, "quote_changed": True, "anexos_incidencia_critica": True,
+        "client_new_note": True, "task_urgent": True, "deadline_approaching": True,
+        "processing_error": True, "document_read_failure": True, "price_change": True,
     },
     "material_margins": {
         "pvc": 15.0, "aluminio": 18.0, "portada": 18.0, "rede": 18.0, "desconhecido": 20.0,
@@ -32,7 +34,8 @@ SETTINGS_DEFAULTS = {
     "automation_prefs": {
         "imap_poll_minutes": 5, "auto_close_months": 6, "default_sla_days": 2,
         "reminder_interval_days": 3, "category_suggestion_threshold": 2,
-        "supplier_quote_history_limit": 5,
+        "supplier_quote_history_limit": 5, "deadline_warning_days": 1,
+        "price_change_alert_pct": 15, "notification_scan_minutes": 5,
     },
     "security_prefs": {
         "pin_max_attempts": 3, "pin_lock_minutes": 10, "auto_lock_minutes": 0,
@@ -65,6 +68,8 @@ NUMERIC_BOUNDS = {
         "imap_poll_minutes": (0, 1440), "auto_close_months": (1, 60),
         "default_sla_days": (1, 365), "reminder_interval_days": (1, 90),
         "category_suggestion_threshold": (1, 20), "supplier_quote_history_limit": (1, 50),
+        "deadline_warning_days": (1, 30), "price_change_alert_pct": (1, 100),
+        "notification_scan_minutes": (1, 1440),
     },
     "security_prefs": {
         "pin_max_attempts": (1, 20), "pin_lock_minutes": (1, 1440), "auto_lock_minutes": (0, 1440),

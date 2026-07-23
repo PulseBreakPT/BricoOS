@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -66,6 +66,7 @@ try:
     import edition_summary
     import push_notifications
     import app_settings
+    import notifications
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -98,6 +99,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     from . import edition_summary
     from . import push_notifications
     from . import app_settings
+    from . import notifications
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -1960,12 +1962,25 @@ async def accept_new_category(task_id: str, payload: AcceptNewCategoryIn):
 
 
 @api_router.post("/tasks")
+async def _notify_task_urgent(doc):
+    """Tarefa confirmada por uma pessoa (não uma sugestão automática) na
+    prioridade mais alta que existe para tarefas — não há nível "urgente"
+    próprio em TASK_PRIORITIES, "alta" é o topo da escala."""
+    if doc.get("priority") != "alta":
+        return
+    await notifications.create_notification(
+        db, dedup_key=f"task-urgent-{doc['id']}", category="task_urgent",
+        title="Tarefa urgente criada", body=doc.get("title") or "",
+        url="/tarefas", task_id=doc["id"], note_id=doc.get("note_id") or None)
+
+
 async def create_task(payload: TaskIn):
     doc = _with_subtask_ids(payload.model_dump())
     doc.update({"id": str(uuid.uuid4()), "created_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     if doc.get("note_id"):
         await log_activity(doc["note_id"], "task_added", f"Lembrete criado: {doc['title']}")
+    await _notify_task_urgent(doc)
     doc.pop("_id", None)
     return doc
 
@@ -1981,6 +1996,7 @@ async def create_note_task(note_id: str, payload: TaskIn):
     doc.update({"note_id": note_id, "id": str(uuid.uuid4()), "created_at": now_iso()})
     await db.tasks.insert_one(dict(doc))
     await log_activity(note_id, "task_added", f"Lembrete criado: {doc['title']}")
+    await _notify_task_urgent(doc)
     doc.pop("_id", None)
     return doc
 
@@ -2137,6 +2153,7 @@ async def system_health():
             "ultima_verificacao_env": sent_state.get("checked_at") or "",
             "ia_configurada": ai_available(),
         },
+        "background_loops": await _background_loops_status(),
         "now": now_iso(),
     }
 
@@ -2754,15 +2771,19 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
     cust = (n or {}).get("customer_name") or "Pedido"
     try:
         if quality_report["status"] != "ok":
-            await push_notifications.notify_category(
-                db, "quote_quality_issue", f"{cust} · confirmar orçamento",
-                f"Problemas na leitura do PDF do fornecedor{quality_note}.", url=f"/?open={note_id}")
+            await notifications.create_notification(
+                db, dedup_key=f"quote-quality-{file_id}", category="quote_quality_issue",
+                priority="critica" if quality_report["status"] == "error" else "alta",
+                title=f"{cust} · confirmar orçamento",
+                body=f"Problemas na leitura do PDF do fornecedor{quality_note}.",
+                url=f"/?open={note_id}", note_id=note_id)
         if quote_diff and quote_diff["has_changes"]:
-            await push_notifications.notify_category(
-                db, "quote_changed", f"{cust} · orçamento do fornecedor mudou",
-                diff_summary_text(quote_diff), url=f"/?open={note_id}")
+            await notifications.create_notification(
+                db, dedup_key=f"quote-changed-{file_id}", category="quote_changed",
+                title=f"{cust} · orçamento do fornecedor mudou",
+                body=diff_summary_text(quote_diff), url=f"/?open={note_id}", note_id=note_id)
     except Exception as e:
-        logger.warning(f"Notificação push do orçamento falhou (nota {note_id}): {e}")
+        logger.warning(f"Notificação do orçamento falhou (nota {note_id}): {e}")
     if urgency_hits:
         await log_activity(note_id, "updated",
                            f"Possível urgência detetada no texto do orçamento (\"{urgency_hits[0]}\") "
@@ -3442,10 +3463,18 @@ async def _summarize_correio_semanal(subject, pdf_bytes_list):
         return await asyncio.to_thread(correio_semanal.build_digest, pdf_bytes_list, subject)
     except Exception as e:
         logger.error(f"Resumo do Correio Semanal falhou: {e}")
+        content_hash = hashlib.sha256(pdf_bytes_list[0]).hexdigest()[:16] if pdf_bytes_list else "sem-pdf"
+        await notifications.create_notification(
+            db, dedup_key=f"doc-read-fail-csn-summary-{content_hash}", category="document_read_failure",
+            title="Falha na leitura de um documento",
+            body=f"Resumo do Correio Semanal ({subject or 'sem assunto'}) não foi possível gerar.", url="/emails")
         return ""
 
 
 CATEGORY_SUGGESTION_THRESHOLD = 2  # nº de edições distintas com o mesmo padrão antes de sugerir
+DEADLINE_WARNING_DAYS = 1  # avisar X dias antes de um pedido ficar em atraso (definições → Automação)
+PRICE_CHANGE_ALERT_PCT = 15  # variação de preço (%) que gera notificação (definições → Automação)
+NOTIFICATION_SCAN_MINUTES = 5  # cadência do ciclo de alertas de estado (waiting_supplier/forgotten/urgent/...)
 
 
 async def _suggest_new_categories(fingerprints, source, edition_ref):
@@ -3524,6 +3553,10 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
         structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject, rules)
     except Exception as e:
         logger.error(f"Extração estruturada do Correio Semanal falhou: {e}")
+        await notifications.create_notification(
+            db, dedup_key=f"doc-read-fail-csn-extract-{email_id}", category="document_read_failure",
+            title="Falha na leitura de um documento",
+            body=f"Extração estruturada do Correio Semanal ({subject or 'sem assunto'}) falhou.", url="/emails")
         return None
     if not structured or not structured.get("csn_number"):
         return None
@@ -3603,6 +3636,10 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
         processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename, rules)
     except Exception as e:
         logger.error(f"Processamento do Anexos_Edição falhou: {e}")
+        await notifications.create_notification(
+            db, dedup_key=f"doc-read-fail-anexos-{email_id}", category="document_read_failure",
+            title="Falha na leitura de um documento",
+            body=f"Processamento do Anexos_Edição ({zip_filename}) falhou.", url="/emails")
         return None
     if not processed.get("edition_number"):
         processed["edition_number"] = fallback_edition
@@ -3619,6 +3656,19 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
         "id": str(uuid.uuid4()), "email_id": email_id, "edition_number": processed["edition_number"],
         "zip_filename": zip_filename, "processed": processed, "diff_since_previous": diff,
         "created_at": now_iso()})
+
+    if diff and diff.get("price_changes"):
+        big_changes = [c for c in diff["price_changes"]
+                       if c.get("variacao_pct") is not None and abs(c["variacao_pct"]) >= PRICE_CHANGE_ALERT_PCT]
+        if big_changes:
+            top = big_changes[0]
+            extra = f" e mais {len(big_changes) - 1}" if len(big_changes) > 1 else ""
+            await notifications.create_notification(
+                db, dedup_key=f"price-change-{processed['edition_number']}",
+                category="price_change", title="Alteração importante de preços",
+                body=f"{top.get('descricao') or top['key']}: {top['preco_antigo']}€ → {top['preco_novo']}€ "
+                     f"({top['variacao_pct']:+.1f}%){extra}",
+                url="/emails")
 
     created = 0
     base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
@@ -3642,12 +3692,13 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
         created += 1
         if f.get("category") == "incidencia" and f.get("severity") == "critico":
             try:
-                await push_notifications.notify_category(
-                    db, "anexos_incidencia_critica",
-                    f"Incidência crítica — Edição {processed['edition_number']}", filename,
-                    url="/emails")
+                await notifications.create_notification(
+                    db, dedup_key=f"anexos-incidencia-{processed['edition_number']}-{f['path']}",
+                    category="anexos_incidencia_critica",
+                    title=f"Incidência crítica — Edição {processed['edition_number']}",
+                    body=filename, url="/emails")
             except Exception as e:
-                logger.warning(f"Notificação push de incidência crítica falhou: {e}")
+                logger.warning(f"Notificação de incidência crítica falhou: {e}")
 
     created += await _suggest_new_categories(processed.get("unclassified_fingerprints"),
                                               source="anexos_edicao", edition_ref=processed["edition_number"])
@@ -3985,9 +4036,11 @@ async def poll_supplier_replies():
                 push_category = "client"
             else:
                 push_category = "unmatched"
-            await push_notifications.notify_new_email(db, m["subject"], from_label, category=push_category)
+            await notifications.create_notification(
+                db, dedup_key=f"new-email-{email_id}", category=push_category, title="Novo email",
+                body=f"{from_label}: {m['subject'] or '(sem assunto)'}", url="/emails", note_id=note_id or None)
         except Exception as e:
-            logger.warning(f"Notificação push falhou (email {email_id}): {e}")
+            logger.warning(f"Notificação falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
             quem = supplier_name or m.get("from_name") or m["from_email"]
@@ -4028,6 +4081,11 @@ async def poll_supplier_replies():
                                            f"como orçamento do fornecedor: {e}")
                     except Exception as e:
                         logger.error(f"Falha ao processar PDF recebido por email: {e}")
+                        await notifications.create_notification(
+                            db, dedup_key=f"processing-error-{email_id}", category="processing_error",
+                            title="Erro de processamento",
+                            body=f"Falha ao processar um PDF recebido por email ({first['filename']}).",
+                            url=f"/?open={note_id}" if note_id else "/emails", note_id=note_id or None)
             else:
                 # Resposta do cliente: nunca avança o estado sozinho (não há
                 # forma segura de saber se aprovou, recusou ou só perguntou
@@ -4460,6 +4518,11 @@ async def create_note_from_email(email_id: str):
     await log_activity(note["id"], "email_received",
                        f"Pedido criado a partir de um email recebido de {e.get('from_email')}",
                        {"from": e.get("from_email"), "uid": e.get("uid")})
+    cust = note.get("customer_name") or "Cliente"
+    await notifications.create_notification(
+        db, dedup_key=f"client-new-note-{note['id']}", category="client_new_note",
+        title="Novo pedido de cliente", body=f"{cust}: {description}", url=f"/?open={note['id']}",
+        note_id=note["id"])
     return enrich_note(await db.notes.find_one({"id": note["id"]}, {"_id": 0}))
 
 
@@ -4900,6 +4963,11 @@ async def build_notifications():
             out.append({"id": f"{n['id']}-wait", "note_id": n["id"], "kind": "waiting_supplier", "severity": "high",
                         "title": f"{cust} · sem resposta do fornecedor",
                         "message": f"Há {days} dia(s) sem resposta. {NEXT_ACTION.get(status)}", "days": days})
+        elif status in WAITING_SUPPLIER and (sla - days) <= DEADLINE_WARNING_DAYS:
+            out.append({"id": f"{n['id']}-deadline", "note_id": n["id"], "kind": "deadline_approaching",
+                        "severity": "medium", "title": f"{cust} · prazo prestes a terminar",
+                        "message": f"Fica em atraso daqui a {sla - days} dia(s). {NEXT_ACTION.get(status)}",
+                        "days": days})
         elif status in FORGOTTEN_STATUSES and days >= sla:
             out.append({"id": f"{n['id']}-forg", "note_id": n["id"], "kind": "forgotten", "severity": "medium",
                         "title": f"{cust} · pedido parado",
@@ -4954,10 +5022,94 @@ async def build_notifications():
     return out
 
 
+class MarkNotificationsReadIn(BaseModel):
+    ids: List[str] = []
+
+
 @api_router.get("/notifications")
-async def notifications():
-    items = await build_notifications()
-    return {"items": items[:50], "count": len(items)}
+async def list_notifications(status: str = "", category: str = "", priority: str = "",
+                              q: str = "", before: str = "", limit: int = 30):
+    """Centro de Notificações — lista persistente (db.notifications), com
+    filtros/paginação/pesquisa. Substitui a lista efémera anterior
+    (build_notifications() continua a existir como DETETOR de condições
+    de estado, agora usado só para alimentar create_notification — ver
+    _sync_alert_notifications)."""
+    query = {}
+    if status:
+        query["status"] = status
+    if category:
+        query["category"] = category
+    if priority:
+        query["priority"] = priority
+    if before:
+        query["created_at"] = {"$lt": before}
+    if q:
+        query["$text"] = {"$search": q}
+    items = await db.notifications.find(query, {"_id": 0}).sort("created_at", -1).to_list(min(max(limit, 1), 100))
+    return {"items": items, "count": len(items)}
+
+
+@api_router.get("/notifications/stream")
+async def notifications_stream(request: Request):
+    """Sincronização em tempo real (SSE) — todos os separadores/dispositivos
+    autenticados ligados aqui recebem um evento sempre que uma notificação
+    é criada/lida/arquivada em qualquer um deles. Autenticado por
+    ?device_token= na query (EventSource não permite cabeçalhos custom; o
+    middleware pin_gate já aceita este formato). Hub em memória, seguro
+    porque o deploy é um único processo (ver notifications.py)."""
+    queue = notifications.subscribe()
+
+    async def event_generator():
+        try:
+            yield "retry: 5000\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=25)
+                    yield f"data: {_json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            notifications.unsubscribe(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@api_router.get("/notifications/unread-count")
+async def notifications_unread_count():
+    return {"count": await notifications.unread_count(db)}
+
+
+@api_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str):
+    return {"ok": await notifications.mark_read(db, notification_id)}
+
+
+@api_router.post("/notifications/mark-read")
+async def mark_notifications_read(payload: MarkNotificationsReadIn):
+    return {"ok": True, "count": await notifications.mark_read_bulk(db, payload.ids)}
+
+
+@api_router.post("/notifications/{notification_id}/archive")
+async def archive_notification_endpoint(notification_id: str):
+    return {"ok": await notifications.archive(db, notification_id)}
+
+
+@api_router.get("/notifications/{notification_id}/logs")
+async def notification_logs_endpoint(notification_id: str):
+    logs = await db.notification_logs.find(
+        {"notification_id": notification_id}, {"_id": 0}).sort("at", 1).to_list(200)
+    return {"items": logs}
+
+
+@api_router.post("/notifications/ack/{notification_id}/{ack_token}")
+async def ack_notification_endpoint(notification_id: str, ack_token: str):
+    """Chamado pelo próprio service worker depois de mostrar a notificação
+    — sem token de dispositivo (o SW não tem acesso a localStorage); o
+    ack_token de uso único é o segredo. Ver AUTH_EXEMPT_PREFIXES."""
+    return {"ok": await notifications.ack_delivery(db, notification_id, ack_token)}
 
 
 @api_router.get("/today")
@@ -5751,14 +5903,125 @@ async def ensure_indexes():
                         ("category_suggestions", "signature"), ("category_suggestions", "status"),
                         ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
                         ("tasks", "category_signature"), ("auth_devices", "token"),
-                        ("pushed_alerts", "alert_id")]:
+                        ("auth_devices", "device_id"),
+                        ("pushed_alerts", "alert_id"),
+                        ("notifications", "status"), ("notifications", "priority"),
+                        ("notifications", "category"), ("notifications", "created_at"),
+                        ("notifications", "has_pending_delivery"), ("notifications", "deliveries.ack_token"),
+                        ("notification_logs", "notification_id"), ("system_health", "name")]:
         try:
             await db[coll].create_index(field)
         except Exception:
             pass
+    # dedup_key tem de ser mesmo único — é o que torna create_notification
+    # idempotente mesmo sob corrida (dois pedidos a criar o mesmo alerta ao
+    # mesmo tempo só um consegue inserir; o outro apanha o erro e reaproveita).
+    try:
+        await db.notifications.create_index("dedup_key", unique=True)
+    except Exception:
+        pass
+    try:
+        await db.notifications.create_index([("title", "text"), ("body", "text")])
+    except Exception:
+        pass
 
 
 _background_tasks = set()
+
+
+async def _heartbeat(name):
+    """Marca que este laço de fundo ainda está vivo — lido por
+    GET /system/health (background_loops) para o Painel de Saúde poder
+    mostrar se algum ficou parado."""
+    await db.system_health.update_one(
+        {"name": name}, {"$set": {"name": name, "status": "ok", "last_heartbeat": now_iso()}}, upsert=True)
+
+
+async def _supervised_loop(name, coro_fn, restart_delay=10):
+    """Auto-cura para tarefas de fundo: hoje, se um laço `while True`
+    levantasse uma exceção fora dos seus próprios try/except internos
+    (bug de código, e não uma falha de uma verificação isolada), a tarefa
+    morria e ficava morta até o processo reiniciar — sem log nenhum a
+    avisar. Este wrapper regista o incidente (log crítico +
+    db.system_health) e volta a chamar coro_fn(), em vez de deixar o laço
+    morrer para sempre. Complementa (não substitui) o `restart:
+    unless-stopped` + autoheal do container, que só cobre o processo
+    inteiro morrer — não uma tarefa de fundo dentro dele."""
+    while True:
+        try:
+            await coro_fn()
+            logger.warning(f"Loop de fundo '{name}' terminou sem exceção (inesperado) — a reiniciar em {restart_delay}s.")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.critical(f"Loop de fundo '{name}' falhou, a reiniciar em {restart_delay}s: {e}")
+            try:
+                await db.system_health.update_one(
+                    {"name": name},
+                    {"$set": {"name": name, "status": "crashed", "last_error": str(e), "last_crash_at": now_iso()}},
+                    upsert=True)
+            except Exception:
+                pass
+        await asyncio.sleep(restart_delay)
+
+
+def _spawn_supervised(name, coro_fn):
+    task = asyncio.create_task(_supervised_loop(name, coro_fn))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
+NOTIFICATION_RETRY_INTERVAL_SECONDS = 120
+
+
+async def _notification_retry_loop():
+    """Repetição automática de entregas push falhadas (ver notifications.py:
+    retry_pending_deliveries) — corre a cada 2 minutos, com backoff
+    crescente por entrega."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            retried = await notifications.retry_pending_deliveries(db)
+            if retried:
+                logger.info(f"Notificações: {retried} entrega(s) repetida(s).")
+        except Exception as e:
+            logger.error(f"Repetição de notificações falhou: {e}")
+        await _heartbeat("notification_retry")
+        await asyncio.sleep(NOTIFICATION_RETRY_INTERVAL_SECONDS)
+
+
+_LOOP_EXPECTED_INTERVAL_SECONDS = {
+    "imap_poll": lambda: max(IMAP_POLL_MINUTES, 1) * 60,
+    "daily_maintenance": lambda: DAILY_MAINTENANCE_INTERVAL_HOURS * 3600,
+    "notification_retry": lambda: NOTIFICATION_RETRY_INTERVAL_SECONDS,
+    "notification_scan": lambda: max(NOTIFICATION_SCAN_MINUTES, 1) * 60,
+}
+
+
+async def _background_loops_status():
+    """Consumido por GET /system/health (Painel de Saúde) — um laço fica
+    "stale" se não escrever um heartbeat há mais do que o dobro do seu
+    próprio intervalo esperado + 60s de margem, sinal de que morreu e
+    ainda não foi reiniciado pelo _supervised_loop (ou está preso algures)."""
+    docs = {d["name"]: d async for d in db.system_health.find({}, {"_id": 0})}
+    now = datetime.now(timezone.utc)
+    out = []
+    for name, interval_fn in _LOOP_EXPECTED_INTERVAL_SECONDS.items():
+        if name == "imap_poll" and not (SMTP_CONFIGURED and IMAP_POLL_MINUTES > 0):
+            out.append({"name": name, "status": "disabled", "last_heartbeat": None, "stale": False})
+            continue
+        doc = docs.get(name)
+        expected = interval_fn()
+        if not doc or not doc.get("last_heartbeat"):
+            out.append({"name": name, "status": "unknown", "last_heartbeat": None, "stale": True})
+            continue
+        last = parse_dt(doc["last_heartbeat"])
+        age = (now - last).total_seconds() if last else None
+        stale = age is None or age > expected * 2 + 60
+        out.append({"name": name, "status": doc.get("status", "ok"),
+                    "last_heartbeat": doc["last_heartbeat"], "stale": stale})
+    return out
 
 
 async def _imap_poll_loop():
@@ -5779,6 +6042,7 @@ async def _imap_poll_loop():
                 logger.info(f"IMAP: {sent_result['new']} email(s) enviado(s) pelo Gmail sincronizado(s).")
         except Exception as e:
             logger.error(f"Verificação IMAP (enviados) falhou: {e}")
+        await _heartbeat("imap_poll")
         await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
 
 
@@ -5812,27 +6076,30 @@ async def _backfill_correio_semanal_summaries():
 
 DAILY_MAINTENANCE_INTERVAL_HOURS = 24
 
-# Alertas do Centro de Notificações (build_notifications) que também valem
-# uma notificação push — mapeados para as categorias de notification_prefs.
-# quote_quality_issue/quote_changed ficam de fora daqui: já são
-# notificados no próprio instante em que o PDF do fornecedor é importado
-# (ver _apply_supplier_pdf), notificar outra vez aqui seria repetido.
-_DIGEST_PUSH_KINDS = {"waiting_supplier", "forgotten", "urgent", "reminder_overdue"}
+# Alertas do Centro de Notificações (build_notifications) que também geram
+# uma notificação persistente — mapeados para categorias de
+# notification_prefs. quote_quality_issue/quote_changed/anexos_incidencia_critica
+# ficam de fora: já são notificados no próprio instante em que acontecem
+# (ver _apply_supplier_pdf, _process_anexos_edicao) — repetir aqui duplicaria.
+_ALERT_NOTIFY_KINDS = {"waiting_supplier", "forgotten", "urgent", "reminder_overdue", "deadline_approaching"}
 
 
-async def _push_pending_alerts():
-    """Notificação push para alertas "de estado" (um pedido continua parado,
-    continua urgente, ...) — ao contrário de um email novo ou um PDF
+async def _sync_alert_notifications():
+    """Notificações para alertas "de estado" (um pedido continua parado, um
+    prazo está a chegar, ...) — ao contrário de um email novo ou um PDF
     importado, não há um instante único em que isto "acontece", por isso
-    corre uma vez por dia (dentro de _daily_maintenance_loop) e usa
-    db.pushed_alerts para nunca repetir o mesmo alerta enquanto a condição
-    se mantiver — só volta a notificar se o alerta desaparecer (resolvido)
-    e reaparecer mais tarde."""
-    items = [i for i in await build_notifications() if i["kind"] in _DIGEST_PUSH_KINDS]
+    este ciclo corre a cada NOTIFICATION_SCAN_MINUTES (definições →
+    Automação) e usa db.pushed_alerts para saber quais alertas já estão
+    "abertos" — só cria uma notificação nova quando um alerta aparece pela
+    primeira vez; quando desaparece (resolvido), liberta o id, para poder
+    notificar de novo se a mesma situação se repetir mais tarde. O
+    dedup_key de create_notification leva um sufixo aleatório porque a
+    deduplicação real já é feita aqui, por db.pushed_alerts — cada
+    ativação nova deve mesmo criar um registo novo no Centro de
+    Notificações."""
+    items = [i for i in await build_notifications() if i["kind"] in _ALERT_NOTIFY_KINDS]
     current_ids = {i["id"] for i in items}
     already = {d["alert_id"] async for d in db.pushed_alerts.find({}, {"_id": 0, "alert_id": 1})}
-    # Alertas que já não aparecem (resolvidos) — liberta o id para poder
-    # voltar a notificar se a mesma situação se repetir no futuro.
     stale = already - current_ids
     if stale:
         await db.pushed_alerts.delete_many({"alert_id": {"$in": list(stale)}})
@@ -5840,14 +6107,29 @@ async def _push_pending_alerts():
         if item["id"] in already:
             continue
         try:
-            sent = await push_notifications.notify_category(
-                db, item["kind"], item["title"], item["message"],
-                url=f"/?open={item['note_id']}" if item.get("note_id") else "/tarefas")
+            await notifications.create_notification(
+                db, dedup_key=f"alert-{item['id']}-{uuid.uuid4().hex[:8]}", category=item["kind"],
+                title=item["title"], body=item["message"],
+                url=f"/?open={item['note_id']}" if item.get("note_id") else "/tarefas",
+                note_id=item.get("note_id"))
         except Exception as e:
-            logger.warning(f"Notificação push de alerta falhou ({item['id']}): {e}")
+            logger.warning(f"Notificação de alerta falhou ({item['id']}): {e}")
             continue
-        if sent:
-            await db.pushed_alerts.insert_one({"alert_id": item["id"], "kind": item["kind"], "created_at": now_iso()})
+        await db.pushed_alerts.insert_one({"alert_id": item["id"], "kind": item["kind"], "created_at": now_iso()})
+
+
+async def _notification_scan_loop():
+    """Alertas de estado (pedido parado, urgente, prazo a terminar, ...) —
+    cadência configurável (definições → Automação → "Verificar alertas de
+    pedidos parados/urgentes a cada"), por omissão 5 min."""
+    await asyncio.sleep(45)
+    while True:
+        try:
+            await _sync_alert_notifications()
+        except Exception as e:
+            logger.error(f"Sincronização de alertas falhou: {e}")
+        await _heartbeat("notification_scan")
+        await asyncio.sleep(max(NOTIFICATION_SCAN_MINUTES, 1) * 60)
 
 
 async def _daily_maintenance_loop():
@@ -5864,10 +6146,7 @@ async def _daily_maintenance_loop():
                 logger.info(f"Arquivamento automático: {closed} pedido(s) inativo(s) arquivado(s).")
         except Exception as e:
             logger.error(f"Arquivamento automático falhou: {e}")
-        try:
-            await _push_pending_alerts()
-        except Exception as e:
-            logger.error(f"Notificação push de alertas pendentes falhou: {e}")
+        await _heartbeat("daily_maintenance")
         await asyncio.sleep(DAILY_MAINTENANCE_INTERVAL_HOURS * 3600)
 
 
@@ -5887,6 +6166,7 @@ async def _refresh_runtime_settings():
     global MAX_SUPPLIER_PDF_BYTES, MAX_ANEXOS_ZIP_BYTES, MAX_EMAIL_ATTACHMENT_TOTAL_BYTES
     global MAX_ATTACHMENTS_PER_EMAIL
     global INCLUDE_EMAIL_SIGNATURE, AUTO_GREETING, CORREIO_SEMANAL_SENDER
+    global DEADLINE_WARNING_DAYS, PRICE_CHANGE_ALERT_PCT, NOTIFICATION_SCAN_MINUTES
     automation = await app_settings.get_group(db, "automation_prefs")
     DEFAULT_SLA_DAYS = automation["default_sla_days"]
     REMINDER_INTERVAL_DAYS_DEFAULT = automation["reminder_interval_days"]
@@ -5894,6 +6174,9 @@ async def _refresh_runtime_settings():
     CATEGORY_SUGGESTION_THRESHOLD = automation["category_suggestion_threshold"]
     SUPPLIER_QUOTE_HISTORY_LIMIT = automation["supplier_quote_history_limit"]
     IMAP_POLL_MINUTES = automation["imap_poll_minutes"]
+    DEADLINE_WARNING_DAYS = automation["deadline_warning_days"]
+    PRICE_CHANGE_ALERT_PCT = automation["price_change_alert_pct"]
+    NOTIFICATION_SCAN_MINUTES = automation["notification_scan_minutes"]
     security = await app_settings.get_group(db, "security_prefs")
     PIN_MAX_ATTEMPTS = security["pin_max_attempts"]
     PIN_LOCK_MINUTES = security["pin_lock_minutes"]
@@ -5920,15 +6203,13 @@ async def on_startup():
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
     if SMTP_CONFIGURED and IMAP_POLL_MINUTES > 0:
-        task = asyncio.create_task(_imap_poll_loop())
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        _spawn_supervised("imap_poll", _imap_poll_loop)
     backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
     _background_tasks.add(backfill_task)
     backfill_task.add_done_callback(_background_tasks.discard)
-    maintenance_task = asyncio.create_task(_daily_maintenance_loop())
-    _background_tasks.add(maintenance_task)
-    maintenance_task.add_done_callback(_background_tasks.discard)
+    _spawn_supervised("daily_maintenance", _daily_maintenance_loop)
+    _spawn_supervised("notification_retry", _notification_retry_loop)
+    _spawn_supervised("notification_scan", _notification_scan_loop)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------
@@ -5939,7 +6220,7 @@ async def on_startup():
 INITIAL_PIN = os.environ.get("ACCESS_PIN", "250724")
 PIN_MAX_ATTEMPTS = 3
 PIN_LOCK_MINUTES = 10
-AUTH_EXEMPT_PREFIXES = ("/api/auth/", "/api/oauth/", "/api/gmail/connect")
+AUTH_EXEMPT_PREFIXES = ("/api/auth/", "/api/oauth/", "/api/gmail/connect", "/api/notifications/ack/")
 
 
 def _hash_pin(pin, salt):
@@ -5970,7 +6251,29 @@ async def _device_token_valid(token):
     if not doc:
         return False
     _device_token_cache[token] = now_ts + 300
+    # "Última atividade" na página Dispositivos — atualizada no máximo 1x/5min
+    # por dispositivo (a mesma janela da cache acima), para não escrever na
+    # BD a cada pedido autenticado.
+    await db.auth_devices.update_one({"id": doc["id"]}, {"$set": {"last_seen": now_iso()}})
     return True
+
+
+_DEVICE_TYPE_PATTERNS = [
+    ("iPhone", re.compile(r"iPhone", re.I)),
+    ("iPad", re.compile(r"iPad", re.I)),
+    ("Android", re.compile(r"Android", re.I)),
+    ("macOS", re.compile(r"Macintosh|Mac OS X", re.I)),
+    ("Windows", re.compile(r"Windows", re.I)),
+    ("Linux", re.compile(r"Linux", re.I)),
+]
+
+
+def _parse_device_type(user_agent):
+    ua = user_agent or ""
+    for label, pattern in _DEVICE_TYPE_PATTERNS:
+        if pattern.search(ua):
+            return label
+    return "Desconhecido"
 
 
 def _client_ip(request):
@@ -6023,11 +6326,29 @@ async def verify_pin(payload: PinVerifyIn, request: Request):
     if pin and secrets.compare_digest(_hash_pin(pin, pin_doc["salt"]), pin_doc["hash"]):
         await db.auth_attempts.delete_one({"key": key})
         token = secrets.token_urlsafe(32)
-        await db.auth_devices.insert_one({
-            "id": str(uuid.uuid4()), "token": token, "device_id": payload.device_id[:64],
-            "ip": ip, "user_agent": (request.headers.get("user-agent") or "")[:300],
-            "created_at": now_iso(), "last_seen": now_iso()})
-        logger.info(f"PIN validado — novo dispositivo verificado (ip={ip})")
+        device_id = payload.device_id[:64] or str(uuid.uuid4())
+        user_agent = (request.headers.get("user-agent") or "")[:300]
+        # Upsert por device_id (o UUID estável gerado por deviceAuth.js), não
+        # um insert_one sempre novo: caso contrário, cada bloqueio/desbloqueio
+        # (manual ou por inatividade) deixava órfã a subscrição push já ativa
+        # nesse aparelho — o dispositivo "esquecia-se" de ter notificações ligadas.
+        # O token antigo (se existir) fica automaticamente inválido, porque
+        # deixa de bater com o `token` gravado; limpa-se também da cache para
+        # não continuar válido até expirar sozinho (5 min, ver _device_token_valid).
+        existing = await db.auth_devices.find_one({"device_id": device_id}, {"_id": 0, "id": 1, "token": 1})
+        if existing:
+            if existing.get("token"):
+                _device_token_cache.pop(existing["token"], None)
+            await db.auth_devices.update_one(
+                {"device_id": device_id},
+                {"$set": {"token": token, "ip": ip, "user_agent": user_agent,
+                           "last_seen": now_iso(), "session_active": True}})
+        else:
+            await db.auth_devices.insert_one({
+                "id": str(uuid.uuid4()), "token": token, "device_id": device_id,
+                "ip": ip, "user_agent": user_agent, "created_at": now_iso(), "last_seen": now_iso(),
+                "session_active": True, "push_enabled": False})
+        logger.info(f"PIN validado — dispositivo verificado (ip={ip})")
         return {"ok": True, "token": token}
     fails = ((await db.auth_attempts.find_one({"key": key}, {"_id": 0}) or {}).get("fails", 0)) + 1
     update = {"key": key, "fails": fails, "ip": ip, "updated_at": now_iso()}
@@ -6038,6 +6359,18 @@ async def verify_pin(payload: PinVerifyIn, request: Request):
     if fails >= PIN_MAX_ATTEMPTS:
         return {"ok": False, "locked": True, "retry_in_seconds": PIN_LOCK_MINUTES * 60, "attempts_left": 0}
     return {"ok": False, "locked": False, "retry_in_seconds": 0, "attempts_left": PIN_MAX_ATTEMPTS - fails}
+
+
+@api_router.post("/auth/lock")
+async def auth_lock(request: Request):
+    """Chamado por lockScreen() (osShell.js) antes de limpar o token local —
+    marca este dispositivo como sem sessão ativa, para as notificações push
+    pausarem até ao próximo PIN certo (ver notifications.py: um dispositivo
+    só recebe push com session_active=True). Fechar a app não passa por
+    aqui — só um bloqueio explícito do PIN pausa as notificações."""
+    token = request.headers.get("x-device-token")
+    result = await db.auth_devices.update_one({"token": token}, {"$set": {"session_active": False}})
+    return {"ok": bool(result.matched_count)}
 
 
 # ---------- Notificações push (Web Push) ----------
@@ -6069,14 +6402,15 @@ async def push_subscribe(payload: PushSubscriptionIn, request: Request):
     await db.auth_devices.update_one(
         {"id": device["id"]},
         {"$set": {"push_subscription": {"endpoint": payload.endpoint, "keys": payload.keys},
-                   "push_subscribed_at": now_iso()}})
+                   "push_subscribed_at": now_iso(), "push_enabled": True}})
     return {"ok": True}
 
 
 @api_router.post("/push/unsubscribe")
 async def push_unsubscribe(request: Request):
     device = await _device_from_request(request)
-    await db.auth_devices.update_one({"id": device["id"]}, {"$unset": {"push_subscription": ""}})
+    await db.auth_devices.update_one(
+        {"id": device["id"]}, {"$unset": {"push_subscription": ""}, "$set": {"push_enabled": False}})
     return {"ok": True}
 
 
@@ -6143,10 +6477,31 @@ async def list_devices(request: Request):
     devices = await db.auth_devices.find({}, {"_id": 0}).sort("last_seen", -1).to_list(100)
     return [{
         "id": d["id"], "ip": d.get("ip", ""), "user_agent": d.get("user_agent", ""),
+        "device_type": _parse_device_type(d.get("user_agent")),
         "created_at": d.get("created_at"), "last_seen": d.get("last_seen"),
         "has_push": bool(d.get("push_subscription")),
+        "push_enabled": bool(d.get("push_enabled")),
         "is_current": d.get("token") == current_token,
     } for d in devices]
+
+
+class DevicePushIn(BaseModel):
+    enabled: bool
+
+
+@api_router.post("/auth/devices/{device_id}/push")
+async def set_device_push(device_id: str, payload: DevicePushIn):
+    """Liga/desliga notificações num dispositivo a partir da página
+    Dispositivos — pode ser um dispositivo diferente do que está a fazer o
+    pedido. Só altera a intenção (push_enabled); nunca cria uma subscrição
+    do zero (isso só o próprio dispositivo pode fazer, ao aceitar a
+    permissão do browser) — se `push_subscription` ainda existir de uma
+    ativação anterior, voltar a ligar aqui retoma o envio de imediato."""
+    result = await db.auth_devices.update_one(
+        {"id": device_id}, {"$set": {"push_enabled": payload.enabled}})
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+    return {"ok": True}
 
 
 @api_router.delete("/auth/devices/{device_id}")
