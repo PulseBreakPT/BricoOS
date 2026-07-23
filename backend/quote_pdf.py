@@ -102,8 +102,12 @@ def detect_material(description):
     return "desconhecido"
 
 
-def margin_for_material(material):
-    return MATERIAL_MARGINS.get(material, MARGIN_UNKNOWN_PCT)
+def margin_for_material(material, overrides=None):
+    """`overrides`, quando indicado, é o grupo de definições
+    material_margins (definições → Preços) — substitui MATERIAL_MARGINS
+    sem alterar a deteção do material em si."""
+    table = overrides or MATERIAL_MARGINS
+    return table.get(material, table.get("desconhecido", MARGIN_UNKNOWN_PCT))
 
 
 def material_label(material):
@@ -136,11 +140,11 @@ PRICE_ROUND_TIERS = [(100, 1), (500, 5), (5000, 5), (20000, 10)]
 PRICE_ROUND_STEP_ABOVE = 50
 
 
-def _price_round_step(value):
-    for ceiling, step in PRICE_ROUND_TIERS:
+def _price_round_step(value, tiers=None, step_above=None):
+    for ceiling, step in (tiers or PRICE_ROUND_TIERS):
         if value < ceiling:
             return step
-    return PRICE_ROUND_STEP_ABOVE
+    return PRICE_ROUND_STEP_ABOVE if step_above is None else step_above
 
 
 def _round_up_to_step(value, step):
@@ -151,11 +155,13 @@ def _round_up_to_step(value, step):
     return float(units * step_d)
 
 
-def round_commercial(value):
+def round_commercial(value, tiers=None, step_above=None):
     """Preço redondo ao cliente, escolhendo automaticamente o múltiplo
     conforme o valor (ver PRICE_ROUND_TIERS) — usado tanto no preço de cada
-    artigo como, opcionalmente, num total."""
-    return _round_up_to_step(value, _price_round_step(value))
+    artigo como, opcionalmente, num total. `tiers`/`step_above`, quando
+    indicados, vêm do grupo de definições price_rounding (definições →
+    Preços) em vez das constantes por omissão."""
+    return _round_up_to_step(value, _price_round_step(value, tiers, step_above))
 
 
 # Limite teórico da margem para este IVA: quando margem/100 se aproxima de
@@ -197,16 +203,19 @@ def coefficient_for_margin(margin_pct):
     return _round_half_up(price_coefficient(margin_pct), 3)
 
 
-def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT):
+def suggest_client_price(supplier_unit_price, margin_pct=MARGIN_UNKNOWN_PCT,
+                          rounding_tiers=None, rounding_step_above=None):
     """Preço de venda ao cliente: PV_com_IVA = Custo / (1/(1+IVA) - margem),
     depois arredondado para cima a um valor comercial (ver
     round_commercial) — nunca um valor quebrado ao cêntimo (ex.:
     703,28 € → 705,00 €). Arredondar para cima nunca deixa a margem final
-    abaixo da configurada (só pode ficar igual ou ligeiramente acima)."""
+    abaixo da configurada (só pode ficar igual ou ligeiramente acima).
+    `rounding_tiers`/`rounding_step_above`, quando indicados, vêm do grupo
+    de definições price_rounding."""
     if not supplier_unit_price or supplier_unit_price <= 0:
         return 0.0
     exact = supplier_unit_price * price_coefficient(margin_pct)
-    return round_commercial(exact)
+    return round_commercial(exact, rounding_tiers, rounding_step_above)
 
 
 def _header_field(text, pattern):

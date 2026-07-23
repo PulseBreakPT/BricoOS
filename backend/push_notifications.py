@@ -20,6 +20,11 @@ import logging
 from cryptography.hazmat.primitives.asymmetric import ec
 from pywebpush import webpush, WebPushException
 
+try:
+    import app_settings
+except ImportError:  # Permite também executar como módulo: python -m backend.server
+    from . import app_settings
+
 logger = logging.getLogger(__name__)
 
 VAPID_SETTINGS_KEY = "vapid_keys"
@@ -114,14 +119,20 @@ async def notify_all(db, payload):
     return sent
 
 
-async def notify_new_email(db, subject, from_label):
+async def notify_category(db, category, title, body, url="/", tag=None):
+    """Envia só se a categoria estiver ativa nas preferências de
+    notificação (definições → Notificações) — cada uma das 11 categorias
+    (fornecedor, cliente, Correio Semanal, pedido parado, incidência
+    crítica, ...) pode ser ligada/desligada em separado."""
+    prefs = await app_settings.get_group(db, "notification_prefs")
+    if not prefs.get(category, True):
+        return 0
+    return await notify_all(db, {"title": title, "body": body, "url": url, "tag": tag or category})
+
+
+async def notify_new_email(db, subject, from_label, category="unmatched"):
     """Chamado a cada email novo guardado em received_emails (ver
-    poll_supplier_replies) — sem distinguir tipo/origem: qualquer email
-    novo que entre no sistema gera uma notificação."""
-    payload = {
-        "title": "Novo email",
-        "body": f"{from_label}: {subject or '(sem assunto)'}",
-        "url": "/emails",
-        "tag": "email",
-    }
-    return await notify_all(db, payload)
+    poll_supplier_replies). `category` é uma das chaves de
+    notification_prefs — "supplier"/"client"/"correio_semanal"/"unmatched"."""
+    return await notify_category(
+        db, category, "Novo email", f"{from_label}: {subject or '(sem assunto)'}", url="/emails", tag="email")

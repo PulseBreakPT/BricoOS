@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import api from "@/lib/api";
 import { clearDeviceToken, getDeviceId, getDeviceToken, setDeviceToken } from "@/lib/deviceAuth";
 import { haptics } from "@/lib/haptics";
+import { useIdleLock } from "@/hooks/useIdleLock";
 
 const PIN_LENGTH = 6;
 // Pequena pausa antes de revelar a app: dá tempo ao "check" de sucesso ser
@@ -70,7 +71,22 @@ export default function PinGate({ children }) {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
+  const [autoLockMinutes, setAutoLockMinutes] = useState(0);
   const timerRef = useRef(null);
+
+  // Bloqueio automático por inatividade (definições → Segurança) — só faz
+  // sentido pedir a preferência depois de verificado (o endpoint exige
+  // dispositivo autenticado, como qualquer outro em /api).
+  useEffect(() => {
+    if (status !== "ok") return undefined;
+    let cancelled = false;
+    api.get("/settings/security_prefs")
+      .then(({ data }) => { if (!cancelled) setAutoLockMinutes(data.auto_lock_minutes || 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [status]);
+
+  useIdleLock(autoLockMinutes, status === "ok");
 
   // Ponto único de bloqueio: usado tanto por um 401 vindo do servidor como
   // pelo temporizador de inatividade abaixo. Limpa sempre o token local, para

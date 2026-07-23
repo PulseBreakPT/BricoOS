@@ -10,6 +10,7 @@ import {
   Lock,
   Palette,
   RotateCw,
+  Settings as SettingsIcon,
   Share,
   SquarePlus,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import { WALLPAPERS, lockScreen } from "@/lib/osShell";
 import { haptics } from "@/lib/haptics";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useWorkspace } from "@/context/WorkspaceContext";
 
 const SESSION_START = Date.now();
 
@@ -68,6 +70,7 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
   const [iosStepsOpen, setIosStepsOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
   const push = usePushNotifications();
+  const { openPanel } = useWorkspace();
 
   const handleInstall = async () => {
     if (installing) return;
@@ -191,6 +194,12 @@ export default function SystemMenu({ wallpaperId, onWallpaperChange }) {
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          <DropdownMenuItem
+            data-testid="system-menu-settings"
+            onClick={() => { haptics.tap(); openPanel("settings"); }}
+          >
+            <SettingsIcon className="mr-2 h-4 w-4" /> Definições completas
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => window.location.reload()}>
             <RotateCw className="mr-2 h-4 w-4" /> Reiniciar interface
