@@ -26,7 +26,7 @@ export default function SystemBar({
   return (
     <header
       data-testid="system-bar"
-      className="os-system-bar fixed inset-x-3 top-2 z-[65] hidden h-12 items-center rounded-[18px] border border-neutral-900/[0.08] px-2.5 lg:grid lg:grid-cols-[minmax(190px,0.9fr)_minmax(220px,1.2fr)_minmax(210px,0.9fr)] 2xl:grid-cols-[minmax(250px,1fr)_minmax(300px,540px)_minmax(310px,1fr)]"
+      className="os-system-bar fixed inset-x-3 top-2 z-[65] hidden h-12 items-center rounded-[18px] border border-neutral-900/[0.08] px-2.5 lg:grid lg:grid-cols-[minmax(190px,0.9fr)_minmax(220px,1.2fr)_minmax(210px,0.9fr)] 2xl:grid-cols-[minmax(250px,1fr)_minmax(300px,540px)_minmax(310px,1fr)] 3xl:grid-cols-[minmax(320px,1fr)_minmax(360px,680px)_minmax(380px,1fr)]"
     >
       <div className="flex min-w-0 items-center gap-2">
         <div
@@ -35,17 +35,17 @@ export default function SystemBar({
         >
           <BrandMark className="h-7 w-7 rounded-[9px]" />
           <span className="hidden leading-none xl:block">
-            <span className="block text-[11px] font-extrabold tracking-tight text-neutral-900">
+            <span className="block text-[11px] 3xl:text-[13px] font-extrabold tracking-tight text-neutral-900">
               BRICO OS
             </span>
-            <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.2em] text-neutral-400">
+            <span className="mt-1 block text-[7px] 3xl:text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">
               Operations
             </span>
           </span>
         </div>
 
         <span className="h-5 w-px bg-neutral-900/10" aria-hidden="true" />
-        <div className="os-active-app-chip flex min-w-0 items-center gap-2 rounded-xl border border-neutral-900/[0.07] bg-white/70 px-2.5 py-1.5 text-[11px] font-bold text-neutral-800">
+        <div className="os-active-app-chip flex min-w-0 items-center gap-2 rounded-xl border border-neutral-900/[0.07] bg-white/70 px-2.5 py-1.5 text-[11px] 3xl:text-[13px] font-bold text-neutral-800">
           {ActiveIcon ? (
             <ActiveIcon className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
           ) : null}
@@ -59,13 +59,13 @@ export default function SystemBar({
         type="button"
         data-testid="system-search"
         onClick={onOpenSearch}
-        className="os-command-island group mx-auto flex h-9 w-full max-w-[540px] items-center gap-2 rounded-[13px] border border-neutral-900/[0.1] bg-white/75 px-3.5 text-left text-[11px] font-semibold text-neutral-500 shadow-[inset_0_1px_2px_rgba(16,17,20,0.06)] transition-all hover:border-neutral-900/20 hover:bg-white hover:text-neutral-700"
+        className="os-command-island group mx-auto flex h-9 w-full max-w-[540px] items-center gap-2 rounded-[13px] border border-neutral-900/[0.1] bg-white/75 px-3.5 text-left text-[11px] 3xl:text-[13px] font-semibold text-neutral-500 shadow-[inset_0_1px_2px_rgba(16,17,20,0.06)] transition-all hover:border-neutral-900/20 hover:bg-white hover:text-neutral-700 3xl:max-w-[680px]"
       >
         <Search className="h-3.5 w-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">
           Pesquisar pedidos, clientes, emails e ficheiros
         </span>
-        <span className="rounded border border-neutral-900/10 bg-neutral-900/[0.05] px-1.5 py-0.5 font-mono text-[9px] font-bold text-neutral-400 group-hover:text-neutral-600">
+        <span className="rounded border border-neutral-900/10 bg-neutral-900/[0.05] px-1.5 py-0.5 font-mono text-[9px] 3xl:text-[11px] font-bold text-neutral-400 group-hover:text-neutral-600">
           ⌘K
         </span>
       </button>

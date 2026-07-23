@@ -35,6 +35,7 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import BrandMark from "@/components/BrandMark";
@@ -77,7 +78,7 @@ import {
   wallpaperStyle,
   lockScreen,
 } from "@/lib/osShell";
-import { PANEL_TYPES } from "@/lib/panelRegistry";
+import { PANEL_TYPES, MOBILE_TOOL_TYPES } from "@/lib/panelRegistry";
 import { haptics } from "@/lib/haptics";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { toast } from "sonner";
@@ -321,6 +322,7 @@ function MobileNavigation({
   onOpenSearch,
   onOpenActivity,
   onOpenTrash,
+  onOpenTool,
 }) {
   const { status } = useSystemStatus();
   const { showInstallOption, install } = usePwaInstall();
@@ -418,6 +420,31 @@ function MobileNavigation({
             </div>
           </div>
         ))}
+        <div>
+          <p className="engraved px-3 pb-2">Ferramentas</p>
+          <div className="space-y-1">
+            {MOBILE_TOOL_TYPES.map((type) => {
+              const meta = PANEL_TYPES[type];
+              if (!meta) return null;
+              const Icon = meta.icon;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  data-testid={`mobile-nav-tool-${type}`}
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenTool?.(type);
+                  }}
+                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3.5 text-left text-sm font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                  <span className="flex-1">{meta.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </nav>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button
@@ -790,6 +817,7 @@ function LayoutInner() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileToolPanel, setMobileToolPanel] = useState(null);
   const [missionControlOpen, setMissionControlOpen] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [wallpaperId, setWallpaperId] = useState(() => getWallpaperId());
@@ -854,7 +882,10 @@ function LayoutInner() {
   }, [isDesktop, showDesktop]);
 
   useEffect(() => {
-    if (isDesktop) setMobileNavOpen(false);
+    if (isDesktop) {
+      setMobileNavOpen(false);
+      setMobileToolPanel(null);
+    }
   }, [isDesktop]);
 
   // Sinaliza ao CSS quando a janela principal está maximizada (o rail
@@ -994,6 +1025,10 @@ function LayoutInner() {
                   setMobileNavOpen(false);
                   setTrashOpen(true);
                 }}
+                onOpenTool={(type) => {
+                  setMobileNavOpen(false);
+                  setMobileToolPanel(type);
+                }}
               />
             </SheetContent>
           </Sheet>
@@ -1026,6 +1061,7 @@ function LayoutInner() {
               <MobileHomeSurface
                 onOpenRoute={openRoute}
                 onOpenActivity={() => setActivityOpen(true)}
+                onOpenTool={(type) => setMobileToolPanel(type)}
               />
             ) : (
               <div
@@ -1065,7 +1101,41 @@ function LayoutInner() {
       />
       <ActivityCenter open={activityOpen} onOpenChange={setActivityOpen} />
       <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
+      {!isDesktop ? (
+        <Sheet open={!!mobileToolPanel} onOpenChange={(open) => { if (!open) setMobileToolPanel(null); }}>
+          <SheetContent
+            side="bottom"
+            data-testid="mobile-tool-panel"
+            className="os-chrome flex h-[85dvh] w-full flex-col gap-0 rounded-t-[22px] p-0"
+          >
+            {mobileToolPanel && PANEL_TYPES[mobileToolPanel] ? (
+              <MobileToolPanelBody type={mobileToolPanel} />
+            ) : null}
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
+  );
+}
+
+// Monta o mesmo componente usado pelos painéis flutuantes do computador
+// (lib/panelRegistry.js) — sem duplicar Explorador/Calculadora/etc., só
+// muda o invólucro (folha inferior em vez de janela flutuante).
+function MobileToolPanelBody({ type }) {
+  const meta = PANEL_TYPES[type];
+  const Icon = meta.icon;
+  const Component = meta.Component;
+  return (
+    <>
+      <SheetHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+        <SheetTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
+          <Icon className="h-4 w-4" /> {meta.title}
+        </SheetTitle>
+      </SheetHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <Component />
+      </div>
+    </>
   );
 }
 

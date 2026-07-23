@@ -36,7 +36,7 @@ function LiveClock() {
   const date = now.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div className="flex flex-col items-center">
-      <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-neutral-900 sm:text-5xl">{time}</p>
+      <p className="font-mono text-4xl font-bold tabular-nums tracking-tight text-neutral-900 sm:text-5xl 3xl:text-6xl">{time}</p>
       <p className="mt-1 text-xs font-semibold capitalize tracking-wide text-[color:var(--chrome-muted)]">{date}</p>
     </div>
   );
@@ -272,13 +272,16 @@ export default function PinGate({ children }) {
 
   // Teclas físicas da máquina — rebaixadas no grafite, com curso curto ao
   // toque (active:scale) e realce discreto no hover de rato.
-  const keyBase = "group relative flex h-16 select-none items-center justify-center rounded-2xl border border-neutral-900/10 bg-white/85 text-neutral-900 shadow-[0_1px_2px_rgba(16,17,20,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-150 active:scale-95 active:bg-neutral-100 disabled:opacity-25 sm:hover:border-neutral-900/25 sm:hover:bg-white";
+  const keyBase = "group relative flex h-16 select-none items-center justify-center rounded-2xl border border-neutral-900/10 bg-white/85 text-neutral-900 shadow-[0_1px_2px_rgba(16,17,20,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-150 active:scale-95 active:bg-neutral-100 disabled:opacity-25 sm:hover:border-neutral-900/25 sm:hover:bg-white 3xl:h-20";
 
   return (
-    <div data-testid="pin-screen" className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[color:var(--chrome-deep)] px-6 py-8">
+    <div
+      data-testid="pin-screen"
+      className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[color:var(--chrome-deep)] pb-[max(2rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pt-[max(2rem,env(safe-area-inset-top))]"
+    >
       <Ambient />
 
-      <div className="relative flex w-full max-w-xs flex-col items-center">
+      <div className="relative flex w-full max-w-xs flex-col items-center 3xl:max-w-sm">
         <div className="animate-fade-up" style={{ "--stagger-i": 0 }}>
           <LiveClock />
         </div>
@@ -343,7 +346,7 @@ export default function PinGate({ children }) {
                   disabled={locked || checkingPin}
                   className={keyBase}
                 >
-                  <span className="text-2xl font-semibold leading-none">{d}</span>
+                  <span className="text-2xl font-semibold leading-none 3xl:text-3xl">{d}</span>
                 </button>
               ))}
               <button
@@ -351,7 +354,7 @@ export default function PinGate({ children }) {
                 data-testid="pin-clear"
                 onClick={clearAll}
                 disabled={locked || checkingPin || !pin.length}
-                className="h-16 rounded-2xl text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-neutral-900/[0.06] disabled:opacity-20 sm:hover:bg-neutral-900/[0.04] sm:hover:text-[color:var(--chrome-muted)]"
+                className="h-16 rounded-2xl text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-neutral-900/[0.06] disabled:opacity-20 sm:hover:bg-neutral-900/[0.04] sm:hover:text-[color:var(--chrome-muted)] 3xl:h-20"
               >
                 Limpar
               </button>
@@ -362,14 +365,14 @@ export default function PinGate({ children }) {
                 disabled={locked || checkingPin}
                 className={keyBase}
               >
-                <span className="text-2xl font-semibold leading-none">0</span>
+                <span className="text-2xl font-semibold leading-none 3xl:text-3xl">0</span>
               </button>
               <button
                 type="button"
                 data-testid="pin-backspace"
                 onClick={backspace}
                 disabled={locked || checkingPin || !pin.length}
-                className="flex h-16 items-center justify-center rounded-2xl text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-neutral-900/[0.06] disabled:opacity-20 sm:hover:bg-neutral-900/[0.04] sm:hover:text-[color:var(--chrome-muted)]"
+                className="flex h-16 items-center justify-center rounded-2xl text-[color:var(--chrome-faint)] transition-all duration-150 active:scale-95 active:bg-neutral-900/[0.06] disabled:opacity-20 sm:hover:bg-neutral-900/[0.04] sm:hover:text-[color:var(--chrome-muted)] 3xl:h-20"
               >
                 <Delete className="h-6 w-6" />
               </button>

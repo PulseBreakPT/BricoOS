@@ -90,7 +90,7 @@ function ItemRow({ item, active, onClick }) {
 function ExplorerColumn({ column, query, selectedId, onOpenFolder, onOpenItem }) {
   if (column.type === "root") {
     return (
-      <div className="w-56 shrink-0 overflow-y-auto border-r border-border p-1.5">
+      <div className="w-40 shrink-0 overflow-y-auto border-r border-border p-1.5 sm:w-56">
         <p className="px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Loja</p>
         {ROOT_FOLDERS.map((f) => <FolderRow key={f.key} folder={f} onClick={() => onOpenFolder(f)} />)}
         <p className="mt-3 px-2 pb-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">Espaços inteligentes</p>
@@ -99,12 +99,12 @@ function ExplorerColumn({ column, query, selectedId, onOpenFolder, onOpenItem })
     );
   }
   if (column.type === "loading") {
-    return <div className="flex w-56 shrink-0 items-center justify-center border-r border-border p-4"><Spinner className="h-4 w-4 text-muted-foreground" /></div>;
+    return <div className="flex w-40 shrink-0 items-center justify-center border-r border-border p-4 sm:w-56"><Spinner className="h-4 w-4 text-muted-foreground" /></div>;
   }
   const term = query.trim().toLowerCase();
   const filtered = term ? column.items.filter((it) => `${it.label} ${it.sublabel}`.toLowerCase().includes(term)) : column.items;
   return (
-    <div className="w-64 shrink-0 overflow-y-auto border-r border-border p-1.5">
+    <div className="w-48 shrink-0 overflow-y-auto border-r border-border p-1.5 sm:w-64">
       <p className="truncate px-2 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">
         {column.label} ({filtered.length})
       </p>
@@ -197,7 +197,7 @@ export default function Explorer() {
             onOpenItem={(it) => openItem(it, i)}
           />
         ))}
-        <div className="w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/60 p-3">
+        <div className="w-56 shrink-0 overflow-y-auto border-l border-border bg-muted/60 p-3 sm:w-72">
           <ExplorerDetailPane item={selected} onNavigate={openEntity} />
         </div>
       </div>

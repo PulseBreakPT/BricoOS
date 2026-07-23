@@ -793,7 +793,7 @@ export default function Notes() {
       ) : kanbanView ? (
         <PedidoKanban items={items} onOpen={openNote} onMove={changeStatus} isActionBusy={isActionBusy} />
       ) : (
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
           {/* Primeiro carregamento: esqueletos com a silhueta dos cartões
               reais — a grelha nasce estável, sem salto quando os dados chegam. */}
           {loading && items.length === 0

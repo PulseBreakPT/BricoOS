@@ -127,13 +127,13 @@ export default function MissionControl({
         className="pointer-events-none absolute inset-0 bg-dot-grid-dark opacity-60"
       />
 
-      <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between gap-5">
+      <header className="relative mx-auto flex w-full max-w-6xl items-center justify-between gap-5 3xl:max-w-7xl">
         <div className="flex min-w-0 items-center gap-3.5">
           <span className="mission-control-glyph flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-neutral-900/10 text-neutral-700">
             <Layers3 className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="font-mono text-[8px] font-black uppercase tracking-[0.22em] text-neutral-400">
+            <p className="font-mono text-[8px] 3xl:text-[10px] font-black uppercase tracking-[0.22em] text-neutral-400">
               Workspace 01 · Multitarefa
             </p>
             <h2
@@ -143,7 +143,7 @@ export default function MissionControl({
               Todas as janelas
             </h2>
           </div>
-          <span className="hidden rounded-full border border-neutral-900/10 bg-neutral-900/[0.04] px-2.5 py-1 font-mono text-[9px] font-bold text-neutral-400 sm:inline-flex">
+          <span className="hidden rounded-full border border-neutral-900/10 bg-neutral-900/[0.04] px-2.5 py-1 font-mono text-[9px] 3xl:text-[11px] font-bold text-neutral-400 sm:inline-flex">
             {totalWindows} {totalWindows === 1 ? "janela" : "janelas"}
           </span>
         </div>
@@ -153,7 +153,7 @@ export default function MissionControl({
             type="button"
             data-testid="mission-show-desktop"
             onClick={showDesktop}
-            className="flex min-h-11 items-center gap-2 rounded-2xl border border-neutral-900/10 bg-neutral-900/[0.04] px-3.5 text-[10px] font-extrabold text-neutral-500 transition-colors hover:border-neutral-900/20 hover:bg-white hover:text-neutral-900"
+            className="flex min-h-11 items-center gap-2 rounded-2xl border border-neutral-900/10 bg-neutral-900/[0.04] px-3.5 text-[10px] 3xl:text-[12px] font-extrabold text-neutral-500 transition-colors hover:border-neutral-900/20 hover:bg-white hover:text-neutral-900"
           >
             <MonitorUp className="h-4 w-4" />
             <span className="hidden sm:inline">Mostrar secretária</span>
@@ -169,19 +169,19 @@ export default function MissionControl({
         </div>
       </header>
 
-      <div className="mission-space-strip relative mx-auto mt-5 flex w-full max-w-6xl items-center gap-3 rounded-[18px] border border-neutral-900/[0.08] px-3 py-2.5">
-        <span className="flex h-9 w-14 items-center justify-center rounded-xl border border-red-400/25 bg-red-500/10 font-mono text-[8px] font-black uppercase tracking-[0.12em] text-red-100/75">
+      <div className="mission-space-strip relative mx-auto mt-5 flex w-full max-w-6xl items-center gap-3 rounded-[18px] border border-neutral-900/[0.08] px-3 py-2.5 3xl:max-w-7xl">
+        <span className="flex h-9 w-14 items-center justify-center rounded-xl border border-red-400/25 bg-red-500/10 font-mono text-[8px] 3xl:text-[10px] font-black uppercase tracking-[0.12em] text-red-100/75">
           OP·01
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[10px] font-extrabold text-neutral-600">
+          <span className="block truncate text-[10px] 3xl:text-[12px] font-extrabold text-neutral-600">
             Operação principal
           </span>
-          <span className="mt-0.5 block truncate text-[8px] font-semibold text-neutral-400">
+          <span className="mt-0.5 block truncate text-[8px] 3xl:text-[10px] font-semibold text-neutral-400">
             {primaryWindow?.title || "Ambiente de trabalho"} · ferramentas do turno
           </span>
         </span>
-        <span className="flex items-center gap-2 font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-neutral-400">
+        <span className="flex items-center gap-2 font-mono text-[8px] 3xl:text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-400">
           <span className="led led-ok" /> Espaço ativo
         </span>
       </div>
@@ -199,7 +199,7 @@ export default function MissionControl({
           </p>
         </div>
       ) : (
-        <div className="relative mx-auto my-auto grid w-full max-w-6xl grid-cols-1 items-start gap-4 py-7 md:grid-cols-2 xl:grid-cols-3">
+        <div className="relative mx-auto my-auto grid w-full max-w-6xl grid-cols-1 items-start gap-4 py-7 md:grid-cols-2 xl:grid-cols-3 3xl:max-w-7xl 3xl:grid-cols-4">
           {primaryWindow ? (
             <button
               data-testid="mission-control-primary"
@@ -215,19 +215,19 @@ export default function MissionControl({
                 <span className="os-window-app-icon flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-900/10">
                   {PrimaryIcon ? <PrimaryIcon className="h-3.5 w-3.5 text-neutral-700" /> : null}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[11px] font-extrabold text-neutral-800">
+                <span className="min-w-0 flex-1 truncate text-[11px] 3xl:text-[13px] font-extrabold text-neutral-800">
                   {primaryWindow.title}
                 </span>
-                <span className="rounded-full border border-neutral-900/[0.08] bg-neutral-900/[0.04] px-2 py-1 font-mono text-[7px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                <span className="rounded-full border border-neutral-900/[0.08] bg-neutral-900/[0.04] px-2 py-1 font-mono text-[7px] 3xl:text-[9px] font-bold uppercase tracking-[0.1em] text-neutral-400">
                   {primaryWindow.minimized ? "Minimizada" : "Principal"}
                 </span>
               </div>
               <PreviewSurface icon={PrimaryIcon} primary />
               <div className="flex items-center justify-between border-t border-slate-200 bg-white px-3.5 py-2.5">
-                <span className="text-[10px] font-extrabold text-slate-700">
+                <span className="text-[10px] 3xl:text-[12px] font-extrabold text-slate-700">
                   Retomar aplicação
                 </span>
-                <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                <span className="font-mono text-[8px] 3xl:text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
                   Workspace 01
                 </span>
               </div>
@@ -263,19 +263,19 @@ export default function MissionControl({
                     <span className="os-window-app-icon flex h-7 w-7 items-center justify-center rounded-lg border border-neutral-900/10">
                       <Icon className="h-3.5 w-3.5 text-neutral-600" />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-extrabold text-neutral-800">
+                    <span className="min-w-0 flex-1 truncate text-[11px] 3xl:text-[13px] font-extrabold text-neutral-800">
                       {label}
                     </span>
-                    <span className="font-mono text-[7px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                    <span className="font-mono text-[7px] 3xl:text-[9px] font-bold uppercase tracking-[0.1em] text-neutral-400">
                       {panel.minimized ? "Minimizada" : active ? "Em foco" : "Aberta"}
                     </span>
                   </div>
                   <PreviewSurface icon={Icon} />
                   <div className="flex items-center justify-between border-t border-slate-200 bg-white px-3.5 py-2.5">
-                    <span className="text-[10px] font-extrabold text-slate-700">
+                    <span className="text-[10px] 3xl:text-[12px] font-extrabold text-slate-700">
                       Abrir janela
                     </span>
-                    <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                    <span className="font-mono text-[8px] 3xl:text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
                       Ferramenta
                     </span>
                   </div>
@@ -299,7 +299,7 @@ export default function MissionControl({
         </div>
       )}
 
-      <p className="relative mx-auto mt-auto font-mono text-[8px] font-bold uppercase tracking-[0.18em] text-neutral-400">
+      <p className="relative mx-auto mt-auto font-mono text-[8px] 3xl:text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
         F3 visão geral · Esc voltar · ⌘H secretária
       </p>
     </div>

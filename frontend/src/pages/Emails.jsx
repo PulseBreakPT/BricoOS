@@ -159,7 +159,7 @@ const SEVERITY_BADGE_CFG = {
 function SeverityBadge({ severity }) {
   const cfg = SEVERITY_BADGE_CFG[severity];
   if (!cfg) return null;
-  return <span className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${cfg.cls}`}>{cfg.label}</span>;
+  return <span className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold 3xl:text-[11px] ${cfg.cls}`}>{cfg.label}</span>;
 }
 
 // Uma linha de tarefa sugerida — 3 formas conforme t.kind: "task" simples
@@ -590,7 +590,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-indigo-text)]">
                         <BarChart3 className="h-3.5 w-3.5" /> Resumo da edição
                       </p>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-foreground/80 sm:grid-cols-3">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-foreground/80 sm:grid-cols-3 3xl:grid-cols-5">
                         <p>{m.edition_summary.stats.documentos_analisados} documentos analisados</p>
                         <p>{m.edition_summary.stats.assuntos_novos} assuntos novos</p>
                         <p>{m.edition_summary.stats.alteracoes} alterações</p>

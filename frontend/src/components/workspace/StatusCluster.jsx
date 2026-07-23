@@ -29,7 +29,7 @@ function MonthGrid({ now, dueDays }) {
         {["S", "T", "Q", "Q", "S", "S", "D"].map((d, i) => (
           <span
             key={`wd-${i}`}
-            className="py-1 text-[8px] font-black uppercase text-neutral-400"
+            className="py-1 text-[8px] 3xl:text-[10px] font-black uppercase text-neutral-400"
           >
             {d}
           </span>
@@ -42,7 +42,7 @@ function MonthGrid({ now, dueDays }) {
           ) : (
             <span
               key={`day-${day}`}
-              className={`relative mx-auto flex h-6 w-6 items-center justify-center rounded-lg font-mono text-[10px] font-bold tabular-nums ${day === now.getDate() ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-600"}`}
+              className={`relative mx-auto flex h-6 w-6 items-center justify-center rounded-lg font-mono text-[10px] 3xl:text-[12px] font-bold tabular-nums ${day === now.getDate() ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-600"}`}
             >
               {day}
               {dueDays.has(day) && day !== now.getDate() ? (
@@ -101,7 +101,7 @@ function ClockAgenda({ now }) {
         <button
           type="button"
           data-testid="menubar-clock"
-          className="whitespace-nowrap rounded-lg px-1.5 py-1 text-right font-mono text-[11px] font-extrabold tabular-nums text-neutral-900 transition-colors hover:bg-neutral-900/[0.06]"
+          className="whitespace-nowrap rounded-lg px-1.5 py-1 text-right font-mono text-[11px] 3xl:text-[13px] font-extrabold tabular-nums text-neutral-900 transition-colors hover:bg-neutral-900/[0.06]"
           title="Calendário e agenda do dia"
         >
           {now.toLocaleTimeString("pt-PT", {
@@ -117,7 +117,7 @@ function ClockAgenda({ now }) {
         data-testid="clock-agenda"
       >
         <div className="border-b border-border px-4 pb-3 pt-4">
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="text-[9px] 3xl:text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">
             {now.toLocaleDateString("pt-PT", { weekday: "long" })}
           </p>
           <p className="mt-1 font-heading text-xl font-extrabold capitalize tracking-tight text-foreground">
@@ -128,15 +128,15 @@ function ClockAgenda({ now }) {
           <MonthGrid now={now} dueDays={dueDays} />
         </div>
         <div className="border-t border-border px-4 py-3">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-[9px] 3xl:text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
             Agenda de hoje
           </p>
           {allTasks == null ? (
-            <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+            <p className="mt-2 text-[11px] 3xl:text-[13px] font-semibold text-muted-foreground">
               A carregar…
             </p>
           ) : todayTasks.length === 0 ? (
-            <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+            <p className="mt-2 text-[11px] 3xl:text-[13px] font-semibold text-muted-foreground">
               Sem tarefas com prazo para hoje.
             </p>
           ) : (
@@ -146,7 +146,7 @@ function ClockAgenda({ now }) {
                   <span
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${isOverdue(t.due_date, t.done) ? "bg-red-500" : "bg-emerald-500"}`}
                   />
-                  <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-foreground">
+                  <span className="min-w-0 flex-1 truncate text-[11px] 3xl:text-[13px] font-bold text-foreground">
                     {t.title}
                   </span>
                 </li>
@@ -160,7 +160,7 @@ function ClockAgenda({ now }) {
               setOpen(false);
               navigate("/tarefas");
             }}
-            className="mt-3 flex w-full items-center justify-center rounded-xl border border-border bg-muted px-3 py-2 text-[10px] font-extrabold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="mt-3 flex w-full items-center justify-center rounded-xl border border-border bg-muted px-3 py-2 text-[10px] 3xl:text-[12px] font-extrabold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             Abrir Tarefas
           </button>
@@ -181,7 +181,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
     return (
       <div
         data-testid="system-status"
-        className="flex min-w-0 items-center gap-2.5 text-[10px] font-bold text-neutral-500"
+        className="flex min-w-0 items-center gap-2.5 text-[10px] 3xl:text-[12px] font-bold text-neutral-500"
       >
         <span
           className="flex items-center gap-1.5"
@@ -221,7 +221,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
                 minute: "2-digit",
               })}
             </p>
-            <p className="mt-0.5 text-[11px] font-semibold capitalize text-neutral-500">
+            <p className="mt-0.5 text-[11px] 3xl:text-[13px] font-semibold capitalize text-neutral-500">
               {now.toLocaleDateString("pt-PT", {
                 weekday: "long",
                 day: "numeric",
@@ -229,7 +229,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
               })}
             </p>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full border border-neutral-900/10 bg-neutral-900/[0.04] px-2 py-1 text-[10px] font-bold text-neutral-600">
+          <span className="flex items-center gap-1.5 rounded-full border border-neutral-900/10 bg-neutral-900/[0.04] px-2 py-1 text-[10px] 3xl:text-[12px] font-bold text-neutral-600">
             <span className={`led ${online ? "led-ok" : "led-alert"}`} />{" "}
             {online ? "Sistema online" : "Sem ligação"}
           </span>
@@ -237,7 +237,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
         {status ? (
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-neutral-900/[0.04] p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              <div className="flex items-center gap-1.5 text-[10px] 3xl:text-[12px] font-bold uppercase tracking-wider text-neutral-400">
                 <ClipboardList className="h-3 w-3" /> Pedidos
               </div>
               <p className="mt-1 font-mono text-xl font-black tabular-nums">
@@ -245,7 +245,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
               </p>
             </div>
             <div className="rounded-xl bg-neutral-900/[0.04] p-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              <div className="flex items-center gap-1.5 text-[10px] 3xl:text-[12px] font-bold uppercase tracking-wider text-neutral-400">
                 <Mail className="h-3 w-3" /> Por ver
               </div>
               <p className="mt-1 font-mono text-xl font-black tabular-nums">
@@ -261,7 +261,7 @@ export default function StatusCluster({ variant = "sidebar" }) {
   return (
     <div
       data-testid="sidebar-status"
-      className="relative flex flex-col gap-2 text-[11px] font-semibold text-[color:var(--chrome-muted)]"
+      className="relative flex flex-col gap-2 text-[11px] 3xl:text-[13px] font-semibold text-[color:var(--chrome-muted)]"
     >
       <div className="flex items-center justify-between">
         <span

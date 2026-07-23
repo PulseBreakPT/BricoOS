@@ -1626,6 +1626,17 @@ code {
   }
 }
 
+/* TV/4K: só 3 widgets no deck, por isso o ganho de espaço vem de os
+   alargar (mais respiração), não de mais colunas. */
+@media (min-width: 1920px) {
+  .os-widget-deck {
+    width: min(
+      1320px,
+      calc(100vw - var(--os-liveops-width) - var(--os-shell-gap) * 4 - 4rem)
+    );
+  }
+}
+
 .mobile-workspace,
 .mobile-workspace *,
 .themed-surface,

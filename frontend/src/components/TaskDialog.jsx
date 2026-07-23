@@ -353,7 +353,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Secção</Label>
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
@@ -387,7 +387,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
           </Select>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-3">
           <div className="space-y-1.5">
             <Label>Data limite</Label>
             <Input

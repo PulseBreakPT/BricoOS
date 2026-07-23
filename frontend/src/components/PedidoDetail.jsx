@@ -960,7 +960,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="note-dialog"
-        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl xl:max-w-6xl" : "sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl"}`}
+        className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl xl:max-w-6xl 3xl:max-w-7xl" : "sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl 3xl:max-w-6xl"}`}
       >
         {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
@@ -1450,7 +1450,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <ViewField label="Fornecedor preferido" value={suppliers.find((s) => s.id === form.supplier_id)?.name} />
                 </div>
               )}
-              <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {editMode ? (
                   <div className="space-y-1.5">
                     <Label>Prazo alerta (dias)</Label>
@@ -2049,7 +2049,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <p className="mt-0.5 text-xs">Toca em "Adicionar fotos" para tirar ou escolher uma foto.</p>
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 3xl:grid-cols-6">
                     {photos.map((p) => (
                       <div
                         key={p.id}
