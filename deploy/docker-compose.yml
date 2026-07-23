@@ -80,6 +80,8 @@ services:
       AI_MODEL: ${AI_MODEL:-gpt-5.4}
       # Arquivar automaticamente pedidos inativos há mais de N meses.
       AUTO_CLOSE_MONTHS: ${AUTO_CLOSE_MONTHS:-6}
+      # Notificações push (opcional — sem isto usa o GMAIL_SMTP_USER acima).
+      VAPID_CLAIMS_EMAIL: ${VAPID_CLAIMS_EMAIL:-}
     # Loopback no host para debug local (curl http://127.0.0.1:8001/api/).
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8001}:8001"

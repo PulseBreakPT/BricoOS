@@ -30,7 +30,7 @@ from email.utils import parseaddr, make_msgid, parsedate_to_datetime
 from html import escape as html_escape, unescape as html_unescape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 
@@ -64,6 +64,7 @@ try:
     import classification_rules
     import severity as severity_engine
     import edition_summary
+    import push_notifications
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -94,6 +95,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     from . import classification_rules
     from . import severity as severity_engine
     from . import edition_summary
+    from . import push_notifications
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -122,6 +124,11 @@ SMTP_CONFIGURED = bool(GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD)
 # Intervalo (minutos) da verificação automática de respostas na caixa de
 # entrada, por IMAP em modo só-leitura. 0 desliga a verificação automática.
 IMAP_POLL_MINUTES = int(os.environ.get('IMAP_POLL_MINUTES', '5') or 0)
+
+# Contacto usado na notificação push (claim "sub" do VAPID, exigido pelo
+# protocolo) — por omissão reaproveita o Gmail já configurado, para não
+# obrigar a preencher mais uma variável de ambiente só para isto.
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', '').strip() or GMAIL_SMTP_USER
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 AI_MODEL = os.environ.get('AI_MODEL', 'gpt-5.4')
@@ -3922,6 +3929,11 @@ async def poll_supplier_replies():
             "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
             "edition_summary": edition_summary_result,
             "seen": False, "received_at": now_iso()})
+        try:
+            from_label = supplier_name or m.get("from_name") or m["from_email"]
+            await push_notifications.notify_new_email(db, m["subject"], from_label)
+        except Exception as e:
+            logger.warning(f"Notificação push falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
             quem = supplier_name or m.get("from_name") or m["from_email"]
@@ -5684,7 +5696,7 @@ async def ensure_indexes():
                         ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
                         ("category_suggestions", "signature"), ("category_suggestions", "status"),
                         ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
-                        ("tasks", "category_signature")]:
+                        ("tasks", "category_signature"), ("auth_devices", "token")]:
         try:
             await db[coll].create_index(field)
         except Exception:
@@ -5892,6 +5904,59 @@ async def verify_pin(payload: PinVerifyIn, request: Request):
     if fails >= PIN_MAX_ATTEMPTS:
         return {"ok": False, "locked": True, "retry_in_seconds": PIN_LOCK_MINUTES * 60, "attempts_left": 0}
     return {"ok": False, "locked": False, "retry_in_seconds": 0, "attempts_left": PIN_MAX_ATTEMPTS - fails}
+
+
+# ---------- Notificações push (Web Push) ----------
+# A subscrição fica gravada no próprio registo do dispositivo já
+# verificado por PIN (db.auth_devices) — sem tabela nova, sem conta de
+# utilizador: um dispositivo, uma subscrição. Ver push_notifications.py.
+class PushSubscriptionIn(BaseModel):
+    endpoint: str
+    keys: Dict[str, str]
+
+
+async def _device_from_request(request: Request):
+    token = request.headers.get("x-device-token")
+    device = await db.auth_devices.find_one({"token": token}, {"_id": 0})
+    if not device:
+        raise HTTPException(status_code=401, detail="Dispositivo não reconhecido")
+    return device
+
+
+@api_router.get("/push/vapid-public-key")
+async def push_vapid_public_key():
+    keys = await push_notifications.get_vapid_keys(db, claims_email=VAPID_CLAIMS_EMAIL)
+    return {"public_key": keys["public_key"]}
+
+
+@api_router.post("/push/subscribe")
+async def push_subscribe(payload: PushSubscriptionIn, request: Request):
+    device = await _device_from_request(request)
+    await db.auth_devices.update_one(
+        {"id": device["id"]},
+        {"$set": {"push_subscription": {"endpoint": payload.endpoint, "keys": payload.keys},
+                   "push_subscribed_at": now_iso()}})
+    return {"ok": True}
+
+
+@api_router.post("/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    device = await _device_from_request(request)
+    await db.auth_devices.update_one({"id": device["id"]}, {"$unset": {"push_subscription": ""}})
+    return {"ok": True}
+
+
+@api_router.post("/push/test")
+async def push_test(request: Request):
+    device = await _device_from_request(request)
+    if not device.get("push_subscription"):
+        raise HTTPException(status_code=400, detail="Este dispositivo ainda não tem notificações ativas")
+    sent = await push_notifications.send_to_device(db, device, {
+        "title": "BRICO OS", "body": "Notificações ativas neste dispositivo.",
+        "url": "/", "tag": "test"})
+    if not sent:
+        raise HTTPException(status_code=502, detail="Não foi possível enviar a notificação — tenta ativar de novo.")
+    return {"ok": True}
 
 
 @app.middleware("http")
