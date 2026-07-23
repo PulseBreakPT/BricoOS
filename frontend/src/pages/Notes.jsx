@@ -51,6 +51,29 @@ const PRESETS = [
 
 const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
 
+// Modo recuperação: se a página fechar/recarregar por interrupção (não por
+// fechar o pedido de propósito), a próxima visita retoma exatamente onde
+// ficou. Guardado só enquanto o pedido está aberto — um fecho deliberado
+// limpa a entrada, para não reabrir sozinho depois de já ter terminado.
+const LAST_VIEWED_KEY = "brico_last_viewed_note";
+const LAST_VIEWED_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+
+function saveLastViewed(id, tab) {
+  try {
+    localStorage.setItem(LAST_VIEWED_KEY, JSON.stringify({ id, tab, savedAt: Date.now() }));
+  } catch { /* armazenamento bloqueado — modo recuperação fica só desligado */ }
+}
+function clearLastViewed() {
+  try { localStorage.removeItem(LAST_VIEWED_KEY); } catch { /* ignore */ }
+}
+function readLastViewed() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAST_VIEWED_KEY) || "null");
+    if (raw && raw.id && Date.now() - (raw.savedAt || 0) < LAST_VIEWED_MAX_AGE_MS) return raw;
+  } catch { /* ignore */ }
+  return null;
+}
+
 // As duas áreas do painel — completamente separadas, cada uma só com os seus
 // pedidos: «band» = Orçamentos Banda Alumínios; «geral» = Pedidos de Clientes.
 const SEGMENTS = {
@@ -153,6 +176,7 @@ export default function Notes() {
   const loadSeq = useRef(0);
   const todaySeq = useRef(0);
   const metaSeq = useRef(0);
+  const recoveredRef = useRef(false);
 
   const loadMeta = useCallback(async () => {
     const seq = ++metaSeq.current;
@@ -275,9 +299,37 @@ export default function Notes() {
       setDetailCreateMode(SEGMENTS[segment].createMode);
       setDetailOpen(true);
     }
+    // Modo recuperação: só tenta uma vez por carregamento da página (senão
+    // reabria sozinho depois de a pessoa fechar o pedido de propósito, já
+    // que fechar o "?open=" acima também muda location.search e voltava a
+    // correr este efeito) e só quando não há nada mais a abrir pelo URL.
+    if (!recoveredRef.current) {
+      recoveredRef.current = true;
+      if (!openId && !wantsNew) {
+        const last = readLastViewed();
+        if (last) {
+          setDetailNoteId(last.id);
+          setDetailInitialTab(DETAIL_TABS.includes(last.tab) ? last.tab : "detalhes");
+          setDetailOpen(true);
+        }
+      }
+    }
     // Ao limpar os parâmetros transitórios (gmail/open/new), a área ativa mantém-se no URL.
     if (g || openId || wantsNew) navigate(params.get("area") === "band" ? "/?area=band" : "/", { replace: true });
   }, [location.search, loadMeta, navigate, segment]);
+
+  // Guarda o pedido atualmente aberto para o modo recuperação — atualizado
+  // sempre que se abre um pedido ou se muda de aba, para a janela dos
+  // LAST_VIEWED_MAX_AGE_MS deslizar enquanto a pessoa está mesmo a trabalhar
+  // nele (e não expirar a meio de uma sessão longa).
+  useEffect(() => {
+    if (detailOpen && detailNoteId) saveLastViewed(detailNoteId, detailInitialTab);
+  }, [detailOpen, detailNoteId, detailInitialTab]);
+
+  const handleDetailOpenChange = useCallback((v) => {
+    setDetailOpen(v);
+    if (!v) clearLastViewed();
+  }, []);
 
   const openNew = () => {
     setDetailNoteId(null);
@@ -805,7 +857,7 @@ export default function Notes() {
 
       <PedidoDetail
         open={detailOpen}
-        onOpenChange={setDetailOpen}
+        onOpenChange={handleDetailOpenChange}
         noteId={detailNoteId}
         initialTab={detailInitialTab}
         initialCreateMode={detailCreateMode}

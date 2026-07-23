@@ -18,6 +18,7 @@ import imaplib
 import smtplib
 import warnings
 import mimetypes
+import urllib.parse
 import email as email_lib
 import nh3
 from email import encoders as email_encoders
@@ -54,8 +55,15 @@ try:
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
-    from quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
+    from quote_validation import (
+        build_quality_report, confidence_score, detect_urgency_signals,
+        diff_quote_versions, diff_summary_text, duplicate_medidas,
+    )
     import correio_semanal
+    import anexos_edicao
+    import classification_rules
+    import severity as severity_engine
+    import edition_summary
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -77,8 +85,15 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         detect_material, margin_for_material, material_label, parse_supplier_pdf,
         suggest_client_price,
     )
-    from .quote_validation import build_quality_report, diff_quote_versions, diff_summary_text
+    from .quote_validation import (
+        build_quality_report, confidence_score, detect_urgency_signals,
+        diff_quote_versions, diff_summary_text, duplicate_medidas,
+    )
     from . import correio_semanal
+    from . import anexos_edicao
+    from . import classification_rules
+    from . import severity as severity_engine
+    from . import edition_summary
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -292,6 +307,29 @@ def callback_due(note, now, side):
     return last is None or (now - last) >= timedelta(hours=CALLBACK_RETRY_HOURS)
 
 
+def _priority_score(note):
+    """Motor de prioridades: um número (não guardado, recalculado sempre
+    que o pedido passa por enrich_note — ou seja, sempre que é lido) que
+    combina a prioridade escolhida pela pessoa com sinais objetivos
+    (atraso, tempo de espera, problemas de leitura no último orçamento
+    importado). Serve só para ordenar (sort=urgency) — nunca substitui ou
+    sobrepõe a prioridade manual guardada em note.priority."""
+    score = (3 - PRIORITY_RANK.get(note.get("priority"), 2)) * 30.0
+    if note.get("is_overdue"):
+        score += 50
+    score += min(note.get("waiting_days", 0) or 0, 30)
+    sq = note.get("supplier_quote") or {}
+    qr = sq.get("quality_report") or {}
+    if qr.get("status") == "error":
+        score += 15
+    elif qr.get("status") == "warning":
+        score += 5
+    diff = sq.get("diff_since_previous")
+    if diff and diff.get("has_changes"):
+        score += 10
+    return round(score, 1)
+
+
 def enrich_note(note, now=None):
     now = now or datetime.now(timezone.utc)
     status = note.get("status", "novo")
@@ -305,6 +343,12 @@ def enrich_note(note, now=None):
     days = max((now - ref).days, 0) if ref else 0
     note["waiting_days"] = days
     note["is_overdue"] = (status in WAITING_SUPPLIER or status in FORGOTTEN_STATUSES) and days >= sla
+    # Prazo previsto de resposta: mesma referência usada para "waiting_days"
+    # (o SLA conta a partir da última mudança de estado), só que como data
+    # concreta em vez de "há X dias" — mais fácil de mostrar num calendário
+    # ou de comparar com "hoje".
+    note["expected_reply_date"] = (ref + timedelta(days=sla)).date().isoformat() if ref else None
+    note["priority_score"] = _priority_score(note)
     sup = parse_dt(note.get("last_supplier_sent_at"))
     cli = parse_dt(note.get("last_client_contact_at"))
     note["days_since_supplier"] = (now - sup).days if sup else None
@@ -1149,6 +1193,8 @@ async def list_notes(
         docs = [d for d in docs if d.get("needs_callback")]
     if sort == "priority":
         docs.sort(key=lambda d: (PRIORITY_RANK.get(d.get("priority"), 2), d.get("created_at")))
+    elif sort == "urgency":
+        docs.sort(key=lambda d: -d.get("priority_score", 0))
     elif sort == "deadline":
         docs.sort(key=lambda d: -d.get("waiting_days", 0))
     elif sort == "customer":
@@ -1852,9 +1898,53 @@ async def delete_task_group(group_id: str):
 
 
 @api_router.get("/tasks")
-async def list_tasks(note_id: Optional[str] = None):
-    q = {"note_id": note_id} if note_id else {}
+async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = None):
+    q = {}
+    if note_id:
+        q["note_id"] = note_id
+    # Tarefas sugeridas pelo Correio Semanal ficam de fora da lista normal
+    # até serem aceites — só aparecem quando pedidas explicitamente
+    # (suggested=true), para não intrometer sugestões por confirmar na
+    # lista de tarefas já assumidas.
+    q["suggested"] = suggested if suggested is not None else {"$ne": True}
     return await db.tasks.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+
+@api_router.post("/tasks/{task_id}/accept-suggestion")
+async def accept_task_suggestion(task_id: str):
+    t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    await db.tasks.update_one({"id": task_id}, {"$set": {"suggested": False}})
+    t["suggested"] = False
+    return t
+
+
+class AcceptNewCategoryIn(BaseModel):
+    category: str
+
+
+@api_router.post("/tasks/{task_id}/accept-new-category")
+async def accept_new_category(task_id: str, payload: AcceptNewCategoryIn):
+    """Confirma uma sugestão de categoria nova (ver server.py:
+    _suggest_new_categories) — a categoria e as suas palavras-chave ficam
+    gravadas em classification_rules (base de dados, nunca código) e
+    aplicam-se já à próxima edição do Correio Semanal/Anexos_Edição
+    processada, sem precisar de deploy nenhum."""
+    t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
+    if not t or t.get("kind") != "new_category_suggestion":
+        raise HTTPException(status_code=404, detail="Sugestão de categoria não encontrada")
+    category = (payload.category or "").strip()
+    if not category:
+        raise HTTPException(status_code=400, detail="Indique um nome para a categoria")
+    rules = await classification_rules.learn_new_category(
+        db, category, t.get("category_keywords") or [], source=t.get("source", ""))
+    if t.get("category_signature"):
+        await db.category_suggestions.update_one(
+            {"signature": t["category_signature"]},
+            {"$set": {"status": "accepted", "accepted_as": category, "updated_at": now_iso()}})
+    await db.tasks.delete_one({"id": task_id})
+    return {"category": category, "keywords": rules.get(category, [])}
 
 
 @api_router.post("/tasks")
@@ -2508,6 +2598,9 @@ async def add_quote(note_id: str, payload: QuoteIn):
 BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
 MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
 MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
+# O Anexos_Edição.zip do Correio Semanal (dossiers e planogramas incluídos)
+# ronda facilmente os 20 MB — bem acima do limite de um PDF de fornecedor.
+MAX_ANEXOS_ZIP_BYTES = 30 * 1024 * 1024
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_PHOTOS_PER_NOTE = 30
 
@@ -2540,17 +2633,32 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
     Levanta ValueError se o PDF não for reconhecido.
 
     Centro de Validação Automática: antes de guardar, confere a qualidade da
-    leitura (imagens, preços, descrições, totais — ver quote_validation) e,
+    leitura (imagens, preços, descrições, totais — ver quote_validation),
+    deteta se o mesmo ficheiro já tinha sido importado (evita duplicados) e,
     se já havia uma versão anterior do orçamento para este pedido, compara
-    artigo a artigo (adicionados, removidos, alterados) e guarda a versão
-    anterior no histórico. Nada disto bloqueia a importação — só fica
-    registado para a pessoa decidir com informação completa."""
+    artigo a artigo (adicionados, removidos, alterados), conta a revisão e
+    guarda a versão anterior no histórico. Nada disto bloqueia a importação
+    nem muda a prioridade sozinho — só fica registado/etiquetado para a
+    pessoa decidir com informação completa."""
+    content_hash = hashlib.sha256(data).hexdigest()
+    dup = await db.note_files.find_one(
+        {"note_id": note_id, "kind": "supplier_pdf", "content_hash": content_hash}, {"_id": 0, "id": 1})
+    if dup:
+        await log_activity(note_id, "updated",
+                           f"PDF do fornecedor recebido, mas é idêntico a um já importado — não "
+                           f"reprocessado{source_label}.", {"file_id": dup["id"]})
+        current = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_quote": 1})
+        return (current or {}).get("supplier_quote")
+
     parsed = parse_supplier_pdf(data)
     quality_report = build_quality_report(parsed)
+    confidence = confidence_score(quality_report)
+    dup_medidas = duplicate_medidas(parsed["items"])
+
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
-        "filename": filename or "orcamento_fornecedor.pdf",
+        "filename": filename or "orcamento_fornecedor.pdf", "content_hash": content_hash,
         "content_b64": base64.b64encode(data).decode(), "created_at": now_iso()})
     for item in parsed["items"]:
         material = detect_material(item.get("description"))
@@ -2561,24 +2669,48 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         item["coefficient"] = coefficient_for_margin(item["margin_pct"])
         item["include"] = True
 
-    prev = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_quote": 1, "supplier_quote_history": 1})
-    prev_quote = (prev or {}).get("supplier_quote")
+    n = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    prev_quote = (n or {}).get("supplier_quote")
     quote_diff = None
     extra_set = {}
     if prev_quote:
         quote_diff = diff_quote_versions(prev_quote.get("items"), parsed["items"])
-        history = list((prev or {}).get("supplier_quote_history") or [])
+        history = list((n or {}).get("supplier_quote_history") or [])
         history.append({k: prev_quote.get(k) for k in (
             "quote_number", "date", "obra", "total", "source_file_id", "imported_at")})
         extra_set["supplier_quote_history"] = history[-SUPPLIER_QUOTE_HISTORY_LIMIT:]
+    # Contagem de revisões: campo próprio, nunca aparado (ao contrário do
+    # array de histórico acima, que só guarda as últimas
+    # SUPPLIER_QUOTE_HISTORY_LIMIT versões em detalhe) — para continuar
+    # correta depois da 6ª importação do mesmo orçamento.
+    revision_number = ((n or {}).get("supplier_quote_revision_count") or 0) + 1
+    extra_set["supplier_quote_revision_count"] = revision_number
+
+    urgency_hits = detect_urgency_signals(
+        (n or {}).get("description"), (n or {}).get("details"),
+        *[i.get("description") for i in parsed["items"]])
 
     supplier_quote = {**parsed,
                       "margin_rules": {"pvc": margin_for_material("pvc"),
                                        "aluminio": margin_for_material("aluminio")},
                       "source_file_id": file_id, "imported_at": now_iso(),
-                      "quality_report": quality_report, "diff_since_previous": quote_diff}
-    await db.notes.update_one({"id": note_id}, {"$set": {
-        "supplier_quote": supplier_quote, "updated_at": now_iso(), **extra_set}})
+                      "quality_report": quality_report, "diff_since_previous": quote_diff,
+                      "confidence_score": confidence, "revision_number": revision_number,
+                      "duplicate_medidas": dup_medidas}
+
+    # Etiquetas automáticas — só acrescenta (nunca remove uma etiqueta posta
+    # à mão) e nunca mexe em note.priority sozinho, mesmo quando deteta
+    # sinais de urgência: fica assinalado para uma pessoa decidir.
+    auto_labels = sorted({i.get("material_label") for i in parsed["items"] if i.get("material_label")})
+    if quality_report["status"] != "ok":
+        auto_labels.append("revisão necessária")
+    if urgency_hits:
+        auto_labels.append("possível urgência")
+
+    update_ops = {"$set": {"supplier_quote": supplier_quote, "updated_at": now_iso(), **extra_set}}
+    if auto_labels:
+        update_ops["$addToSet"] = {"labels": {"$each": auto_labels}}
+    await db.notes.update_one({"id": note_id}, update_ops)
 
     quality_note = ""
     if quality_report["status"] != "ok":
@@ -2586,9 +2718,14 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         quality_note = f" — ⚠ verificar: {'; '.join(problems)}"
     await log_activity(note_id, "updated",
                        f"Orçamento do fornecedor importado ({supplier_quote['quote_number']}, "
-                       f"{len(parsed['items'])} linha(s)){source_label}{quality_note}", {"file_id": file_id})
+                       f"{len(parsed['items'])} linha(s), revisão {revision_number}, confiança "
+                       f"{confidence}%){source_label}{quality_note}", {"file_id": file_id})
     if quote_diff and quote_diff["has_changes"]:
         await log_activity(note_id, "updated", diff_summary_text(quote_diff), {"diff": quote_diff})
+    if urgency_hits:
+        await log_activity(note_id, "updated",
+                           f"Possível urgência detetada no texto do orçamento (\"{urgency_hits[0]}\") "
+                           f"— confirme a prioridade.", {"urgency_hits": urgency_hits})
 
     # O total do fornecedor entra no fluxo normal de orçamentos recebidos
     # (muda o estado e alimenta as estatísticas de resposta).
@@ -2657,7 +2794,10 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
             # importação) antes de confirmar o envio — ver ConfirmSendDialog.
             "source_file_id": supplier_quote.get("source_file_id") or "",
             "quality_report": supplier_quote.get("quality_report"),
-            "diff_since_previous": supplier_quote.get("diff_since_previous")},
+            "diff_since_previous": supplier_quote.get("diff_since_previous"),
+            "confidence_score": supplier_quote.get("confidence_score"),
+            "revision_number": supplier_quote.get("revision_number"),
+            "duplicate_medidas": supplier_quote.get("duplicate_medidas")},
         "updated_at": now_iso()}})
     return pdf_bytes, filename, file_id
 
@@ -3202,15 +3342,24 @@ def _email_body_html(msg, plain_fallback):
 
 
 def _email_pdf_attachments(msg):
-    """Extrai anexos PDF (máx. 5, até MAX_SUPPLIER_PDF_BYTES cada)."""
+    """Extrai anexos PDF e ZIP (máx. 5 no total) — PDF até
+    MAX_SUPPLIER_PDF_BYTES, ZIP até MAX_ANEXOS_ZIP_BYTES (o
+    Anexos_Edição.zip do Correio Semanal chega a rondar os 20 MB)."""
     out = []
     for part in msg.walk():
         filename = _decode_mime_header(part.get_filename() or "")
-        if part.get_content_type() != "application/pdf" and not filename.lower().endswith(".pdf"):
+        content_type = part.get_content_type()
+        is_pdf = content_type == "application/pdf" or filename.lower().endswith(".pdf")
+        is_zip = (
+            content_type in ("application/zip", "application/x-zip-compressed")
+            or filename.lower().endswith(".zip")
+        )
+        if not is_pdf and not is_zip:
             continue
         payload = part.get_payload(decode=True)
-        if payload and len(payload) <= MAX_SUPPLIER_PDF_BYTES:
-            out.append({"filename": filename or "documento.pdf", "data": payload})
+        limit = MAX_ANEXOS_ZIP_BYTES if is_zip else MAX_SUPPLIER_PDF_BYTES
+        if payload and len(payload) <= limit:
+            out.append({"filename": filename or ("anexo.zip" if is_zip else "documento.pdf"), "data": payload})
         if len(out) >= 5:
             break
     return out
@@ -3249,6 +3398,208 @@ async def _summarize_correio_semanal(subject, pdf_bytes_list):
     except Exception as e:
         logger.error(f"Resumo do Correio Semanal falhou: {e}")
         return ""
+
+
+CATEGORY_SUGGESTION_THRESHOLD = 2  # nº de edições distintas com o mesmo padrão antes de sugerir
+
+
+async def _suggest_new_categories(fingerprints, source, edition_ref):
+    """A resposta determinística a "o sistema reconhece um tipo de
+    documento novo e cria a categoria sozinho": um documento que não bata
+    com nenhuma categoria conhecida fica em "outro" com uma "impressão
+    digital" das suas palavras mais distintivas (ver
+    classification_rules.unclassified_fingerprint). Se o mesmo padrão
+    aparecer em CATEGORY_SUGGESTION_THRESHOLD edições diferentes, é sinal
+    de que é mesmo um tipo de documento recorrente — sugere-se uma
+    categoria nova a um humano (POST /tasks/{id}/accept-new-category);
+    assim que aceite, fica gravada na base de dados (nunca no código) e
+    passa a aplicar-se sozinha a partir da próxima edição. Sem qualquer
+    ocorrência repetida, não há sinal nenhum para propor — esse é o limite
+    honesto de um motor sem IA."""
+    if not fingerprints:
+        return 0
+    created = 0
+    for item in fingerprints:
+        fp = item.get("fingerprint") or []
+        if len(fp) < 2:
+            continue
+        signature = "+".join(sorted(fp[:4]))
+        doc = await db.category_suggestions.find_one({"signature": signature})
+        example = {"source": source, "edition_ref": edition_ref, "label": item.get("path") or item.get("title")}
+        if doc:
+            if doc.get("status") != "pending" or edition_ref in {e.get("edition_ref") for e in doc.get("examples", [])}:
+                continue  # já decidido, ou a mesma edição já contou (evita inflar por reprocessamento)
+            await db.category_suggestions.update_one(
+                {"signature": signature},
+                {"$inc": {"occurrences": 1}, "$push": {"examples": example}, "$set": {"updated_at": now_iso()}})
+            occurrences = doc.get("occurrences", 1) + 1
+        else:
+            await db.category_suggestions.insert_one({
+                "id": str(uuid.uuid4()), "signature": signature, "keywords": fp[:6], "status": "pending",
+                "occurrences": 1, "examples": [example], "created_at": now_iso(), "updated_at": now_iso()})
+            occurrences = 1
+        if occurrences < CATEGORY_SUGGESTION_THRESHOLD:
+            continue
+        exists = await db.tasks.find_one({"suggested": True, "kind": "new_category_suggestion",
+                                           "category_signature": signature})
+        if exists:
+            continue
+        await db.tasks.insert_one({
+            "id": str(uuid.uuid4()), "category": "construcao", "done": False, "priority": "baixa",
+            "due_date": "", "repeat": "none", "subtasks": [], "labels": ["categoria-nova"],
+            "note_id": "", "group_id": "",
+            # csn_number/edition_number seguem o mesmo campo que o painel de
+            # tarefas sugeridas usa para filtrar por edição (ver
+            # SuggestedTasksPanel no frontend) — sem isto a sugestão nunca
+            # apareceria em lado nenhum.
+            "csn_number": edition_ref if source == "correio_semanal" else "",
+            "edition_number": edition_ref if source == "anexos_edicao" else "",
+            "title": f"[Categoria nova?] Documentos recorrentes não reconhecidos: {', '.join(fp[:4])}",
+            "created_at": now_iso(), "suggested": True, "source": source, "kind": "new_category_suggestion",
+            "category_signature": signature, "category_keywords": fp[:6]})
+        created += 1
+    return created
+
+
+async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
+    """Complementa o resumo em HTML com dados estruturados: guarda um
+    "digest" desta edição, compara com a edição anterior (se houver) e
+    sugere tarefas a partir das secções com "A Encomendar"/"A Fazer"
+    marcado, ou um rascunho de email quando a secção pede uma resposta de
+    adesão/não adesão. Nunca cria uma tarefa já confirmada nem envia
+    nada sozinho — fica marcada como sugestão (suggested=True) até
+    alguém aceitar, mesmo padrão de aprovação usado no resto da app.
+
+    A classificação por secção usa as regras partilhadas com o
+    Anexos_Edição (classification_rules.load_rules) — a prioridade da
+    tarefa sugerida segue a gravidade calculada por severity.py, em vez de
+    ser sempre "média"."""
+    rules = await classification_rules.load_rules(db)
+    try:
+        structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject, rules)
+    except Exception as e:
+        logger.error(f"Extração estruturada do Correio Semanal falhou: {e}")
+        return None
+    if not structured or not structured.get("csn_number"):
+        return None
+
+    prev_list = await db.correio_semanal_digests.find(
+        {"csn_number": {"$ne": structured["csn_number"]}}, {"_id": 0},
+    ).sort("created_at", -1).to_list(1)
+    prev = (prev_list[0]["structured"] if prev_list else None)
+    diff = correio_semanal.diff_digest_versions(prev, structured) if prev else None
+
+    await db.correio_semanal_digests.insert_one({
+        "id": str(uuid.uuid4()), "email_id": email_id, "csn_number": structured["csn_number"],
+        "week_label": structured.get("week_label"), "issue_date": structured.get("issue_date"),
+        "structured": structured, "diff_since_previous": diff, "created_at": now_iso()})
+
+    created = 0
+    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
+                 "repeat": "none", "subtasks": [], "labels": ["correio-semanal"], "note_id": "", "group_id": ""}
+    for section in structured["sections"]:
+        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(section.get("severity"), "media")
+        for action in section.get("checked_actions") or []:
+            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
+                                               "source_page": section["page"], "kind": "task", "action": action})
+            if exists:
+                continue
+            await db.tasks.insert_one({
+                **base_task, "id": str(uuid.uuid4()), "priority": priority,
+                "title": f"[Correio Semanal {structured['csn_number']}] {action}: {section['title']}",
+                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
+                "csn_number": structured["csn_number"], "source_page": section["page"],
+                "kind": "task", "action": action, "severity": section.get("severity")})
+            created += 1
+        if section.get("requires_adhesion_email") and section.get("adhesion_emails"):
+            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
+                                               "source_page": section["page"], "kind": "email_draft"})
+            if exists:
+                continue
+            to = ",".join(section["adhesion_emails"])
+            mailto = f"mailto:{to}?subject={urllib.parse.quote(section['title'])}"
+            await db.tasks.insert_one({
+                **base_task, "id": str(uuid.uuid4()), "priority": priority,
+                "title": f"[Correio Semanal {structured['csn_number']}] Responder por email: {section['title']}",
+                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
+                "csn_number": structured["csn_number"], "source_page": section["page"],
+                "kind": "email_draft", "mailto": mailto, "recipients": section["adhesion_emails"],
+                "severity": section.get("severity")})
+            created += 1
+
+    created += await _suggest_new_categories(structured.get("unclassified_fingerprints"),
+                                              source="correio_semanal", edition_ref=structured["csn_number"])
+
+    return {"digest": structured, "diff": diff, "suggested_tasks_created": created, "prev_digest": prev}
+
+
+ANEXOS_EDICAO_ACTIONABLE = {
+    "nota_encomenda": "Responder/encomendar",
+    "incidencia": "Rever incidências",
+    "campanha": "Preparar campanha",
+    "planograma": "Atualizar exposição",
+}
+
+
+async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edition=None):
+    """Processa o Anexos_Edição.zip que costuma acompanhar o Correio
+    Semanal: descompacta (incl. zips aninhados), classifica e extrai cada
+    ficheiro pelo próprio conteúdo — nunca pelo nome (ver anexos_edicao.py)
+    — compara com a edição anterior (novos/removidos/atualizados, preços
+    alterados, produtos novos/descontinuados) e sugere tarefas a partir do
+    que precisar de ação. Sempre como sugestão (suggested=True), nunca
+    confirmada nem enviada sozinha.
+
+    A classificação usa as mesmas regras partilhadas com o correio_semanal
+    (classification_rules.load_rules) e a prioridade da tarefa sugerida
+    segue a gravidade calculada por severity.py."""
+    rules = await classification_rules.load_rules(db)
+    try:
+        processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename, rules)
+    except Exception as e:
+        logger.error(f"Processamento do Anexos_Edição falhou: {e}")
+        return None
+    if not processed.get("edition_number"):
+        processed["edition_number"] = fallback_edition
+    if not processed.get("edition_number"):
+        return None
+
+    prev_list = await db.anexos_edicoes.find(
+        {"edition_number": {"$ne": processed["edition_number"]}}, {"_id": 0},
+    ).sort("created_at", -1).to_list(1)
+    prev = prev_list[0]["processed"] if prev_list else None
+    diff = anexos_edicao.diff_edicao_versions(prev, processed) if prev else None
+
+    await db.anexos_edicoes.insert_one({
+        "id": str(uuid.uuid4()), "email_id": email_id, "edition_number": processed["edition_number"],
+        "zip_filename": zip_filename, "processed": processed, "diff_since_previous": diff,
+        "created_at": now_iso()})
+
+    created = 0
+    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
+                 "repeat": "none", "subtasks": [], "labels": ["anexos-edicao"], "note_id": "", "group_id": ""}
+    for f in processed.get("files", []):
+        verb = ANEXOS_EDICAO_ACTIONABLE.get(f["category"])
+        if not verb:
+            continue
+        filename = f["path"].rsplit("/", 1)[-1]
+        exists = await db.tasks.find_one({"suggested": True, "edition_number": processed["edition_number"],
+                                           "source_path": f["path"]})
+        if exists:
+            continue
+        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(f.get("severity"), "media")
+        await db.tasks.insert_one({
+            **base_task, "id": str(uuid.uuid4()), "priority": priority,
+            "title": f"[Anexos Edição {processed['edition_number']}] {verb}: {filename}",
+            "created_at": now_iso(), "suggested": True, "source": "anexos_edicao",
+            "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task",
+            "severity": f.get("severity")})
+        created += 1
+
+    created += await _suggest_new_categories(processed.get("unclassified_fingerprints"),
+                                              source="anexos_edicao", edition_ref=processed["edition_number"])
+
+    return {"processed": processed, "diff": diff, "suggested_tasks_created": created, "prev_processed": prev}
 
 
 def _imap_fetch_since(last_uid):
@@ -3511,10 +3862,42 @@ async def poll_supplier_replies():
             classification["priority"] = rules_result["priority_override"]
             classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
         correio_semanal_summary = ""
+        correio_semanal_result = None
+        anexos_result = None
         att_filenames = [att["filename"] for att in m.get("attachments", [])]
         if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
-            pdf_bytes_list = [att["data"] for att in m["attachments"]]
-            correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
+            # O boletim e o pacote de anexos (Anexos_Edição.zip) chegam no
+            # mesmo email mas são processados por módulos diferentes — só o
+            # PDF vai para o resumo do Correio Semanal, só o zip para o
+            # anexos_edicao.
+            pdf_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".pdf")]
+            zip_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".zip")]
+            if pdf_atts:
+                pdf_bytes_list = [a["data"] for a in pdf_atts]
+                correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
+                correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
+            if zip_atts:
+                fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
+                anexos_result = await _process_anexos_edicao(
+                    zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
+        edition_summary_result = None
+        if correio_semanal_result or anexos_result:
+            # Resumo único da edição — junta o que veio do boletim com o
+            # que veio do zip (um dos dois pode faltar) no formato pedido:
+            # nº de documentos, assuntos novos, alterações, tarefas
+            # criadas, campanhas iniciadas/terminadas, prazos desta
+            # semana, incidências críticas, informativos e erros.
+            edition_summary_result = edition_summary.build_summary(
+                (correio_semanal_result or {}).get("digest"),
+                (anexos_result or {}).get("processed"),
+                (correio_semanal_result or {}).get("diff"),
+                (anexos_result or {}).get("diff"),
+                (correio_semanal_result or {}).get("prev_digest"),
+                (anexos_result or {}).get("prev_processed"))
+            edition_summary_result["stats"]["tarefas_criadas"] = (
+                ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
+                + ((anexos_result or {}).get("suggested_tasks_created") or 0))
+            edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
         await db.received_emails.insert_one({
             "id": email_id, "uid": m["uid"], "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -3522,10 +3905,22 @@ async def poll_supplier_replies():
             "matched": bool(note_id or supplier_id),
             "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
             "body_html": m.get("body_html") or "",
-            "attachments": attachments_meta, "has_pdf": bool(attachments_meta),
+            "attachments": attachments_meta,
+            "has_pdf": any(a["filename"].lower().endswith(".pdf") for a in attachments_meta),
             **classification,
             "correio_semanal_summary": correio_semanal_summary,
             "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
+            "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
+            "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
+            "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
+            "anexos_edicao_number": (anexos_result or {}).get("processed", {}).get("edition_number") or "",
+            "anexos_edicao_summary": {
+                "file_count": (anexos_result or {}).get("processed", {}).get("file_count"),
+                "by_category": (anexos_result or {}).get("processed", {}).get("by_category"),
+            } if anexos_result else None,
+            "anexos_edicao_diff": (anexos_result or {}).get("diff"),
+            "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
+            "edition_summary": edition_summary_result,
             "seen": False, "received_at": now_iso()})
         if note_id:
             matched += 1
@@ -3546,8 +3941,11 @@ async def poll_supplier_replies():
                 # PDF da BandAluminios em anexo → analisa e gera automaticamente
                 # o PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
                 # enviado sem confirmação explícita do utilizador.
-                if m.get("attachments"):
-                    first = m["attachments"][0]
+                # (m["attachments"] pode agora incluir também .zip — ver
+                # _email_pdf_attachments — por isso filtra-se só o PDF.)
+                supplier_pdf_atts = [a for a in m.get("attachments", []) if a["filename"].lower().endswith(".pdf")]
+                if supplier_pdf_atts:
+                    first = supplier_pdf_atts[0]
                     try:
                         supplier_quote = await _apply_supplier_pdf(
                             note_id, first["data"], first["filename"], source_label=" (recebido por email)")
@@ -4563,6 +4961,48 @@ async def today(segment: Optional[str] = None):
             "summary": summary, "potential_value": st["potential_value"]}
 
 
+SEVERITY_RANK = {"error": 2, "warning": 1, "info": 0}
+
+
+@api_router.get("/notes/needs-review")
+async def notes_needs_review():
+    """Centro de Exceções + Centro de Decisões: reúne, numa lista só, todos
+    os pedidos cujo orçamento do fornecedor precisa de atenção humana —
+    leitura do PDF incompleta (quality_report), artigos alterados desde a
+    última versão, ou já pronto para o cliente mas ainda por confirmar o
+    envio. Ao contrário de percorrer a lista toda de pedidos à procura de
+    problemas, só aparece aqui quem realmente precisa de uma decisão."""
+    notes = await db.notes.find(
+        {"archived": {"$ne": True}, "supplier_quote": {"$exists": True, "$ne": None}},
+        {"_id": 0}).to_list(2000)
+    now = datetime.now(timezone.utc)
+    out = []
+    for n in notes:
+        sq = n.get("supplier_quote") or {}
+        qr = sq.get("quality_report") or {}
+        diff = sq.get("diff_since_previous") or {}
+        reasons = []
+        if qr.get("status") and qr["status"] != "ok":
+            reasons.append({"kind": "quality", "severity": qr["status"],
+                            "label": "Problemas na leitura do PDF do fornecedor"})
+        if diff.get("has_changes"):
+            reasons.append({"kind": "changed", "severity": "warning",
+                            "label": "Orçamento alterado desde a última versão"})
+        if n.get("pending_client_send"):
+            reasons.append({"kind": "pending_send", "severity": "info",
+                            "label": "Pronto a enviar — falta confirmar"})
+        if not reasons:
+            continue
+        en = enrich_note(dict(n), now)
+        out.append({
+            "id": en["id"], "customer_name": en.get("customer_name") or "Cliente",
+            "quote_number": sq.get("quote_number"), "confidence_score": sq.get("confidence_score"),
+            "waiting_days": en.get("waiting_days"), "reasons": reasons,
+            "severity_rank": max((SEVERITY_RANK.get(r["severity"], 0) for r in reasons), default=0)})
+    out.sort(key=lambda d: (-d["severity_rank"], -(d.get("waiting_days") or 0)))
+    return {"items": out, "count": len(out)}
+
+
 # ---------- Assistant endpoints (preflight, history, learning, batches) ----------
 @api_router.get("/notes/{note_id}/preflight")
 async def note_preflight(note_id: str):
@@ -5239,7 +5679,12 @@ async def ensure_indexes():
                         ("received_emails", "reply_kind"), ("notes", "email"),
                         ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
                         ("sent_emails", "message_id"),
-                        ("email_attachments", "email_id")]:
+                        ("email_attachments", "email_id"),
+                        ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
+                        ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
+                        ("category_suggestions", "signature"), ("category_suggestions", "status"),
+                        ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
+                        ("tasks", "category_signature")]:
         try:
             await db[coll].create_index(field)
         except Exception:
@@ -5298,6 +5743,26 @@ async def _backfill_correio_semanal_summaries():
         logger.error(f"Resumo automático de Correios Semanais em atraso falhou: {e}")
 
 
+DAILY_MAINTENANCE_INTERVAL_HOURS = 24
+
+
+async def _daily_maintenance_loop():
+    """Arquivamento inteligente (auto_close_inactive) só corria uma vez, no
+    arranque do servidor — um servidor que fica meses sem reiniciar nunca
+    mais arquivava nada sozinho. Este laço corre independentemente da
+    configuração de email (o IMAP pode estar desligado) e repete a cada
+    DAILY_MAINTENANCE_INTERVAL_HOURS."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            closed = await auto_close_inactive()
+            if closed:
+                logger.info(f"Arquivamento automático: {closed} pedido(s) inativo(s) arquivado(s).")
+        except Exception as e:
+            logger.error(f"Arquivamento automático falhou: {e}")
+        await asyncio.sleep(DAILY_MAINTENANCE_INTERVAL_HOURS * 3600)
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
@@ -5315,6 +5780,9 @@ async def on_startup():
     backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
     _background_tasks.add(backfill_task)
     backfill_task.add_done_callback(_background_tasks.discard)
+    maintenance_task = asyncio.create_task(_daily_maintenance_loop())
+    _background_tasks.add(maintenance_task)
+    maintenance_task.add_done_callback(_background_tasks.discard)
 
 
 # ---------- Proteção por PIN (dispositivos verificados) ----------

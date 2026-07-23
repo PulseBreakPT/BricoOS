@@ -1,20 +1,26 @@
 """Centro de Validação Automática do orçamento do fornecedor.
 
-Duas responsabilidades, sempre em cima do dicionário devolvido por
-`quote_pdf.parse_supplier_pdf` (ou do `supplier_quote` já guardado no
-pedido, que tem os mesmos campos mais os de preço):
+Sempre em cima do dicionário devolvido por `quote_pdf.parse_supplier_pdf`
+(ou do `supplier_quote` já guardado no pedido, que tem os mesmos campos
+mais os de preço):
 
 - `build_quality_report`: confere se a leitura do PDF está completa e
   coerente (imagens, preços, descrições, medidas, numeração, totais) —
   cada verificação é "ok", "warning" (informativo, não bloqueia) ou
   "error" (algo que quase de certeza precisa de correção manual).
+- `confidence_score`: resume esse relatório num número (0-100).
+- `duplicate_medidas`: artigos com a mesma medida no mesmo orçamento.
 - `diff_quote_versions`: compara duas versões dos itens do mesmo
   orçamento (reimportação de um PDF corrigido) e assinala artigos
   adicionados, removidos ou alterados.
+- `detect_urgency_signals`: deteção simples por palavras-chave no texto
+  do pedido/orçamento.
 
-Nada aqui decide sozinho enviar ou bloquear nada — só produz a
-informação para a pessoa decidir, tal como o resto da app.
+Nada aqui decide sozinho enviar, bloquear ou mudar prioridades — só
+produz informação para a pessoa decidir, tal como o resto da app.
 """
+
+import unicodedata
 
 _PRICE_TOLERANCE = 0.005
 _TOTAL_TOLERANCE = 0.05
@@ -81,6 +87,34 @@ def build_quality_report(quote):
     return {"status": overall, "checks": checks}
 
 
+_SEVERITY_SCORE = {"ok": 1.0, "warning": 0.5, "error": 0.0}
+
+
+def confidence_score(quality_report):
+    """Resume o quality_report num número (0-100) para ordenar ou destacar
+    orçamentos que precisam de mais atenção sem ter de ler a check-list
+    inteira. Um "error" pesa o dobro de um "warning" (ex.: falta o preço
+    de um artigo é mais grave do que faltar a medida)."""
+    checks = quality_report.get("checks") or []
+    if not checks:
+        return 0
+    total = sum(_SEVERITY_SCORE.get(c["status"], 0) for c in checks)
+    return round(total / len(checks) * 100)
+
+
+def duplicate_medidas(items):
+    """Artigos com a mesma medida (LxA) dentro do mesmo orçamento. Não é
+    necessariamente um erro — o cliente pode querer duas janelas iguais —
+    mas vale a pena confirmar que não é um artigo duplicado por engano."""
+    by_medida = {}
+    for i in items or []:
+        m = (i.get("medida") or "").strip()
+        if not m:
+            continue
+        by_medida.setdefault(m, []).append(i.get("n"))
+    return [{"medida": m, "items": ns} for m, ns in by_medida.items() if len(ns) > 1]
+
+
 _DIFF_FIELDS = (
     ("qty", "quantidade"),
     ("supplier_unit_price", "preço de custo"),
@@ -141,3 +175,23 @@ def diff_summary_text(diff):
     if not parts:
         return "Orçamento do fornecedor reimportado sem alterações nos artigos."
     return "Orçamento do fornecedor alterado desde a versão anterior: " + ", ".join(parts) + "."
+
+
+def _fold(text):
+    normalized = unicodedata.normalize("NFKD", text or "")
+    return "".join(c for c in normalized if not unicodedata.combining(c)).lower()
+
+
+_URGENCY_KEYWORDS = (
+    "urgente", "urgencia", "para ontem", "o mais rapido possivel",
+    "o quanto antes", "com urgencia", "extrema urgencia",
+)
+
+
+def detect_urgency_signals(*texts):
+    """Deteção simples por palavras-chave no texto do pedido/orçamento —
+    nunca muda a prioridade sozinha, só assinala para uma pessoa confirmar
+    (ver _apply_supplier_pdf em server.py, que só acrescenta uma etiqueta
+    e regista na cronologia)."""
+    combined = _fold(" ".join(t for t in texts if t))
+    return [kw for kw in _URGENCY_KEYWORDS if kw in combined]

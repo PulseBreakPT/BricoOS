@@ -145,6 +145,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   // Assistant data
   const [dupWarn, setDupWarn] = useState([]);
+  const [preflight, setPreflight] = useState(null);
+  const [clientHistory, setClientHistory] = useState(null);
 
   // AI (OpenAI) state
   const [aiSummary, setAiSummary] = useState("");
@@ -159,15 +161,19 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
-    const [q, a, t, m, p] = await Promise.all([
+    const [q, a, t, m, p, pf, ch] = await Promise.all([
       api.get(`/notes/${nid}/quotes`),
       api.get(`/notes/${nid}/activities`),
       api.get(`/notes/${nid}/tasks`),
       api.get(`/notes/${nid}/emails`).catch(() => ({ data: [] })),
       api.get(`/notes/${nid}/photos`).catch(() => ({ data: [] })),
+      api.get(`/notes/${nid}/preflight`).catch(() => ({ data: null })),
+      api.get(`/notes/${nid}/client-history`).catch(() => ({ data: null })),
     ]);
     setQuotes(q.data); setActivities(a.data); setTasks(t.data); setReceivedEmails(m.data || []);
     setPhotos(p.data || []);
+    setPreflight(pf.data);
+    setClientHistory(ch.data);
   }, []);
 
   const loadNote = useCallback(async (nid) => {
@@ -208,6 +214,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setIsReminder(false);
       setClientEmailData({ subject: "", body: "", to: "" });
       setDupWarn([]);
+      setPreflight(null);
+      setClientHistory(null);
+      setAiSummary("");
       setAutoState("idle");
       setEditMode(false);
       setPhotos([]);
@@ -780,6 +789,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       toast.error(getErrorMessage(e, "Não foi possível gerar o PDF"));
     } finally {
       setGeneratingPdf(false);
+    }
+  };
+  const generateAiSummary = async () => {
+    setSummarizing(true);
+    try {
+      const { data } = await api.post(`/notes/${id}/ai-summary`);
+      setAiSummary(data.summary || "");
+      toast.success("Resumo gerado");
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível gerar o resumo"));
+    } finally {
+      setSummarizing(false);
     }
   };
   const sqTotal = (sq?.items || [])
@@ -1436,6 +1457,79 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 )}
               </div>
 
+              {!isCreate && !editMode && preflight ? (
+                <>
+                  <SectionTitle title="Estado de completude" />
+                  <div data-testid="preflight-panel" className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+                    <p className={`flex items-center gap-1.5 text-xs font-extrabold ${preflight.ready ? "text-emerald-700" : "text-amber-700"}`}>
+                      {preflight.ready ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                      {preflight.ready ? "Informação completa" : "Falta informação para avançar"}
+                    </p>
+                    {preflight.missing?.length ? (
+                      <p className="mt-1.5 text-[11px] font-semibold text-amber-700">Em falta: {preflight.missing.join(", ")}</p>
+                    ) : null}
+                    {preflight.warnings?.length ? (
+                      <p className="mt-1 text-[11px] text-amber-600">{preflight.warnings.join(" ")}</p>
+                    ) : null}
+                    {preflight.checklist?.length ? (
+                      <details className="mt-2 text-[11px] text-muted-foreground">
+                        <summary className="cursor-pointer font-semibold">Checklist para {preflight.product_label || "este tipo de pedido"}</summary>
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                          {preflight.checklist.map((c, idx) => <li key={idx}>{c}</li>)}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              {!isCreate && !editMode && clientHistory && (clientHistory.past_count > 0 || clientHistory.reusable_quotes?.length > 0) ? (
+                <>
+                  <SectionTitle title="Histórico deste cliente" />
+                  <div data-testid="client-history-panel" className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {clientHistory.past_count} pedido(s) anterior(es) deste cliente
+                      {clientHistory.suppliers_used?.length ? ` · fornecedores já usados: ${clientHistory.suppliers_used.join(", ")}` : ""}
+                    </p>
+                    {clientHistory.reusable_quotes?.length ? (
+                      <ul className="mt-2 space-y-1.5 text-[11px]">
+                        {clientHistory.reusable_quotes.slice(0, 5).map((q, idx) => (
+                          <li key={idx} className="flex items-center justify-between gap-2 rounded-lg bg-card px-2 py-1.5">
+                            <span className="min-w-0 truncate text-muted-foreground">
+                              {q.product || q.supplier_name}
+                              <span className="ml-1 text-foreground/60">({Math.round((q.similarity || 0) * 100)}% semelhante)</span>
+                            </span>
+                            <span className="shrink-0 font-mono font-bold text-foreground">{Number(q.price || 0).toFixed(2)} €</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+
+              {!isCreate && !editMode ? (
+                <>
+                  <SectionTitle title="Resumo automático" />
+                  <div data-testid="ai-summary-panel" className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
+                    {note?.ai_summary || aiSummary ? (
+                      <p className="text-xs italic text-foreground/80">{aiSummary || note?.ai_summary}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Sem resumo gerado ainda — 2-3 frases sobre o pedido, geradas por IA.</p>
+                    )}
+                    <Button
+                      data-testid="generate-ai-summary"
+                      size="sm" variant="outline" disabled={summarizing}
+                      onClick={generateAiSummary}
+                      className="mt-2 rounded-lg"
+                    >
+                      {summarizing ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                      {note?.ai_summary || aiSummary ? "Atualizar resumo" : "Gerar resumo"}
+                    </Button>
+                  </div>
+                </>
+              ) : null}
+
               {editMode ? (
                 <div className="mt-6 flex gap-2">
                   <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700">
@@ -1664,6 +1758,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         <AttachmentDescription>
                           {sq.date ? `${sq.date} · ` : ""}{sq.obra ? `Obra ${sq.obra} · ` : ""}{sq.items.length} linha(s)
                           {sq.total ? ` · custo total ${Number(sq.total).toFixed(2)} € c/ IVA` : ""}
+                          {sq.revision_number > 1 ? ` · revisão ${sq.revision_number}` : ""}
+                          {sq.confidence_score != null ? ` · confiança ${sq.confidence_score}%` : ""}
                         </AttachmentDescription>
                       </AttachmentContent>
                     </Attachment>
@@ -1711,6 +1807,17 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                             ))}
                           </ul>
                         ) : null}
+                      </div>
+                    ) : null}
+
+                    {sq.duplicate_medidas?.length ? (
+                      <div data-testid="sq-duplicate-medidas" className="mt-3 rounded-xl border border-border bg-muted/40 p-3 text-[11px] text-muted-foreground">
+                        <p className="font-semibold text-foreground/80">A confirmar — medidas repetidas (pode ser propositado):</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {sq.duplicate_medidas.map((d, idx) => (
+                            <li key={idx}>{d.medida}: artigos nº {d.items.join(", ")}</li>
+                          ))}
+                        </ul>
                       </div>
                     ) : null}
 

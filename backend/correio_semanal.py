@@ -13,13 +13,30 @@ não texto simples — para o resumo ser rápido de ler em vez de uma parede de
 texto. Todo o texto extraído do PDF passa por html.escape antes de entrar em
 qualquer tag; as únicas tags no output são as que este módulo escreve, nunca
 HTML vindo do PDF (que nem sequer tem HTML — é só texto).
+
+A extração estruturada (extract_structured, usada para tarefas sugeridas e
+comparação semanal) classifica cada secção pelo mesmo motor partilhado que
+os Anexos_Edição usam — classification_rules.py e extraction_patterns.py —
+para a "lógica base" ser realmente uma só nos dois lados, como pedido: uma
+secção sobre uma campanha e um ficheiro de campanha dentro do zip caem na
+mesma categoria, com o mesmo motor de gravidade (severity.py).
 """
 
 import re
+import unicodedata
 from collections import Counter
 from html import escape as html_escape
 
 import fitz  # PyMuPDF
+
+try:
+    import classification_rules as clsrules
+    import extraction_patterns
+    import severity as severity_engine
+except ImportError:  # Permite também executar como módulo: python -m backend.server
+    from . import classification_rules as clsrules
+    from . import extraction_patterns
+    from . import severity as severity_engine
 
 _TOC_ENTRY_RE = re.compile(r"^\s*(\d{2})\.\s*(.+?)\s*$")
 _PAGE_MARK_RE = re.compile(r"^\s*P\.(\d+)\s*$")
@@ -44,8 +61,274 @@ _NOISE_LINE_RE = re.compile(
     r"^\s*(PARA VOLTAR AO IN[IÍ]CIO|CLICAR\s*AQUI|ZONA DE COMENT[ÁA]RIOS PDV:?|"
     r"CSN\s*N?[ºo°]?\s*\d+\s*[–-]\s*SEM\s*\d+/\d+|PARA INFORMA[ÇC][ÃA]O)\s*$",
     re.IGNORECASE)
-_ACTION_RE = re.compile(r"❑\s*(A ENCOMENDAR|A FAZER)", re.IGNORECASE)
 _FWD_PREFIX_RE = re.compile(r"^\s*(re|fw|fwd|enc)\s*:\s*", re.IGNORECASE)
+
+# Cada página tem 3 caixas fixas: "PARA INFORMAÇÃO", "A ENCOMENDAR", "A
+# FAZER". Uma caixa por marcar mantém o glifo ❑ no texto extraído do PDF;
+# uma caixa marcada (✅) perde o glifo — o texto extraído fica só com o
+# nome da caixa, sem nada à frente. O ❑ de uma caixa por marcar também pode
+# aparecer isolado numa linha própria, com o nome da caixa só na linha
+# seguinte (varia consoante a versão do boletim). Confirmado a olho contra
+# o PDV real (5 páginas, marcações diferentes) — o ❑ ANTES do nome é o
+# único sinal fiável de "não marcada".
+CHECKBOX_LABELS = ("PARA INFORMAÇÃO", "A ENCOMENDAR", "A FAZER")
+_CHECKBOX_GLYPH_RE = re.compile(r"^❑\s*(.*)$")
+
+
+def _checkbox_state(text):
+    """{"PARA INFORMAÇÃO"|"A ENCOMENDAR"|"A FAZER": True/False} — True =
+    marcada nesta página (aplica-se)."""
+    state = {}
+    pending_unchecked = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        m = _CHECKBOX_GLYPH_RE.match(line)
+        if m:
+            rest = m.group(1).strip()
+            if rest:
+                for label in CHECKBOX_LABELS:
+                    if rest.upper().startswith(label):
+                        state.setdefault(label, False)
+                pending_unchecked = False
+            else:
+                pending_unchecked = True
+            continue
+        matched = False
+        for label in CHECKBOX_LABELS:
+            if line.upper() == label:
+                state.setdefault(label, not pending_unchecked)
+                matched = True
+                break
+        pending_unchecked = False if matched else pending_unchecked
+    return state
+
+
+# ---------- Extração estruturada (para tarefas sugeridas e comparação semanal) ----------
+_CSN_NUMBER_RE = re.compile(r"CORREIO\s*SEMANAL\s*N[ºo°]\s*(\d+)", re.IGNORECASE)
+_WEEK_LABEL_RE = re.compile(r"^S\.(\d{1,2})\s*$", re.MULTILINE)
+_ISSUE_DATE_RE = re.compile(
+    r"(\d{1,2})\s+de\s+(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|"
+    r"setembro|outubro|novembro|dezembro)\s*\n\s*(\d{4})", re.IGNORECASE)
+_SEMANA_RE = re.compile(r"^SEMANA\s*N[ºo°]\s*(\d+)", re.IGNORECASE)
+_WEEKDAY_RE = re.compile(
+    r"^(Segunda|Ter[çc]a|Quarta|Quinta|Sexta|S[áa]bado|Domingo)\s*-?\s*feira,\s*"
+    r"(\d{1,2})\s+de\s+(\w+)", re.IGNORECASE)
+_CALENDAR_ITEM_START_RE = re.compile(r"^(DATA LIMITE DE RESPOSTA|MEA\s*N[ºo°])", re.IGNORECASE)
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_ADHESION_RE = re.compile(r"N[ÃA]O\s+ADES[ÃA]O|ADES[ÃA]O", re.IGNORECASE)
+
+_MONTHS_PT = {
+    "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
+    "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+
+
+def _fold(text):
+    normalized = unicodedata.normalize("NFKD", text or "")
+    return "".join(c for c in normalized if not unicodedata.combining(c)).lower()
+
+
+def _iso_date(day, month_name, year):
+    month = _MONTHS_PT.get(_fold(month_name))
+    if not month or not year:
+        return None
+    try:
+        return f"{int(year):04d}-{month:02d}-{int(day):02d}"
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_header(full_text):
+    csn = _CSN_NUMBER_RE.search(full_text)
+    week = _WEEK_LABEL_RE.search(full_text)
+    date_m = _ISSUE_DATE_RE.search(full_text)
+    year = int(date_m.group(3)) if date_m else None
+    return {
+        "csn_number": csn.group(1) if csn else None,
+        "week_label": f"S.{week.group(1)}" if week else None,
+        "issue_date": _iso_date(date_m.group(1), date_m.group(2), year) if date_m else None,
+        "year": year,
+    }
+
+
+def _parse_deadlines_calendar(full_text, year):
+    """A caixa "DATAS a não esquecer!" da página 1 — SEMANA Nº > dia da
+    semana > lista de prazos. Sempre no mesmo formato de semana para
+    semana mesmo que o resto do boletim mude de layout, por isso é a
+    fonte mais fiável para os prazos (item 1 do pedido)."""
+    start = full_text.find("SEMANA")
+    if start == -1:
+        return []
+    end = full_text.find("Atualidades", start)
+    block = full_text[start:end if end != -1 else None]
+    lines = [l.strip() for l in block.splitlines() if l.strip()]
+
+    calendar = []
+    week = day_label = day_date_text = day_iso = None
+    items, buf = [], []
+
+    def flush_item():
+        if buf:
+            text = re.sub(r"\s+", " ", " ".join(buf)).strip(" -")
+            if text:
+                items.append(text)
+            buf.clear()
+
+    def flush_day():
+        flush_item()
+        if day_label and items:
+            calendar.append({"week": week, "weekday": day_label, "date": day_date_text,
+                              "date_iso": day_iso, "items": list(items)})
+        items.clear()
+
+    for line in lines:
+        m = _SEMANA_RE.match(line)
+        if m:
+            flush_day()
+            week = f"Nº{m.group(1)}"
+            day_label = day_date_text = day_iso = None
+            continue
+        m = _WEEKDAY_RE.match(line)
+        if m:
+            flush_day()
+            day_label = m.group(1).title()
+            day_date_text = f"{m.group(2)} de {m.group(3)}"
+            day_iso = _iso_date(m.group(2), m.group(3), year)
+            continue
+        if _CALENDAR_ITEM_START_RE.match(line):
+            flush_item()
+            buf.append(line)
+            continue
+        if buf:
+            buf.append(line)
+    flush_day()
+    return calendar
+
+
+def _page_department(text):
+    """A "etiqueta" curta em maiúsculas (ex.: BRICOLAGE, JARDIM, DIGITAL) —
+    mesma heurística usada em _reflow para não fundir a etiqueta com o
+    título ao lado, aqui reaproveitada como campo próprio. Deteta o que
+    houver, não uma lista fixa de departamentos."""
+    for line in text.splitlines():
+        line = line.strip()
+        if (line and line.isupper() and " " not in line and len(line) <= 15
+                and not _PAGE_MARK_RE.match(line) and not _NOISE_LINE_RE.match(line)):
+            return line.title()
+    return None
+
+
+def _adhesion_info(text):
+    """Secções que pedem uma resposta por email (adesão/não adesão) — para
+    sugerir o rascunho, nunca para enviar sozinho."""
+    if not _ADHESION_RE.search(text):
+        return False, []
+    return True, sorted(set(_EMAIL_RE.findall(text)))
+
+
+def extract_structured(pdf_bytes_list, subject, rules=None):
+    """Extração estruturada (não HTML) do mesmo boletim que build_digest
+    resume — usada para sugerir tarefas, comparar com a semana anterior e
+    guardar histórico. Orientada pelo conteúdo de cada página (marcador
+    P.N + índice + as 3 caixas fixas), nunca por um número de página fixo:
+    uma secção nova, numa posição nunca vista, é lida da mesma forma.
+
+    `rules` é o dicionário de categorias/palavras-chave carregado da base
+    de dados (classification_rules.load_rules) — partilhado com o
+    anexos_edicao.py. Sem ele, usa a semente predefinida (útil para testes
+    isolados deste módulo)."""
+    rules = rules if rules is not None else clsrules.DEFAULT_KEYWORDS
+    all_pages = []
+    for pdf_bytes in pdf_bytes_list:
+        all_pages.extend(_pages_text(pdf_bytes))
+    if not all_pages:
+        return None
+
+    full_text = "\n".join(all_pages)
+    header = _parse_header(full_text)
+    toc, toc_pages = _parse_toc(all_pages)
+    deadlines_calendar = _parse_deadlines_calendar(full_text, header.get("year"))
+
+    sections = []
+    seen_titles = set()
+    for i, page_text in enumerate(all_pages):
+        if i in toc_pages:
+            continue
+        paragraphs, actions = _clean_page(page_text)
+        total_len = sum(len(p) for _, p in paragraphs)
+        if total_len < 30:
+            continue
+        title = _section_title(page_text, i, toc)
+        if title in seen_titles:
+            title = f"{title} (cont.)"
+        else:
+            seen_titles.add(title)
+        requires_adhesion, adhesion_emails = _adhesion_info(page_text)
+        category = clsrules.classify(f"{title} {page_text}", rules)
+        section = {
+            "page": i + 1, "title": title, "department": _page_department(page_text),
+            "category": category, "checked_actions": actions,
+            "deadline_mentions": _extract_facts(page_text),
+            "mea_mentions": sorted({m.group(0).strip() for m in _MEA_RE.finditer(page_text)}),
+            "requires_adhesion_email": requires_adhesion, "adhesion_emails": adhesion_emails,
+            "text": " ".join(p for _, p in paragraphs)[:2000],
+        }
+        section["severity"] = severity_engine.classify_severity(
+            category, page_text, requires_adhesion=requires_adhesion)
+        facts = extraction_patterns.extract_facts(page_text)
+        if facts:
+            section["facts"] = facts
+        if category == "outro":
+            section["fingerprint"] = clsrules.unclassified_fingerprint(page_text)
+        sections.append(section)
+
+    by_category = Counter(s["category"] for s in sections)
+    by_severity = Counter(s["severity"] for s in sections)
+    unclassified = [{"title": s["title"], "fingerprint": s["fingerprint"]}
+                     for s in sections if s.get("fingerprint")]
+
+    return {**header, "subject": _clean_subject_title(subject), "sections": sections,
+            "deadlines_calendar": deadlines_calendar,
+            "section_titles": [s["title"] for s in sections],
+            "by_category": dict(by_category), "by_severity": dict(by_severity),
+            "unclassified_fingerprints": unclassified}
+
+
+def diff_digest_versions(prev, new):
+    """Compara duas edições do Correio Semanal (extract_structured) —
+    assuntos novos, removidos, e prazos novos/removidos. Não tenta
+    adivinhar se um assunto é "o mesmo" só que mudou (os títulos raramente
+    coincidem ao carácter entre edições) — só o que apareceu e o que
+    desapareceu, que já poupa reler tudo de novo."""
+    if not prev or not new:
+        return None
+    prev_titles = set(prev.get("section_titles") or [])
+    new_titles = set(new.get("section_titles") or [])
+
+    def _flat_items(digest):
+        return {item for day in (digest.get("deadlines_calendar") or []) for item in day.get("items", [])}
+
+    prev_items, new_items = _flat_items(prev), _flat_items(new)
+    prev_depts = Counter(s.get("department") for s in (prev.get("sections") or []) if s.get("department"))
+    new_depts = Counter(s.get("department") for s in (new.get("sections") or []) if s.get("department"))
+    dept_changes = {d: new_depts[d] - prev_depts.get(d, 0) for d in new_depts if new_depts[d] != prev_depts.get(d, 0)}
+    for d in prev_depts:
+        if d not in new_depts:
+            dept_changes[d] = -prev_depts[d]
+
+    added_sections = sorted(new_titles - prev_titles)
+    removed_sections = sorted(prev_titles - new_titles)
+    added_deadlines = sorted(new_items - prev_items)
+    removed_deadlines = sorted(prev_items - new_items)
+    return {
+        "prev_csn_number": prev.get("csn_number"), "new_csn_number": new.get("csn_number"),
+        "added_sections": added_sections, "removed_sections": removed_sections,
+        "added_deadlines": added_deadlines, "removed_deadlines": removed_deadlines,
+        "department_changes": dept_changes,
+        "has_changes": bool(added_sections or removed_sections or added_deadlines or removed_deadlines),
+    }
 
 
 def _pages_text(pdf_bytes):
@@ -164,25 +447,26 @@ def _reflow(lines):
 
 
 def _clean_page(text):
-    """Limpa uma página: tira o ruído do layout, extrai as etiquetas de
-    ação (❑ A ENCOMENDAR / ❑ A FAZER) e junta o texto em parágrafos."""
+    """Limpa uma página: tira o ruído do layout, lê o estado das 3 caixas
+    fixas (PARA INFORMAÇÃO / A ENCOMENDAR / A FAZER) e junta o texto em
+    parágrafos. Devolve (parágrafos, [rótulos marcados])."""
+    checkbox_state = _checkbox_state(text)
+    actions = [label.title() for label in ("A ENCOMENDAR", "A FAZER") if checkbox_state.get(label)]
     raw_lines = [l.strip() for l in text.splitlines() if l.strip()]
     counts = Counter(raw_lines)
     lines = []
-    actions = []
     seen_repeats = set()
     for line in raw_lines:
         line = _PAGE_MARK_PREFIX_RE.sub("", line).strip()
         if not line:
             continue
-        am = _ACTION_RE.search(line)
-        if am:
-            tag = am.group(1).title()
-            if tag not in actions:
-                actions.append(tag)
-            line = _ACTION_RE.sub("", line).strip(" ❑")
-            if not line:
+        cm = _CHECKBOX_GLYPH_RE.match(line)
+        if cm:
+            rest = cm.group(1).strip()
+            if not rest or any(rest.upper().startswith(l) for l in CHECKBOX_LABELS):
                 continue
+        elif any(line.upper() == label for label in CHECKBOX_LABELS):
+            continue
         if _NOISE_LINE_RE.match(line) or _PAGE_MARK_RE.match(line) or _TOC_ENTRY_RE.match(line):
             continue
         # Chrome do layout (etiquetas de secção, "DIGITAL", etc.) repete-se
