@@ -26,7 +26,7 @@ import {
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
-  ArrowUpRight, Building2, FileWarning,
+  ArrowUpRight, Building2, FileWarning, Eye,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -1667,7 +1667,80 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         </AttachmentDescription>
                       </AttachmentContent>
                     </Attachment>
-                    <p className="mt-2 text-[11px] text-muted-foreground">
+
+                    {sq.source_file_id ? (
+                      <a
+                        data-testid="sq-view-original"
+                        href={withDeviceToken(`${API}/notes/${id}/files/${sq.source_file_id}`)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Ver PDF original do fornecedor
+                      </a>
+                    ) : null}
+
+                    {/* Centro de Validação Automática: confere a leitura do PDF
+                        (imagens, preços, descrições, totais) antes de o marcar
+                        como pronto — nunca bloqueia, só avisa. */}
+                    {sq.quality_report ? (
+                      <div
+                        data-testid="sq-quality-report"
+                        className={`mt-3 rounded-xl border p-3 ${
+                          sq.quality_report.status === "ok"
+                            ? "border-emerald-200 bg-[var(--pastel-emerald-bg)]"
+                            : sq.quality_report.status === "error"
+                            ? "border-red-200 bg-[var(--pastel-red-bg)]"
+                            : "border-amber-200 bg-[var(--pastel-amber-bg)]"
+                        }`}
+                      >
+                        <p className={`flex items-center gap-1.5 text-xs font-extrabold ${
+                          sq.quality_report.status === "ok" ? "text-emerald-700"
+                          : sq.quality_report.status === "error" ? "text-red-700" : "text-amber-700"
+                        }`}>
+                          {sq.quality_report.status === "ok" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                          {sq.quality_report.status === "ok" ? "Pronto para enviar — nenhum problema encontrado" : "Verificar antes de enviar"}
+                        </p>
+                        {sq.quality_report.checks.filter((c) => c.status !== "ok").length > 0 ? (
+                          <ul className="mt-1.5 space-y-1 text-[11px] text-foreground/80">
+                            {sq.quality_report.checks.filter((c) => c.status !== "ok").map((c) => (
+                              <li key={c.id} className="flex items-start gap-1.5">
+                                <span className="mt-0.5">{c.status === "error" ? "✕" : "!"}</span>
+                                <span>{c.detail || c.label}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {sq.diff_since_previous?.has_changes ? (
+                      <div data-testid="sq-diff-panel" className="mt-3 rounded-xl border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
+                        <p className="flex items-center gap-1.5 text-xs font-extrabold text-[color:var(--pastel-blue-text)]">
+                          <FileWarning className="h-4 w-4" /> Alterado desde a última importação
+                        </p>
+                        <ul className="mt-1.5 space-y-1 text-[11px] text-foreground/80">
+                          {sq.diff_since_previous.added.map((it) => (
+                            <li key={`add-${it.n}`}>+ Nº {it.n} adicionado — {it.description}</li>
+                          ))}
+                          {sq.diff_since_previous.removed.map((it) => (
+                            <li key={`rem-${it.n}`}>− Nº {it.n} removido — {it.description}</li>
+                          ))}
+                          {sq.diff_since_previous.changed.map((it) => (
+                            <li key={`chg-${it.n}`}>
+                              ~ Nº {it.n} alterado — {it.description}
+                              {Object.values(it.fields).map((f, idx) => (
+                                <span key={idx} className="ml-1 font-mono text-[10px]">
+                                  ({f.label}: {String(f.old ?? "—")} → {String(f.new ?? "—")})
+                                </span>
+                              ))}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    <p className="mt-3 text-[11px] text-muted-foreground">
                       Margens automáticas por material: <b>PVC 15%</b> · <b>alumínio, redes mosquiteiras e portadas 18%</b> — a margem é ajustável linha a linha; o coeficiente e o preço final recalculam-se sozinhos com a fórmula exata da loja.
                     </p>
 

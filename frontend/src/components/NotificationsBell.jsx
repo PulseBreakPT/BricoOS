@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Clock, AlarmClockOff, Zap, X } from "lucide-react";
+import { Bell, Clock, AlarmClockOff, Zap, X, ShieldAlert, FileDiff } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
@@ -13,6 +13,8 @@ const KIND_ICON = {
   forgotten: AlarmClockOff,
   urgent: Zap,
   reminder_overdue: Bell,
+  quote_quality_issue: ShieldAlert,
+  quote_changed: FileDiff,
 };
 const SEV = {
   high: { ring: "border-red-200 bg-[var(--pastel-red-bg)]", icon: "bg-[var(--pastel-red-bg)] text-red-600", dot: "#DC2626" },
