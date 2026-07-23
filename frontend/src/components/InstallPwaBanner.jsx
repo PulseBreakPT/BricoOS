@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Share, SquarePlus, X } from "lucide-react";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
-import BrandWordmark from "@/components/BrandWordmark";
 
 const DISMISS_KEY = "brico-pwa-install-dismissed";
 
@@ -68,7 +67,7 @@ export default function InstallPwaBanner() {
                         <Download className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1.5 truncate text-sm font-bold text-foreground">Instalar <BrandWordmark className="h-3.5 w-auto" /></p>
+                        <p className="truncate text-sm font-bold text-foreground">Instalar BRICO OS</p>
                         <p className="truncate text-xs text-muted-foreground">Acesso mais rápido, direto do ecrã principal.</p>
                     </div>
                     <button
