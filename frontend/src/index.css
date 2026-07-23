@@ -1697,10 +1697,21 @@ code {
 
 .os-home-hero {
   background:
-    radial-gradient(circle at 12% 8%, rgba(217, 38, 38, 0.1), transparent 31%),
-    radial-gradient(circle at 92% 80%, rgba(242, 184, 75, 0.12), transparent 34%),
-    radial-gradient(circle at 62% 20%, rgba(67, 86, 123, 0.08), transparent 42%),
-    linear-gradient(145deg, #ffffff 0%, #f6f6f4 50%, #efeeeb 100%);
+    radial-gradient(ellipse 58% 50% at 6% -6%, rgba(217, 38, 38, 0.16), transparent 68%),
+    radial-gradient(ellipse 60% 52% at 104% 106%, rgba(242, 184, 75, 0.2), transparent 70%),
+    radial-gradient(ellipse 42% 40% at 68% 12%, rgba(67, 86, 123, 0.1), transparent 74%),
+    radial-gradient(ellipse 46% 40% at 18% 62%, rgba(255, 255, 255, 0.85), transparent 100%),
+    linear-gradient(150deg, #ffffff 0%, #f7f6f3 48%, #eeece6 100%);
+}
+
+.os-home-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
 }
 
 .os-home-grid {
@@ -1711,6 +1722,16 @@ code {
   background-size: 28px 28px;
   mask-image: linear-gradient(to bottom right, black, transparent 82%);
   -webkit-mask-image: linear-gradient(to bottom right, black, transparent 82%);
+}
+
+/* Brilho suave atrás das horas — dá profundidade ao número sem baixar o
+   contraste do texto (o texto continua a preto sólido por cima). */
+.os-home-clock-glow {
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 65% 60% at 20% 55%, rgba(242, 184, 75, 0.28), transparent 70%),
+    radial-gradient(ellipse 50% 55% at 88% 25%, rgba(217, 38, 38, 0.16), transparent 72%);
+  filter: blur(18px);
 }
 
 .os-home-app-icon {

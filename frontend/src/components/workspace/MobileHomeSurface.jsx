@@ -104,12 +104,15 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity }) {
         </div>
 
         <div className="relative mt-8 sm:mt-10">
-          <p className="font-heading text-[clamp(3.6rem,16vw,6.5rem)] font-black leading-[0.78] tracking-[-0.075em] tabular-nums">
-            {now.toLocaleTimeString("pt-PT", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
+          <div className="relative">
+            <div aria-hidden="true" className="os-home-clock-glow absolute -inset-x-4 -inset-y-6 sm:-inset-x-10 sm:-inset-y-12" />
+            <p className="relative font-heading text-[clamp(3.6rem,16vw,6.5rem)] font-black leading-[0.78] tracking-[-0.075em] tabular-nums whitespace-nowrap sm:text-[clamp(6.5rem,15vw,8.5rem)]">
+              {now.toLocaleTimeString("pt-PT", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
           <p className="mt-4 text-xs font-bold capitalize text-muted-foreground sm:text-sm">
             {now.toLocaleDateString("pt-PT", {
               weekday: "long",
