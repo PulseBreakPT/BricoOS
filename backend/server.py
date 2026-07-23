@@ -30,7 +30,7 @@ from email.utils import parseaddr, make_msgid, parsedate_to_datetime
 from html import escape as html_escape, unescape as html_unescape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 
@@ -65,6 +65,7 @@ try:
     import severity as severity_engine
     import edition_summary
     import push_notifications
+    import app_settings
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -96,6 +97,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     from . import severity as severity_engine
     from . import edition_summary
     from . import push_notifications
+    from . import app_settings
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -141,6 +143,9 @@ SCOPES = [
 
 AUTHOR = "Chefe de Loja"
 DEFAULT_SLA_DAYS = 2
+REMINDER_INTERVAL_DAYS_DEFAULT = 3
+INCLUDE_EMAIL_SIGNATURE = True
+AUTO_GREETING = True
 VALID_CATEGORIES = ["construcao", "bricolage", "decoracao", "jardim"]
 TASK_PRIORITIES = ["nenhuma", "baixa", "media", "alta"]
 TASK_PRIORITY_RANK = {"alta": 0, "media": 1, "baixa": 2, "nenhuma": 3}
@@ -363,7 +368,7 @@ def enrich_note(note, now=None):
     # ---- Assistant computed fields ----
     note["waiting_on"] = compute_waiting_on(status)
     note["reminder_count"] = note.get("reminder_count", 0) or 0
-    ri = note.get("reminder_interval_days") or 3
+    ri = note.get("reminder_interval_days") or REMINDER_INTERVAL_DAYS_DEFAULT
     dsup = note["days_since_supplier"]
     note["reminder_due"] = bool(status in WAITING_SUPPLIER and dsup is not None and dsup >= ri)
     pt = detect_product_type(note)
@@ -2538,7 +2543,7 @@ def caixilharia_email(n, spec, is_reminder=False):
     ref_artigo = (n.get("reference") or "").strip()
     hoje = datetime.now(timezone.utc).strftime("%d/%m/%Y")
 
-    lines = [f"{business_greeting()} Exmos. Senhores,", ""]
+    lines = [f"{business_greeting(enabled=AUTO_GREETING)} Exmos. Senhores,", ""]
     if is_reminder:
         lines.append("Venho por este meio reforçar o pedido de caixilharia à medida enviado anteriormente:")
     else:
@@ -2608,6 +2613,7 @@ MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
 # O Anexos_Edição.zip do Correio Semanal (dossiers e planogramas incluídos)
 # ronda facilmente os 20 MB — bem acima do limite de um PDF de fornecedor.
 MAX_ANEXOS_ZIP_BYTES = 30 * 1024 * 1024
+MAX_ATTACHMENTS_PER_EMAIL = 5
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_PHOTOS_PER_NOTE = 30
 
@@ -2631,7 +2637,19 @@ def _client_pdf_filename(quote_number):
     return f"Orcamento_{ref}_cliente.pdf"
 
 
-SUPPLIER_QUOTE_HISTORY_LIMIT = 5
+async def _price_rounding_config():
+    """Converte o grupo de definições price_rounding (definições → Preços)
+    para o formato que quote_pdf.round_commercial espera: uma lista
+    [(limite, múltiplo abaixo desse limite), ...] mais o múltiplo acima do
+    último limite. Cada tuplo empareja um limite com o múltiplo do escalão
+    ANTERIOR (ver quote_pdf._price_round_step) — por isso step_0 vai com
+    limit_1, step_1 com limit_2, e por aí adiante."""
+    cfg = await app_settings.get_group(db, "price_rounding")
+    tiers = [
+        (cfg["limit_1"], cfg["step_0"]), (cfg["limit_2"], cfg["step_1"]),
+        (cfg["limit_3"], cfg["step_2"]), (cfg["limit_4"], cfg["step_3"]),
+    ]
+    return tiers, cfg["step_4"]
 
 
 async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
@@ -2662,6 +2680,9 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
     confidence = confidence_score(quality_report)
     dup_medidas = duplicate_medidas(parsed["items"])
 
+    margin_overrides = await app_settings.get_group(db, "material_margins")
+    rounding_tiers, rounding_step_above = await _price_rounding_config()
+
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
         "id": file_id, "note_id": note_id, "kind": "supplier_pdf",
@@ -2671,8 +2692,9 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         material = detect_material(item.get("description"))
         item["material"] = material
         item["material_label"] = material_label(material)
-        item["margin_pct"] = margin_for_material(material)
-        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
+        item["margin_pct"] = margin_for_material(material, margin_overrides)
+        item["client_price"] = suggest_client_price(
+            item.get("supplier_unit_price"), item["margin_pct"], rounding_tiers, rounding_step_above)
         item["coefficient"] = coefficient_for_margin(item["margin_pct"])
         item["include"] = True
 
@@ -2698,8 +2720,8 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
         *[i.get("description") for i in parsed["items"]])
 
     supplier_quote = {**parsed,
-                      "margin_rules": {"pvc": margin_for_material("pvc"),
-                                       "aluminio": margin_for_material("aluminio")},
+                      "margin_rules": {"pvc": margin_for_material("pvc", margin_overrides),
+                                       "aluminio": margin_for_material("aluminio", margin_overrides)},
                       "source_file_id": file_id, "imported_at": now_iso(),
                       "quality_report": quality_report, "diff_since_previous": quote_diff,
                       "confidence_score": confidence, "revision_number": revision_number,
@@ -2729,6 +2751,18 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
                        f"{confidence}%){source_label}{quality_note}", {"file_id": file_id})
     if quote_diff and quote_diff["has_changes"]:
         await log_activity(note_id, "updated", diff_summary_text(quote_diff), {"diff": quote_diff})
+    cust = (n or {}).get("customer_name") or "Pedido"
+    try:
+        if quality_report["status"] != "ok":
+            await push_notifications.notify_category(
+                db, "quote_quality_issue", f"{cust} · confirmar orçamento",
+                f"Problemas na leitura do PDF do fornecedor{quality_note}.", url=f"/?open={note_id}")
+        if quote_diff and quote_diff["has_changes"]:
+            await push_notifications.notify_category(
+                db, "quote_changed", f"{cust} · orçamento do fornecedor mudou",
+                diff_summary_text(quote_diff), url=f"/?open={note_id}")
+    except Exception as e:
+        logger.warning(f"Notificação push do orçamento falhou (nota {note_id}): {e}")
     if urgency_hits:
         await log_activity(note_id, "updated",
                            f"Possível urgência detetada no texto do orçamento (\"{urgency_hits[0]}\") "
@@ -2773,7 +2807,7 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
     # Prepara logo o email para o cliente com o PDF anexado. Fica PENDENTE de
     # confirmação no ecrã de revisão — nada é enviado automaticamente.
     n = await db.notes.find_one({"id": note_id}, {"_id": 0})
-    template = client_quote_template(n)
+    template = client_quote_template(n, greeting_enabled=AUTO_GREETING)
     # Assunto automático: «Orçamento Cliente <nº da obra>», com o identificador
     # lido do PDF do fornecedor tal e qual aparece no documento. Só é usado
     # quando há exatamente UM identificador — caso contrário o assunto fica
@@ -2840,6 +2874,7 @@ async def update_supplier_quote(note_id: str, payload: SupplierQuoteIn):
     supplier_quote = note.get("supplier_quote")
     if not supplier_quote:
         raise HTTPException(status_code=400, detail="Importe primeiro o PDF do fornecedor.")
+    rounding_tiers, rounding_step_above = await _price_rounding_config()
     edits = {item.n: item for item in payload.items}
     for item in supplier_quote.get("items", []):
         edit = edits.get(item.get("n"))
@@ -2852,7 +2887,8 @@ async def update_supplier_quote(note_id: str, payload: SupplierQuoteIn):
         # nunca introduzidos ou corrigidos manualmente.
         item["margin_pct"] = min(max(edit.margin_pct, 0.0), MAX_MARGIN_PCT)
         item["coefficient"] = coefficient_for_margin(item["margin_pct"])
-        item["client_price"] = suggest_client_price(item.get("supplier_unit_price"), item["margin_pct"])
+        item["client_price"] = suggest_client_price(
+            item.get("supplier_unit_price"), item["margin_pct"], rounding_tiers, rounding_step_above)
         item["include"] = edit.include
     await db.notes.update_one({"id": note_id}, {"$set": {
         "supplier_quote": supplier_quote, "updated_at": now_iso()}})
@@ -3100,8 +3136,10 @@ def _signature_bytes():
 
 def _build_email_body(body, attachments=None):
     """Corpo do email com a assinatura embutida no fim (HTML + imagem inline
-    via cid, com fallback em texto simples) e PDFs anexados quando existem."""
-    signature = _signature_bytes()
+    via cid, com fallback em texto simples) e PDFs anexados quando existem.
+    Definições → Email → "incluir assinatura" desliga a imagem sem alterar
+    o resto do corpo."""
+    signature = _signature_bytes() if INCLUDE_EMAIL_SIGNATURE else None
     if signature:
         related = MIMEMultipart("related")
         alternative = MIMEMultipart("alternative")
@@ -3367,7 +3405,7 @@ def _email_pdf_attachments(msg):
         limit = MAX_ANEXOS_ZIP_BYTES if is_zip else MAX_SUPPLIER_PDF_BYTES
         if payload and len(payload) <= limit:
             out.append({"filename": filename or ("anexo.zip" if is_zip else "documento.pdf"), "data": payload})
-        if len(out) >= 5:
+        if len(out) >= MAX_ATTACHMENTS_PER_EMAIL:
             break
     return out
 
@@ -3602,6 +3640,14 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
             "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task",
             "severity": f.get("severity")})
         created += 1
+        if f.get("category") == "incidencia" and f.get("severity") == "critico":
+            try:
+                await push_notifications.notify_category(
+                    db, "anexos_incidencia_critica",
+                    f"Incidência crítica — Edição {processed['edition_number']}", filename,
+                    url="/emails")
+            except Exception as e:
+                logger.warning(f"Notificação push de incidência crítica falhou: {e}")
 
     created += await _suggest_new_categories(processed.get("unclassified_fingerprints"),
                                               source="anexos_edicao", edition_ref=processed["edition_number"])
@@ -3931,7 +3977,15 @@ async def poll_supplier_replies():
             "seen": False, "received_at": now_iso()})
         try:
             from_label = supplier_name or m.get("from_name") or m["from_email"]
-            await push_notifications.notify_new_email(db, m["subject"], from_label)
+            if correio_semanal_result or anexos_result:
+                push_category = "correio_semanal"
+            elif reply_kind == "supplier":
+                push_category = "supplier"
+            elif reply_kind == "client":
+                push_category = "client"
+            else:
+                push_category = "unmatched"
+            await push_notifications.notify_new_email(db, m["subject"], from_label, category=push_category)
         except Exception as e:
             logger.warning(f"Notificação push falhou (email {email_id}): {e}")
         if note_id:
@@ -5192,7 +5246,7 @@ async def note_quote_template(note_id: str, supplier_id: Optional[str] = None, i
         subject, body = caixilharia_email(n, n["caixilharia"], is_reminder)
         return {"subject": subject, "body": body,
                 "supplier": sup, "to": sup.get("email") if sup else ""}
-    template = supplier_quote_template(n, is_reminder=is_reminder)
+    template = supplier_quote_template(n, is_reminder=is_reminder, greeting_enabled=AUTO_GREETING)
     return {**template, "supplier": sup, "to": sup.get("email") if sup else ""}
 
 
@@ -5202,7 +5256,7 @@ async def note_client_template(note_id: str):
     n = await db.notes.find_one({"id": note_id}, {"_id": 0})
     if not n:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    template = client_quote_template(n)
+    template = client_quote_template(n, greeting_enabled=AUTO_GREETING)
     return {**template, "to": (n.get("email") or "").strip(), "has_email": bool((n.get("email") or "").strip())}
 
 
@@ -5696,7 +5750,8 @@ async def ensure_indexes():
                         ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
                         ("category_suggestions", "signature"), ("category_suggestions", "status"),
                         ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
-                        ("tasks", "category_signature"), ("auth_devices", "token")]:
+                        ("tasks", "category_signature"), ("auth_devices", "token"),
+                        ("pushed_alerts", "alert_id")]:
         try:
             await db[coll].create_index(field)
         except Exception:
@@ -5757,6 +5812,43 @@ async def _backfill_correio_semanal_summaries():
 
 DAILY_MAINTENANCE_INTERVAL_HOURS = 24
 
+# Alertas do Centro de Notificações (build_notifications) que também valem
+# uma notificação push — mapeados para as categorias de notification_prefs.
+# quote_quality_issue/quote_changed ficam de fora daqui: já são
+# notificados no próprio instante em que o PDF do fornecedor é importado
+# (ver _apply_supplier_pdf), notificar outra vez aqui seria repetido.
+_DIGEST_PUSH_KINDS = {"waiting_supplier", "forgotten", "urgent", "reminder_overdue"}
+
+
+async def _push_pending_alerts():
+    """Notificação push para alertas "de estado" (um pedido continua parado,
+    continua urgente, ...) — ao contrário de um email novo ou um PDF
+    importado, não há um instante único em que isto "acontece", por isso
+    corre uma vez por dia (dentro de _daily_maintenance_loop) e usa
+    db.pushed_alerts para nunca repetir o mesmo alerta enquanto a condição
+    se mantiver — só volta a notificar se o alerta desaparecer (resolvido)
+    e reaparecer mais tarde."""
+    items = [i for i in await build_notifications() if i["kind"] in _DIGEST_PUSH_KINDS]
+    current_ids = {i["id"] for i in items}
+    already = {d["alert_id"] async for d in db.pushed_alerts.find({}, {"_id": 0, "alert_id": 1})}
+    # Alertas que já não aparecem (resolvidos) — liberta o id para poder
+    # voltar a notificar se a mesma situação se repetir no futuro.
+    stale = already - current_ids
+    if stale:
+        await db.pushed_alerts.delete_many({"alert_id": {"$in": list(stale)}})
+    for item in items:
+        if item["id"] in already:
+            continue
+        try:
+            sent = await push_notifications.notify_category(
+                db, item["kind"], item["title"], item["message"],
+                url=f"/?open={item['note_id']}" if item.get("note_id") else "/tarefas")
+        except Exception as e:
+            logger.warning(f"Notificação push de alerta falhou ({item['id']}): {e}")
+            continue
+        if sent:
+            await db.pushed_alerts.insert_one({"alert_id": item["id"], "kind": item["kind"], "created_at": now_iso()})
+
 
 async def _daily_maintenance_loop():
     """Arquivamento inteligente (auto_close_inactive) só corria uma vez, no
@@ -5772,7 +5864,48 @@ async def _daily_maintenance_loop():
                 logger.info(f"Arquivamento automático: {closed} pedido(s) inativo(s) arquivado(s).")
         except Exception as e:
             logger.error(f"Arquivamento automático falhou: {e}")
+        try:
+            await _push_pending_alerts()
+        except Exception as e:
+            logger.error(f"Notificação push de alertas pendentes falhou: {e}")
         await asyncio.sleep(DAILY_MAINTENANCE_INTERVAL_HOURS * 3600)
+
+
+async def _refresh_runtime_settings():
+    """Alguns valores (definições → Automação/Segurança/Limites de
+    anexos/Email) são lidos como constante de módulo em muitos sítios do
+    código, em vez de irem à base de dados em cada utilização — para não
+    obrigar a alterar dezenas de pontos de leitura já espalhados pelo
+    ficheiro. Em vez disso, esta função relê os grupos e REATRIBUI as
+    constantes (Python resolve o nome no momento da chamada, não no
+    import, por isso todos os sítios que já as usam passam a ver o valor
+    novo de imediato). Corre uma vez no arranque e outra vez sempre que
+    um destes grupos é gravado (ver put_settings_group)."""
+    global DEFAULT_SLA_DAYS, REMINDER_INTERVAL_DAYS_DEFAULT, AUTO_CLOSE_MONTHS
+    global CATEGORY_SUGGESTION_THRESHOLD, SUPPLIER_QUOTE_HISTORY_LIMIT, IMAP_POLL_MINUTES
+    global PIN_MAX_ATTEMPTS, PIN_LOCK_MINUTES
+    global MAX_SUPPLIER_PDF_BYTES, MAX_ANEXOS_ZIP_BYTES, MAX_EMAIL_ATTACHMENT_TOTAL_BYTES
+    global MAX_ATTACHMENTS_PER_EMAIL
+    global INCLUDE_EMAIL_SIGNATURE, AUTO_GREETING, CORREIO_SEMANAL_SENDER
+    automation = await app_settings.get_group(db, "automation_prefs")
+    DEFAULT_SLA_DAYS = automation["default_sla_days"]
+    REMINDER_INTERVAL_DAYS_DEFAULT = automation["reminder_interval_days"]
+    AUTO_CLOSE_MONTHS = automation["auto_close_months"]
+    CATEGORY_SUGGESTION_THRESHOLD = automation["category_suggestion_threshold"]
+    SUPPLIER_QUOTE_HISTORY_LIMIT = automation["supplier_quote_history_limit"]
+    IMAP_POLL_MINUTES = automation["imap_poll_minutes"]
+    security = await app_settings.get_group(db, "security_prefs")
+    PIN_MAX_ATTEMPTS = security["pin_max_attempts"]
+    PIN_LOCK_MINUTES = security["pin_lock_minutes"]
+    uploads = await app_settings.get_group(db, "upload_limits")
+    MAX_SUPPLIER_PDF_BYTES = uploads["max_supplier_pdf_mb"] * 1024 * 1024
+    MAX_ANEXOS_ZIP_BYTES = uploads["max_anexos_zip_mb"] * 1024 * 1024
+    MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = uploads["max_email_attachment_total_mb"] * 1024 * 1024
+    MAX_ATTACHMENTS_PER_EMAIL = uploads["max_attachments_per_email"]
+    email_prefs = await app_settings.get_group(db, "email_prefs")
+    INCLUDE_EMAIL_SIGNATURE = email_prefs["include_signature"]
+    AUTO_GREETING = email_prefs["auto_greeting"]
+    CORREIO_SEMANAL_SENDER = email_prefs["correio_semanal_sender"]
 
 
 @app.on_event("startup")
@@ -5782,6 +5915,7 @@ async def on_startup():
         await migrate()
         await seed_notas_telemovel()
         await seed_pedidos_whatsapp()
+        await _refresh_runtime_settings()
         await auto_close_inactive()
     except Exception as e:
         logger.error(f"Startup falhou: {e}")
@@ -5957,6 +6091,80 @@ async def push_test(request: Request):
     if not sent:
         raise HTTPException(status_code=502, detail="Não foi possível enviar a notificação — tenta ativar de novo.")
     return {"ok": True}
+
+
+# ---------- Definições (grupos genéricos — ver app_settings.py) ----------
+@api_router.get("/settings/{group}")
+async def get_settings_group(group: str):
+    try:
+        return await app_settings.get_group(db, group)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Grupo de definições desconhecido")
+
+
+_RUNTIME_GLOBALS_GROUPS = {"automation_prefs", "security_prefs", "upload_limits", "email_prefs"}
+
+
+@api_router.put("/settings/{group}")
+async def put_settings_group(group: str, patch: Dict[str, Any]):
+    if group not in app_settings.SETTINGS_DEFAULTS:
+        raise HTTPException(status_code=404, detail="Grupo de definições desconhecido")
+    result = await app_settings.update_group(db, group, patch)
+    if group in _RUNTIME_GLOBALS_GROUPS:
+        await _refresh_runtime_settings()
+    return result
+
+
+# ---------- Alterar PIN e gerir dispositivos verificados ----------
+class ChangePinIn(BaseModel):
+    current_pin: str
+    new_pin: str
+
+
+@api_router.post("/auth/change-pin")
+async def change_pin(payload: ChangePinIn):
+    pin_doc = await _get_pin_doc()
+    current = re.sub(r"\D", "", payload.current_pin or "")
+    new = re.sub(r"\D", "", payload.new_pin or "")
+    if not secrets.compare_digest(_hash_pin(current, pin_doc["salt"]), pin_doc["hash"]):
+        raise HTTPException(status_code=400, detail="PIN atual incorreto")
+    if len(new) < 4 or len(new) > 8:
+        raise HTTPException(status_code=400, detail="O novo PIN deve ter entre 4 e 8 dígitos")
+    salt = secrets.token_hex(16)
+    await db.settings.update_one(
+        {"key": "access_pin"},
+        {"$set": {"salt": salt, "hash": _hash_pin(new, salt), "updated_at": now_iso()}})
+    return {"ok": True}
+
+
+@api_router.get("/auth/devices")
+async def list_devices(request: Request):
+    current_token = request.headers.get("x-device-token")
+    devices = await db.auth_devices.find({}, {"_id": 0}).sort("last_seen", -1).to_list(100)
+    return [{
+        "id": d["id"], "ip": d.get("ip", ""), "user_agent": d.get("user_agent", ""),
+        "created_at": d.get("created_at"), "last_seen": d.get("last_seen"),
+        "has_push": bool(d.get("push_subscription")),
+        "is_current": d.get("token") == current_token,
+    } for d in devices]
+
+
+@api_router.delete("/auth/devices/{device_id}")
+async def revoke_device(device_id: str):
+    result = await db.auth_devices.delete_one({"id": device_id})
+    if not result.deleted_count:
+        raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+    return {"ok": True}
+
+
+@api_router.get("/classification-rules")
+async def get_classification_rules_summary():
+    """Só leitura — resumo do que o motor de classificação (partilhado entre
+    Correio Semanal e Anexos_Edição) já reconhece, para a secção
+    'Classificação automática' das definições."""
+    rules = await classification_rules.load_rules(db)
+    return {"categories": [
+        {"category": cat, "keyword_count": len(keywords)} for cat, keywords in rules.items()]}
 
 
 @app.middleware("http")

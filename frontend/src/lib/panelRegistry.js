@@ -1,4 +1,4 @@
-import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown, FolderTree } from "lucide-react";
+import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon } from "lucide-react";
 import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
@@ -6,6 +6,7 @@ import Tasks from "@/pages/Tasks";
 import TaskGroups from "@/pages/TaskGroups";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
+import Settings from "@/pages/Settings";
 import Calculator from "@/components/miniapps/Calculator";
 import Scratchpad from "@/components/miniapps/Scratchpad";
 import Stopwatch from "@/components/miniapps/Stopwatch";
@@ -33,11 +34,12 @@ export const PANEL_TYPES = {
   calculator: { title: "Calculadora", icon: CalculatorIcon, Component: Calculator },
   scratchpad: { title: "Bloco de notas", icon: StickyNote, Component: Scratchpad },
   stopwatch: { title: "Cronómetro", icon: Timer, Component: Stopwatch },
+  settings: { title: "Definições", icon: SettingsIcon, Component: Settings },
 };
 
 export const PANEL_ORDER = [
   "notes", "emails", "suppliers", "tasks", "taskGroups", "dashboard", "catalog",
-  "explorer", "health", "downloads", "calculator", "scratchpad", "stopwatch",
+  "explorer", "health", "downloads", "calculator", "scratchpad", "stopwatch", "settings",
 ];
 
 // Caminho da rota "normal" de cada tipo — usado para impedir abrir um
@@ -53,6 +55,7 @@ export const PANEL_ROUTES = {
   taskGroups: "/grupos-tarefas",
   dashboard: "/estatisticas",
   catalog: "/catalogo-tecnico",
+  settings: "/definicoes",
 };
 
 export function routeMatchesPanelType(pathname, type) {

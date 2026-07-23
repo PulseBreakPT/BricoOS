@@ -12,8 +12,13 @@ from zoneinfo import ZoneInfo
 LISBON = ZoneInfo("Europe/Lisbon")
 
 
-def business_greeting(now=None):
-    """Saudação adequada ao horário comercial em Portugal continental."""
+def business_greeting(now=None, enabled=True):
+    """Saudação adequada ao horário comercial em Portugal continental.
+    `enabled=False` (definições → Email → "usar saudação automática")
+    devolve sempre "Bom dia", sem olhar às horas — continua uma função
+    pura, só muda o que decide."""
+    if not enabled:
+        return "Bom dia"
     current = now or datetime.now(LISBON)
     if current.tzinfo is None:
         current = current.replace(tzinfo=LISBON)
@@ -27,9 +32,9 @@ def _quantity(note):
     return int(match.group()) if match else 1
 
 
-def supplier_quote_template(note, is_reminder=False, now=None):
+def supplier_quote_template(note, is_reminder=False, now=None, greeting_enabled=True):
     """Pedido de cotação no registo habitual do utilizador."""
-    greeting = business_greeting(now)
+    greeting = business_greeting(now, greeting_enabled)
     description = (note.get("description") or "artigo").strip()
     plural = _quantity(note) > 1
     article = "os seguintes artigos" if plural else "o seguinte artigo"
@@ -63,9 +68,9 @@ def supplier_quote_template(note, is_reminder=False, now=None):
     return {"subject": subject, "body": "\n".join(lines)}
 
 
-def client_quote_template(note, now=None):
+def client_quote_template(note, now=None, greeting_enabled=True):
     """Mensagem para acompanhar o PDF do orçamento enviado ao cliente."""
-    greeting = business_greeting(now)
+    greeting = business_greeting(now, greeting_enabled)
     description = (note.get("description") or "artigo solicitado").strip()
     subject = f"Orçamento solicitado — {description}"
     body = "\n".join([

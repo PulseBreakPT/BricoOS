@@ -51,12 +51,25 @@ function EmptyLine({ children }) {
 // Widgets do ambiente de trabalho — a secretária deixa de ser um espaço
 // vazio e passa a mostrar o pulso real da loja (tarefas do dia, pedidos em
 // aberto e correio por ver), como os widgets de um SO moderno.
+const DEFAULT_LIMITS = { agenda_limit: 4, pedidos_limit: 3, correio_limit: 3 };
+
 export default function DesktopWidgets({ onOpenRoute }) {
   const { status } = useSystemStatus();
   const [tasks, setTasks] = useState(null);
   const [notes, setNotes] = useState(null);
   const [mail, setMail] = useState(null);
+  const [limits, setLimits] = useState(DEFAULT_LIMITS);
   const now = new Date();
+
+  // Quantas linhas cada widget mostra — configurável em definições →
+  // Resumo no ambiente de trabalho, em vez de um .slice(N) fixo.
+  useEffect(() => {
+    let alive = true;
+    api.get("/settings/desktop_widget_limits")
+      .then(({ data }) => { if (alive) setLimits(data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -73,10 +86,10 @@ export default function DesktopWidgets({ onOpenRoute }) {
             !task.done &&
             (isToday(task.due_date) || isOverdue(task.due_date, task.done)),
         );
-        setTasks(list.slice(0, 4));
+        setTasks(list.slice(0, limits.agenda_limit));
       } else setTasks([]);
       if (n.status === "fulfilled")
-        setNotes((n.value.data?.items || []).slice(0, 3));
+        setNotes((n.value.data?.items || []).slice(0, limits.pedidos_limit));
       else setNotes([]);
       if (m.status === "fulfilled") setMail(m.value.data);
       else setMail({ count: 0, items: [] });
@@ -90,7 +103,7 @@ export default function DesktopWidgets({ onOpenRoute }) {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [limits.agenda_limit, limits.pedidos_limit]);
 
   return (
     <div className="os-widget-deck animate-fade-up">
@@ -189,7 +202,7 @@ export default function DesktopWidgets({ onOpenRoute }) {
             <EmptyLine>Caixa de entrada em dia.</EmptyLine>
           ) : (
             <ul className="space-y-1.5">
-              {(mail.items || []).slice(0, 3).map((message) => (
+              {(mail.items || []).slice(0, limits.correio_limit).map((message) => (
                 <li key={message.id} className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
                   <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-neutral-800">
