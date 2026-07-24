@@ -1739,3 +1739,24 @@ code {
     display: contents !important;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Bloqueio de orientação (PWA) — rede de segurança                   */
+/* ------------------------------------------------------------------ */
+
+/* A app instalada é bloqueada em vertical via manifest.json
+   ("orientation": "portrait-primary") e, em tempo de execução, via
+   screen.orientation.lock() (ver frontend/src/hooks/usePortraitLock.js).
+   Isto aqui NÃO roda a interface — é só uma rede de segurança para o caso
+   raro de algum browser ignorar os dois bloqueios acima e mesmo assim
+   reportar landscape: mantém as dimensões do layout em proporção vertical
+   (a UI foi toda desenhada para isso) em vez de deixar grids/painéis
+   esticarem para uma proporção larga e partirem visualmente. */
+@media (orientation: landscape) {
+  html,
+  body,
+  #root {
+    width: 100vh;
+    height: 100vw;
+  }
+}

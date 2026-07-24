@@ -29,7 +29,7 @@ function ensureStore() {
 
 const store = ensureStore();
 
-function isStandaloneNow() {
+export function isStandaloneNow() {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia?.("(display-mode: standalone)").matches ||

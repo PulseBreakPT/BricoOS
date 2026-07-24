@@ -13,6 +13,7 @@ import Emails from "@/pages/Emails";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import Knowledge from "@/pages/Knowledge";
+import { usePortraitLock } from "@/hooks/usePortraitLock";
 
 // A antiga página "Hoje" fundiu-se com "Pedidos" em "/". Links antigos para
 // /clientes (ex.: ?open=<id> em notificações guardadas) continuam a funcionar.
@@ -29,6 +30,9 @@ function LegacyTaskGroupsRedirect() {
 }
 
 function App() {
+  // App instalada (PWA) fica sempre em vertical — ver frontend/src/hooks/
+  // usePortraitLock.js para o porquê e o comportamento em cada browser.
+  usePortraitLock();
   return (
     <div className="App">
       {/* O PinGate envolve o Router inteiro: todas as rotas — atuais e futuras —
