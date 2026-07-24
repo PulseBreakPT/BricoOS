@@ -416,7 +416,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // sem pedidos extra por tecla).
   useEffect(() => {
     if (!open || !isCreate) return;
-    api.get("/explorer/clients").then(({ data }) => setClients(data || [])).catch(() => setClients([]));
+    api.get("/explorer/clients").then(({ data }) => setClients(data?.items || [])).catch(() => setClients([]));
   }, [open, isCreate]);
 
   // Foco automático no nome do cliente assim que o passo "Cliente" do
