@@ -107,14 +107,14 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity, onOpenT
     >
       <div className="os-home-hero relative overflow-hidden rounded-[28px] border border-border px-5 pb-5 pt-4 text-foreground shadow-[0_28px_70px_-28px_rgba(0,0,0,0.25)] sm:px-7 sm:pb-7 sm:pt-5">
         <div aria-hidden="true" className="os-home-grid absolute inset-0" />
-        <div className="relative flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex flex-wrap items-center justify-center gap-3">
           <span className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">
             <span className={`led ${online ? "led-ok" : "led-alert"}`} />
             Ambiente 01
           </span>
         </div>
 
-        <div className="relative mt-8 sm:mt-10">
+        <div className="relative mt-8 flex flex-col items-center text-center sm:mt-10">
           <div className="relative">
             <div aria-hidden="true" className="os-home-clock-glow absolute -inset-x-4 -inset-y-6 sm:-inset-x-10 sm:-inset-y-12" />
             <p className="relative font-heading text-[clamp(3.6rem,16vw,6.5rem)] font-black leading-[0.78] tracking-[-0.075em] tabular-nums whitespace-nowrap sm:text-[clamp(6.5rem,15vw,8.5rem)]">
