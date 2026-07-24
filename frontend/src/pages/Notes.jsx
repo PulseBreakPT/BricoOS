@@ -7,6 +7,7 @@ import {
   Plus, Search, SlidersHorizontal, Inbox, Focus, X, ArrowLeft, ArrowRight,
   Send, PhoneCall, CheckCircle2, Copy, Zap, Keyboard, AlertTriangle, Clock,
   PhoneMissed, TrendingUp, Frame, Store, MailCheck, KanbanSquare, LayoutGrid, Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -148,6 +149,11 @@ export default function Notes() {
   const [gmailStatus, setGmailStatus] = useState({ connected: false, configured: false });
   const [labels, setLabels] = useState([]);
   const [today, setToday] = useState(null);
+  // "Prontos para enviar"/"Precisa de atenção" começam recolhidos (só a
+  // barra de resumo) — expandidos ocupavam o ecrã todo quando havia muitos
+  // itens, empurrando a lista de pedidos para muito longe do topo.
+  const [toConfirmOpen, setToConfirmOpen] = useState(false);
+  const [attentionOpen, setAttentionOpen] = useState(false);
 
   // Área ativa, lida do URL (?area=band) para sobreviver a reloads e links.
   const [segment, setSegment] = useState(() => (
@@ -575,68 +581,83 @@ export default function Notes() {
       ) : null}
 
       {/* Prontos para enviar — email + PDF preparados automaticamente a partir
-          do email do fornecedor; um clique abre o ecrã de confirmação */}
+          do email do fornecedor; recolhido por omissão (só a barra de
+          resumo), para não empurrar a lista de pedidos para longe do topo
+          quando há muitos prontos ao mesmo tempo */}
       {(today?.to_confirm || []).length > 0 ? (
-        <section data-testid="to-confirm-panel" className="mt-4 rounded-2xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-4 sm:p-5">
-          <h2 className="flex flex-wrap items-center gap-2 font-heading text-base font-extrabold text-[color:var(--pastel-emerald-text)]">
-            <MailCheck className="h-4 w-4 text-emerald-600" /> Prontos para enviar ao cliente
-            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
-          </h2>
-          <p className="mt-0.5 text-xs text-[color:var(--pastel-emerald-text)]/80">Analisados e calculados automaticamente — só falta a tua confirmação.</p>
-          <div className="mt-3 space-y-2">
-            {today.to_confirm.map((n) => (
-              <button
-                key={n.id}
-                data-testid={`to-confirm-${n.id}`}
-                onClick={() => setConfirmNote(n)}
-                className="flex w-full flex-col items-stretch gap-3 rounded-xl bg-card p-3 text-left transition-colors hover:bg-[var(--pastel-emerald-bg)] min-[420px]:flex-row min-[420px]:items-center"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold text-foreground">{n.customer_name || "Sem nome"}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {n.pending_client_send?.pdf_filename || "PDF pronto"}
-                    {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
-                  </p>
-                </div>
-                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
-                  <Send className="h-3.5 w-3.5" /> Rever e enviar
-                </span>
-              </button>
-            ))}
-          </div>
+        <section data-testid="to-confirm-panel" className="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-[var(--pastel-emerald-bg)]">
+          <button
+            type="button" data-testid="to-confirm-toggle" onClick={() => setToConfirmOpen((v) => !v)}
+            className="flex w-full items-center gap-2 p-3 text-left sm:p-3.5"
+          >
+            <MailCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span className="min-w-0 flex-1 truncate font-heading text-sm font-extrabold text-[color:var(--pastel-emerald-text)]">Prontos para enviar ao cliente</span>
+            <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[color:var(--pastel-emerald-text)] transition-transform ${toConfirmOpen ? "rotate-180" : ""}`} />
+          </button>
+          {toConfirmOpen ? (
+            <div className="space-y-2 px-3 pb-3 sm:px-3.5 sm:pb-3.5">
+              {today.to_confirm.map((n) => (
+                <button
+                  key={n.id}
+                  data-testid={`to-confirm-${n.id}`}
+                  onClick={() => setConfirmNote(n)}
+                  className="flex w-full items-center gap-3 rounded-xl bg-card p-2.5 text-left transition-colors hover:bg-[var(--pastel-emerald-bg)]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-extrabold text-foreground">{n.customer_name || "Sem nome"}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {n.pending_client_send?.pdf_filename || "PDF pronto"}
+                      {n.pending_client_send?.total != null ? ` · ${Number(n.pending_client_send.total).toFixed(2)} € c/ IVA` : ""}
+                    </p>
+                  </div>
+                  <span className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white">
+                    <Send className="h-3.5 w-3.5" /> <span className="hidden min-[420px]:inline">Rever e enviar</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
-      {/* Precisa de atenção — triagem no topo, o resto é a própria lista */}
+      {/* Precisa de atenção — recolhido por omissão, mesmo espírito do painel acima */}
       {attention.length > 0 ? (
-        <section className="mt-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-foreground">
-            <AlertTriangle className="h-4 w-4 text-red-500" /> Precisa de atenção
-            <span className="rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-xs font-bold text-[color:var(--pastel-red-text)]">{today.attention_count}</span>
-          </h2>
-          <div className="mt-3 space-y-2">
-            {attention.slice(0, 4).map((a) => (
-              <button
-                key={a.id} data-testid={`attention-${a.id}`}
-                onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
-                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-muted ${a.severity === "high" ? "border-red-200 bg-[var(--pastel-red-bg)]" : "border-amber-200 bg-[var(--pastel-amber-bg)]"}`}
-              >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-[var(--pastel-red-bg)] text-red-600" : "bg-[var(--pastel-amber-bg)] text-amber-600"}`}>
-                  <AlertTriangle className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold text-foreground">{a.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{a.message}</p>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            ))}
-            {today.attention_count > 4 ? (
-              <button onClick={() => setPreset("overdue")} className="w-full rounded-xl border border-dashed border-border p-2 text-center text-xs font-semibold text-muted-foreground hover:text-foreground">
-                Ver os restantes na lista (filtro "Atrasados") →
-              </button>
-            ) : null}
-          </div>
+        <section className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
+          <button
+            type="button" data-testid="attention-toggle" onClick={() => setAttentionOpen((v) => !v)}
+            className="flex w-full items-center gap-2 p-3 text-left sm:p-3.5"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+            <span className="min-w-0 flex-1 truncate font-heading text-sm font-extrabold text-foreground">Precisa de atenção</span>
+            <span className="shrink-0 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-xs font-bold text-[color:var(--pastel-red-text)]">{today.attention_count}</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${attentionOpen ? "rotate-180" : ""}`} />
+          </button>
+          {attentionOpen ? (
+            <div className="space-y-2 px-3 pb-3 sm:px-3.5 sm:pb-3.5">
+              {attention.slice(0, 4).map((a) => (
+                <button
+                  key={a.id} data-testid={`attention-${a.id}`}
+                  onClick={() => a.note_id ? openNote(a.note_id) : navigate("/tarefas")}
+                  className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors hover:bg-muted ${a.severity === "high" ? "border-red-200 bg-[var(--pastel-red-bg)]" : "border-amber-200 bg-[var(--pastel-amber-bg)]"}`}
+                >
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.severity === "high" ? "bg-[var(--pastel-red-bg)] text-red-600" : "bg-[var(--pastel-amber-bg)] text-amber-600"}`}>
+                    <AlertTriangle className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-extrabold text-foreground">{a.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{a.message}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+              {today.attention_count > 4 ? (
+                <button onClick={() => setPreset("overdue")} className="w-full rounded-xl border border-dashed border-border p-2 text-center text-xs font-semibold text-muted-foreground hover:text-foreground">
+                  Ver os restantes na lista (filtro "Atrasados") →
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
