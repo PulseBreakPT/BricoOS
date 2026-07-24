@@ -102,6 +102,20 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
     || (results.knowledge_articles || []).length
   );
 
+  useEffect(() => {
+    // Pesquisar pelo nº BricoAval abre o pedido diretamente, sem precisar de
+    // clicar — só quando o resultado é inequivocamente um único pedido
+    // (ver bricoaval_match, GET /search).
+    if (!results) return;
+    const totalCount = (results.notes || []).length + (results.suppliers || []).length
+      + (results.tasks || []).length + (results.emails || []).length
+      + (results.knowledge_articles || []).length;
+    if (totalCount === 1 && results.notes?.length === 1 && results.notes[0].bricoaval_match) {
+      goToNote(results.notes[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="command-palette" className="command-palette-dialog elev-window-active top-[10%] max-w-xl translate-y-0 gap-0 overflow-hidden border-border p-0 sm:rounded-2xl [&>button:last-child]:text-[color:var(--chrome-muted)] [&>button:last-child]:hover:text-foreground">

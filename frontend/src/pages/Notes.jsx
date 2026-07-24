@@ -46,6 +46,7 @@ const PRESETS = [
   { key: "urgente", label: "Urgentes", filters: { priority: "urgente" } },
   { key: "recebidos", label: "Recebidos", filters: { status: "orcamento_recebido" } },
   { key: "aprovados", label: "Aprovados", filters: { status: "aprovado,encomendado" } },
+  { key: "com_bricoaval", label: "Com nº BricoAval", filters: { has_bricoaval: true } },
   { key: "arquivados", label: "Arquivados", filters: { archived: true } },
 ];
 
@@ -221,6 +222,7 @@ export default function Notes() {
     if (p.waiting) params.waiting = p.waiting;
     if (p.callback) params.callback = true;
     if (p.archived) params.archived = true;
+    if (p.has_bricoaval) params.has_bricoaval = true;
     if (advPriority) params.priority = advPriority;
     if (category !== "todos") params.category = category;
     if (advSupplier) params.supplier_id = advSupplier;
@@ -669,6 +671,7 @@ export default function Notes() {
                     <SelectItem value="priority">Prioridade</SelectItem>
                     <SelectItem value="deadline">Mais tempo parados</SelectItem>
                     <SelectItem value="customer">Nome do cliente</SelectItem>
+                    <SelectItem value="bricoaval">Nº Orçamento BricoAval</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

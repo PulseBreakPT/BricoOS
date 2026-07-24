@@ -645,6 +645,25 @@ def normalize_email(v):
     return v
 
 
+_BRICOAVAL_RE = re.compile(r"^#OM\d+$")
+_BRICOAVAL_TOKEN_RE = re.compile(r"#?OM\d+", re.IGNORECASE)
+
+
+def normalize_bricoaval(v):
+    """Normaliza o nº de Orçamento BricoAval para a forma canónica "#OM00001" —
+    usada tanto ao gravar o campo como ao comparar tokens extraídos de emails/PDFs
+    (ver _match_note_by_bricoaval), para que gravação e procura usem sempre a mesma
+    forma."""
+    v = (v or "").strip().upper().replace(" ", "")
+    if not v:
+        return ""
+    if not v.startswith("#"):
+        v = "#" + v
+    if not _BRICOAVAL_RE.match(v):
+        raise ValueError('Nº BricoAval inválido — formato esperado "#OM00001".')
+    return v
+
+
 class NoteIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     customer_name: str = ""
@@ -657,6 +676,7 @@ class NoteIn(BaseModel):
     quantity: str = ""
     color: str = ""
     reference: str = ""
+    bricoaval_number: str = ""
     status: str = "novo"
     priority: str = "media"
     labels: List[str] = []
@@ -700,6 +720,11 @@ class NoteIn(BaseModel):
     def _v_email(cls, v):
         return normalize_email(v)
 
+    @field_validator("bricoaval_number")
+    @classmethod
+    def _v_bricoaval(cls, v):
+        return normalize_bricoaval(v)
+
 
 class NotePatch(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -713,6 +738,7 @@ class NotePatch(BaseModel):
     quantity: Optional[str] = None
     color: Optional[str] = None
     reference: Optional[str] = None
+    bricoaval_number: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     labels: Optional[List[str]] = None
@@ -740,6 +766,11 @@ class NotePatch(BaseModel):
     @classmethod
     def _v_sla(cls, v):
         return _check_positive(v, "Prazo (SLA)")
+
+    @field_validator("bricoaval_number")
+    @classmethod
+    def _v_bricoaval(cls, v):
+        return normalize_bricoaval(v)
 
     @field_validator("reminder_interval_days")
     @classmethod
@@ -1268,7 +1299,7 @@ async def list_notes(
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
     overdue: Optional[bool] = None, archived: Optional[bool] = None,
     waiting: Optional[str] = None, reminder_due: Optional[bool] = None, callback: Optional[bool] = None,
-    segment: Optional[str] = None, has_customer: Optional[bool] = None,
+    segment: Optional[str] = None, has_customer: Optional[bool] = None, has_bricoaval: Optional[bool] = None,
     sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
     q = {}
@@ -1286,7 +1317,7 @@ async def list_notes(
     if search:
         rx = {"$regex": re.escape(search), "$options": "i"}
         q["$or"] = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"email": rx},
-                    {"details": rx}, {"measurements": rx}, {"reference": rx}, {"labels": rx}]
+                    {"details": rx}, {"measurements": rx}, {"reference": rx}, {"bricoaval_number": rx}, {"labels": rx}]
         # Telefones: quem procura "917 100 512" ou "917-100" tem de encontrar
         # o número guardado como "917100512" — compara só os dígitos.
         digits = re.sub(r"\D", "", search)
@@ -1305,6 +1336,8 @@ async def list_notes(
         # campo novo na base de dados (ver PedidoPicker.jsx).
         docs = [d for d in docs
                 if bool((d.get("customer_name") or "").strip() or (d.get("email") or "").strip()) == has_customer]
+    if has_bricoaval is not None:
+        docs = [d for d in docs if bool((d.get("bricoaval_number") or "").strip()) == has_bricoaval]
     if overdue:
         docs = [d for d in docs if d["is_overdue"]]
     if waiting:
@@ -1323,6 +1356,11 @@ async def list_notes(
         docs.sort(key=lambda d: (d.get("customer_name") or "").lower())
     elif sort == "recent":
         docs.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    elif sort == "bricoaval":
+        # Pedidos com nº atribuído primeiro, ordenados pelo próprio número;
+        # os restantes ficam depois, por ordem de criação.
+        docs.sort(key=lambda d: (not bool((d.get("bricoaval_number") or "").strip()),
+                                 d.get("bricoaval_number") or ""))
     else:  # "smart" e qualquer valor desconhecido
         docs.sort(key=lambda d: (0 if d["is_overdue"] else 1, PRIORITY_RANK.get(d.get("priority"), 2),
                                  d.get("status_updated_at") or d.get("created_at")))
@@ -1369,14 +1407,34 @@ async def check_duplicate(payload: DuplicateCheckIn):
     return {"matches": docs}
 
 
+async def _check_bricoaval_conflict(number, exclude_id=None):
+    """Nº BricoAval é único em toda a base (arquivados incluído) — nunca reutilizado,
+    como um nº de fatura. Levanta 409 se já pertencer a outro pedido."""
+    if not number:
+        return
+    q = {"bricoaval_number": number}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    dup = await db.notes.find_one(q, {"_id": 0, "id": 1, "customer_name": 1})
+    if dup:
+        raise HTTPException(
+            status_code=409,
+            detail=f'O nº BricoAval "{number}" já está associado ao pedido de {dup.get("customer_name") or "outro cliente"}.')
+
+
 @api_router.post("/notes")
 async def create_note(payload: NoteIn):
     doc = payload.model_dump()
+    await _check_bricoaval_conflict(doc.get("bricoaval_number"))
+    bricoaval_history = []
+    if doc.get("bricoaval_number"):
+        bricoaval_history.append({"from": "", "to": doc["bricoaval_number"], "changed_at": now_iso(), "author": AUTHOR})
     doc.update({"id": str(uuid.uuid4()), "created_by": AUTHOR, "archived": False,
                 "last_supplier_sent_at": "", "last_client_contact_at": "", "last_client_reply_at": "",
                 "reminder_count": 0, "last_reminder_at": "", "auto_closed": False,
                 "client_no_answer_count": 0, "supplier_no_answer_count": 0,
                 "last_client_attempt_at": "", "last_supplier_attempt_at": "",
+                "bricoaval_history": bricoaval_history, "bricoaval_first_linked_at": "", "bricoaval_first_pdf_at": "",
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido criado para {doc.get('customer_name') or 'cliente'}")
@@ -1389,6 +1447,8 @@ async def get_note(note_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     doc["photo_count"] = await db.note_files.count_documents({"note_id": note_id, "kind": "photo"})
+    if doc.get("bricoaval_number"):
+        doc["bricoaval_summary"] = await _bricoaval_summary(doc)
     return enrich_note(doc)
 
 
@@ -1415,13 +1475,22 @@ async def update_note(note_id: str, payload: NotePatch):
                            {"from": current.get("status"), "to": update["status"]})
     if "priority" in update and update["priority"] != current.get("priority"):
         await log_activity(note_id, "priority_change", f"Prioridade alterada para {update['priority']}", {"to": update["priority"]})
+    bricoaval_push = None
+    if "bricoaval_number" in update and update["bricoaval_number"] != (current.get("bricoaval_number") or ""):
+        await _check_bricoaval_conflict(update["bricoaval_number"], exclude_id=note_id)
+        bricoaval_push = {"from": current.get("bricoaval_number") or "", "to": update["bricoaval_number"],
+                           "changed_at": now_iso(), "author": AUTHOR}
     fl = {"customer_name": "cliente", "phone": "telefone", "email": "email", "description": "descrição",
           "details": "notas", "category": "secção", "measurements": "medidas", "labels": "etiquetas",
-          "supplier_id": "fornecedor", "sla_days": "prazo", "reference": "referência"}
+          "supplier_id": "fornecedor", "sla_days": "prazo", "reference": "referência",
+          "bricoaval_number": "nº Orçamento BricoAval"}
     changed = [fl[k] for k in update if k in fl and update[k] != current.get(k)]
     if changed:
         await log_activity(note_id, "updated", "Atualizado: " + ", ".join(changed))
-    await db.notes.update_one({"id": note_id}, {"$set": update})
+    mongo_update = {"$set": update}
+    if bricoaval_push is not None:
+        mongo_update["$push"] = {"bricoaval_history": bricoaval_push}
+    await db.notes.update_one({"id": note_id}, mongo_update)
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -2723,14 +2792,24 @@ async def global_search(q: str = ""):
     if len(term) < 2:
         return {"notes": [], "suppliers": [], "tasks": [], "emails": [], "knowledge_articles": []}
     rx = {"$regex": re.escape(term), "$options": "i"}
-    note_or = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"reference": rx}]
+    note_or = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"reference": rx}, {"bricoaval_number": rx}]
     digits = re.sub(r"\D", "", term)
     if len(digits) >= 3:
         note_or.append({"phone": {"$regex": r"\D*".join(digits)}})
     notes = await db.notes.find(
         {"$or": note_or},
-        {"_id": 0, "id": 1, "customer_name": 1, "description": 1, "status": 1, "phone": 1, "archived": 1},
+        {"_id": 0, "id": 1, "customer_name": 1, "description": 1, "status": 1, "phone": 1, "archived": 1, "bricoaval_number": 1},
     ).sort("created_at", -1).limit(6).to_list(6)
+    # Quando o termo bate exatamente com o nº BricoAval de um pedido,
+    # marca-se para o frontend poder abrir esse pedido diretamente sem
+    # precisar de clicar (ver CommandPalette.jsx) — só quando é
+    # inequivocamente esse único pedido.
+    try:
+        term_norm = normalize_bricoaval(term)
+    except ValueError:
+        term_norm = None
+    for n in notes:
+        n["bricoaval_match"] = bool(term_norm) and n.get("bricoaval_number") == term_norm
     suppliers = await db.suppliers.find(
         {"$or": [{"name": rx}, {"email": rx}]},
         {"_id": 0, "id": 1, "name": 1, "email": 1, "category": 1},
@@ -3449,7 +3528,11 @@ async def _apply_supplier_pdf(note_id, data, filename, source_label=""):
 async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
     """Gera o PDF de venda ao cliente e guarda-o no pedido. Não envia nada.
     Levanta ValueError se não houver linhas incluídas/válidas."""
-    pdf_bytes = build_client_pdf(supplier_quote, BRICO_LOGO_PATH.read_bytes())
+    bricoaval_note = await db.notes.find_one({"id": note_id}, {"_id": 0, "bricoaval_number": 1})
+    # Cópia rasa só para o PDF — nunca grava bricoaval_number dentro de
+    # note.supplier_quote, só o passa ao gerador do documento.
+    quote_for_pdf = {**supplier_quote, "bricoaval_number": (bricoaval_note or {}).get("bricoaval_number") or ""}
+    pdf_bytes = build_client_pdf(quote_for_pdf, BRICO_LOGO_PATH.read_bytes())
     filename = _client_pdf_filename(supplier_quote.get("quote_number"))
     file_id = str(uuid.uuid4())
     await db.note_files.insert_one({
@@ -3937,6 +4020,40 @@ def communication_status(sent_docs, received_docs, sla_days=2, now=None):
     return None
 
 
+async def _bricoaval_summary(note):
+    """Resumo rápido do nº de Orçamento BricoAval de um pedido — só chamado
+    por get_note quando o pedido tem número atribuído. Usa as mesmas
+    coleções (sent_emails/received_emails) que alimentam o separador
+    Comunicação, sem reaproveitar diretamente note_communication (que
+    também monta a lista completa de itens, desnecessária aqui)."""
+    note_id = note["id"]
+    sent = await db.sent_emails.find({"note_id": note_id}, {"_id": 0}).sort("sent_at", -1).to_list(500)
+    received = await db.received_emails.find({"note_id": note_id}, {"_id": 0}).sort("received_at", -1).to_list(500)
+    automation = await app_settings.get_group(db, "automation_prefs")
+    sla_days = note.get("sla_days") or automation.get("default_sla_days") or 2
+    last_sent_at = sent[0]["sent_at"] if sent else None
+    last_received_at = received[0]["received_at"] if received else None
+    all_items = sent + received
+    documents_count = sum(len(i.get("attachments") or []) for i in all_items)
+    pdfs_count = sum(
+        1 for i in all_items for a in (i.get("attachments") or [])
+        if (a.get("filename") or "").lower().endswith(".pdf"))
+    history = note.get("bricoaval_history") or []
+    return {
+        "number": note["bricoaval_number"],
+        "communication_status": communication_status(sent, received, sla_days=sla_days),
+        "last_email_at": max(filter(None, [last_sent_at, last_received_at]), default=None),
+        "last_reply_at": last_received_at,
+        "last_activity_at": note.get("status_updated_at") or note.get("updated_at"),
+        "linked_emails_count": len(sent) + len(received),
+        "linked_documents_count": documents_count,
+        "linked_pdfs_count": pdfs_count,
+        "assigned_at": history[0].get("changed_at", "") if history else "",
+        "first_linked_at": note.get("bricoaval_first_linked_at") or "",
+        "first_pdf_at": note.get("bricoaval_first_pdf_at") or "",
+    }
+
+
 def _smtp_send(to_email, subject, body, attachments=None, message_id=None, in_reply_to=None, references=None):
     message = _build_email_body(body, attachments)
     message["From"] = GMAIL_SMTP_USER
@@ -3998,6 +4115,15 @@ async def _send_email(to_email, subject, body, attachments=None, note_id=None, k
     associação")."""
     if not to_email:
         raise HTTPException(status_code=400, detail="O destinatário não tem email definido.")
+    if note_id:
+        # Nº de Orçamento BricoAval, quando o pedido o tiver, viaja sempre no
+        # assunto — sem exigir nada do utilizador. A maioria dos
+        # fornecedores/clientes preserva o assunto ao responder, por isso o
+        # nº passa a acompanhar praticamente todas as respostas futuras
+        # (sinal 4 de _match_note_by_bricoaval).
+        bricoaval_note = await db.notes.find_one({"id": note_id}, {"_id": 0, "bricoaval_number": 1})
+        if bricoaval_note and bricoaval_note.get("bricoaval_number") and bricoaval_note["bricoaval_number"] not in subject:
+            subject = f"{subject} [{bricoaval_note['bricoaval_number']}]"
     internal_token = note_id or ""
     msgid = _make_message_id(note_id)
     in_reply_to, references = _reply_headers(reply_to)
@@ -4864,6 +4990,42 @@ async def _match_client_reply(from_email, subject):
     return docs[0]["id"]
 
 
+def _extract_pdf_text(pdf_bytes):
+    """Texto de um PDF anexado a um email recebido — mesmo padrão de extração
+    já usado em anexos_edicao.py/correio_semanal.py (PyMuPDF), só que sem
+    classificação nenhuma: aqui só interessa procurar o nº BricoAval no texto."""
+    try:
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        return "\n".join(page.get_text() for page in doc)
+    except Exception:
+        return ""
+
+
+async def _match_note_by_bricoaval(subject, body, attachments, index):
+    """Sinal 4 da cadeia de correspondência — nº de Orçamento BricoAval
+    encontrado no assunto, corpo, nome de anexo ou texto de um PDF anexado.
+    Só considera tokens que já têm a forma exata "#OM<dígitos>" (nunca dígitos
+    soltos) e só resolve se o token normalizado existir no índice de números
+    ativos (correspondência exata, não parcial)."""
+    if not index:
+        return None
+    blob_parts = [subject or "", body or ""]
+    for att in attachments or []:
+        blob_parts.append(att.get("filename") or "")
+        if (att.get("filename") or "").lower().endswith(".pdf") and att.get("data"):
+            blob_parts.append(_extract_pdf_text(att["data"]))
+    blob = "\n".join(blob_parts)
+    for token in _BRICOAVAL_TOKEN_RE.findall(blob):
+        try:
+            number = normalize_bricoaval(token)
+        except ValueError:
+            continue
+        if number in index:
+            return index[number]["note_id"]
+    return None
+
+
 async def _match_note_by_headers(m):
     """Sinais 1-5 da cadeia de correspondência (Message-ID, In-Reply-To,
     References, thread do Gmail, identificador interno) — ao contrário de
@@ -4988,6 +5150,20 @@ async def poll_supplier_replies():
     messages = await asyncio.to_thread(_imap_fetch_since, last_uid)
     matched = 0
     max_uid = last_uid
+    # Índice em memória dos nºs BricoAval ativos, carregado uma vez por ciclo
+    # (não por mensagem) — usado pelo sinal 4 da cadeia de correspondência,
+    # abaixo. Guarda mais do que o note_id para que o resto do ciclo não
+    # precise de voltar ao Mongo por cada correspondência.
+    active_bricoaval = {
+        d["bricoaval_number"]: {
+            "note_id": d["id"], "customer_name": d.get("customer_name") or "",
+            "status": d.get("status") or "", "supplier_id": d.get("supplier_id") or "",
+        }
+        for d in await db.notes.find(
+            {"bricoaval_number": {"$nin": ["", None]}},
+            {"_id": 0, "id": 1, "bricoaval_number": 1, "customer_name": 1, "status": 1, "supplier_id": 1},
+        ).to_list(2000)
+    }
     for m in messages:
         max_uid = max(max_uid, m["uid"])
         if m["from_email"] == GMAIL_SMTP_USER.lower():
@@ -5000,6 +5176,23 @@ async def poll_supplier_replies():
         # assunto/remetente já existente (sinais 6-7, atrás do filtro
         # "parece um orçamento").
         note_id, reply_kind, supplier_id, supplier_name, match_method = await _match_note_by_headers(m)
+        if not note_id:
+            # Sinal 4 — nº de Orçamento BricoAval encontrado no conteúdo
+            # (assunto/corpo/anexos). Tão fiável como os sinais de
+            # cabeçalho (formato único, correspondência exata por índice),
+            # por isso corre antes do sinal fraco de assunto/remetente.
+            note_id = await _match_note_by_bricoaval(m["subject"], m["body"], m.get("attachments", []), active_bricoaval)
+            if note_id:
+                match_method = "bricoaval_number"
+                bnote = await db.notes.find_one({"id": note_id}, {"_id": 0})
+                reply_kind = await _infer_kind_for_recipient(m["from_email"], bnote)
+                if reply_kind == "other":
+                    reply_kind = "supplier"
+                supplier_id = bnote.get("supplier_id") or None
+                supplier_name = None
+                if supplier_id:
+                    sup = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0, "name": 1})
+                    supplier_name = sup.get("name") if sup else None
         if not note_id:
             note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
             reply_kind = "supplier" if note_id else ""
@@ -5107,8 +5300,9 @@ async def poll_supplier_replies():
                 push_category = "client"
             else:
                 push_category = "unmatched"
+            notif_title = "Email associado por nº BricoAval" if match_method == "bricoaval_number" else "Novo email"
             await notifications.create_notification(
-                db, dedup_key=f"new-email-{email_id}", category=push_category, title="Novo email",
+                db, dedup_key=f"new-email-{email_id}", category=push_category, title=notif_title,
                 body=f"{from_label}: {m['subject'] or '(sem assunto)'}", url="/emails", note_id=note_id or None)
         except Exception as e:
             logger.warning(f"Notificação falhou (email {email_id}): {e}")
@@ -5120,6 +5314,21 @@ async def poll_supplier_replies():
                 logger.warning(f"Criação do artigo do Centro de Conhecimento falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
+            if match_method == "bricoaval_number":
+                # Marcos de "primeira vez" para este nº BricoAval — só uma vez
+                # cada, guardados como campos simples na nota para não ter de
+                # contar documentos a cada evento.
+                bn = await db.notes.find_one({"id": note_id}, {"_id": 0, "bricoaval_number": 1,
+                                                                 "bricoaval_first_linked_at": 1, "bricoaval_first_pdf_at": 1})
+                if bn and not bn.get("bricoaval_first_linked_at"):
+                    await db.notes.update_one({"id": note_id}, {"$set": {"bricoaval_first_linked_at": now_iso()}})
+                    await log_activity(note_id, "bricoaval_first_linked",
+                                       f"Primeiro email associado pelo nº BricoAval {bn['bricoaval_number']}")
+                if bn and attachments_meta and any(a["filename"].lower().endswith(".pdf") for a in attachments_meta) \
+                        and not bn.get("bricoaval_first_pdf_at"):
+                    await db.notes.update_one({"id": note_id}, {"$set": {"bricoaval_first_pdf_at": now_iso()}})
+                    await log_activity(note_id, "bricoaval_first_pdf",
+                                       f"Primeiro PDF associado ao nº BricoAval {bn['bricoaval_number']}")
             await _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachments_meta, supplier_name)
     await db.imap_state.update_one({"id": "inbox"}, {"$set": {
         "id": "inbox", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
@@ -5722,7 +5931,7 @@ async def link_email_to_note(email_id: str, payload: LinkNoteIn):
     from_email = (e.get("from_email") or "").lower()
     reply_kind = "client" if n.get("email") and n["email"].lower() == from_email else "supplier"
     await db.received_emails.update_one({"id": email_id}, {"$set": {
-        "note_id": payload.note_id, "matched": True, "reply_kind": reply_kind}})
+        "note_id": payload.note_id, "matched": True, "reply_kind": reply_kind, "match_method": "manual"}})
     await db.email_attachments.update_many({"email_id": email_id}, {"$set": {"note_id": payload.note_id}})
     await log_activity(payload.note_id, "email_received",
                        f"Email associado manualmente ({e.get('from_email')}): {e.get('subject') or '(sem assunto)'}",

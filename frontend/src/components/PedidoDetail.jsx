@@ -48,9 +48,13 @@ import KnowledgeArticlePicker from "@/components/KnowledgeArticlePicker";
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
-  category: "construcao", quantity: "", reference: "",
+  category: "construcao", quantity: "", reference: "", bricoaval_number: "",
   priority: "media", labels: [], supplier_id: "", sla_days: 2, reminder_interval_days: 3,
   related_article_ids: [],
+};
+
+const BRICOAVAL_STATUS_LABEL = {
+  erro: "Erro no envio", respondido: "Respondido", sem_resposta: "Sem resposta", enviado: "Enviado",
 };
 
 const DRAFT_KEY = "brico_draft_new_note";
@@ -166,6 +170,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [replyResult, setReplyResult] = useState(null);
 
   const isCreate = !id;
+  // Mesma heurística de "Pedido de Cliente" usada em PedidoPicker.jsx e no
+  // backend (_pedido_type_for_note): segmento "geral" (não é Banda
+  // Alumínios) com nome ou email de cliente preenchido.
+  const isBricoavalEligible = !isCreate && !note?.caixilharia && !!((form.customer_name || "").trim() || (form.email || "").trim());
   const dirty = useRef(false);
   const contentScrollRef = useRef(null);
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
@@ -1464,6 +1472,64 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </div>
                   ) : null}
                 </div>
+              ) : null}
+
+              {isBricoavalEligible ? (
+                <>
+                  <SectionTitle title="Orçamento BricoAval" />
+                  <div className="mt-3">
+                    {editMode ? (
+                      <div className="max-w-xs space-y-1.5">
+                        <Label>Nº Orçamento BricoAval</Label>
+                        <Input
+                          data-testid="input-bricoaval-number" value={form.bricoaval_number}
+                          onChange={(e) => set("bricoaval_number", e.target.value)}
+                          className="font-mono" placeholder="#OM00001"
+                        />
+                      </div>
+                    ) : form.bricoaval_number ? (
+                      <div className="flex items-center gap-2">
+                        <ViewField label="Nº Orçamento BricoAval" value={form.bricoaval_number} mono />
+                        <Button
+                          data-testid="copy-bricoaval-number" size="icon" variant="ghost" className="mt-4 h-7 w-7 shrink-0"
+                          onClick={async () => { await navigator.clipboard.writeText(form.bricoaval_number); toast.success("Nº BricoAval copiado"); }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <ViewField label="Nº Orçamento BricoAval" value="" />
+                    )}
+
+                    {note?.bricoaval_summary ? (
+                      <div data-testid="bricoaval-summary" className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/60 p-3 sm:grid-cols-3">
+                        <ViewField label="Estado da comunicação" value={BRICOAVAL_STATUS_LABEL[note.bricoaval_summary.communication_status] || "—"} />
+                        <ViewField label="Último email" value={formatDateTime(note.bricoaval_summary.last_email_at)} />
+                        <ViewField label="Última resposta" value={formatDateTime(note.bricoaval_summary.last_reply_at)} />
+                        <ViewField label="Última atividade" value={formatDateTime(note.bricoaval_summary.last_activity_at)} />
+                        <ViewField label="Emails associados" value={String(note.bricoaval_summary.linked_emails_count)} />
+                        <ViewField label="Documentos associados" value={String(note.bricoaval_summary.linked_documents_count)} />
+                        <ViewField label="PDFs associados" value={String(note.bricoaval_summary.linked_pdfs_count)} />
+                      </div>
+                    ) : null}
+
+                    {(note?.bricoaval_history || []).length > 0 ? (
+                      <details className="mt-3">
+                        <summary data-testid="bricoaval-history-toggle" className="cursor-pointer text-xs font-bold text-muted-foreground hover:text-foreground">
+                          Histórico do número ({note.bricoaval_history.length})
+                        </summary>
+                        <div className="mt-2 space-y-1.5">
+                          {[...note.bricoaval_history].reverse().map((h, i) => (
+                            <p key={i} className="text-xs text-muted-foreground">
+                              <span className="font-mono">{h.from || "(nenhum)"}</span> → <span className="font-mono font-bold text-foreground">{h.to || "(removido)"}</span>
+                              {" · "}{formatDateTime(h.changed_at)}{h.author ? ` · ${h.author}` : ""}
+                            </p>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                </>
               ) : null}
 
               <SectionTitle title="Etiquetas" />
