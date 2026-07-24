@@ -74,6 +74,24 @@ _FWD_PREFIX_RE = re.compile(r"^\s*(re|fw|fwd|enc)\s*:\s*", re.IGNORECASE)
 CHECKBOX_LABELS = ("PARA INFORMAÇÃO", "A ENCOMENDAR", "A FAZER")
 _CHECKBOX_GLYPH_RE = re.compile(r"^❑\s*(.*)$")
 
+# Marcador de lista (linha começada por -/•/*) — dá a estas linhas o seu
+# próprio parágrafo (`list_item`) em vez de caírem dentro do texto corrido
+# do parágrafo anterior, indistinguíveis do resto (ver _reflow).
+_LIST_MARKER_RE = re.compile(r"^[-•*]\s+(.+)$")
+
+
+def _normalize_text(s):
+    """Limpeza leve do texto já reconstruído por _reflow — nunca muda
+    palavras nem a ordem, só o espaçamento/pontuação à volta delas: espaços
+    a mais (colunas estreitas do PDV geram muitos), espaço a mais antes de
+    pontuação, e falta de espaço a seguir a uma frase fechada quando a
+    seguinte começa logo maiúscula (comum quando duas linhas de colunas
+    diferentes ficam coladas na extração)."""
+    s = re.sub(r"[ \t]{2,}", " ", s or "")
+    s = re.sub(r"\s+([,.;:!?])", r"\1", s)
+    s = re.sub(r"([.!?])(?=[A-ZÀ-Ú])", r"\1 ", s)
+    return s.strip()
+
 
 def _checkbox_state(text):
     """{"PARA INFORMAÇÃO"|"A ENCOMENDAR"|"A FAZER": True/False} — True =
@@ -274,6 +292,11 @@ def extract_structured(pdf_bytes_list, subject, rules=None):
             "mea_mentions": sorted({m.group(0).strip() for m in _MEA_RE.finditer(page_text)}),
             "requires_adhesion_email": requires_adhesion, "adhesion_emails": adhesion_emails,
             "text": " ".join(p for _, p in paragraphs)[:2000],
+            # Parágrafos reais (título/texto/lista), preservados em vez de
+            # achatados — a leitura no Centro de Conhecimento usa isto para
+            # não mostrar cada secção como um único bloco de texto (ver
+            # frontend/src/lib/knowledgeReading.js).
+            "paragraphs": [{"type": kind, "text": text} for kind, text in paragraphs],
         }
         section["severity"] = severity_engine.classify_severity(
             category, page_text, requires_adhesion=requires_adhesion)
@@ -404,7 +427,8 @@ def _extract_facts(full_text):
 def _reflow(lines):
     """As páginas deste PDF vêm muitas vezes com uma palavra por linha
     (colunas estreitas) — junta em parágrafos para ficar legível, sem tirar
-    nem alterar palavra nenhuma. Devolve uma lista de (é_título, texto).
+    nem alterar palavra nenhuma. Devolve uma lista de (tipo, texto), com
+    tipo em "heading" | "text" | "list_item".
 
     Uma linha em maiúsculas é um título/subtítulo do próprio boletim — fica
     sempre em destaque, nunca fundida com o texto corrido. Mas um título
@@ -412,19 +436,23 @@ def _reflow(lines):
     largura da coluna) — essas juntam-se num único parágrafo de título, para
     não aparecer partido a meio. Uma "etiqueta" de uma palavra só (ex.
     "DIGITAL", "ATUALIDADES" — o departamento/categoria da página) fica
-    sempre isolada, nunca se funde com o título ao lado."""
+    sempre isolada, nunca se funde com o título ao lado. Uma linha que
+    comece por um marcador de lista (-/•/*) abre o seu próprio parágrafo
+    "list_item", em vez de ficar fundida no texto corrido à volta —
+    mantém listas (ex. códigos de artigo) legíveis como lista, não como
+    frase única."""
     paragraphs = []
     buf = []
     heading_buf = []
 
     def flush_text():
         if buf:
-            paragraphs.append((False, " ".join(buf)))
+            paragraphs.append(("text", _normalize_text(" ".join(buf))))
             buf.clear()
 
     def flush_heading():
         if heading_buf:
-            paragraphs.append((True, " ".join(heading_buf)))
+            paragraphs.append(("heading", _normalize_text(" ".join(heading_buf))))
             heading_buf.clear()
 
     for line in lines:
@@ -433,9 +461,15 @@ def _reflow(lines):
             is_tag = " " not in line and len(line) <= 15
             if is_tag:
                 flush_heading()
-                paragraphs.append((True, line))
+                paragraphs.append(("heading", _normalize_text(line)))
             else:
                 heading_buf.append(line)
+            continue
+        m = _LIST_MARKER_RE.match(line)
+        if m:
+            flush_text()
+            flush_heading()
+            paragraphs.append(("list_item", _normalize_text(m.group(1))))
             continue
         flush_heading()
         buf.append(line)
@@ -559,12 +593,25 @@ def build_digest(pdf_bytes_list, subject):
         if actions:
             tags = ", ".join(html_escape(a) for a in actions)
             section_html.append(f'<p class="csn-action">Ação: {tags}</p>')
-        for is_heading, para in paragraphs:
+        list_buf = []
+
+        def flush_list():
+            if list_buf:
+                items = "".join(f"<li>{_highlight(html_escape(t))}</li>" for t in list_buf)
+                section_html.append(f"<ul>{items}</ul>")
+                list_buf.clear()
+
+        for kind, para in paragraphs:
+            if kind == "list_item":
+                list_buf.append(para)
+                continue
+            flush_list()
             escaped = _highlight(html_escape(para))
-            if is_heading:
+            if kind == "heading":
                 section_html.append(f"<p><strong>{escaped}</strong></p>")
             else:
                 section_html.append(f"<p>{escaped}</p>")
+        flush_list()
         html_parts.append("".join(section_html))
 
     return "".join(html_parts)
