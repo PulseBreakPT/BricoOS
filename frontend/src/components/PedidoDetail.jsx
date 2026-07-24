@@ -26,7 +26,7 @@ import {
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
-  Building2, FileWarning, Eye,
+  Building2, FileWarning, Eye, MessageCircle,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -45,6 +45,7 @@ import NameInput from "@/components/NameInput";
 import EmailInput from "@/components/EmailInput";
 import { haptics } from "@/lib/haptics";
 import { DEFAULT_COUNTRY_CODE } from "@/lib/phoneFormat";
+import { stripAccents } from "@/lib/textClean";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
@@ -64,6 +65,14 @@ const BRICOAVAL_STATUS_LABEL = {
 
 const DRAFT_KEY = "brico_draft_new_note";
 const MAX_PHOTOS_PER_NOTE = 30;
+
+// Mesma lógica de frontend/src/pages/Suppliers.jsx (PhoneActions/waLink) —
+// números legados sem indicativo assumem Portugal, tal como o "tel:".
+function phoneWaLink(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length < 9) return null;
+  return `https://wa.me/${(phone || "").trim().startsWith("+") ? digits : `351${digits}`}`;
+}
 
 const ACT_ICONS = {
   created: Sparkles, status_change: ArrowRightLeft, priority_change: Flag,
@@ -164,8 +173,23 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
   // Assistant data
   const [dupWarn, setDupWarn] = useState([]);
+  const [checkingDup, setCheckingDup] = useState(false);
   const [preflight, setPreflight] = useState(null);
   const [clientHistory, setClientHistory] = useState(null);
+
+  // Sugestões de cliente conhecido enquanto se escreve o nome (passo
+  // "Cliente" do assistente) — carregado uma vez de /explorer/clients,
+  // filtrado localmente (sem acento) a cada tecla.
+  const [clients, setClients] = useState([]);
+  const [suggestDismissed, setSuggestDismissed] = useState(false);
+  // Brilho breve (~900ms) num campo preenchido automaticamente (colar
+  // "Nome - telefone", escolher uma sugestão, "Usar estes dados") — só
+  // feedback visual, nunca controla lógica.
+  const [highlightFields, setHighlightFields] = useState(() => new Set());
+  const highlightTimer = useRef(null);
+  // Snapshot do formulário tirado ao entrar em modo de edição — para
+  // mostrar um ponto azul nos campos alterados desde então (só em edição).
+  const originalFormRef = useRef(null);
 
   // AI (OpenAI) state
   const [aiSummary, setAiSummary] = useState("");
@@ -187,6 +211,46 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const clientPhoneRef = useRef(null);
   const clientEmailRef = useRef(null);
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
+
+  const flashHighlight = (fields) => {
+    setHighlightFields(new Set(fields));
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightFields(new Set()), 900);
+  };
+
+  // Ponto azul discreto junto ao rótulo — só em edição, só depois de o
+  // valor ter mudado desde que se entrou em modo de edição.
+  const fieldChanged = (key) => editMode && originalFormRef.current && form[key] !== originalFormRef.current[key];
+  const startEdit = () => { originalFormRef.current = { ...form }; setEditMode(true); };
+
+  // Preenche nome/telefone/email a partir de um cliente já conhecido —
+  // tanto de uma sugestão do autocompletar (name/phone/email) como de um
+  // possível duplicado já detetado (customer_name/phone/email).
+  const applyClientData = ({ name, phone, email }) => {
+    if (name) set("customer_name", name);
+    if (phone) set("phone", phone);
+    if (email) set("email", email);
+    setSuggestDismissed(true);
+    flashHighlight(["name", "phone", "email"].filter((f) => ({ name, phone, email }[f])));
+    toast.success("Dados do cliente preenchidos automaticamente.");
+    haptics.success();
+  };
+
+  // O spinner só aparece se o pedido demorar mais de ~200ms — para um
+  // pedido rápido (o caso comum), criar/guardar parece instantâneo em vez
+  // de "piscar" um spinner por uma fração de segundo.
+  const [showSaveSpinner, setShowSaveSpinner] = useState(false);
+  useEffect(() => {
+    if (!saving) { setShowSaveSpinner(false); return; }
+    const t = setTimeout(() => setShowSaveSpinner(true), 200);
+    return () => clearTimeout(t);
+  }, [saving]);
+  const [showCreatingSpinner, setShowCreatingSpinner] = useState(false);
+  useEffect(() => {
+    if (!creating) { setShowCreatingSpinner(false); return; }
+    const t = setTimeout(() => setShowCreatingSpinner(true), 200);
+    return () => clearTimeout(t);
+  }, [creating]);
 
   const loadSub = useCallback(async (nid) => {
     const [q, a, t, m, p, pf, ch] = await Promise.all([
@@ -330,19 +394,38 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     if (dirty.current) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* noop */ } }
   }, [form, isCreate, open]);
 
-  // Duplicate detection while creating
+  // Duplicate detection while creating (debounced 600ms — checkingDup
+  // alimenta um indicador discreto "a verificar…" enquanto o pedido está
+  // pendente, para o utilizador perceber que não ficou parado por engano).
   useEffect(() => {
     if (!open || !isCreate) return;
     const phone = form.phone.trim(); const name = form.customer_name.trim();
-    if (!phone && !name) { setDupWarn([]); return; }
+    if (!phone && !name) { setDupWarn([]); setCheckingDup(false); return; }
+    setCheckingDup(true);
     const t = setTimeout(async () => {
       try {
         const { data } = await api.post("/notes/check-duplicate", { phone, customer_name: name, description: form.description });
         setDupWarn(data.matches || []);
-      } catch { setDupWarn([]); }
+      } catch { setDupWarn([]); } finally { setCheckingDup(false); }
     }, 600);
     return () => clearTimeout(t);
   }, [form.phone, form.customer_name, form.description, isCreate, open]);
+
+  // Sugestões de cliente conhecido — carregadas uma vez quando o
+  // assistente de criação abre (accent-insensitive, filtrado localmente,
+  // sem pedidos extra por tecla).
+  useEffect(() => {
+    if (!open || !isCreate) return;
+    api.get("/explorer/clients").then(({ data }) => setClients(data || [])).catch(() => setClients([]));
+  }, [open, isCreate]);
+
+  // Foco automático no nome do cliente assim que o passo "Cliente" do
+  // assistente fica ativo — poupa um clique em quase todos os pedidos novos.
+  useEffect(() => {
+    if (!open || !isCreate || createMode === "choice" || createStep !== 0) return;
+    const t = setTimeout(() => clientNameRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [open, isCreate, createMode, createStep]);
 
   const refresh = async () => {
     if (id) { await loadNote(id); await loadSub(id); }
@@ -444,6 +527,18 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
     return false;
   };
 
+  // Até 5 clientes já conhecidos cujo nome bate com o que se está a
+  // escrever (sem acento — "conceicao" encontra "Conceição"). Escondidas
+  // assim que se escolhe uma ou se sai do campo (suggestDismissed).
+  const clientSuggestions = useMemo(() => {
+    const q = stripAccents(form.customer_name.trim().toLowerCase());
+    if (suggestDismissed || q.length < 2) return [];
+    return clients
+      .filter((c) => c.name && stripAccents(c.name.toLowerCase()).includes(q) && c.name.trim().toLowerCase() !== q)
+      .slice(0, 5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, form.customer_name, suggestDismissed]);
+
   const wizardBack = () => {
     if (createStep === 0) setCreateMode("choice");
     else setCreateStep((s) => s - 1);
@@ -458,9 +553,13 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   };
 
   // Enter avança para o campo seguinte (Nome -> Telefone -> Email -> avança
-  // de passo), em vez de submeter o formulário sem querer.
-  const handleClientEnter = (nextRef) => (e) => {
+  // de passo). Shift+Enter volta ao campo anterior; Ctrl/Cmd+Enter avança
+  // logo de passo a partir de qualquer um dos três campos — atalhos extra,
+  // não obrigam a chegar ao último campo primeiro.
+  const handleClientEnter = (nextRef, prevRef) => (e) => {
     if (e.key !== "Enter") return;
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); wizardNext(); return; }
+    if (e.shiftKey) { e.preventDefault(); (prevRef || clientNameRef).current?.focus(); return; }
     e.preventDefault();
     if (nextRef) nextRef.current?.focus();
     else wizardNext();
@@ -469,14 +568,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   // "Detalhe que impressiona": colar "Bernardo Santos - 917100512" (ou
   // .../ + email) no campo de nome separa automaticamente os três campos.
   const handleDetectContact = (parsed) => {
-    if (parsed.name) set("customer_name", parsed.name);
-    if (parsed.phone) set("phone", parsed.phone.startsWith("+") ? parsed.phone : `${DEFAULT_COUNTRY_CODE}${parsed.phone}`);
-    if (parsed.email) set("email", parsed.email);
-    const filled = [parsed.phone ? "telefone" : null, parsed.email ? "email" : null].filter(Boolean).join(" e ");
-    if (filled) {
-      toast.success(`Nome e ${filled} preenchidos automaticamente.`);
-      haptics.success();
-    }
+    applyClientData({
+      name: parsed.name || undefined,
+      phone: parsed.phone ? (parsed.phone.startsWith("+") ? parsed.phone : `${DEFAULT_COUNTRY_CODE}${parsed.phone}`) : undefined,
+      email: parsed.email || undefined,
+    });
   };
 
   const createBandPedido = async () => {
@@ -1078,6 +1174,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       <DialogContent
         data-testid="note-dialog"
         className={`flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full ${isCreate && createMode === "band" ? "sm:max-w-5xl xl:max-w-6xl 3xl:max-w-7xl" : "sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl 3xl:max-w-6xl"}`}
+        onEscapeKeyDown={(e) => {
+          // Esc só fecha quando não há nada por guardar — evita perder um
+          // rascunho a meio (criação) ou uma edição em curso por engano.
+          if (!dirty.current) return;
+          e.preventDefault();
+          toast.message("Tens alterações por guardar", {
+            description: isCreate ? "Fecha pelo X se quiseres mesmo descartar o rascunho." : "Guarda ou cancela a edição antes de fechar.",
+          });
+          haptics.warning();
+        }}
       >
         {/* Header (fixed) */}
         <DialogHeader className="shrink-0 space-y-0 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
@@ -1094,7 +1200,16 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     ? "Escolhe o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
                   : (form.phone
-                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-foreground hover:underline">{formatPhoneDisplay(form.phone)}</a>
+                    ? (
+                      <span className="inline-flex items-center gap-1">
+                        <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-foreground hover:underline">{formatPhoneDisplay(form.phone)}</a>
+                        {phoneWaLink(form.phone) ? (
+                          <a href={phoneWaLink(form.phone)} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded p-0.5 text-muted-foreground hover:bg-[var(--pastel-emerald-bg)] hover:text-emerald-600">
+                            <MessageCircle className="h-3 w-3" />
+                          </a>
+                        ) : null}
+                      </span>
+                    )
                     : "Sem telefone")}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
@@ -1157,7 +1272,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </Button>
                 </>
               ) : (
-                <Button data-testid="detail-edit" size="sm" variant="outline" onClick={() => setEditMode(true)} className="h-9 w-full rounded-lg border-border font-bold sm:w-auto sm:shrink-0">
+                <Button data-testid="detail-edit" size="sm" variant="outline" onClick={startEdit} className="h-9 w-full rounded-lg border-border font-bold sm:w-auto sm:shrink-0">
                   <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
                 </Button>
               )}
@@ -1230,36 +1345,72 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {/* Passo 1 — Cliente (comum aos dois fluxos) */}
                 {createStep === 0 ? (
                   <>
+                    {checkingDup && dupWarn.length === 0 ? (
+                      <p className="mb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Spinner className="h-3 w-3" /> a verificar duplicados…
+                      </p>
+                    ) : null}
                     {dupWarn.length > 0 ? (
                       <div data-testid="dup-warning" className="mb-4 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-sm text-[color:var(--pastel-amber-text)]">
                         <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4" /> Possível pedido duplicado</p>
-                        <ul className="mt-1.5 space-y-1">
+                        <ul className="mt-1.5 space-y-1.5">
                           {dupWarn.map((d) => (
-                            <li key={d.id} className="text-xs">• {d.customer_name} — {d.description || "sem descrição"} <span className="opacity-70">({getStatusCfg(d.status).label})</span></li>
+                            <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
+                              <span>• {d.customer_name} — {d.description || "sem descrição"} <span className="opacity-70">({getStatusCfg(d.status).label})</span></span>
+                              <button
+                                type="button"
+                                onClick={() => applyClientData({ name: d.customer_name, phone: d.phone, email: d.email })}
+                                className="shrink-0 rounded-md border border-amber-300 bg-white/60 px-1.5 py-0.5 text-[10px] font-bold text-[color:var(--pastel-amber-text)] hover:bg-white"
+                              >
+                                Usar estes dados
+                              </button>
+                            </li>
                           ))}
                         </ul>
                       </div>
                     ) : null}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-1.5">
+                      <div className="relative space-y-1.5">
                         <Label>Nome do cliente</Label>
                         <NameInput
                           testId="input-customer-name"
                           value={form.customer_name}
-                          onChange={(v) => set("customer_name", v)}
-                          onKeyDown={handleClientEnter(clientPhoneRef)}
+                          onChange={(v) => { set("customer_name", v); setSuggestDismissed(false); }}
+                          onBlur={() => setSuggestDismissed(true)}
+                          onKeyDown={handleClientEnter(clientPhoneRef, null)}
                           onDetectContact={handleDetectContact}
                           inputRef={clientNameRef}
                           placeholder="Ex.: Teresa Mera"
+                          highlighted={highlightFields.has("name")}
                         />
+                        {clientSuggestions.length > 0 ? (
+                          <div data-testid="client-suggestions" className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+                            {clientSuggestions.map((c) => (
+                              <button
+                                key={c.key}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => applyClientData({ name: c.name, phone: c.phone, email: c.email })}
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-muted"
+                              >
+                                <span className="min-w-0 truncate font-semibold text-foreground">{c.name}</span>
+                                <span className="shrink-0 text-muted-foreground">
+                                  {c.phone ? formatPhoneDisplay(c.phone) : ""}{c.pedidos_count ? ` · ${c.pedidos_count} pedido(s)` : ""}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="space-y-1.5">
                         <Label>Telefone</Label>
                         <PhoneInput
                           value={form.phone}
                           onChange={(v) => set("phone", v)}
-                          onKeyDown={handleClientEnter(clientEmailRef)}
+                          onKeyDown={handleClientEnter(clientEmailRef, clientNameRef)}
                           inputRef={clientPhoneRef}
+                          onComplete={() => clientEmailRef.current?.focus()}
+                          highlighted={highlightFields.has("phone")}
                         />
                       </div>
                     </div>
@@ -1269,12 +1420,24 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         testId="input-email"
                         value={form.email}
                         onChange={(v) => set("email", v)}
-                        onKeyDown={handleClientEnter(null)}
+                        onKeyDown={handleClientEnter(null, clientPhoneRef)}
                         inputRef={clientEmailRef}
                         placeholder="cliente@email.com"
+                        highlighted={highlightFields.has("email")}
                       />
                     </div>
                   </>
+                ) : null}
+
+                {/* Mini-resumo do cliente — visível a partir do passo 2, para
+                    não precisar de voltar atrás só para confirmar quem é o
+                    cliente (o passo "Confirmar" do fluxo normal já tem o seu
+                    próprio resumo mais completo, por isso fica só aqui). */}
+                {createStep === 1 ? (
+                  <div className="mb-4 truncate rounded-lg bg-muted/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+                    Cliente: <span className="font-semibold text-foreground">{form.customer_name || "Sem nome"}</span>
+                    {form.phone ? ` · ${formatPhoneDisplay(form.phone)}` : ""}
+                  </div>
                 ) : null}
 
                 {/* Passo 2 (normal) — artigo e especificação essencial */}
@@ -1376,11 +1539,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     </Button>
                   ) : createMode === "band" ? (
                     <Button data-testid="wizard-create-band" onClick={createBandPedido} disabled={creating || !caixCatalog} className="flex-1 rounded-xl">
-                      {creating ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido à medida
+                      {showCreatingSpinner ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido à medida
                     </Button>
                   ) : (
                     <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl">
-                      {saving ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido
+                      {showSaveSpinner ? <Spinner className="mr-2 h-4 w-4" /> : null} Criar pedido
                     </Button>
                   )}
                 </div>
@@ -1424,7 +1587,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {editMode ? (
                   <div className="space-y-1.5">
-                    <Label>Nome do cliente</Label>
+                    <Label className="flex items-center">
+                      Nome do cliente
+                      {fieldChanged("customer_name") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                    </Label>
                     <NameInput testId="input-customer-name" value={form.customer_name} onChange={(v) => set("customer_name", v)} placeholder="Ex.: Teresa Mera" />
                   </div>
                 ) : (
@@ -1432,7 +1598,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 )}
                 {editMode ? (
                   <div className="space-y-1.5">
-                    <Label>Telefone</Label>
+                    <Label className="flex items-center">
+                      Telefone
+                      {fieldChanged("phone") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                    </Label>
                     <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                   </div>
                 ) : (
@@ -1441,7 +1610,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               </div>
               {editMode ? (
                 <div className="mt-4 space-y-1.5">
-                  <Label>Email do cliente</Label>
+                  <Label className="flex items-center">
+                    Email do cliente
+                    {fieldChanged("email") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                  </Label>
                   <EmailInput testId="input-email" value={form.email} onChange={(v) => set("email", v)} placeholder="cliente@email.com" />
                 </div>
               ) : (
@@ -1781,7 +1953,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {editMode ? (
                 <div className="mt-6 flex gap-2">
                   <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700">
-                    {saving ? <Spinner className="mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
+                    {showSaveSpinner ? <Spinner className="mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
                     Guardar
                   </Button>
                   <Button data-testid="cancel-note-btn" variant="outline" onClick={cancelEdit} disabled={saving} className="rounded-xl">

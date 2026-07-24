@@ -1403,7 +1403,7 @@ async def check_duplicate(payload: DuplicateCheckIn):
     if not ors:
         return {"matches": []}
     q = {"archived": {"$ne": True}, "status": {"$nin": list(CLOSED_STATUSES)}, "$or": ors}
-    docs = await db.notes.find(q, {"_id": 0, "id": 1, "customer_name": 1, "description": 1, "status": 1, "phone": 1}).limit(5).to_list(5)
+    docs = await db.notes.find(q, {"_id": 0, "id": 1, "customer_name": 1, "description": 1, "status": 1, "phone": 1, "email": 1}).limit(5).to_list(5)
     return {"matches": docs}
 
 

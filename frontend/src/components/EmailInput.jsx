@@ -8,6 +8,7 @@ import { normalizeEmailLive, isValidEmail, emailDomain, countNonSpaceUpTo } from
 // (gmail.com, outlook.com, ...) assim que o formato fica correto.
 export default function EmailInput({
   value, onChange, onBlur, onKeyDown, testId = "input-email", placeholder, inputRef: externalRef,
+  highlighted = false,
 }) {
   const inputRef = useRef(null);
   const pendingCursor = useRef(null);
@@ -39,9 +40,10 @@ export default function EmailInput({
             onChange(normalizeEmailLive(e.target.value).trim());
             onBlur?.(e);
           }}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => { e.target.select(); e.target.scrollIntoView({ block: "center", behavior: "smooth" }); }}
           placeholder={placeholder}
-          className={`pr-8 transition-colors duration-150 ${value && !valid ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+          autoComplete="email"
+          className={`pr-8 transition-all duration-150 ${value && !valid ? "border-amber-400 focus-visible:ring-amber-400" : ""} ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
         />
         {valid ? (
           <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500 duration-150 animate-in zoom-in-50" />

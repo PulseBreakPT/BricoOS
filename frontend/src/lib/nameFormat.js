@@ -4,6 +4,8 @@
 // nunca muda (só a capitalização de cada letra), por isso quem chama isto
 // num campo de texto pode preservar a posição do cursor tal e qual.
 
+import { cleanPastedText } from "./textClean";
+
 const NAME_PARTICLES = new Set(["da", "de", "do", "das", "dos", "e"]);
 
 function capitalizeWord(word) {
@@ -35,7 +37,7 @@ export function capitalizeName(value) {
 // enquanto se escreve, para não impedir escrever um espaço a seguir a
 // outro por engano sem o campo "comer" a tecla.
 export function normalizeName(value) {
-  const collapsed = String(value ?? "").trim().replace(/\s+/g, " ");
+  const collapsed = cleanPastedText(value ?? "").trim().replace(/\s+/g, " ");
   return capitalizeName(collapsed);
 }
 
@@ -53,17 +55,24 @@ export function nameHasUnexpectedChars(value) {
   return str.length > 0 && !NAME_SAFE_RE.test(str);
 }
 
-// "Detalhe que impressiona" — ao colar uma linha inteira tipo
-// "Bernardo Santos - 917100512" ou "Bernardo Santos 917100512
-// bernardo@gmail.com" no campo de nome, separa automaticamente o que
-// parecer email/telefone, deixando só o nome limpo. Devolve null quando
-// não há nada a extrair (colou só um nome normal) — nesse caso quem chama
-// isto trata o valor como um "paste" normal, sem qualquer efeito extra.
+// "Detalhe que impressiona" — ao colar uma linha (ou várias, ou separadas
+// por "|") tipo "Bernardo Santos - 917100512", "Bernardo Santos 917100512
+// bernardo@gmail.com", "Bernardo Santos | 917100512 | bernardo@gmail.com"
+// ou mesmo em três linhas separadas, no campo de nome separa
+// automaticamente o que parecer email/telefone, deixando só o nome limpo.
+// Devolve null quando não há nada a extrair (colou só um nome normal) —
+// nesse caso quem chama isto trata o valor como um "paste" normal, sem
+// qualquer efeito extra.
 const EMAIL_TOKEN_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 const PHONE_TOKEN_RE = /\+?\d[\d\s().-]{6,}\d/;
+// \s já apanha quebras de linha — por isso um "cole" em três linhas
+// (nome\ntelefone\nemail) colapsa para uma só string tal como o formato
+// "Nome - telefone" separado por hífen; "|" é só mais um separador comum
+// (ex.: exportações de contactos) tratado da mesma forma.
+const SEPARATORS_RE = /[-–,·|]/g;
 
 export function parseContactPaste(text) {
-  const str = String(text ?? "");
+  const str = cleanPastedText(text ?? "");
   const emailMatch = str.match(EMAIL_TOKEN_RE);
   const withoutEmail = emailMatch ? str.replace(emailMatch[0], " ") : str;
   const phoneMatch = withoutEmail.match(PHONE_TOKEN_RE);
@@ -71,7 +80,7 @@ export function parseContactPaste(text) {
   const phoneDigits = phoneMatch ? phoneMatch[0].replace(/\D/g, "") : "";
   if (phoneMatch && (phoneDigits.length < 9 || phoneDigits.length > 15)) return null; // não parece um telefone real, ignora
   const namePart = (phoneMatch ? withoutEmail.replace(phoneMatch[0], " ") : withoutEmail)
-    .replace(/[-–,·]/g, " ").replace(/\s+/g, " ").trim();
+    .replace(SEPARATORS_RE, " ").replace(/\s+/g, " ").trim();
   return {
     name: namePart ? capitalizeName(namePart) : "",
     phone: phoneMatch ? (phoneMatch[0].trim().startsWith("+") ? `+${phoneDigits}` : phoneDigits) : "",

@@ -6,26 +6,44 @@ import {
 } from "@/components/ui/select";
 import {
   COUNTRY_CODES, DEFAULT_COUNTRY_CODE, MAX_DIGITS, splitPhone, formatNational,
-  countDigitsUpTo, positionAfterNDigits, phoneLengthStatus,
+  countDigitsUpTo, positionAfterNDigits, phoneLengthStatus, detectPastedCountry,
 } from "@/lib/phoneFormat";
 import { haptics } from "@/lib/haptics";
 
 export { COUNTRY_CODES, DEFAULT_COUNTRY_CODE };
+
+// Lembra o último país escolhido manualmente — só usado como ponto de
+// partida de um número novo (ainda vazio); um valor já existente (a editar
+// um pedido antigo) continua sempre a mandar no país mostrado.
+const LAST_COUNTRY_KEY = "brico_last_phone_country";
+function rememberedCountry() {
+  try {
+    const saved = localStorage.getItem(LAST_COUNTRY_KEY);
+    return COUNTRY_CODES.some((c) => c.code === saved) ? saved : DEFAULT_COUNTRY_CODE;
+  } catch {
+    return DEFAULT_COUNTRY_CODE;
+  }
+}
 
 // Campo de telefone com indicativo de país. Guarda sempre o valor combinado
 // (ex.: "+351917100512") no form, para o "tel:" funcionar também com clientes
 // de fora de Portugal.
 export default function PhoneInput({
   value, onChange, onKeyDown, testId = "input-phone", placeholder = "917100512", inputRef: externalRef,
+  onComplete, highlighted = false,
 }) {
-  const [country, setCountry] = useState(DEFAULT_COUNTRY_CODE);
-  const [digits, setDigits] = useState("");
+  const [country, setCountry] = useState(() => (value ? splitPhone(value).country : rememberedCountry()));
+  const [digits, setDigits] = useState(() => (value ? splitPhone(value).digits : ""));
   const lastEmitted = useRef();
   const inputRef = useRef(null);
   const pendingCursor = useRef(null);
 
   useEffect(() => {
     if (value === lastEmitted.current) return;
+    // Um valor vazio não deve "roubar" o país já escolhido (ex.: o país
+    // lembrado de um pedido anterior) — só sincroniza quando há de facto
+    // um número a refletir.
+    if (!value) { lastEmitted.current = value; return; }
     const { country: c, digits: d } = splitPhone(value);
     setCountry(c);
     setDigits(d);
@@ -53,7 +71,14 @@ export default function PhoneInput({
   return (
     <div className="space-y-1">
       <div className="flex gap-1.5">
-        <Select value={country} onValueChange={(c) => { setCountry(c); emit(c, digits); }}>
+        <Select
+          value={country}
+          onValueChange={(c) => {
+            setCountry(c);
+            emit(c, digits);
+            try { localStorage.setItem(LAST_COUNTRY_KEY, c); } catch { /* noop */ }
+          }}
+        >
           <SelectTrigger data-testid={`${testId}-country`} className="w-[4.5rem] shrink-0 px-2 font-mono text-xs">
             <SelectValue>{country}</SelectValue>
           </SelectTrigger>
@@ -93,18 +118,36 @@ export default function PhoneInput({
               const cursorInRaw = e.target.selectionStart ?? raw.length;
               const digitsBeforeCursor = countDigitsUpTo(raw, cursorInRaw);
               const clean = raw.replace(/\D/g, "").slice(0, MAX_DIGITS);
+              const wasComplete = phoneLengthStatus(country, digits) === "ok";
+              const nowComplete = phoneLengthStatus(country, clean) === "ok";
               setDigits(clean);
               emit(country, clean);
               pendingCursor.current = positionAfterNDigits(formatNational(country, clean), digitsBeforeCursor);
+              // Avança para o campo seguinte assim que o número atinge o
+              // comprimento esperado do país — só ao escrever (mais dígitos
+              // do que antes), nunca ao apagar nem ao colar (o paste já tem
+              // o seu próprio fluxo acima/abaixo).
+              if (onComplete && !wasComplete && nowComplete && clean.length > digits.length) onComplete();
+            }}
+            onPaste={(e) => {
+              const pasted = e.clipboardData?.getData("text") || "";
+              if (!pasted || pasted.includes("+")) return; // "+..." já tratado acima, no onChange
+              const detected = detectPastedCountry(pasted.replace(/\D/g, ""), country);
+              if (!detected) return; // número nacional comum — segue o onChange normal
+              e.preventDefault();
+              setCountry(detected.country);
+              setDigits(detected.digits);
+              emit(detected.country, detected.digits);
             }}
             onBlur={() => {
               if (lengthStatus === "short" || lengthStatus === "long") haptics.warning();
             }}
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => { e.target.select(); e.target.scrollIntoView({ block: "center", behavior: "smooth" }); }}
             onKeyDown={onKeyDown}
-            className={`min-w-0 flex-1 pr-8 font-mono transition-colors duration-150 ${
+            autoComplete="tel"
+            className={`min-w-0 flex-1 pr-8 font-mono transition-all duration-150 ${
               lengthStatus === "short" || lengthStatus === "long" ? "border-amber-400 focus-visible:ring-amber-400" : ""
-            }`}
+            } ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
             placeholder={placeholder}
           />
           {lengthStatus === "ok" ? (

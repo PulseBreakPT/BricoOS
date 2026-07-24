@@ -121,6 +121,29 @@ export function phoneLengthStatus(country, digits) {
   return "ok";
 }
 
+// Reconhece "00351917100512" ou "351917100512" (sem "+") colados no campo
+// de dígitos — só quando a sequência já excede visivelmente o que o país
+// atualmente selecionado esperaria, para nunca confundir com um número
+// nacional que por acaso começa pelos mesmos dígitos (ex.: um nº espanhol
+// de 9 dígitos a começar por "34..." não é o indicativo de Espanha, é
+// só coincidência — 9 dígitos cabe perfeitamente no país atual e por isso
+// esta função nem chega a olhar para os indicativos). Devolve
+// {country, digits} do país detetado, ou null se não for de confiança.
+export function detectPastedCountry(rawDigits, currentCountry) {
+  let digits = String(rawDigits ?? "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  const currentRange = EXPECTED_LENGTH[currentCountry];
+  if (currentRange && digits.length <= currentRange[1]) return null; // cabe no país atual, nada a fazer
+  const match = COUNTRY_CODES_BY_LENGTH.find((c) => {
+    const cc = c.code.slice(1); // indicativo sem o "+"
+    if (!digits.startsWith(cc)) return false;
+    const rest = digits.slice(cc.length);
+    const range = EXPECTED_LENGTH[c.code];
+    return !!range && rest.length >= range[0] && rest.length <= range[1];
+  });
+  return match ? { country: match.code, digits: digits.slice(match.code.length - 1) } : null;
+}
+
 // Cursor: ao formatar, o texto mostrado fica mais comprido do que o que a
 // pessoa escreveu (espaços/parênteses/hífen inseridos automaticamente) — sem
 // isto, o cursor saltaria sempre para o fim do campo a cada tecla, tornando
