@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response, Streamin
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
 import asyncio
 import hashlib
 import secrets
@@ -5349,6 +5350,19 @@ async def poll_supplier_replies():
         # Os efeitos automáticos (estado do pedido, análise de PDF) continuam
         # a só acontecer quando há um pedido associado.
         email_id = str(uuid.uuid4())
+        # "Reclama" já este uid inserindo um documento mínimo — o índice
+        # único em received_emails.uid é o que impede duas execuções
+        # concorrentes (ciclo automático + "Sincronizar" manual) de
+        # processarem o mesmo email: só uma consegue inserir, a outra apanha
+        # o erro de duplicado aqui, ANTES de gastar trabalho a processar
+        # anexos/PDF/Correio Semanal ou a criar notificações — não só antes
+        # do insert final. O resto dos campos é preenchido no fim, com
+        # update_one sobre este mesmo documento.
+        try:
+            await db.received_emails.insert_one({"id": email_id, "uid": m["uid"], "received_at": now_iso()})
+        except DuplicateKeyError:
+            logger.debug(f"IMAP: uid {m['uid']} já reclamado por outra execução — a ignorar.")
+            continue
         attachments_meta = []
         for att in m.get("attachments", []):
             att_id = str(uuid.uuid4())
@@ -5399,8 +5413,12 @@ async def poll_supplier_replies():
                 ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
                 + ((anexos_result or {}).get("suggested_tasks_created") or 0))
             edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
-        await db.received_emails.insert_one({
-            "id": email_id, "uid": m["uid"], "note_id": note_id or "",
+        # O documento já existe (reclamado acima, logo no início) — o resto
+        # dos campos é preenchido agora, calculado com o processamento feito
+        # entretanto. "id"/"uid"/"received_at" já lá estão, não voltam a
+        # entrar aqui.
+        await db.received_emails.update_one({"id": email_id}, {"$set": {
+            "note_id": note_id or "",
             "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
             "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
             "matched": bool(note_id or supplier_id),
@@ -5425,7 +5443,8 @@ async def poll_supplier_replies():
             "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
             "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
             "match_method": match_method or "",
-            "seen": False, "received_at": now_iso()})
+            "seen": False,
+        }})
         try:
             from_label = supplier_name or m.get("from_name") or m["from_email"]
             if correio_semanal_result or anexos_result:
@@ -7828,6 +7847,30 @@ async def seed_pedidos_whatsapp():
     logger.info("Seed de pedidos do WhatsApp (20 jul) aplicado: 3 pedidos.")
 
 
+async def _dedupe_received_emails_by_uid():
+    """Pré-requisito para o índice único de received_emails.uid (ver
+    ensure_indexes) poder ser criado: se a corrida entre o ciclo automático
+    de IMAP e o "Sincronizar" manual já tiver duplicado algum uid antes
+    desta correção existir, o create_index falharia contra os dados
+    existentes. Mantém sempre o registo mais antigo (por received_at) de
+    cada uid e apaga os duplicados a mais. Idempotente — não faz nada
+    quando não há duplicados (o caso comum, em qualquer arranque normal)."""
+    cursor = db.received_emails.aggregate([
+        {"$match": {"uid": {"$ne": None}}},
+        {"$sort": {"received_at": 1}},
+        {"$group": {"_id": "$uid", "ids": {"$push": "$id"}, "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gt": 1}}},
+    ])
+    removed = 0
+    async for group in cursor:
+        extra_ids = group["ids"][1:]  # mantém o primeiro (mais antigo), apaga o resto
+        if extra_ids:
+            result = await db.received_emails.delete_many({"id": {"$in": extra_ids}})
+            removed += result.deleted_count
+    if removed:
+        logger.warning(f"received_emails: {removed} registo(s) duplicado(s) por uid removido(s) (corrida anterior à correção).")
+
+
 async def ensure_indexes():
     for f in ["status", "priority", "category", "created_at", "supplier_id", "archived"]:
         try:
@@ -7878,6 +7921,26 @@ async def ensure_indexes():
     # mesmo tempo só um consegue inserir; o outro apanha o erro e reaproveita).
     try:
         await db.notifications.create_index("dedup_key", unique=True)
+    except Exception:
+        pass
+    # uid tem de ser mesmo único — mesmo motivo do dedup_key acima. O ciclo
+    # automático (_imap_poll_loop, a cada IMAP_POLL_MINUTES) e o botão
+    # "Sincronizar" manual (POST /emails/sync) chamam poll_supplier_replies()
+    # de forma independente e sem nenhum bloqueio; sem este índice, os dois
+    # podiam passar ambos pela verificação find_one({"uid": ...}) antes de
+    # qualquer um inserir, duplicando o email (e os efeitos associados —
+    # notificação, PDF, Correio Semanal). O índice único é a garantia real;
+    # o find_one em poll_supplier_replies() continua a existir só como
+    # otimização, para evitar trabalho desnecessário no caso comum.
+    #
+    # Se a corrida já tiver duplicado algum uid ANTES desta correção
+    # existir, o create_index abaixo falha silenciosamente contra dados
+    # sujos (mesmo padrão de "try/except: pass" já usado em todo este
+    # bloco) — por isso a limpeza corre sempre primeiro, no mesmo arranque,
+    # para o índice ficar mesmo ativo já nesta execução.
+    await _dedupe_received_emails_by_uid()
+    try:
+        await db.received_emails.create_index("uid", unique=True)
     except Exception:
         pass
     try:
