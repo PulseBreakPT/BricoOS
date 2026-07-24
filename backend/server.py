@@ -26,7 +26,7 @@ from email.header import decode_header
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-from email.utils import parseaddr, make_msgid, parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 from html import escape as html_escape, unescape as html_unescape
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -1268,7 +1268,8 @@ async def list_notes(
     category: Optional[str] = None, supplier_id: Optional[str] = None, label: Optional[str] = None,
     overdue: Optional[bool] = None, archived: Optional[bool] = None,
     waiting: Optional[str] = None, reminder_due: Optional[bool] = None, callback: Optional[bool] = None,
-    segment: Optional[str] = None, sort: str = "smart", skip: int = 0, limit: int = 300,
+    segment: Optional[str] = None, has_customer: Optional[bool] = None,
+    sort: str = "smart", skip: int = 0, limit: int = 300,
 ):
     q = {}
     q["archived"] = True if archived else {"$ne": True}
@@ -1298,6 +1299,12 @@ async def list_notes(
     docs = await db.notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
     now = datetime.now(timezone.utc)
     docs = [enrich_note(d, now) for d in docs]
+    if has_customer is not None:
+        # Distingue "Pedido de Cliente" de "Pedido Geral" dentro do mesmo
+        # segmento "geral" — mesma regra de _pedido_type_for_note, sem
+        # campo novo na base de dados (ver PedidoPicker.jsx).
+        docs = [d for d in docs
+                if bool((d.get("customer_name") or "").strip() or (d.get("email") or "").strip()) == has_customer]
     if overdue:
         docs = [d for d in docs if d["is_overdue"]]
     if waiting:
@@ -1497,7 +1504,8 @@ async def send_client_quote(note_id: str, payload: ClientSendIn):
         if f:
             attachments.append({"data": base64.b64decode(f["content_b64"]), "filename": f.get("filename")})
     await _send_email(to, payload.subject, payload.body, attachments,
-                      note_id=note_id, kind="client", to_label=n.get("customer_name") or "", pdf_file_id=file_id)
+                      note_id=note_id, kind="client", to_label=n.get("customer_name") or "", pdf_file_id=file_id,
+                      pedido_type=await _pedido_type_for_note(n))
     await db.notes.update_one({"id": note_id}, {"$set": {
         "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
         "status_updated_at": now_iso(), "updated_at": now_iso()},
@@ -3837,46 +3845,181 @@ def _build_email_body(body, attachments=None):
     return message
 
 
-def _smtp_send(to_email, subject, body, attachments=None, message_id=None):
+# Identificador interno embutido na parte local do Message-ID de todo o
+# email enviado (ex. "<brico-3f2c...-a1b2c3d4e5f6@brico2.internal>") — nunca
+# aparece no corpo nem no assunto, só num cabeçalho técnico que nenhum
+# cliente de email mostra por omissão (mesma técnica usada por sistemas de
+# suporte como Zendesk/Front/Help Scout). Serve de sinal extra de
+# correspondência (prioridade 5, ver _match_note_by_headers) quando os
+# cabeçalhos de resposta nativos (Message-ID/In-Reply-To/References, sinais
+# 1-3) não bastam — ex. um cliente reencaminha manualmente uma citação
+# antiga que ainda contém este Message-ID nalgum lado da cadeia.
+_INTERNAL_TOKEN_RE = re.compile(r"brico-([0-9a-fA-F-]{36})-", re.IGNORECASE)
+
+
+def _make_message_id(note_id=None):
+    token = note_id or "livre"
+    return f"<brico-{token}-{uuid.uuid4().hex[:12]}@brico2.internal>"
+
+
+def extract_internal_token(*headers):
+    for h in headers:
+        if not h:
+            continue
+        m = _INTERNAL_TOKEN_RE.search(h)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _reply_headers(parent):
+    """A partir do email a que se está a responder (dict com `message_id`/
+    `references` já guardados em sent_emails/received_emails), monta
+    In-Reply-To/References para a resposta ficar na mesma conversa (thread)
+    no cliente de email do destinatário — hoje nenhum dos dois cabeçalhos
+    era definido, por isso toda a resposta era uma mensagem nova aos olhos
+    do Gmail/Outlook do destinatário."""
+    if not parent:
+        return None, []
+    parent_msgid = (parent.get("message_id") or "").strip()
+    if not parent_msgid:
+        return None, []
+    references = list(parent.get("references") or [])
+    if parent_msgid not in references:
+        references.append(parent_msgid)
+    return parent_msgid, references
+
+
+async def _pedido_type_for_note(note):
+    """'band' | 'cliente' | 'geral' — mesma regra de segment_clause
+    (server.py, «band» = caixilharia ou fornecedor Band*), aplicada a um
+    único pedido em vez de servir de filtro numa listagem. Usada para
+    preencher `pedido_type` automaticamente nos envios feitos a partir de
+    dentro de um pedido (PedidoDetail.jsx), sem precisar de seletor."""
+    if not note:
+        return ""
+    is_band = bool(note.get("caixilharia"))
+    if not is_band and note.get("supplier_id"):
+        sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "name": 1})
+        is_band = bool(sup and re.search("band", sup.get("name") or "", re.IGNORECASE))
+    if is_band:
+        return "band"
+    return "cliente" if (note.get("customer_name") or "").strip() or (note.get("email") or "").strip() else "geral"
+
+
+def communication_status(sent_docs, received_docs, sla_days=2, now=None):
+    """'erro' | 'respondido' | 'sem_resposta' | 'enviado' | None (nunca
+    houve comunicação) — um só sítio a decidir o estado, reaproveitado pelo
+    resumo do separador Comunicação. Pura (não acede à base de dados) para
+    ser testável isoladamente; `sent_docs`/`received_docs` já vêm ordenados
+    do mais recente para o mais antigo (mesma ordem devolvida pelo
+    endpoint). "Entregue" não existe como estado próprio — nem SMTP nem a
+    API do Gmail confirmam entrega real, só que o envio não falhou (ver
+    Fora de âmbito do plano)."""
+    if not sent_docs and not received_docs:
+        return None
+    last_sent = sent_docs[0] if sent_docs else None
+    if last_sent and last_sent.get("status") == "erro":
+        return "erro"
+    if received_docs:
+        return "respondido"
+    if last_sent:
+        sent_at = last_sent.get("sent_at") or ""
+        try:
+            sent_dt = datetime.fromisoformat(sent_at.replace("Z", "+00:00"))
+            if sent_dt.tzinfo is None:
+                sent_dt = sent_dt.replace(tzinfo=timezone.utc)
+            if ((now or datetime.now(timezone.utc)) - sent_dt).days >= sla_days:
+                return "sem_resposta"
+        except ValueError:
+            pass
+        return "enviado"
+    return None
+
+
+def _smtp_send(to_email, subject, body, attachments=None, message_id=None, in_reply_to=None, references=None):
     message = _build_email_body(body, attachments)
     message["From"] = GMAIL_SMTP_USER
     message["To"] = to_email
     message["Subject"] = subject
     if message_id:
         message["Message-ID"] = message_id
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    if references:
+        message["References"] = " ".join(references)
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
         smtp.login(GMAIL_SMTP_USER, GMAIL_SMTP_APP_PASSWORD)
         smtp.sendmail(GMAIL_SMTP_USER, [to_email], message.as_string())
 
 
 async def _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id,
-                          message_id="", source="site"):
+                          message_id="", source="site", pedido_type="", in_reply_to="", references=None,
+                          internal_token="", status="enviado", error=""):
     """Ponto único de registo de envios — cobre fornecedores, clientes e
-    qualquer envio futuro, para a secção "Emails" mostrar tudo o que saiu,
-    mesmo sem pedido associado. message_id identifica o email de forma única
-    (mesmo Message-ID que vai no cabeçalho enviado) para a sincronização da
-    pasta "Enviados" do Gmail não duplicar o que a própria app já enviou."""
+    qualquer envio futuro, para a secção "Emails" (e a Comunicação do
+    pedido) mostrar tudo o que saiu, mesmo sem pedido associado ou quando o
+    envio falhou (`status="erro"`, para não desaparecer da história). O
+    conteúdo dos anexos passa a ficar guardado (não só o nome) em
+    `db.email_attachments` com `direction="sent"`, reaproveitando a mesma
+    coleção/endpoint de download já usados para os anexos recebidos."""
+    sent_id = str(uuid.uuid4())
+    now = now_iso()
+    attachment_meta = []
+    for att in (attachments or []):
+        filename = att.get("filename") or "documento"
+        data = att.get("data")
+        att_id = str(uuid.uuid4())
+        if data:
+            await db.email_attachments.insert_one({
+                "id": att_id, "email_id": sent_id, "note_id": note_id or "",
+                "filename": filename, "content_b64": base64.b64encode(data).decode(),
+                "direction": "sent", "created_at": now})
+        attachment_meta.append({"id": att_id, "filename": filename})
     await db.sent_emails.insert_one({
-        "id": str(uuid.uuid4()), "to": to_email, "to_label": to_label or "",
+        "id": sent_id, "to": to_email, "to_label": to_label or "",
         "subject": subject, "body": body, "note_id": note_id or "", "kind": kind,
-        "pdf_file_id": pdf_file_id or "",
-        "attachments": [{"filename": a.get("filename")} for a in (attachments or [])],
-        "message_id": message_id or "", "source": source, "sent_at": now_iso()})
+        "pdf_file_id": pdf_file_id or "", "attachments": attachment_meta,
+        "message_id": message_id or "", "source": source, "sent_at": now,
+        "pedido_type": pedido_type or "", "in_reply_to": in_reply_to or "",
+        "references": references or [], "internal_token": internal_token or "",
+        "gm_thread_id": "", "status": status, "error": error})
+    return sent_id
 
 
-async def _send_email(to_email, subject, body, attachments=None, note_id=None, kind="other", to_label="", pdf_file_id=""):
+async def _send_email(to_email, subject, body, attachments=None, note_id=None, kind="other", to_label="",
+                       pdf_file_id="", pedido_type="", reply_to=None):
+    """`reply_to` é o dict do email (sent_emails ou received_emails) a que
+    esta mensagem responde — usado só para montar In-Reply-To/References
+    (ver _reply_headers); `None` para uma mensagem nova (sem thread a
+    continuar). `pedido_type` identifica o tipo de pedido escolhido no envio
+    ("cliente"|"geral"|"band"|"") — associação obrigatória pedida pelo
+    utilizador, sempre gravada mesmo quando `note_id` é vazio ("sem
+    associação")."""
     if not to_email:
         raise HTTPException(status_code=400, detail="O destinatário não tem email definido.")
-    msgid = make_msgid(domain="gmail.com")
+    internal_token = note_id or ""
+    msgid = _make_message_id(note_id)
+    in_reply_to, references = _reply_headers(reply_to)
     if SMTP_CONFIGURED:
         try:
-            await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments, msgid)
-            await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid)
-            return
+            await asyncio.to_thread(_smtp_send, to_email, subject, body, attachments, msgid, in_reply_to, references)
+            return await _log_sent_email(
+                to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid,
+                pedido_type=pedido_type, in_reply_to=in_reply_to or "", references=references,
+                internal_token=internal_token)
         except smtplib.SMTPAuthenticationError:
+            await _log_sent_email(
+                to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid,
+                pedido_type=pedido_type, in_reply_to=in_reply_to or "", references=references,
+                internal_token=internal_token, status="erro", error="Autenticação SMTP recusada")
             raise HTTPException(status_code=502, detail="O Gmail recusou a palavra-passe de aplicação (SMTP). "
                                                         "Confirme GMAIL_SMTP_USER e GMAIL_SMTP_APP_PASSWORD no servidor.")
         except Exception as e:
+            await _log_sent_email(
+                to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid,
+                pedido_type=pedido_type, in_reply_to=in_reply_to or "", references=references,
+                internal_token=internal_token, status="erro", error=str(e))
             logger.error(f"Erro ao enviar email por SMTP: {e}")
             raise HTTPException(status_code=502, detail="Falha ao enviar o email por SMTP.")
     creds = await get_gmail_creds()
@@ -3888,12 +4031,27 @@ async def _send_email(to_email, subject, body, attachments=None, note_id=None, k
         message["to"] = to_email
         message["subject"] = subject
         message["message-id"] = msgid
+        if in_reply_to:
+            message["In-Reply-To"] = in_reply_to
+        if references:
+            message["References"] = " ".join(references)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        service.users().messages().send(userId="me", body={"raw": raw}).execute()
-        await _log_sent_email(to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid)
+        resp = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        sent_id = await _log_sent_email(
+            to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid,
+            pedido_type=pedido_type, in_reply_to=in_reply_to or "", references=references,
+            internal_token=internal_token)
+        gm_thread_id = (resp or {}).get("threadId") or ""
+        if gm_thread_id:
+            await db.sent_emails.update_one({"id": sent_id}, {"$set": {"gm_thread_id": gm_thread_id}})
+        return sent_id
     except HTTPException:
         raise
     except Exception as e:
+        await _log_sent_email(
+            to_email, subject, body, attachments, note_id, kind, to_label, pdf_file_id, msgid,
+            pedido_type=pedido_type, in_reply_to=in_reply_to or "", references=references,
+            internal_token=internal_token, status="erro", error=str(e))
         logger.error(f"Erro ao enviar email: {e}")
         raise HTTPException(status_code=502, detail="Falha ao enviar o email pelo Gmail.")
 
@@ -4462,6 +4620,27 @@ async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edi
     return {"processed": processed, "diff": diff, "suggested_tasks_created": created, "prev_processed": prev}
 
 
+# Extensão IMAP do Gmail: agrupa mensagens na mesma conversa com um ID
+# estável, mesmo quando os cabeçalhos de threading (Message-ID/In-Reply-To/
+# References) tenham sido reescritos por algum servidor intermédio — sinal 4
+# da cadeia de correspondência (ver _match_note_by_headers).
+_GM_THRID_RE = re.compile(rb"X-GM-THRID\s+(\d+)")
+
+
+def _extract_gm_thrid(msg_data):
+    for part in msg_data:
+        if isinstance(part, tuple):
+            m = _GM_THRID_RE.search(part[0])
+            if m:
+                return m.group(1).decode()
+    return None
+
+
+def _references_list(msg):
+    raw = (msg.get("References") or "").strip()
+    return re.findall(r"<[^<>]+>", raw) if raw else []
+
+
 def _imap_fetch_since(last_uid):
     box = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
     try:
@@ -4476,7 +4655,7 @@ def _imap_fetch_since(last_uid):
         uids = [u for u in uids if u > (last_uid or 0)][-50:]
         messages = []
         for uid in uids:
-            _, msg_data = box.uid("fetch", str(uid), "(BODY.PEEK[])")
+            _, msg_data = box.uid("fetch", str(uid), "(X-GM-THRID BODY.PEEK[])")
             raw = next((p[1] for p in msg_data if isinstance(p, tuple)), None)
             if not raw:
                 continue
@@ -4491,6 +4670,10 @@ def _imap_fetch_since(last_uid):
                 "body": body,
                 "body_html": _email_body_html(msg, body)[:40000].strip(),
                 "attachments": _email_pdf_attachments(msg),
+                "message_id": (msg.get("Message-ID") or "").strip(),
+                "in_reply_to": (msg.get("In-Reply-To") or "").strip(),
+                "references": _references_list(msg),
+                "gm_thread_id": _extract_gm_thrid(msg_data) or "",
             })
         return messages
     finally:
@@ -4547,7 +4730,7 @@ def _imap_fetch_sent_since(last_uid):
         uids = [u for u in uids if u > (last_uid or 0)][-50:]
         messages = []
         for uid in uids:
-            _, msg_data = box.uid("fetch", str(uid), "(BODY.PEEK[])")
+            _, msg_data = box.uid("fetch", str(uid), "(X-GM-THRID BODY.PEEK[])")
             raw = next((p[1] for p in msg_data if isinstance(p, tuple)), None)
             if not raw:
                 continue
@@ -4564,6 +4747,9 @@ def _imap_fetch_sent_since(last_uid):
             messages.append({
                 "uid": uid,
                 "message_id": (msg.get("Message-ID") or "").strip(),
+                "in_reply_to": (msg.get("In-Reply-To") or "").strip(),
+                "references": _references_list(msg),
+                "gm_thread_id": _extract_gm_thrid(msg_data) or "",
                 "to_email": (addr or "").lower(),
                 "to_name": display_name.strip(),
                 "subject": _decode_mime_header(msg.get("Subject")),
@@ -4678,6 +4864,122 @@ async def _match_client_reply(from_email, subject):
     return docs[0]["id"]
 
 
+async def _match_note_by_headers(m):
+    """Sinais 1-5 da cadeia de correspondência (Message-ID, In-Reply-To,
+    References, thread do Gmail, identificador interno) — ao contrário de
+    _match_note_for_reply/_match_client_reply (sinais 6-7, assunto/
+    remetente), corre sempre, independentemente do assunto parecer ou não
+    um orçamento: um Message-ID/thread que bate certo é, por si só, prova
+    suficiente de que esta mensagem pertence à mesma conversa que enviámos.
+    Devolve (note_id, reply_kind, supplier_id, supplier_name, match_method)
+    — a mesma forma de _match_note_for_reply, para poll_supplier_replies
+    poder tratar os dois caminhos da mesma maneira."""
+    msgid = (m.get("message_id") or "").strip()
+    in_reply_to = (m.get("in_reply_to") or "").strip()
+    references = m.get("references") or []
+    candidates = list(dict.fromkeys(c for c in ([msgid, in_reply_to] + references) if c))
+
+    sent, method = None, None
+    if candidates:
+        sent = await db.sent_emails.find_one(
+            {"message_id": {"$in": candidates}}, {"_id": 0, "note_id": 1, "kind": 1})
+        if sent and sent.get("note_id"):
+            method = "message_id"
+    gm_thread_id = (m.get("gm_thread_id") or "").strip()
+    if (not sent or not sent.get("note_id")) and gm_thread_id:
+        sent = await db.sent_emails.find_one(
+            {"gm_thread_id": gm_thread_id}, {"_id": 0, "note_id": 1, "kind": 1})
+        if sent and sent.get("note_id"):
+            method = "gm_thread_id"
+
+    note_id, kind = (sent.get("note_id"), sent.get("kind")) if sent and sent.get("note_id") else (None, None)
+    if not note_id:
+        token = extract_internal_token(msgid, in_reply_to, *references)
+        if token:
+            sent = await db.sent_emails.find_one({"internal_token": token}, {"_id": 0, "note_id": 1, "kind": 1})
+            if sent and sent.get("note_id"):
+                note_id, kind, method = sent["note_id"], sent.get("kind"), "internal_token"
+            else:
+                # O próprio token já é o note_id (ver _make_message_id) —
+                # continua a ser um sinal válido mesmo sem um sent_emails
+                # correspondente (ex.: envio anterior a esta funcionalidade).
+                note = await db.notes.find_one({"id": token}, {"_id": 0, "id": 1})
+                if note:
+                    note_id, method = note["id"], "internal_token"
+    if not note_id:
+        return None, "", None, None, None
+
+    reply_kind = "supplier" if kind == "supplier" else ("client" if kind == "client" else "")
+    supplier_id = supplier_name = None
+    if reply_kind != "client":
+        note = await db.notes.find_one({"id": note_id}, {"_id": 0, "supplier_id": 1})
+        if note and note.get("supplier_id"):
+            sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "id": 1, "name": 1})
+            if sup:
+                supplier_id, supplier_name, reply_kind = sup["id"], sup.get("name"), "supplier"
+    return note_id, reply_kind, supplier_id, supplier_name, method
+
+
+async def _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachments_meta, supplier_name=None):
+    """Efeitos de uma resposta identificada como associada a um pedido —
+    avança o estado (fornecedor), analisa PDF de fornecedor e gera PDF de
+    cliente automaticamente, ou regista a resposta do cliente (sem avançar
+    estado sozinho, por não haver forma segura de saber se aprovou/recusou).
+    Reaproveitado tanto pela correspondência por cabeçalhos
+    (_match_note_by_headers, sinais 1-5) como pela correspondência por
+    assunto/remetente (_match_note_for_reply/_match_client_reply, sinais
+    6-7) — os mesmos efeitos, qualquer que seja o sinal que resolveu a
+    associação, para não haver duas versões da mesma lógica."""
+    quem = supplier_name or m.get("from_name") or m["from_email"]
+    verbo = "Resposta recebida de" if reply_kind == "supplier" else "Resposta recebida do cliente"
+    await log_activity(note_id, "email_received",
+                       f"{verbo} {quem}: {m['subject'] or '(sem assunto)'}"
+                       + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
+                       {"from": m["from_email"], "uid": m["uid"], "reply_kind": reply_kind})
+    if reply_kind == "supplier":
+        n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
+        if n and n.get("status") in WAITING_SUPPLIER:
+            await db.notes.update_one({"id": note_id}, {"$set": {
+                "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
+            await log_activity(note_id, "status_change",
+                               "Estado alterado para Orçamento recebido (resposta por email)",
+                               {"to": "orcamento_recebido"})
+        # PDF da BandAluminios em anexo → analisa e gera automaticamente o
+        # PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
+        # enviado sem confirmação explícita do utilizador.
+        supplier_pdf_atts = [a for a in m.get("attachments", []) if a["filename"].lower().endswith(".pdf")]
+        if supplier_pdf_atts:
+            first = supplier_pdf_atts[0]
+            try:
+                supplier_quote = await _apply_supplier_pdf(
+                    note_id, first["data"], first["filename"], source_label=" (recebido por email)")
+                try:
+                    await _generate_client_pdf_file(
+                        note_id, supplier_quote,
+                        source_label=" — automático, reveja e envie quando quiser")
+                except ValueError as e:
+                    await log_activity(note_id, "updated",
+                                       f"PDF do fornecedor analisado, mas o PDF de cliente não foi gerado: {e}")
+            except ValueError as e:
+                await log_activity(note_id, "updated",
+                                   f"PDF recebido por email ({first['filename']}) mas não reconhecido "
+                                   f"como orçamento do fornecedor: {e}")
+            except Exception as e:
+                logger.error(f"Falha ao processar PDF recebido por email: {e}")
+                await notifications.create_notification(
+                    db, dedup_key=f"processing-error-{email_id}", category="processing_error",
+                    title="Erro de processamento",
+                    body=f"Falha ao processar um PDF recebido por email ({first['filename']}).",
+                    url=f"/?open={note_id}" if note_id else "/emails", note_id=note_id or None)
+    else:
+        # Resposta do cliente: nunca avança o estado sozinho — mas fica
+        # marcado e reaparece bem visível nos alertas para alguém decidir.
+        # Um cliente que responde está claramente contactável, por isso
+        # repõe o contador de chamadas sem resposta.
+        await db.notes.update_one({"id": note_id}, {"$set": {
+            "last_client_reply_at": now_iso(), "client_no_answer_count": 0, "updated_at": now_iso()}})
+
+
 async def poll_supplier_replies():
     if not SMTP_CONFIGURED:
         return {"ok": False, "new": 0, "detail": "SMTP não configurado."}
@@ -4692,17 +4994,27 @@ async def poll_supplier_replies():
             continue
         if await db.received_emails.find_one({"uid": m["uid"]}):
             continue
-        note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
-        reply_kind = "supplier" if note_id else ""
+        # Sinais 1-5 (Message-ID/In-Reply-To/References/thread do Gmail/
+        # identificador interno) correm sempre, independentemente do
+        # assunto; só se nenhum resolver é que se cai para o matching por
+        # assunto/remetente já existente (sinais 6-7, atrás do filtro
+        # "parece um orçamento").
+        note_id, reply_kind, supplier_id, supplier_name, match_method = await _match_note_by_headers(m)
         if not note_id:
-            # Ou não há fornecedor conhecido, ou há um fornecedor conhecido mas
-            # nenhum pedido atualmente à sua espera — nesse caso, antes de
-            # desistir, tenta-se o lado do cliente (simétrico ao matching de
-            # fornecedor, que até agora não existia).
-            client_note_id = await _match_client_reply(m["from_email"], m["subject"])
-            if client_note_id:
-                note_id, reply_kind = client_note_id, "client"
-                supplier_id, supplier_name = None, None
+            note_id, supplier_id, supplier_name = await _match_note_for_reply(m["from_email"], m["subject"])
+            reply_kind = "supplier" if note_id else ""
+            if note_id:
+                match_method = "subject_or_sender"
+            if not note_id:
+                # Ou não há fornecedor conhecido, ou há um fornecedor conhecido mas
+                # nenhum pedido atualmente à sua espera — nesse caso, antes de
+                # desistir, tenta-se o lado do cliente (simétrico ao matching de
+                # fornecedor, que até agora não existia).
+                client_note_id = await _match_client_reply(m["from_email"], m["subject"])
+                if client_note_id:
+                    note_id, reply_kind = client_note_id, "client"
+                    supplier_id, supplier_name = None, None
+                    match_method = "subject_or_sender"
         # Guarda TODOS os emails da caixa de entrada — mesmo sem relação com
         # nenhum pedido — para a secção "Emails" mostrar a caixa completa.
         # Os efeitos automáticos (estado do pedido, análise de PDF) continuam
@@ -4714,7 +5026,7 @@ async def poll_supplier_replies():
             await db.email_attachments.insert_one({
                 "id": att_id, "email_id": email_id, "note_id": note_id or "",
                 "filename": att["filename"], "content_b64": base64.b64encode(att["data"]).decode(),
-                "created_at": now_iso()})
+                "direction": "received", "created_at": now_iso()})
             attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
         classification = await _classify_email(m["subject"], m["body"])
         rules_result = await _apply_rules(m["subject"], m["body"], m["from_email"], classification["category"])
@@ -4781,6 +5093,9 @@ async def poll_supplier_replies():
             "anexos_edicao_diff": (anexos_result or {}).get("diff"),
             "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
             "edition_summary": edition_summary_result,
+            "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
+            "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
+            "match_method": match_method or "",
             "seen": False, "received_at": now_iso()})
         try:
             from_label = supplier_name or m.get("from_name") or m["from_email"]
@@ -4805,58 +5120,7 @@ async def poll_supplier_replies():
                 logger.warning(f"Criação do artigo do Centro de Conhecimento falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
-            quem = supplier_name or m.get("from_name") or m["from_email"]
-            verbo = "Resposta recebida de" if reply_kind == "supplier" else "Resposta recebida do cliente"
-            await log_activity(note_id, "email_received",
-                               f"{verbo} {quem}: {m['subject'] or '(sem assunto)'}"
-                               + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
-                               {"from": m["from_email"], "uid": m["uid"], "reply_kind": reply_kind})
-            if reply_kind == "supplier":
-                n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
-                if n and n.get("status") in WAITING_SUPPLIER:
-                    await db.notes.update_one({"id": note_id}, {"$set": {
-                        "status": "orcamento_recebido", "status_updated_at": now_iso(), "updated_at": now_iso()}})
-                    await log_activity(note_id, "status_change",
-                                       "Estado alterado para Orçamento recebido (resposta por email)",
-                                       {"to": "orcamento_recebido"})
-                # PDF da BandAluminios em anexo → analisa e gera automaticamente
-                # o PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
-                # enviado sem confirmação explícita do utilizador.
-                # (m["attachments"] pode agora incluir também .zip — ver
-                # _email_pdf_attachments — por isso filtra-se só o PDF.)
-                supplier_pdf_atts = [a for a in m.get("attachments", []) if a["filename"].lower().endswith(".pdf")]
-                if supplier_pdf_atts:
-                    first = supplier_pdf_atts[0]
-                    try:
-                        supplier_quote = await _apply_supplier_pdf(
-                            note_id, first["data"], first["filename"], source_label=" (recebido por email)")
-                        try:
-                            await _generate_client_pdf_file(
-                                note_id, supplier_quote,
-                                source_label=" — automático, reveja e envie quando quiser")
-                        except ValueError as e:
-                            await log_activity(note_id, "updated",
-                                               f"PDF do fornecedor analisado, mas o PDF de cliente não foi gerado: {e}")
-                    except ValueError as e:
-                        await log_activity(note_id, "updated",
-                                           f"PDF recebido por email ({first['filename']}) mas não reconhecido "
-                                           f"como orçamento do fornecedor: {e}")
-                    except Exception as e:
-                        logger.error(f"Falha ao processar PDF recebido por email: {e}")
-                        await notifications.create_notification(
-                            db, dedup_key=f"processing-error-{email_id}", category="processing_error",
-                            title="Erro de processamento",
-                            body=f"Falha ao processar um PDF recebido por email ({first['filename']}).",
-                            url=f"/?open={note_id}" if note_id else "/emails", note_id=note_id or None)
-            else:
-                # Resposta do cliente: nunca avança o estado sozinho (não há
-                # forma segura de saber se aprovou, recusou ou só perguntou
-                # algo) — mas fica marcado e reaparece bem visível nos
-                # alertas para alguém decidir. Um cliente que responde está
-                # claramente contactável, por isso repõe o contador de
-                # chamadas sem resposta.
-                await db.notes.update_one({"id": note_id}, {"$set": {
-                    "last_client_reply_at": now_iso(), "client_no_answer_count": 0, "updated_at": now_iso()}})
+            await _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachments_meta, supplier_name)
     await db.imap_state.update_one({"id": "inbox"}, {"$set": {
         "id": "inbox", "last_uid": max_uid, "checked_at": now_iso()}}, upsert=True)
     return {"ok": True, "new": matched, "seen": len(messages)}
@@ -4876,8 +5140,16 @@ async def poll_sent_folder():
     max_uid = last_uid
     for m in messages:
         max_uid = max(max_uid, m["uid"])
-        if m["message_id"] and await db.sent_emails.find_one({"message_id": m["message_id"]}):
-            continue  # já registado quando a app enviou este email
+        if m["message_id"]:
+            existing = await db.sent_emails.find_one({"message_id": m["message_id"]}, {"_id": 0, "id": 1, "gm_thread_id": 1})
+            if existing:
+                # já registado quando a app enviou este email — só falta
+                # completar o gm_thread_id, que só se sabe ao reler a pasta
+                # Enviados (o envio por SMTP não o devolve).
+                if m.get("gm_thread_id") and not existing.get("gm_thread_id"):
+                    await db.sent_emails.update_one(
+                        {"id": existing["id"]}, {"$set": {"gm_thread_id": m["gm_thread_id"]}})
+                continue
         if not m["to_email"]:
             continue
         note_id, supplier_id, supplier_name = await _match_note_for_reply(m["to_email"], m["subject"])
@@ -4888,12 +5160,17 @@ async def poll_sent_folder():
             if client_note_id:
                 note_id, kind = client_note_id, "client"
                 to_label = m.get("to_name") or ""
+        note_doc = await db.notes.find_one({"id": note_id}, {"_id": 0}) if note_id else None
         await db.sent_emails.insert_one({
             "id": str(uuid.uuid4()), "to": m["to_email"], "to_label": to_label,
             "subject": m["subject"], "body": m["body"], "body_html": m.get("body_html") or "",
             "note_id": note_id or "",
             "kind": kind or "other", "pdf_file_id": "", "attachments": [],
-            "message_id": m["message_id"], "source": "gmail", "sent_at": m["sent_at"]})
+            "message_id": m["message_id"], "source": "gmail", "sent_at": m["sent_at"],
+            "pedido_type": await _pedido_type_for_note(note_doc), "in_reply_to": m.get("in_reply_to") or "",
+            "references": m.get("references") or [], "internal_token": extract_internal_token(
+                m.get("message_id"), m.get("in_reply_to"), *(m.get("references") or [])) or "",
+            "gm_thread_id": m.get("gm_thread_id") or "", "status": "enviado", "error": ""})
         added += 1
         if note_id:
             quem = to_label or m["to_email"]
@@ -4952,6 +5229,70 @@ async def process_correio_semanal_email(email_id: str):
 @api_router.get("/notes/{note_id}/emails")
 async def note_received_emails(note_id: str):
     return await db.received_emails.find({"note_id": note_id}, {"_id": 0}).sort("received_at", -1).to_list(100)
+
+
+@api_router.get("/notes/{note_id}/communication")
+async def note_communication(note_id: str, q: Optional[str] = None):
+    """Toda a troca de emails deste pedido (enviados + recebidos),
+    normalizada numa só lista cronológica, mais o resumo rápido (último
+    enviado/recebido, fornecedor, estado, contagens) — o separador
+    Comunicação do pedido usa isto sozinho, sem mais nenhum pedido ao
+    servidor."""
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    sent = await db.sent_emails.find({"note_id": note_id}, {"_id": 0}).sort("sent_at", -1).to_list(500)
+    received = await db.received_emails.find({"note_id": note_id}, {"_id": 0}).sort("received_at", -1).to_list(500)
+
+    # Mantém os campos originais de cada documento (body_html, supplier_id,
+    # reply_kind/kind, in_reply_to, ...) e só acrescenta um envelope comum
+    # (`direction`/`at`/`status`) — assim o frontend reaproveita tal e qual
+    # o mesmo desenho de "abrir em pilha" (EntityStackBar, kind: "email")
+    # já usado no painel antigo, sem remapear nada campo a campo.
+    items = []
+    for s in sent:
+        items.append({**s, "direction": "sent", "at": s.get("sent_at"),
+                      "status": s.get("status") or "enviado"})
+    for r in received:
+        items.append({**r, "direction": "received", "at": r.get("received_at"), "status": "recebido"})
+    items.sort(key=lambda i: i.get("at") or "", reverse=True)
+
+    supplier_name = ""
+    if note.get("supplier_id"):
+        sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "name": 1})
+        supplier_name = (sup or {}).get("name") or ""
+
+    if q and q.strip():
+        rx = re.compile(re.escape(q.strip()), re.IGNORECASE)
+
+        def matches(item):
+            haystacks = [
+                item.get("subject") or "", item.get("body") or "", item.get("to") or "",
+                item.get("to_label") or "", item.get("from_email") or "", item.get("from_name") or "",
+                item.get("supplier_name") or "", supplier_name,
+            ] + [a.get("filename") or "" for a in item.get("attachments") or []]
+            return any(rx.search(h) for h in haystacks)
+        items = [i for i in items if matches(i)]
+
+    automation = await app_settings.get_group(db, "automation_prefs")
+    sla_days = note.get("sla_days") or automation.get("default_sla_days") or 2
+    status = communication_status(sent, received, sla_days=sla_days)
+    last_sent_at = sent[0]["sent_at"] if sent else None
+    last_received_at = received[0]["received_at"] if received else None
+
+    return {
+        "items": items,
+        "summary": {
+            "last_sent_at": last_sent_at,
+            "last_received_at": last_received_at,
+            "last_activity_at": max(filter(None, [last_sent_at, last_received_at]), default=None),
+            "supplier_name": supplier_name,
+            "status": status,
+            "total_emails": len(sent) + len(received),
+            "total_attachments": sum(len(s.get("attachments") or []) for s in sent)
+                                  + sum(len(r.get("attachments") or []) for r in received),
+        },
+    }
 
 
 @api_router.get("/emails/unseen")
@@ -5096,12 +5437,31 @@ def _decode_attachments(items):
     return out
 
 
+async def _infer_kind_for_recipient(to_email, note):
+    """'client'|'supplier'|'other' a partir do pedido escolhido (se algum) —
+    usado quando o envio não vem já de um fluxo que sabe isto à partida
+    (send-client-email/send-quote-request), ex. o compositor livre de
+    Emails.jsx depois de associar um pedido via PedidoPicker."""
+    if not note:
+        return "other"
+    to_norm = (to_email or "").strip().lower()
+    if (note.get("email") or "").strip().lower() == to_norm:
+        return "client"
+    if note.get("supplier_id"):
+        sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "email": 1})
+        if sup and (sup.get("email") or "").strip().lower() == to_norm:
+            return "supplier"
+    return "other"
+
+
 class ComposeEmailIn(BaseModel):
     to: str
     subject: str
     body: str
     to_label: str = ""
     attachments: List[AttachmentIn] = []
+    note_id: str = ""
+    pedido_type: str = ""
 
     @field_validator("to")
     @classmethod
@@ -5114,12 +5474,21 @@ class ComposeEmailIn(BaseModel):
 
 @api_router.post("/emails/compose")
 async def compose_email(payload: ComposeEmailIn):
-    """Novo email livre, sem pedido associado — usado pelo botão 'Novo email'
-    na secção Emails."""
+    """Novo email livre — a associação a um pedido (Pedido de Cliente/
+    Pedido Geral/Banda Alumínios) é escolhida no próprio diálogo de
+    composição (ComposeEmailDialog.jsx); "Sem associação" continua possível
+    e fica registado como tal."""
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
     attachments = _decode_attachments(payload.attachments)
-    await _send_email(payload.to, payload.subject, payload.body, attachments=attachments, to_label=payload.to_label.strip())
+    note = await db.notes.find_one({"id": payload.note_id}, {"_id": 0}) if payload.note_id else None
+    kind = await _infer_kind_for_recipient(payload.to, note)
+    pedido_type = payload.pedido_type or await _pedido_type_for_note(note)
+    await _send_email(payload.to, payload.subject, payload.body, attachments=attachments,
+                       to_label=payload.to_label.strip(), note_id=payload.note_id or None, kind=kind,
+                       pedido_type=pedido_type)
+    if payload.note_id:
+        await log_activity(payload.note_id, "email_sent", f"Email enviado a {payload.to}", {"to": payload.to})
     return {"ok": True, "to": payload.to}
 
 
@@ -5132,7 +5501,9 @@ class QuickReplyIn(BaseModel):
 @api_router.post("/emails/{email_id}/reply")
 async def reply_to_email(email_id: str, payload: QuickReplyIn):
     """Resposta rápida a um email recebido, sem sair da caixa de entrada —
-    mesmo destinatário e mesmo pedido associado (se houver)."""
+    mesmo destinatário e mesmo pedido associado (se houver). Fica na mesma
+    conversa (thread) do destinatário: In-Reply-To/References são montados
+    a partir do Message-ID do email original (ver _reply_headers)."""
     e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
     if not e:
         raise HTTPException(status_code=404, detail="Email não encontrado")
@@ -5148,7 +5519,9 @@ async def reply_to_email(email_id: str, payload: QuickReplyIn):
     kind = e.get("reply_kind") if e.get("reply_kind") in ("supplier", "client") else "other"
     to_label = e.get("supplier_name") or e.get("from_name") or ""
     attachments = _decode_attachments(payload.attachments)
-    await _send_email(to, subject, payload.body, attachments=attachments, note_id=e.get("note_id") or None, kind=kind, to_label=to_label)
+    note = await db.notes.find_one({"id": e["note_id"]}, {"_id": 0}) if e.get("note_id") else None
+    await _send_email(to, subject, payload.body, attachments=attachments, note_id=e.get("note_id") or None,
+                       kind=kind, to_label=to_label, pedido_type=await _pedido_type_for_note(note), reply_to=e)
     if e.get("note_id"):
         await log_activity(e["note_id"], "email_sent", f"Resposta rápida enviada a {to}", {"to": to})
     await db.received_emails.update_one({"id": email_id}, {"$set": {"seen": True}})
@@ -5158,6 +5531,8 @@ async def reply_to_email(email_id: str, payload: QuickReplyIn):
 class ForwardEmailIn(BaseModel):
     to: str
     note: str = ""
+    note_id: str = ""
+    pedido_type: str = ""
 
     @field_validator("to")
     @classmethod
@@ -5171,7 +5546,10 @@ class ForwardEmailIn(BaseModel):
 @api_router.post("/emails/{email_id}/forward")
 async def forward_email(email_id: str, payload: ForwardEmailIn):
     """Reencaminha um email recebido para outro destinatário, com o texto
-    original citado e os anexos originais transportados."""
+    original citado e os anexos originais transportados. Um reencaminhamento
+    é uma conversa nova para quem o recebe, por isso não continua a thread
+    do email original (sem In-Reply-To/References) — mas pode ser associado
+    a um pedido tal como qualquer outro envio."""
     e = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
     if not e:
         raise HTTPException(status_code=404, detail="Email não encontrado")
@@ -5186,7 +5564,13 @@ async def forward_email(email_id: str, payload: ForwardEmailIn):
     body = f"{payload.note.strip()}\n\n{quoted}" if payload.note.strip() else quoted
     files = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(10)
     attachments = [{"filename": f["filename"], "data": base64.b64decode(f["content_b64"])} for f in files]
-    await _send_email(payload.to, subject, body, attachments=attachments, kind="other")
+    note = await db.notes.find_one({"id": payload.note_id}, {"_id": 0}) if payload.note_id else None
+    kind = await _infer_kind_for_recipient(payload.to, note)
+    pedido_type = payload.pedido_type or await _pedido_type_for_note(note)
+    await _send_email(payload.to, subject, body, attachments=attachments, kind=kind,
+                       note_id=payload.note_id or None, pedido_type=pedido_type)
+    if payload.note_id:
+        await log_activity(payload.note_id, "email_sent", f"Email reencaminhado a {payload.to}", {"to": payload.to})
     return {"ok": True, "to": payload.to}
 
 
@@ -5664,7 +6048,8 @@ async def send_client_email(note_id: str, payload: ClientEmailIn):
         raise HTTPException(status_code=400, detail="O cliente não tem email definido nos Detalhes.")
     if not payload.subject.strip() or not payload.body.strip():
         raise HTTPException(status_code=400, detail="O assunto e a mensagem não podem estar vazios.")
-    await _send_email(to, payload.subject, payload.body, note_id=note_id, kind="client", to_label=n.get("customer_name") or "")
+    await _send_email(to, payload.subject, payload.body, note_id=note_id, kind="client",
+                       to_label=n.get("customer_name") or "", pedido_type=await _pedido_type_for_note(n))
     await db.notes.update_one({"id": note_id}, {"$set": {
         "status": "aguarda_cliente", "last_client_contact_at": now_iso(),
         "status_updated_at": now_iso(), "updated_at": now_iso()}})
@@ -5697,7 +6082,8 @@ async def send_quote_request(note_id: str, payload: QuoteRequestIn):
             continue
         try:
             await _send_email(supplier["email"], payload.subject, payload.body,
-                              note_id=note_id, kind="supplier", to_label=name)
+                              note_id=note_id, kind="supplier", to_label=name,
+                              pedido_type=await _pedido_type_for_note(note))
         except HTTPException as e:
             failed.append({"supplier_id": sid, "supplier_name": name, "reason": e.detail})
             continue
@@ -6685,8 +7071,12 @@ async def ensure_indexes():
                         ("received_emails", "matched"), ("received_emails", "received_at"),
                         ("received_emails", "reply_kind"), ("notes", "email"),
                         ("sent_emails", "note_id"), ("sent_emails", "kind"), ("sent_emails", "sent_at"),
-                        ("sent_emails", "message_id"),
-                        ("email_attachments", "email_id"),
+                        ("sent_emails", "message_id"), ("sent_emails", "in_reply_to"),
+                        ("sent_emails", "gm_thread_id"), ("sent_emails", "internal_token"),
+                        ("sent_emails", "references"), ("sent_emails", "pedido_type"),
+                        ("received_emails", "message_id"), ("received_emails", "in_reply_to"),
+                        ("received_emails", "gm_thread_id"), ("received_emails", "references"),
+                        ("email_attachments", "email_id"), ("email_attachments", "direction"),
                         ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
                         ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
                         ("category_suggestions", "signature"), ("category_suggestions", "status"),

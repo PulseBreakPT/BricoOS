@@ -26,7 +26,7 @@ import {
   Check, AlertTriangle, Cloud, Frame,
   Store, ArrowLeft, ChevronRight, PhoneMissed, PhoneCall, Package, PackageCheck, BellRing,
   FileUp, FileText, Download, Inbox, RefreshCw, Camera, ImagePlus, ImageOff,
-  ArrowUpRight, Building2, FileWarning, Eye,
+  Building2, FileWarning, Eye,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -78,6 +78,13 @@ const QUICK_LOG_OPTIONS = [
   { event: "cliente_avisado", label: "Cliente avisado", icon: BellRing, tone: "green" },
 ];
 
+// Estado da comunicação do pedido (ver backend/server.py:
+// communication_status) — "Entregue" não existe como estado próprio (nem
+// SMTP nem a API do Gmail confirmam entrega real).
+const COMM_STATUS_LABEL = {
+  erro: "Erro no envio", respondido: "Respondido", sem_resposta: "Sem resposta", enviado: "Enviado",
+};
+
 const QUICK_LOG_TONES = {
   red: "border-red-200 bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]",
   amber: "border-amber-200 bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)] hover:bg-[var(--pastel-amber-bg)]",
@@ -99,7 +106,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [quotes, setQuotes] = useState([]);
   const [activities, setActivities] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [receivedEmails, setReceivedEmails] = useState([]);
+  const [communication, setCommunication] = useState({ items: [], summary: null });
+  const [commSearch, setCommSearch] = useState("");
   const [syncingEmails, setSyncingEmails] = useState(false);
   const [sendingClient, setSendingClient] = useState(false);
   const [comment, setComment] = useState("");
@@ -167,16 +175,34 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       api.get(`/notes/${nid}/quotes`),
       api.get(`/notes/${nid}/activities`),
       api.get(`/notes/${nid}/tasks`),
-      api.get(`/notes/${nid}/emails`).catch(() => ({ data: [] })),
+      api.get(`/notes/${nid}/communication`).catch(() => ({ data: { items: [], summary: null } })),
       api.get(`/notes/${nid}/photos`).catch(() => ({ data: [] })),
       api.get(`/notes/${nid}/preflight`).catch(() => ({ data: null })),
       api.get(`/notes/${nid}/client-history`).catch(() => ({ data: null })),
     ]);
-    setQuotes(q.data); setActivities(a.data); setTasks(t.data); setReceivedEmails(m.data || []);
+    setQuotes(q.data); setActivities(a.data); setTasks(t.data); setCommunication(m.data || { items: [], summary: null });
     setPhotos(p.data || []);
     setPreflight(pf.data);
     setClientHistory(ch.data);
   }, []);
+
+  // Pesquisa dentro da Comunicação — servidor faz o filtro (ver
+  // GET /notes/{id}/communication?q=), mesmo padrão de debounce já usado
+  // no compositor de email (contactsSeq) e no LinkEmailToNoteDialog.
+  const loadCommunication = useCallback(async (nid, query) => {
+    try {
+      const { data } = await api.get(`/notes/${nid}/communication`, { params: { q: query || undefined } });
+      setCommunication(data);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível carregar a comunicação"));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !id || tab !== "comunicacao") return undefined;
+    const t = setTimeout(() => loadCommunication(id, commSearch), commSearch ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [open, id, tab, commSearch, loadCommunication]);
 
   const loadNote = useCallback(async (nid) => {
     const { data } = await api.get(`/notes/${nid}`);
@@ -224,6 +250,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       setPhotos([]);
       setLightboxPhoto(null);
       setStack([]);
+      setCommSearch("");
       // Cada área abre logo o assistente certo: «band» na área Banda
       // Alumínios, «normal» na área geral da loja.
       setCreateMode(initialCreateMode || "choice");
@@ -243,7 +270,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         } else {
           setForm(emptyForm);
         }
-        setNote(null); setQuotes([]); setActivities([]); setTasks([]);
+        setNote(null); setQuotes([]); setActivities([]); setTasks([]); setCommunication({ items: [], summary: null });
       }
     }
   }, [open, noteId, initialTab, initialCreateMode, loadNote, loadSub]);
@@ -930,6 +957,42 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         </div>
       );
     }
+    if (frame.kind === "sent_email") {
+      const m = frame.data;
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-bold text-foreground">{m.to_label || m.to}</p>
+            <p className="text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</p>
+            <p className="text-[11px] text-muted-foreground">{timeAgo(m.sent_at)}</p>
+            {m.status === "erro" ? (
+              <p className="mt-1 text-xs font-semibold text-[color:var(--pastel-red-text)]">
+                Falha ao enviar{m.error ? `: ${m.error}` : ""}
+              </p>
+            ) : null}
+          </div>
+          <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 font-sans text-xs text-foreground">{m.body || "(sem texto)"}</pre>
+          {(m.attachments || []).length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {m.attachments.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => pushFrame({
+                    kind: "pdf",
+                    label: a.filename,
+                    data: { url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename },
+                  })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold text-foreground hover:border-red-300 hover:text-[color:var(--pastel-red-text)]"
+                >
+                  <FileText className="h-3.5 w-3.5" /> {a.filename}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
     if (frame.kind === "pdf") {
       const a = frame.data;
       const kind = previewKind(a.filename, a.contentType);
@@ -1255,9 +1318,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-border px-4 pt-2.5 sm:px-6 sm:pt-3">
             {/* No telemóvel as tabs deslizam na horizontal; em ecrãs maiores ocupam a largura toda */}
-            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-5">
+            <TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto sm:grid sm:grid-cols-6">
               <TabsTrigger value="detalhes" data-testid="tab-detalhes" className="shrink-0 text-xs">Detalhes</TabsTrigger>
               <TabsTrigger value="orcamentos" data-testid="tab-orcamentos" className="shrink-0 text-xs" disabled={isCreate}>Orçamentos</TabsTrigger>
+              <TabsTrigger value="comunicacao" data-testid="tab-comunicacao" className="shrink-0 text-xs" disabled={isCreate}>
+                Comunicação{communication.summary?.total_emails ? ` (${communication.summary.total_emails})` : ""}
+              </TabsTrigger>
               <TabsTrigger value="fotos" data-testid="tab-fotos" className="shrink-0 text-xs" disabled={isCreate}>
                 Fotos{photos.length ? ` (${photos.length})` : ""}
               </TabsTrigger>
@@ -1649,76 +1715,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </div>
               </section>
 
-              {/* Respostas recebidas — fornecedor ou cliente (IMAP, só leitura) */}
-              {gmailStatus?.method === "smtp" || receivedEmails.length > 0 ? (
-                <section data-testid="received-emails-panel" className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-foreground">
-                      <Inbox className="h-4 w-4 text-foreground" /> Respostas recebidas
-                    </h4>
-                    {gmailStatus?.method === "smtp" ? (
-                      <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-8 shrink-0 rounded-lg text-xs">
-                        {syncingEmails ? <Spinner className="mr-1 h-3.5 w-3.5" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Verificar agora
-                      </Button>
-                    ) : null}
-                  </div>
-                  {receivedEmails.length === 0 ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Ainda sem respostas. A caixa de entrada é verificada automaticamente — quando o fornecedor ou o
-                      cliente responderem, a mensagem aparece aqui (e uma resposta do fornecedor avança o estado
-                      sozinho para «Orçamento recebido»).
-                    </p>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      {receivedEmails.map((m) => (
-                        <details key={m.id} data-testid={`received-email-${m.id}`} className="rounded-xl border border-border bg-muted/60 p-3">
-                          <summary className="flex cursor-pointer select-none items-center gap-1">
-                            <span className="min-w-0 flex-1">
-                              <span className="text-sm font-bold text-foreground">{m.supplier_name || m.from_name || m.from_email}</span>
-                              {m.reply_kind === "client" ? (
-                                <span className="ml-2 inline-flex rounded-full bg-[var(--pastel-emerald-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-emerald-text)]">Cliente</span>
-                              ) : null}
-                              <span className="ml-2 text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</span>
-                              <span className="ml-2 text-[11px] text-muted-foreground">{timeAgo(m.received_at)}</span>
-                            </span>
-                            <button
-                              type="button"
-                              data-testid={`open-email-frame-${m.id}`}
-                              title="Abrir em pilha"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); pushFrame({ kind: "email", label: m.subject || "Email", data: m }); }}
-                              className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            >
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </button>
-                          </summary>
-                          {m.body_html ? (
-                            <div
-                              className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-card p-3 font-sans text-xs text-foreground [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground"
-                              dangerouslySetInnerHTML={{ __html: m.body_html }}
-                            />
-                          ) : (
-                            <pre className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-card p-3 font-sans text-xs text-foreground">{m.body || "(sem texto)"}</pre>
-                          )}
-                          {(m.attachments || []).length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {m.attachments.map((a) => (
-                                <button
-                                  key={a.id}
-                                  type="button"
-                                  onClick={() => setPreviewAttachment({ url: withDeviceToken(`${API}/emails/${m.id}/attachments/${a.id}`), filename: a.filename })}
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold text-foreground hover:border-red-300 hover:text-[color:var(--pastel-red-text)]"
-                                >
-                                  <FileText className="h-3.5 w-3.5" /> {a.filename}
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </details>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ) : null}
 
               {/* Email + PDF prontos — confirmação a um clique, sem sair do pedido */}
               {note?.pending_client_send ? (
@@ -2026,6 +2022,99 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </section>
               ) : null}
 
+            </TabsContent>
+
+            {/* COMUNICAÇÃO — toda a troca de emails deste pedido (enviados +
+                recebidos), numa só linha temporal pesquisável. Substitui o
+                antigo painel "Respostas recebidas" (só recebidos, sem
+                pesquisa nem resumo), que vivia aqui em Orçamentos. */}
+            <TabsContent value="comunicacao" className="mt-0 focus-visible:outline-none">
+              {communication.summary ? (
+                <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
+                    <p className="font-mono text-base font-black tabular-nums text-foreground">{communication.summary.total_emails}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Emails trocados</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
+                    <p className="font-mono text-base font-black tabular-nums text-foreground">{communication.summary.total_attachments}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Anexos</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
+                    <p className="text-xs font-black text-foreground">
+                      {communication.summary.last_activity_at ? timeAgo(communication.summary.last_activity_at) : "–"}
+                    </p>
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Última atividade</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
+                    <p className="text-xs font-black text-foreground">{COMM_STATUS_LABEL[communication.summary.status] || "–"}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Estado</p>
+                  </div>
+                </section>
+              ) : null}
+
+              <div className="mt-4 flex items-center gap-2">
+                <Input
+                  data-testid="communication-search" value={commSearch}
+                  onChange={(e) => setCommSearch(e.target.value)}
+                  placeholder="Pesquisar assunto, mensagem, fornecedor, anexo…"
+                />
+                {gmailStatus?.method === "smtp" ? (
+                  <Button data-testid="sync-emails-btn" size="sm" variant="outline" disabled={syncingEmails} onClick={syncEmails} className="h-9 shrink-0 rounded-lg text-xs">
+                    {syncingEmails ? <Spinner className="mr-1 h-3.5 w-3.5" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />} Verificar agora
+                  </Button>
+                ) : null}
+              </div>
+
+              {communication.items.length === 0 ? (
+                <Empty className="border-0 py-8">
+                  <EmptyDescription>
+                    {commSearch ? "Sem resultados para esta pesquisa." : "Ainda sem comunicação registada para este pedido."}
+                  </EmptyDescription>
+                </Empty>
+              ) : (
+                <MessageGroup className="mt-4 gap-0">
+                  {communication.items.map((item, i) => {
+                    const Icon = item.direction === "sent" ? Send : Inbox;
+                    const who = item.direction === "sent"
+                      ? (item.to_label || item.to)
+                      : (item.supplier_name || item.from_name || item.from_email);
+                    return (
+                      <Message key={item.id} data-testid={`communication-item-${item.id}`} className="pb-5">
+                        {i < communication.items.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-muted" /> : null}
+                        <MessageAvatar className="z-10 h-8 w-8 min-w-8 self-start bg-muted text-muted-foreground">
+                          <Icon className="h-4 w-4" />
+                        </MessageAvatar>
+                        <MessageContent className="gap-0.5 pt-0.5">
+                          <button
+                            type="button"
+                            data-testid={`open-communication-frame-${item.id}`}
+                            onClick={() => pushFrame({
+                              kind: item.direction === "sent" ? "sent_email" : "email",
+                              label: item.subject || "Email", data: item,
+                            })}
+                            className="text-left"
+                          >
+                            <p className="text-sm font-bold text-foreground hover:underline">{who || "(sem remetente)"}</p>
+                            <p className="text-xs text-muted-foreground">{item.subject || "(sem assunto)"}</p>
+                          </button>
+                          <p className="text-xs text-muted-foreground">
+                            {item.direction === "sent" ? "Enviado" : "Recebido"} · {formatDateTime(item.at)}{" "}
+                            <span className="text-muted-foreground">({timeAgo(item.at)})</span>
+                            {item.status === "erro" ? (
+                              <span className="ml-2 inline-flex rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-red-text)]">Erro</span>
+                            ) : null}
+                            {(item.attachments || []).length ? (
+                              <span className="ml-2">
+                                · {item.attachments.length} anexo{item.attachments.length === 1 ? "" : "s"}
+                              </span>
+                            ) : null}
+                          </p>
+                        </MessageContent>
+                      </Message>
+                    );
+                  })}
+                </MessageGroup>
+              )}
             </TabsContent>
 
             {/* FOTOS — disponível tanto em Pedidos Gerais como em Banda Alumínios */}
