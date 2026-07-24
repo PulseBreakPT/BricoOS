@@ -58,7 +58,6 @@ import ControlDeck from "@/components/workspace/ControlDeck";
 import DesktopOperationsRail from "@/components/workspace/DesktopOperationsRail";
 import MobileHomeSurface from "@/components/workspace/MobileHomeSurface";
 import MobileSystemDock from "@/components/workspace/MobileSystemDock";
-import OperationalRibbon from "@/components/workspace/OperationalRibbon";
 import SystemBar from "@/components/workspace/SystemBar";
 import BootSplash from "@/components/workspace/BootSplash";
 import DesktopWidgets from "@/components/workspace/DesktopWidgets";
@@ -656,7 +655,6 @@ function PrimaryRouteWindow({
   onClose,
   onMinimize,
   onToggleMaximize,
-  onOpenRoute,
   children,
 }) {
   const Icon = app.icon;
@@ -720,7 +718,6 @@ function PrimaryRouteWindow({
           </div>
         </div>
       </div>
-      <OperationalRibbon app={app} onOpenRoute={onOpenRoute} />
       <div className="os-work-surface min-h-0 flex-1 overflow-auto overscroll-contain bg-[hsl(var(--background))]">
         <div className="os-app-content mx-auto w-full p-5 sm:p-7 xl:p-8">
           {children}
@@ -969,7 +966,6 @@ function LayoutInner() {
             onClose={showDesktopNow}
             onMinimize={showDesktopNow}
             onToggleMaximize={() => setPrimaryMaximized((value) => !value)}
-            onOpenRoute={openRoute}
           >
             <SupplierEmailAlert />
             <div key={location.pathname} className="animate-page-enter">
@@ -1058,13 +1054,6 @@ function LayoutInner() {
                 <NotificationsBell variant="mobile" />
               </div>
             </div>
-            {!homeVisible ? (
-              <OperationalRibbon
-                app={activeRouteApp}
-                variant="mobile"
-                onOpenRoute={openRoute}
-              />
-            ) : null}
           </header>
           <main className="mobile-workspace px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pt-6">
             {homeVisible ? (
