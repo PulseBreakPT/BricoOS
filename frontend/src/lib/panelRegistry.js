@@ -31,7 +31,7 @@ export const PANEL_TYPES = {
   downloads: { title: "Downloads", icon: FolderDown, Component: DownloadsCenter },
   explorer: { title: "Explorador", icon: FolderTree, Component: Explorer },
   settings: { title: "Definições", icon: SettingsIcon, Component: Settings },
-  notifications: { title: "Notificações", icon: Bell, Component: Notifications },
+  notifications: { title: "Centro de Operações", icon: Bell, Component: Notifications },
 };
 
 export const PANEL_ORDER = [

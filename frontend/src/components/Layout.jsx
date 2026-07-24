@@ -51,6 +51,7 @@ import {
   SystemStatusProvider,
   useSystemStatus,
 } from "@/context/SystemStatusContext";
+import { NotificationsProvider } from "@/context/NotificationsContext";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import DesktopWorkspace from "@/components/workspace/DesktopWorkspace";
 import CommandPalette from "@/components/workspace/CommandPalette";
@@ -143,7 +144,7 @@ const ROUTE_APPS = [
   },
   {
     path: "/notificacoes",
-    title: "Notificações",
+    title: "Centro de Operações",
     shortTitle: "Notificações",
     icon: Bell,
     testid: "nav-notificacoes",
@@ -1151,7 +1152,9 @@ export default function Layout() {
   return (
     <WorkspaceProvider>
       <SystemStatusProvider>
-        <LayoutInner />
+        <NotificationsProvider>
+          <LayoutInner />
+        </NotificationsProvider>
       </SystemStatusProvider>
     </WorkspaceProvider>
   );

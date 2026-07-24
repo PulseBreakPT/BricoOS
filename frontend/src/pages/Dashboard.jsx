@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER, timeAgo } from "@/lib/pedido";
+import { useNotificationStream } from "@/hooks/useNotificationStream";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -168,12 +169,17 @@ export default function Dashboard() {
   const load = useCallback(async (signal) => {
     const seq = ++requestSeq.current;
     try {
-      const [s, n, g, nr, ks] = await Promise.all([
-        api.get("/stats", { signal }), api.get("/notifications", { signal }), api.get("/gmail/status", { signal }),
+      const [s, t, g, nr, ks] = await Promise.all([
+        api.get("/stats", { signal }), api.get("/today", { signal }), api.get("/gmail/status", { signal }),
         api.get("/notes/needs-review", { signal }), api.get("/knowledge/stats", { signal }),
       ]);
       if (seq !== requestSeq.current) return; // resposta ultrapassada por um load() mais recente
-      setStats(s.data); setNotifs(n.data); setGmail(g.data); setNeedsReview(nr.data); setKnowledgeStats(ks.data);
+      setStats(s.data);
+      // "Precisa de atenção" usa o mesmo detetor de situações vivas
+      // (build_notifications, via GET /today) que alimenta o Centro de
+      // Operações — não o histórico persistido de db.notifications.
+      setNotifs({ items: t.data.attention || [], count: t.data.attention_count || 0 });
+      setGmail(g.data); setNeedsReview(nr.data); setKnowledgeStats(ks.data);
       setLoadError("");
     } catch (e) {
       if (axios.isCancel(e) || seq !== requestSeq.current) return;
@@ -189,6 +195,12 @@ export default function Dashboard() {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  // Sincronização em tempo real (§ Centro de Operações) — antes, este
+  // widget só se atualizava ao recarregar a página; agora reage a qualquer
+  // mudança de estado das notificações, tal como o sino e o Centro de
+  // Operações.
+  useNotificationStream(() => load());
 
   const disconnectGmail = useCallback(async () => {
     if (gmailBusy) return; // evita dois cliques rápidos a disparar dois pedidos de disconnect + load

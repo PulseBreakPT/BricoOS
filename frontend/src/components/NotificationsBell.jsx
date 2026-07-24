@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell, Clock, AlarmClockOff, Zap, ShieldAlert, FileDiff, Mail, ClipboardList, AlertTriangle,
+  ListChecks, Link as LinkIcon, BookOpen, Cpu,
 } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -13,11 +14,13 @@ import { useNotificationStream } from "@/hooks/useNotificationStream";
 
 const CATEGORY_ICON = {
   waiting_supplier: Clock, deadline_approaching: Clock, forgotten: AlarmClockOff,
-  urgent: Zap, task_urgent: Zap, reminder_overdue: Bell,
+  urgent: Zap, task_urgent: Zap, reminder_overdue: Bell, task_reminder: ListChecks,
+  tasks_overdue_digest: ListChecks,
   quote_quality_issue: ShieldAlert, document_read_failure: ShieldAlert, processing_error: AlertTriangle,
   quote_changed: FileDiff, price_change: FileDiff,
   client_new_note: ClipboardList, supplier: Mail, client: Mail, correio_semanal: Mail, unmatched: Mail,
-  anexos_incidencia_critica: AlertTriangle,
+  anexos_incidencia_critica: AlertTriangle, bricoaval_backfill: LinkIcon,
+  knowledge_new_article: BookOpen, knowledge_engine_updated: Cpu,
 };
 const PRIORITY_STYLE = {
   critica: { ring: "border-red-200 bg-[var(--pastel-red-bg)]", icon: "bg-[var(--pastel-red-bg)] text-red-600" },
@@ -27,7 +30,8 @@ const PRIORITY_STYLE = {
 };
 
 // Acesso rápido às últimas não lidas — o histórico completo, com
-// pesquisa/filtros/arquivo, fica no Centro de Notificações ("Ver todas").
+// pesquisa/filtros/arquivo/agrupamento, fica no Centro de Operações ("Ver
+// todas"); o sino mantém-se um atalho simples, sem lote/expansão.
 // Sincronizado em tempo real (SSE + push do próprio service worker), com
 // o poll de 45s como reserva para quando a ligação em tempo real falhar.
 export default function NotificationsBell({ variant = "sidebar" }) {
@@ -45,7 +49,7 @@ export default function NotificationsBell({ variant = "sidebar" }) {
     try {
       const [countRes, listRes] = await Promise.all([
         api.get("/notifications/unread-count"),
-        api.get("/notifications", { params: { status: "unread", limit: 8 } }),
+        api.get("/notifications", { params: { status: "new", limit: 8 } }),
       ]);
       if (seq !== loadSeq.current) return;
       setCount(countRes.data.count || 0);
@@ -124,7 +128,15 @@ export default function NotificationsBell({ variant = "sidebar" }) {
                     <Icon className="h-4 w-4" />
                   </ItemMedia>
                   <ItemContent className="gap-0">
-                    <ItemTitle className="truncate text-sm text-foreground">{n.title}</ItemTitle>
+                    <div className="flex items-center gap-1.5">
+                      <ItemTitle className="truncate text-sm text-foreground">{n.title}</ItemTitle>
+                      {n.computed_priority === "critica" ? (
+                        <span className="shrink-0 rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">URGENTE</span>
+                      ) : null}
+                      {(n.occurrence_count || 1) > 1 ? (
+                        <span className="shrink-0 rounded-full bg-amber-600 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">ATUALIZADA</span>
+                      ) : null}
+                    </div>
                     <ItemDescription className="line-clamp-none text-xs text-muted-foreground">{n.body}</ItemDescription>
                   </ItemContent>
                 </button>

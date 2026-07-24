@@ -1498,6 +1498,11 @@ async def update_note(note_id: str, payload: NotePatch):
         # primeira vez ou alterado para um novo valor (nunca ao limpar o
         # campo, nem quando nenhum outro campo mudou).
         await _backfill_bricoaval_matches(note_id, update["bricoaval_number"])
+    if "status" in update or "priority" in update:
+        # Centro de Operações (§22): a mudança de estado/prioridade pode
+        # resolver notificações associadas de imediato, sem esperar pelo
+        # próximo ciclo do scan periódico.
+        await _cascade_resolve(note_id=note_id)
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -1515,6 +1520,7 @@ async def change_status(note_id: str, payload: StatusIn):
                            f"Estado: {STATUS_LABEL.get(current.get('status'))} → {STATUS_LABEL.get(payload.status)}",
                            {"from": current.get("status"), "to": payload.status})
     await db.notes.update_one({"id": note_id}, {"$set": update})
+    await _cascade_resolve(note_id=note_id)
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -1526,6 +1532,7 @@ async def resolve_note(note_id: str):
     await db.notes.update_one({"id": note_id}, {"$set": {
         "status": "concluido", "archived": True, "status_updated_at": now_iso(), "updated_at": now_iso()}})
     await log_activity(note_id, "status_change", "Pedido marcado como resolvido e arquivado", {"to": "concluido"})
+    await _cascade_resolve(note_id=note_id)
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -2572,6 +2579,11 @@ async def _set_task_status(task_id, status, actor=None):
     await db.tasks.update_one({"id": task_id}, {"$set": update})
     await log_task_activity(
         task_id, "status_change", f"Estado alterado para {TASK_STATUS_LABELS[status]}", actor=actor)
+    if status in ("done", "archived"):
+        # Centro de Operações (§22): concluir/arquivar a tarefa resolve de
+        # imediato as notificações associadas (task_reminder, task_urgent,
+        # reminder_overdue).
+        await _cascade_resolve(task_id=task_id)
     if status == "done" and task.get("repeat", "none") != "none" and task.get("due_date"):
         next_date = _next_due_date(task["due_date"], task["repeat"])
         if next_date:
@@ -2629,6 +2641,7 @@ async def delete_task(task_id: str):
     doc["deleted_at"] = now_iso()
     await db.tasks_trash.insert_one(dict(doc))
     await db.tasks.delete_one({"id": task_id})
+    await _cascade_resolve(task_id=task_id)
     return {"ok": True}
 
 
@@ -3597,6 +3610,9 @@ async def _generate_client_pdf_file(note_id, supplier_quote, source_label=""):
             "revision_number": supplier_quote.get("revision_number"),
             "duplicate_medidas": supplier_quote.get("duplicate_medidas")},
         "updated_at": now_iso()}})
+    # Centro de Operações (§22): um novo PDF pode já não ter os problemas de
+    # qualidade/alterações da versão anterior — verifica de imediato.
+    await _cascade_resolve(note_id=note_id)
     return pdf_bytes, filename, file_id
 
 
@@ -5223,6 +5239,9 @@ async def _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachm
             await log_activity(note_id, "status_change",
                                "Estado alterado para Orçamento recebido (resposta por email)",
                                {"to": "orcamento_recebido"})
+            # Centro de Operações (§22): sair de «Aguarda fornecedor» resolve
+            # de imediato as notificações waiting_supplier/deadline_approaching.
+            await _cascade_resolve(note_id=note_id)
         # PDF da BandAluminios em anexo → analisa e gera automaticamente o
         # PDF de venda ao cliente. Fica pronto para revisão — NUNCA é
         # enviado sem confirmação explícita do utilizador.
@@ -6514,26 +6533,252 @@ async def build_notifications():
     for t in tasks:
         dd = parse_dt(t.get("due_date"))
         if dd and now.date() > dd.date():
-            out.append({"id": f"task-{t['id']}", "note_id": t.get("note_id") or None, "kind": "reminder_overdue",
-                        "severity": "high", "title": "Lembrete em atraso", "message": t.get("title", ""),
-                        "days": (now.date() - dd.date()).days})
+            out.append({"id": f"task-{t['id']}", "note_id": t.get("note_id") or None, "task_id": t["id"],
+                        "kind": "reminder_overdue", "severity": "high", "title": "Lembrete em atraso",
+                        "message": t.get("title", ""), "days": (now.date() - dd.date()).days})
     sev = {"high": 0, "medium": 1, "low": 2}
     out.sort(key=lambda x: (sev.get(x["severity"], 3), -x.get("days", 0)))
     return out
+
+
+# ---- Centro de Operações: resolução automática, cascata, próxima ação ----
+#
+# Cada resolvedor devolve True quando a condição que gerou a notificação já
+# não se aplica (a situação está "resolvida"). Só entram aqui as categorias
+# com uma condição objetiva e barata de verificar — ver o plano para a
+# justificação categoria a categoria das que ficam de fora.
+
+async def _resolve_task_gone_or_done(doc):
+    if not doc.get("task_id"):
+        return False
+    task = await db.tasks.find_one({"id": doc["task_id"]}, {"_id": 0, "done": 1, "status": 1, "priority": 1})
+    if not task:
+        return True
+    if task.get("done") or task.get("status") in ("done", "archived"):
+        return True
+    return doc["category"] == "task_urgent" and task.get("priority") != "alta"
+
+
+def _make_status_left_resolver(closed_set):
+    async def _check(doc):
+        if not doc.get("note_id"):
+            return False
+        note = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0, "status": 1, "archived": 1})
+        return (not note) or note.get("archived") or note.get("status") not in closed_set
+    return _check
+
+
+async def _resolve_quote_quality_ok(doc):
+    if not doc.get("note_id"):
+        return False
+    note = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0, "archived": 1, "pending_client_send": 1})
+    if not note or note.get("archived"):
+        return True
+    pending = note.get("pending_client_send")
+    if not pending:
+        return True
+    return (pending.get("quality_report") or {}).get("status", "ok") == "ok"
+
+
+async def _resolve_quote_change_ack(doc):
+    if not doc.get("note_id"):
+        return False
+    note = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0, "archived": 1, "pending_client_send": 1})
+    if not note or note.get("archived"):
+        return True
+    pending = note.get("pending_client_send")
+    if not pending:
+        return True
+    diff = pending.get("diff_since_previous")
+    return not (diff and diff.get("has_changes"))
+
+
+async def _resolve_not_urgent(doc):
+    if not doc.get("note_id"):
+        return False
+    note = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0, "priority": 1, "archived": 1})
+    return (not note) or note.get("archived") or note.get("priority") != "urgente"
+
+
+async def _resolve_no_tasks_overdue(doc):
+    today_s = datetime.now(timezone.utc).date().isoformat()
+    n = await db.tasks.count_documents({
+        "suggested": {"$ne": True}, "status": {"$nin": ["done", "archived"]},
+        "due_date": {"$nin": ["", None], "$lt": today_s}})
+    return n <= 0
+
+
+AUTO_RESOLVE_RESOLVERS = {
+    "task_urgent": _resolve_task_gone_or_done,
+    "task_reminder": _resolve_task_gone_or_done,
+    "reminder_overdue": _resolve_task_gone_or_done,
+    "quote_quality_issue": _resolve_quote_quality_ok,
+    "quote_changed": _resolve_quote_change_ack,
+    "waiting_supplier": _make_status_left_resolver(WAITING_SUPPLIER),
+    "deadline_approaching": _make_status_left_resolver(WAITING_SUPPLIER),
+    "forgotten": _make_status_left_resolver(FORGOTTEN_STATUSES),
+    "urgent": _resolve_not_urgent,
+    "tasks_overdue_digest": _resolve_no_tasks_overdue,
+}
+
+
+async def _auto_resolve_scan():
+    """Rede de segurança periódica (chamada pelo _notification_scan_loop) —
+    percorre TODAS as notificações elegíveis. Para reação imediata a uma
+    mudança de estado conhecida, ver _cascade_resolve."""
+    cursor = db.notifications.find(
+        {"status": {"$nin": ["resolved", "archived"]},
+         "category": {"$in": list(AUTO_RESOLVE_RESOLVERS)}},
+        {"_id": 0, "id": 1, "category": 1, "note_id": 1, "task_id": 1})
+    resolved = 0
+    async for doc in cursor:
+        try:
+            if await AUTO_RESOLVE_RESOLVERS[doc["category"]](doc):
+                await notifications.resolve(db, doc["id"], by="auto")
+                resolved += 1
+        except Exception as e:
+            logger.warning(f"Resolução automática falhou ({doc['id']}): {e}")
+    return resolved
+
+
+async def _cascade_resolve(note_id=None, task_id=None):
+    """Resolução em cascata (§21/§22): corre os mesmos resolvedores só
+    sobre as notificações do MESMO grupo (note_id/task_id), chamado logo a
+    seguir a uma mudança de estado já conhecida (update_note,
+    _apply_matched_reply_effects, _apply_supplier_pdf, conclusão de
+    tarefa) — sem esperar pelo próximo ciclo do scan periódico."""
+    if not note_id and not task_id:
+        return 0
+    or_clauses = []
+    if note_id:
+        or_clauses.append({"note_id": note_id})
+    if task_id:
+        or_clauses.append({"task_id": task_id})
+    cursor = db.notifications.find(
+        {"status": {"$nin": ["resolved", "archived"]},
+         "category": {"$in": list(AUTO_RESOLVE_RESOLVERS)}, "$or": or_clauses},
+        {"_id": 0, "id": 1, "category": 1, "note_id": 1, "task_id": 1})
+    resolved = 0
+    async for doc in cursor:
+        try:
+            if await AUTO_RESOLVE_RESOLVERS[doc["category"]](doc):
+                await notifications.resolve(db, doc["id"], by="auto")
+                resolved += 1
+        except Exception as e:
+            logger.warning(f"Resolução em cascata falhou ({doc['id']}): {e}")
+    return resolved
+
+
+def _context_key(category, note=None, task=None):
+    """Contrato (documentado aqui e a respeitar em qualquer alteração
+    futura): determinístico — a mesma nota/tarefa no mesmo estado produz
+    sempre a mesma chave; só estados estáveis e já existentes (status,
+    presença/ausência de campos, comparações categóricas — nunca uma
+    contagem contínua); granularidade baixa de propósito — um punhado de
+    valores fixos por categoria, nunca note_id/task_id/timestamps/dias de
+    atraso embutidos na própria chave. Uma chave granular a mais fragmenta
+    as amostras de aprendizagem (notifications.record_action) e o limiar
+    mínimo de amostras nunca é atingido."""
+    if category in ("waiting_supplier", "deadline_approaching"):
+        if note and note.get("status") not in WAITING_SUPPLIER:
+            return "supplier_replied"
+        return "still_waiting"
+    if category in ("task_reminder", "task_urgent", "reminder_overdue"):
+        if task and task.get("due_date"):
+            today_s = datetime.now(timezone.utc).date().isoformat()
+            if task["due_date"] < today_s:
+                return "overdue"
+            if task["due_date"] == today_s:
+                return "due_today"
+        return "default"
+    if category == "forgotten":
+        return "still_stuck" if note and note.get("status") in FORGOTTEN_STATUSES else "moved"
+    return "default"
+
+
+def next_best_action(doc, note=None, task=None):
+    context_key = _context_key(doc["category"], note, task)
+    action_key = notifications.learned_action_for(doc["category"], context_key)
+    action = notifications.DEFAULT_ACTION_BY_CATEGORY.get(doc["category"], {"type": "open", "label": "Abrir"})
+    if action_key and action_key != action.get("type"):
+        action = {**action, "type": action_key, "label": notifications.ACTION_LABELS.get(action_key, action["label"])}
+    url = doc.get("url") or (f"/?open={doc['note_id']}" if doc.get("note_id")
+                              else "/tarefas" if doc.get("task_id") else "/")
+    return {**action, "url": url}
+
+
+async def _record_notification_action(doc, action):
+    """Regista, para efeitos de aprendizagem (§25), qual ação o operador
+    usou para avançar/fechar esta notificação — chamado a partir dos
+    endpoints de estado, com o contexto lido no momento da ação."""
+    note = None
+    if doc.get("note_id"):
+        raw = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0})
+        note = enrich_note(raw) if raw else None
+    task = await db.tasks.find_one({"id": doc["task_id"]}, {"_id": 0}) if doc.get("task_id") else None
+    context_key = _context_key(doc["category"], note, task)
+    await notifications.record_action(db, doc["category"], context_key, action)
 
 
 class MarkNotificationsReadIn(BaseModel):
     ids: List[str] = []
 
 
+class BulkNotificationIdsIn(BaseModel):
+    ids: List[str] = []
+
+
+class SnoozeNotificationIn(BaseModel):
+    until: str
+
+
+class BulkSnoozeNotificationsIn(BaseModel):
+    ids: List[str] = []
+    until: str
+
+
+class PinNotificationIn(BaseModel):
+    pinned: bool = True
+
+
+class BulkPinNotificationsIn(BaseModel):
+    ids: List[str] = []
+    pinned: bool = True
+
+
+async def _enrich_notification_items(items):
+    """Acrescenta, sem persistir, computed_priority/impact_score/group_id/
+    next_best_action a cada item — reaproveitando enrich_note em lote para
+    não repetir a busca de notas por item (§2, §3, §23, §24)."""
+    note_ids = list({i["note_id"] for i in items if i.get("note_id")})
+    task_ids = list({i["task_id"] for i in items if i.get("task_id")})
+    notes_by_id, tasks_by_id = {}, {}
+    if note_ids:
+        async for n in db.notes.find({"id": {"$in": note_ids}}, {"_id": 0}):
+            notes_by_id[n["id"]] = enrich_note(n)
+    if task_ids:
+        async for t in db.tasks.find({"id": {"$in": task_ids}}, {"_id": 0}):
+            tasks_by_id[t["id"]] = t
+    now = datetime.now(timezone.utc)
+    for i in items:
+        note = notes_by_id.get(i.get("note_id"))
+        task = tasks_by_id.get(i.get("task_id"))
+        i["impact_score"] = notifications.compute_impact_score(i, note, task, now)
+        i["computed_priority"] = notifications.priority_from_score(i["impact_score"])
+        i["group_id"] = i.get("note_id") or i.get("task_id") or None
+        i["next_best_action"] = next_best_action(i, note, task)
+    return items
+
+
 @api_router.get("/notifications")
 async def list_notifications(status: str = "", category: str = "", priority: str = "",
-                              q: str = "", before: str = "", limit: int = 30):
-    """Centro de Notificações — lista persistente (db.notifications), com
-    filtros/paginação/pesquisa. Substitui a lista efémera anterior
-    (build_notifications() continua a existir como DETETOR de condições
-    de estado, agora usado só para alimentar create_notification — ver
-    _sync_alert_notifications)."""
+                              q: str = "", before: str = "", limit: int = 30,
+                              pinned_only: bool = False, sort: str = ""):
+    """Centro de Operações — lista persistente (db.notifications), com
+    filtros/paginação/pesquisa/agrupamento/prioridade dinâmica. Substitui a
+    lista efémera anterior (build_notifications() continua a existir como
+    DETETOR de condições de estado, agora usado só para alimentar
+    create_notification — ver _sync_alert_notifications)."""
     query = {}
     if status:
         query["status"] = status
@@ -6541,12 +6786,113 @@ async def list_notifications(status: str = "", category: str = "", priority: str
         query["category"] = category
     if priority:
         query["priority"] = priority
+    if pinned_only:
+        query["pinned"] = True
     if before:
         query["created_at"] = {"$lt": before}
     if q:
         query["$text"] = {"$search": q}
-    items = await db.notifications.find(query, {"_id": 0}).sort("created_at", -1).to_list(min(max(limit, 1), 100))
+    items = await db.notifications.find(query, {"_id": 0}).sort(
+        [("pinned", -1), ("created_at", -1)]).to_list(min(max(limit, 1), 100))
+    await _enrich_notification_items(items)
+    if sort == "impact":
+        items.sort(key=lambda i: (not i.get("pinned"), -i["impact_score"]))
     return {"items": items, "count": len(items)}
+
+
+@api_router.get("/notifications/summary")
+async def notifications_summary():
+    """Resumo do dia (§12) — contagens agregadas para a barra no topo do
+    painel. A prioridade agregada usa a base guardada, não a dinâmica
+    (computed_priority/impact_score só existem calculadas por item, caro
+    de agregar sobre toda a coleção só para um resumo)."""
+    today_start = datetime.now(timezone.utc).date().isoformat()
+    pipeline = [{"$facet": {
+        "by_status": [{"$group": {"_id": "$status", "n": {"$sum": 1}}}],
+        "by_priority_active": [
+            {"$match": {"status": {"$nin": ["resolved", "archived"]}}},
+            {"$group": {"_id": "$priority", "n": {"$sum": 1}}}],
+        "pinned": [{"$match": {"pinned": True, "status": {"$ne": "archived"}}}, {"$count": "n"}],
+        "created_today": [{"$match": {"created_at": {"$gte": today_start}}}, {"$count": "n"}],
+        "resolved_today": [{"$match": {"resolved_at": {"$gte": today_start}}}, {"$count": "n"}],
+    }}]
+    result = (await db.notifications.aggregate(pipeline).to_list(1))[0]
+    return {
+        "by_status": {d["_id"]: d["n"] for d in result["by_status"]},
+        "by_priority": {d["_id"]: d["n"] for d in result["by_priority_active"]},
+        "pinned_count": (result["pinned"][0]["n"] if result["pinned"] else 0),
+        "created_today": (result["created_today"][0]["n"] if result["created_today"] else 0),
+        "resolved_today": (result["resolved_today"][0]["n"] if result["resolved_today"] else 0),
+    }
+
+
+@api_router.get("/notifications/{notification_id}/context")
+async def notification_context(notification_id: str):
+    """Contexto completo (§6), relações navegáveis (§10, incluindo
+    notificações relacionadas do mesmo grupo — §21) e timeline (§9) de uma
+    notificação, num só pedido — reaproveita enrich_note/_bricoaval_summary
+    já existentes, sem duplicar a query pesada de note_communication."""
+    doc = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Notificação não encontrada")
+    note = task = supplier_name = assignee_name = last_email = last_pdf = bricoaval = None
+    relations, related_notifications = [], []
+    if doc.get("note_id"):
+        raw = await db.notes.find_one({"id": doc["note_id"]}, {"_id": 0})
+        if raw:
+            note = enrich_note(raw)
+            relations.append({"type": "note", "id": note["id"], "label": note.get("customer_name") or "Pedido",
+                               "url": f"/?open={note['id']}"})
+            if note.get("supplier_id"):
+                sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "id": 1, "name": 1})
+                if sup:
+                    supplier_name = sup["name"]
+                    relations.append({"type": "supplier", "id": sup["id"], "label": sup["name"],
+                                       "url": f"/fornecedores/{sup['id']}"})
+            if note.get("bricoaval_number"):
+                bricoaval = await _bricoaval_summary(note)
+                relations.append({"type": "bricoaval", "id": note["bricoaval_number"],
+                                   "label": note["bricoaval_number"], "url": f"/?open={note['id']}"})
+            last_sent = await db.sent_emails.find_one({"note_id": note["id"]}, {"_id": 0}, sort=[("sent_at", -1)])
+            last_recv = await db.received_emails.find_one({"note_id": note["id"]}, {"_id": 0}, sort=[("received_at", -1)])
+            candidates = [e for e in (last_sent, last_recv) if e]
+            if candidates:
+                last_email = max(candidates, key=lambda e: e.get("sent_at") or e.get("received_at") or "")
+                relations.append({"type": "email", "id": last_email.get("id"),
+                                   "label": last_email.get("subject") or "(sem assunto)", "url": "/emails"})
+            for e in sorted(candidates, key=lambda e: e.get("sent_at") or e.get("received_at") or "", reverse=True):
+                pdfs = [a for a in (e.get("attachments") or []) if (a.get("filename") or "").lower().endswith(".pdf")]
+                if pdfs:
+                    last_pdf = {"filename": pdfs[-1]["filename"], "at": e.get("sent_at") or e.get("received_at")}
+                    break
+    if doc.get("task_id"):
+        task = await db.tasks.find_one({"id": doc["task_id"]}, {"_id": 0})
+        if task:
+            relations.append({"type": "task", "id": task["id"], "label": task.get("title") or "Tarefa", "url": "/tarefas"})
+            if task.get("assignee_id"):
+                collab = await db.collaborators.find_one({"id": task["assignee_id"]}, {"_id": 0, "name": 1})
+                assignee_name = (collab or {}).get("name")
+    group_or = []
+    if doc.get("note_id"):
+        group_or.append({"note_id": doc["note_id"]})
+    if doc.get("task_id"):
+        group_or.append({"task_id": doc["task_id"]})
+    if group_or:
+        async for rel in db.notifications.find(
+                {"id": {"$ne": notification_id}, "$or": group_or},
+                {"_id": 0, "id": 1, "category": 1, "title": 1, "status": 1}).to_list(20):
+            related_notifications.append(rel)
+    logs = await db.notification_logs.find(
+        {"notification_id": notification_id}, {"_id": 0}).sort("at", 1).to_list(200)
+    now = datetime.now(timezone.utc)
+    return {
+        "notification": doc, "note": note, "task": task,
+        "supplier_name": supplier_name, "assignee_name": assignee_name,
+        "last_email": last_email, "last_pdf": last_pdf, "bricoaval": bricoaval,
+        "relations": relations, "related_notifications": related_notifications, "timeline": logs,
+        "impact_score": notifications.compute_impact_score(doc, note, task, now),
+        "next_best_action": next_best_action(doc, note, task),
+    }
 
 
 @api_router.get("/notifications/stream")
@@ -6584,17 +6930,85 @@ async def notifications_unread_count():
 
 @api_router.post("/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str):
-    return {"ok": await notifications.mark_read(db, notification_id)}
+    doc = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    ok = await notifications.mark_seen(db, notification_id)
+    if ok and doc:
+        await _record_notification_action(doc, "open")
+    return {"ok": ok}
 
 
 @api_router.post("/notifications/mark-read")
 async def mark_notifications_read(payload: MarkNotificationsReadIn):
-    return {"ok": True, "count": await notifications.mark_read_bulk(db, payload.ids)}
+    return {"ok": True, "count": await notifications.mark_seen_bulk(db, payload.ids)}
+
+
+@api_router.post("/notifications/{notification_id}/track")
+async def track_notification_endpoint(notification_id: str):
+    doc = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    ok = await notifications.track(db, notification_id)
+    if ok and doc:
+        await _record_notification_action(doc, "track")
+    return {"ok": ok}
+
+
+@api_router.post("/notifications/{notification_id}/untrack")
+async def untrack_notification_endpoint(notification_id: str):
+    return {"ok": await notifications.untrack(db, notification_id)}
+
+
+@api_router.post("/notifications/{notification_id}/snooze")
+async def snooze_notification_endpoint(notification_id: str, payload: SnoozeNotificationIn):
+    return {"ok": await notifications.snooze(db, notification_id, payload.until)}
+
+
+@api_router.post("/notifications/{notification_id}/unsnooze")
+async def unsnooze_notification_endpoint(notification_id: str):
+    return {"ok": await notifications.unsnooze(db, notification_id)}
+
+
+@api_router.post("/notifications/{notification_id}/resolve")
+async def resolve_notification_endpoint(notification_id: str):
+    doc = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    ok = await notifications.resolve(db, notification_id, by="manual")
+    if ok and doc:
+        await _record_notification_action(doc, "resolve")
+        await _cascade_resolve(note_id=doc.get("note_id"), task_id=doc.get("task_id"))
+    return {"ok": ok}
+
+
+@api_router.post("/notifications/{notification_id}/pin")
+async def pin_notification_endpoint(notification_id: str, payload: PinNotificationIn):
+    return {"ok": await notifications.pin(db, notification_id, payload.pinned)}
 
 
 @api_router.post("/notifications/{notification_id}/archive")
 async def archive_notification_endpoint(notification_id: str):
-    return {"ok": await notifications.archive(db, notification_id)}
+    doc = await db.notifications.find_one({"id": notification_id}, {"_id": 0})
+    ok = await notifications.archive(db, notification_id)
+    if ok and doc:
+        await _record_notification_action(doc, "archive")
+    return {"ok": ok}
+
+
+@api_router.post("/notifications/bulk/archive")
+async def bulk_archive_notifications(payload: BulkNotificationIdsIn):
+    return {"ok": True, "count": await notifications.archive_bulk(db, payload.ids)}
+
+
+@api_router.post("/notifications/bulk/resolve")
+async def bulk_resolve_notifications(payload: BulkNotificationIdsIn):
+    count = await notifications.resolve_bulk(db, payload.ids, by="manual")
+    return {"ok": True, "count": count}
+
+
+@api_router.post("/notifications/bulk/pin")
+async def bulk_pin_notifications(payload: BulkPinNotificationsIn):
+    return {"ok": True, "count": await notifications.pin_bulk(db, payload.ids, payload.pinned)}
+
+
+@api_router.post("/notifications/bulk/snooze")
+async def bulk_snooze_notifications(payload: BulkSnoozeNotificationsIn):
+    return {"ok": True, "count": await notifications.snooze_bulk(db, payload.ids, payload.until)}
 
 
 @api_router.get("/notifications/{notification_id}/logs")
@@ -7277,6 +7691,34 @@ async def migrate():
         {"archived": {"$exists": False}}, {"$set": {"archived": False}})
     await db.received_emails.update_many(
         {"labels": {"$exists": False}}, {"$set": {"labels": []}})
+    await _migrate_notifications()
+
+
+async def _migrate_notifications():
+    """Centro de Operações — remapeamento de estados (unread/read passam a
+    new/seen; archived inalterado) e preenchimento dos campos novos do doc
+    de notificação. Idempotente: cada update_many só afeta o que ainda não
+    tem o valor/campo novo, sem marcador em db.migrations."""
+    await db.notifications.update_many({"status": "unread"}, {"$set": {"status": "new"}})
+    await db.notifications.update_many({"status": "read"}, {"$set": {"status": "seen"}})
+    defaults = {"occurrence_count": 1, "pinned": False, "snoozed_until": None,
+                "expires_at": None, "resolved_at": None, "resolved_by": None,
+                "email_id": None, "supplier_id": None}
+    for k, v in defaults.items():
+        await db.notifications.update_many({k: {"$exists": False}}, {"$set": {k: v}})
+    try:
+        await db.notifications.update_many(
+            {"updated_at": {"$exists": False}}, [{"$set": {"updated_at": "$created_at"}}])
+    except Exception:
+        pass
+    for category, reason in notifications.CATEGORY_REASON.items():
+        await db.notifications.update_many(
+            {"category": category, "reason": {"$exists": False}}, {"$set": {"reason": reason}})
+    try:
+        await db.notifications.update_many(
+            {"reason": {"$exists": False}}, [{"$set": {"reason": "$body"}}])
+    except Exception:
+        pass
 
 
 async def _normalize_existing_phones():
@@ -7422,7 +7864,11 @@ async def ensure_indexes():
                         ("notifications", "status"), ("notifications", "priority"),
                         ("notifications", "category"), ("notifications", "created_at"),
                         ("notifications", "has_pending_delivery"), ("notifications", "deliveries.ack_token"),
-                        ("notification_logs", "notification_id"), ("system_health", "name")]:
+                        ("notifications", "pinned"), ("notifications", "snoozed_until"),
+                        ("notifications", "expires_at"), ("notifications", "note_id"),
+                        ("notifications", "task_id"), ("notifications", "resolved_at"),
+                        ("notification_logs", "notification_id"),
+                        ("notification_action_stats", "category"), ("system_health", "name")]:
         try:
             await db[coll].create_index(field)
         except Exception:
@@ -7694,6 +8140,22 @@ async def _notification_scan_loop():
             await _check_task_reminders()
         except Exception as e:
             logger.error(f"Lembretes de tarefas falharam: {e}")
+        try:
+            await notifications.wake_snoozed(db)
+        except Exception as e:
+            logger.error(f"Reativação de notificações adiadas falhou: {e}")
+        try:
+            await notifications.sweep_expired(db)
+        except Exception as e:
+            logger.error(f"Expiração automática de notificações falhou: {e}")
+        try:
+            await _auto_resolve_scan()
+        except Exception as e:
+            logger.error(f"Resolução automática de notificações falhou: {e}")
+        try:
+            await notifications.refresh_learned_actions(db)
+        except Exception as e:
+            logger.error(f"Atualização das ações aprendidas falhou: {e}")
         await _heartbeat("notification_scan")
         await asyncio.sleep(max(NOTIFICATION_SCAN_MINUTES, 1) * 60)
 
