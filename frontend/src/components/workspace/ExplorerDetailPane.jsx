@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
 import { formatDateTime, timeAgo, getStatusCfg } from "@/lib/pedido";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import { previewKind } from "@/components/AttachmentPreviewDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ function FornecedorDetailSection({ item, onNavigate }) {
   return (
     <div className="space-y-3">
       <Field label="Email" value={s.email} />
-      <Field label="Telefone" value={s.phone} />
+      <Field label="Telefone" value={formatPhoneDisplay(s.phone)} />
       <Field label="Notas" value={s.notes} />
     </div>
   );
@@ -108,7 +109,7 @@ function ClienteDetailSection({ item }) {
   const c = item.data;
   return (
     <div className="space-y-3">
-      <Field label="Telefone" value={c.phone} />
+      <Field label="Telefone" value={formatPhoneDisplay(c.phone)} />
       <Field label="Email" value={c.email} />
       <Field label="Pedidos" value={`${c.pedidos_count} (${c.active_count} ativo${c.active_count === 1 ? "" : "s"})`} />
     </div>

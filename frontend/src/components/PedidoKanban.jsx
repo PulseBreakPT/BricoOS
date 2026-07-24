@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { MoreVertical, Phone, AlertTriangle } from "lucide-react";
 import { STATUS_ORDER, getStatusCfg, getPriorityCfg, timeAgo } from "@/lib/pedido";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
@@ -76,7 +77,7 @@ function KanbanCard({ note, onOpen, onMove, moving }) {
             onClick={(e) => e.stopPropagation()}
             className="mt-1.5 flex w-fit items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground hover:underline"
           >
-            <Phone className="h-3 w-3" /> {note.phone}
+            <Phone className="h-3 w-3" /> {formatPhoneDisplay(note.phone)}
           </a>
         ) : null}
     </div>

@@ -40,6 +40,7 @@ import ConfirmSendDialog from "@/components/ConfirmSendDialog";
 import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPreviewDialog";
 import EntityStackBar from "@/components/EntityStackBar";
 import PhoneInput from "@/components/PhoneInput";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
@@ -896,7 +897,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
             ) : <p className="text-xs text-red-400">Sem email definido</p>}
             {s.phone ? (
               <a href={`tel:${s.phone}`} className="flex items-center gap-2 font-mono text-xs text-foreground hover:underline">
-                <PhoneCall className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {s.phone}
+                <PhoneCall className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {formatPhoneDisplay(s.phone)}
               </a>
             ) : null}
           </div>
@@ -906,7 +907,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {s.contacts.filter((c) => c.name || c.phone || c.email).map((c, i) => (
                 <div key={i} className="rounded-xl border border-border bg-card p-2.5 text-xs">
                   {c.name ? <span className="font-bold text-foreground">{c.name}</span> : null}
-                  {c.phone ? <span className="ml-2 font-mono text-muted-foreground">{c.phone}</span> : null}
+                  {c.phone ? <span className="ml-2 font-mono text-muted-foreground">{formatPhoneDisplay(c.phone)}</span> : null}
                   {c.email ? <span className="ml-2 font-mono text-muted-foreground">{c.email}</span> : null}
                 </div>
               ))}
@@ -1050,7 +1051,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     ? "Escolhe o tipo de pedido"
                     : `Passo ${createStep + 1} de ${createSteps.length} — ${createSteps[createStep]}`)
                   : (form.phone
-                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-foreground hover:underline">{form.phone}</a>
+                    ? <a href={`tel:${form.phone}`} title="Ligar ao cliente" className="font-mono hover:text-foreground hover:underline">{formatPhoneDisplay(form.phone)}</a>
                     : "Sem telefone")}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
                 {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
@@ -1246,7 +1247,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {createMode === "normal" && createStep === 2 ? (
                   <>
                     <div className="rounded-xl border border-border bg-muted/60 p-3 text-xs text-muted-foreground">
-                      <p><span className="font-bold text-foreground">{form.customer_name || "Sem nome"}</span>{form.phone ? ` · ${form.phone}` : ""}</p>
+                      <p><span className="font-bold text-foreground">{form.customer_name || "Sem nome"}</span>{form.phone ? ` · ${formatPhoneDisplay(form.phone)}` : ""}</p>
                       <p className="mt-0.5">{form.description}{form.quantity ? ` — ${form.quantity}` : ""}</p>
                     </div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1359,7 +1360,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                   </div>
                 ) : (
-                  <ViewField label="Telefone" value={form.phone} mono link={form.phone ? `tel:${form.phone}` : null} />
+                  <ViewField label="Telefone" value={formatPhoneDisplay(form.phone)} mono link={form.phone ? `tel:${form.phone}` : null} />
                 )}
               </div>
               {editMode ? (

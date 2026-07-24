@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { Trash2, AlertTriangle, Building2 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog, normalizeCaixilhariaSpec,
   validateCaixilhariaSpec,
@@ -112,7 +113,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
                   <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 text-xs text-muted-foreground">
                     <p className="font-bold text-foreground">{catalog.supplier.name}</p>
-                    <p className="truncate">{catalog.supplier.email} · {catalog.supplier.phone}</p>
+                    <p className="truncate">{catalog.supplier.email} · {formatPhoneDisplay(catalog.supplier.phone)}</p>
                   </div>
                 </div>
                 {note?.supplier_id && bandSupplier && note.supplier_id === bandSupplier.id ? (

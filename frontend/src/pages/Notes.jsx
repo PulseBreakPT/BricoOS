@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import api, { getErrorMessage } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
 import { CATEGORY_LIST, getCategory } from "@/lib/categories";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import {
   PRIORITY_ORDER, PRIORITY_CONFIG, getStatusCfg, getPriorityCfg,
   getNextActionCta, getNextActionMode,
@@ -923,7 +924,7 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           {note.is_overdue ? <span className="rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]">Parado há {note.waiting_days}d</span> : null}
         </div>
         <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
-        {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-muted-foreground hover:text-foreground hover:underline">{note.phone}</a> : null}
+        {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-muted-foreground hover:text-foreground hover:underline">{formatPhoneDisplay(note.phone)}</a> : null}
         <p className="mt-3 text-base text-foreground">{note.description}</p>
         {note.measurements ? <p className="mt-1 font-mono text-sm text-muted-foreground">Medidas: {note.measurements}</p> : null}
 

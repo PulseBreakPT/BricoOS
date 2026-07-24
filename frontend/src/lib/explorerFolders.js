@@ -3,6 +3,7 @@ import {
   StickyNote, Calendar, Package, Archive, Trash2, Inbox, RefreshCw, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import api from "@/lib/api";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 
 async function fetchNotes(params) {
   const { data } = await api.get("/notes", { params });
@@ -39,7 +40,7 @@ export const ROOT_FOLDERS = [
       const { data } = await api.get("/explorer/clients");
       return (data.items || []).map((c) => ({
         kind: "cliente", id: c.key, label: c.name,
-        sublabel: `${c.pedidos_count} pedido${c.pedidos_count === 1 ? "" : "s"}${c.phone ? ` · ${c.phone}` : ""}`,
+        sublabel: `${c.pedidos_count} pedido${c.pedidos_count === 1 ? "" : "s"}${c.phone ? ` · ${formatPhoneDisplay(c.phone)}` : ""}`,
         data: c,
       }));
     },
@@ -49,7 +50,7 @@ export const ROOT_FOLDERS = [
     fetch: async () => {
       const { data } = await api.get("/suppliers");
       return (data || []).map((s) => ({
-        kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || s.phone || "", data: s,
+        kind: "fornecedor", id: s.id, label: s.name, sublabel: s.email || formatPhoneDisplay(s.phone) || "", data: s,
       }));
     },
   },

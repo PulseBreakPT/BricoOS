@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/empty";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import PhoneInput from "@/components/PhoneInput";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import LabelEditor from "@/components/LabelEditor";
 import AttachmentManager from "@/components/AttachmentManager";
 import KnowledgeArticlePicker from "@/components/KnowledgeArticlePicker";
@@ -247,7 +248,7 @@ export default function Suppliers() {
                 {s.phone ? (
                   <p className="flex items-center justify-between gap-2 text-muted-foreground">
                     <span className="flex min-w-0 items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate font-mono text-xs">{s.phone}</span>
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate font-mono text-xs">{formatPhoneDisplay(s.phone)}</span>
                     </span>
                     <PhoneActions phone={s.phone} />
                   </p>
@@ -258,7 +259,7 @@ export default function Suppliers() {
                       <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate text-xs">
                         {c.name ? <span className="font-semibold">{c.name}</span> : null}{c.name && (c.phone || c.email) ? " · " : ""}
-                        {c.phone ? <span className="font-mono">{c.phone}</span> : null}
+                        {c.phone ? <span className="font-mono">{formatPhoneDisplay(c.phone)}</span> : null}
                         {c.phone && c.email ? " · " : ""}
                         {c.email ? <span className="font-mono">{c.email}</span> : null}
                       </span>

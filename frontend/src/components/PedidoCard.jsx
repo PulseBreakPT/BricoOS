@@ -7,6 +7,7 @@ import {
 import {
   formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg, timeAgo,
 } from "@/lib/pedido";
+import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -92,7 +93,7 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
             </div>
             {note.phone ? (
               <a href={`tel:${note.phone}`} onClick={(e) => e.stopPropagation()} title="Ligar ao cliente" className="mt-0.5 flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground hover:underline">
-                <Phone className="h-3 w-3" /> {note.phone}
+                <Phone className="h-3 w-3" /> {formatPhoneDisplay(note.phone)}
               </a>
             ) : null}
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-medium text-muted-foreground">
