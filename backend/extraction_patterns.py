@@ -25,6 +25,16 @@ _ASSOC_DOC_RE = re.compile(
     re.IGNORECASE)
 _REF_CODE_RE = re.compile(
     r"\b(?:ref(?:er[eê]ncia)?\.?)\s*[:#]\s*([\w./\-]{3,20})\b", re.IGNORECASE)
+# Datas em texto corrido, fora de qualquer "facto" já coberto (prazos/MEA/
+# folheto continuam a ser extraídos à parte, em correio_semanal.py) — só
+# para dar destaque visual a qualquer menção de data dentro do corpo de uma
+# secção (Centro de Conhecimento). Sem grupo de captura: o findall devolve
+# a menção completa, tal como aparece no texto.
+_DATE_RE = re.compile(
+    r"\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|"
+    r"agosto|setembro|outubro|novembro|dezembro)(?:\s+de\s+\d{4})?\b"
+    r"|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+    re.IGNORECASE)
 
 
 def _dedup(items):
@@ -78,4 +88,7 @@ def extract_facts(text):
     referencias = _dedup(_REF_CODE_RE.findall(text))
     if referencias:
         out["referencias"] = referencias
+    datas = _dedup(_DATE_RE.findall(text))
+    if datas:
+        out["datas"] = datas
     return out

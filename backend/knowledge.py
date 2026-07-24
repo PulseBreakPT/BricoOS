@@ -30,7 +30,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
 # mão sempre que o motor mudar de forma que valha a pena reprocessar
 # edições antigas (não há deteção automática — é uma decisão humana ao
 # editar este ficheiro, como as outras migrações desta sessão).
-ENGINE_VERSION = "2026.07.24"
+ENGINE_VERSION = "2026.07.24-legibilidade"
 
 
 def _now_iso():
@@ -96,6 +96,83 @@ def group_sections_by_bucket(sections, deadlines_calendar, attachment_count):
     if attachment_count:
         result.append({"key": "anexos", **BUCKET_META["anexos"], "count": attachment_count})
     return result
+
+
+def _exec_item_text(key, n):
+    """Frase de um item do Resumo Executivo para um bucket com `n`
+    elementos — só chamada para buckets não vazios (n > 0), nunca inventa
+    um número que não esteja já contado noutro sítio (`important_count`,
+    `action_count`, `attachment_count`, ou a própria contagem do bucket)."""
+    if key == "campanhas":
+        return f"{n} {'tema' if n == 1 else 'temas'} de campanhas e promoções"
+    if key == "precos":
+        return f"{n} {'alteração' if n == 1 else 'alterações'} de preços e margens"
+    if key == "produtos":
+        return f"{n} {'produto ou gama nova' if n == 1 else 'produtos e gamas novas'}"
+    if key == "procedimentos":
+        return f"{n} {'procedimento' if n == 1 else 'procedimentos'} da loja"
+    if key == "acoes":
+        return f"{n} {'ação obrigatória' if n == 1 else 'ações obrigatórias'}"
+    if key == "datas":
+        return f"{n} {'data importante' if n == 1 else 'datas importantes'}"
+    if key == "anexos":
+        return f"{n} {'documento anexado' if n == 1 else 'documentos anexados'}"
+    return None
+
+
+def _exec_period_text(article):
+    calendar = article.get("deadlines_calendar") or []
+    dates = [d.get("date") for d in calendar if d.get("date")]
+    if len(dates) >= 2:
+        return f"Período com prazos entre {dates[0]} e {dates[-1]}"
+    if dates:
+        return f"Prazos a partir de {dates[0]}"
+    if article.get("week_label"):
+        return f"Edição {article['week_label']}"
+    if article.get("issue_date"):
+        return f"Edição de {article['issue_date']}"
+    return None
+
+
+def build_executive_summary(article):
+    """Até 5 frases geradas a partir de campos já guardados no artigo —
+    nunca IA, nunca inventa números (só conta o que já está calculado).
+    Um item por bucket não vazio (mesma ordem/chaves de
+    `group_sections_by_bucket`), com `bucket_key` para o frontend poder
+    fazer scroll até essa secção ao tocar no item (Resumo Executivo
+    clicável); quando sobra espaço, completa com um item de período e um
+    de novidades desde a edição anterior — esses dois sem `bucket_key`
+    (não correspondem a nenhuma secção específica). Calculado a pedido, a
+    partir do artigo já carregado — não depende de reprocessamento."""
+    grouped = group_sections_by_bucket(
+        article.get("sections") or [], article.get("deadlines_calendar") or [],
+        article.get("attachment_count") or 0)
+    items = []
+    for bucket in grouped:
+        if len(items) >= 5:
+            break
+        key = bucket["key"]
+        if key == "anexos":
+            count = bucket.get("count") or 0
+        elif key == "datas":
+            count = sum(len(d.get("items") or []) for d in bucket.get("items") or [])
+        else:
+            count = len(bucket.get("items") or [])
+        if not count:
+            continue
+        items.append({"text": _exec_item_text(key, count), "bucket_key": key})
+
+    if len(items) < 5:
+        period = _exec_period_text(article)
+        if period:
+            items.append({"text": period, "bucket_key": None})
+    if len(items) < 5:
+        added = (article.get("diff_since_previous") or {}).get("added_sections") or []
+        if added:
+            n = len(added)
+            noun = "novidade" if n == 1 else "novidades"
+            items.append({"text": f"{n} {noun} desde a edição anterior", "bucket_key": None})
+    return items[:5]
 
 
 def _top_highlights(sections, limit=3):

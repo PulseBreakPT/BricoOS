@@ -2626,6 +2626,7 @@ async def get_knowledge_article(article_id: str):
         "implementation": implementation, "linked_tasks": linked_tasks,
         "related_notes": related_notes, "related_suppliers": related_suppliers,
         "history": history, "current_engine_version": knowledge.ENGINE_VERSION,
+        "executive_summary": knowledge.build_executive_summary(article),
     }
 
 
