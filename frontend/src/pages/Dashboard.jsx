@@ -466,6 +466,49 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Artigos ao todo</span>
+                  <span className="font-mono text-xs font-bold tabular-nums text-foreground">
+                    {knowledgeStats?.total_articles ?? "–"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="knowledge-widget-unprocessed"
+                  onClick={() => navigate("/conhecimento?filtro=atencao")}
+                  className="flex w-full items-center justify-between text-left disabled:cursor-default"
+                  disabled={!knowledgeStats?.unprocessed_count}
+                >
+                  <span className="text-muted-foreground">Por processar</span>
+                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.unprocessed_count ? "text-amber-600 underline" : "text-foreground"}`}>
+                    {knowledgeStats?.unprocessed_count ?? "–"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="knowledge-widget-outdated"
+                  onClick={() => navigate("/conhecimento?filtro=atencao")}
+                  className="flex w-full items-center justify-between text-left disabled:cursor-default"
+                  disabled={!knowledgeStats?.outdated_count}
+                >
+                  <span className="text-muted-foreground">Desatualizados</span>
+                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.outdated_count ? "text-amber-600 underline" : "text-foreground"}`}>
+                    {knowledgeStats?.outdated_count ?? "–"}
+                  </span>
+                </button>
+                {knowledgeStats?.error_count ? (
+                  <button
+                    type="button"
+                    data-testid="knowledge-widget-errors"
+                    onClick={() => navigate("/conhecimento?filtro=atencao")}
+                    className="flex w-full items-center justify-between text-left"
+                  >
+                    <span className="text-muted-foreground">Com erro</span>
+                    <span className="font-mono text-xs font-bold tabular-nums text-red-600 underline">
+                      {knowledgeStats.error_count}
+                    </span>
+                  </button>
+                ) : null}
+                <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Ações pendentes</span>
                   <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.pending_actions_count ? "text-red-600" : "text-foreground"}`}>
                     {knowledgeStats?.pending_actions_count ?? "–"}
@@ -474,6 +517,7 @@ export default function Dashboard() {
               </div>
               <p className="mt-3 text-[10px] font-semibold text-muted-foreground">
                 {knowledgeStats?.updated_at ? `Atualizado ${timeAgo(knowledgeStats.updated_at)}` : ""}
+                {knowledgeStats?.engine_version ? ` · motor ${knowledgeStats.engine_version}` : ""}
               </p>
             </div>
           ),

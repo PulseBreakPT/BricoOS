@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   ChevronDown, Pin, PinOff, Archive, ArchiveRestore, Share2, Printer, Plus,
-  ClipboardList, Mail, Truck, Clock3, Sparkles, History as HistoryIcon,
+  ClipboardList, Mail, Truck, Clock3, Sparkles, History as HistoryIcon, Cpu,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import LabelEditor from "@/components/LabelEditor";
@@ -23,6 +23,18 @@ const HISTORY_ICON = {
 
 const IMPLEMENTATION_ICON = { nao_iniciada: "⬜", em_curso: "🟡", concluida: "🟢" };
 const IMPLEMENTATION_LABEL = { nao_iniciada: "Não iniciada", em_curso: "Em curso", concluida: "Concluída" };
+
+const ENGINE_STATUS_META = {
+  processado: { icon: "🟢", label: "Processado com o motor mais recente" },
+  desatualizado: { icon: "🟡", label: "Motor mais recente disponível" },
+  erro: { icon: "🔴", label: "Última tentativa falhou" },
+};
+
+function engineStatus(article) {
+  if (article.last_error) return "erro";
+  if ((article.engine_version || "") !== (article.current_engine_version || article.engine_version || "")) return "desatualizado";
+  return "processado";
+}
 
 function formatDateTime(iso) {
   if (!iso) return "";
@@ -303,6 +315,24 @@ export default function KnowledgeArticleDialog({ articleId, onOpenChange, onChan
                 </div>
               </div>
             ) : null}
+
+            <Collapsible className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2">
+              <CollapsibleTrigger asChild>
+                <button type="button" data-testid="knowledge-engine-audit-trigger" className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold text-muted-foreground">
+                  <Cpu className="h-3 w-3 shrink-0" />
+                  Processado com o motor {article.engine_version || "–"}
+                  <ChevronDown className="ml-auto h-3 w-3 shrink-0" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
+                <p>
+                  {ENGINE_STATUS_META[engineStatus(article)].icon} {ENGINE_STATUS_META[engineStatus(article)].label}
+                </p>
+                {article.last_processed_at ? <p>Último processamento: {formatDateTime(article.last_processed_at)}</p> : null}
+                <p>Reprocessado {article.reprocess_count || 0}×</p>
+                {article.last_error ? <p className="text-[color:var(--pastel-red-text)]">Último erro: {article.last_error}</p> : null}
+              </CollapsibleContent>
+            </Collapsible>
 
             <div className="space-y-1.5">
               <p className="text-xs font-bold text-muted-foreground">Etiquetas</p>

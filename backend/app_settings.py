@@ -24,7 +24,7 @@ SETTINGS_DEFAULTS = {
         "client_new_note": True, "task_urgent": True, "deadline_approaching": True,
         "processing_error": True, "document_read_failure": True, "price_change": True,
         "task_reminder": True, "tasks_overdue_digest": True,
-        "knowledge_new_article": True,
+        "knowledge_new_article": True, "knowledge_engine_updated": True,
     },
     "material_margins": {
         "pvc": 15.0, "aluminio": 18.0, "portada": 18.0, "rede": 18.0, "desconhecido": 20.0,
@@ -38,6 +38,7 @@ SETTINGS_DEFAULTS = {
         "reminder_interval_days": 3, "category_suggestion_threshold": 2,
         "supplier_quote_history_limit": 5, "deadline_warning_days": 1,
         "price_change_alert_pct": 15, "notification_scan_minutes": 5,
+        "auto_process_correio_semanal": True,
     },
     "security_prefs": {
         "pin_max_attempts": 3, "pin_lock_minutes": 10, "auto_lock_minutes": 0,
