@@ -1,4 +1,4 @@
-import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
+import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Library, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
 import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
+import Knowledge from "@/pages/Knowledge";
 import Calculator from "@/components/miniapps/Calculator";
 import Scratchpad from "@/components/miniapps/Scratchpad";
 import Stopwatch from "@/components/miniapps/Stopwatch";
@@ -29,6 +30,7 @@ export const PANEL_TYPES = {
   taskGroups: { title: "Grupos de Tarefas", icon: FolderTree, Component: TaskGroups },
   dashboard: { title: "Estatísticas", icon: BarChart3, Component: Dashboard },
   catalog: { title: "Catálogo técnico", icon: BookOpenCheck, Component: Catalog },
+  knowledge: { title: "Centro de Conhecimento", icon: Library, Component: Knowledge },
   health: { title: "Painel de Saúde", icon: HeartPulse, Component: HealthPanel },
   downloads: { title: "Downloads", icon: FolderDown, Component: DownloadsCenter },
   explorer: { title: "Explorador", icon: FolderTree, Component: Explorer },
@@ -40,7 +42,7 @@ export const PANEL_TYPES = {
 };
 
 export const PANEL_ORDER = [
-  "notes", "emails", "suppliers", "tasks", "taskGroups", "dashboard", "catalog",
+  "notes", "emails", "suppliers", "tasks", "taskGroups", "knowledge", "dashboard", "catalog",
   "explorer", "health", "downloads", "calculator", "scratchpad", "stopwatch", "settings", "notifications",
 ];
 
@@ -55,6 +57,7 @@ export const PANEL_ROUTES = {
   suppliers: "/fornecedores",
   tasks: "/tarefas",
   taskGroups: "/grupos-tarefas",
+  knowledge: "/conhecimento",
   dashboard: "/estatisticas",
   catalog: "/catalogo-tecnico",
   settings: "/definicoes",

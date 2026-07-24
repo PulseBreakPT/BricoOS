@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, ClipboardList, Mail, Truck, ListChecks, Plus, RefreshCw, BarChart3, FileClock, Zap } from "lucide-react";
+import { Search, ClipboardList, Mail, Truck, ListChecks, Plus, RefreshCw, BarChart3, FileClock, Zap, Library } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -87,9 +87,19 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
     onOpenChange(false);
   };
 
+  const goToArticle = (a) => {
+    // Mesmo espírito de goToNote: navega sempre para a instância encaminhada
+    // pelo router (nunca como painel flutuante), para não arriscar dois
+    // diálogos do mesmo artigo em simultâneo.
+    onLaunch?.();
+    navigate(`/conhecimento?open=${a.id}`);
+    onOpenChange(false);
+  };
+
   const hasResults = results && (
     (results.notes || []).length || (results.suppliers || []).length
     || (results.tasks || []).length || (results.emails || []).length
+    || (results.knowledge_articles || []).length
   );
 
   return (
@@ -173,6 +183,17 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
                 <ResultGroup label="Tarefas" icon={ListChecks}>
                   {results.tasks.map((t) => (
                     <ResultRow key={t.id} testid={`search-task-${t.id}`} title={t.title} subtitle={t.done ? "Concluída" : "Por fazer"} onClick={() => goTo("/tarefas", "tasks")} />
+                  ))}
+                </ResultGroup>
+              ) : null}
+              {(results?.knowledge_articles || []).length ? (
+                <ResultGroup label="Centro de Conhecimento" icon={Library}>
+                  {results.knowledge_articles.map((a) => (
+                    <ResultRow
+                      key={a.id} testid={`search-knowledge-${a.id}`} title={a.title}
+                      subtitle={a.important_count ? `${a.important_count} tema(s) importante(s)` : ""}
+                      onClick={() => goToArticle(a)}
+                    />
                   ))}
                 </ResultGroup>
               ) : null}

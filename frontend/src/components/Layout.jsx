@@ -13,6 +13,7 @@ import {
   FolderDown,
   FolderTree,
   LayoutGrid,
+  Library,
   ListChecks,
   Lock,
   Mail,
@@ -121,6 +122,13 @@ const ROUTE_APPS = [
     testid: "nav-grupos-tarefas",
   },
   {
+    path: "/conhecimento",
+    title: "Centro de Conhecimento",
+    shortTitle: "Conhecimento",
+    icon: Library,
+    testid: "nav-conhecimento",
+  },
+  {
     path: "/estatisticas",
     title: "Centro de Análise",
     shortTitle: "Estatísticas",
@@ -154,9 +162,9 @@ const NAV_GROUPS = [
   { label: "Operação", items: ROUTE_APPS.slice(0, 3) },
   {
     label: "Organização",
-    items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[6], ROUTE_APPS[5]],
+    items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[5], ROUTE_APPS[7], ROUTE_APPS[6]],
   },
-  { label: "Sistema", items: [ROUTE_APPS[7], ROUTE_APPS[8]] },
+  { label: "Sistema", items: [ROUTE_APPS[8], ROUTE_APPS[9]] },
 ];
 
 function getRouteApp(pathname) {

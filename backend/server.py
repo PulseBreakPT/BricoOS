@@ -67,6 +67,7 @@ try:
     import push_notifications
     import app_settings
     import notifications
+    import knowledge
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -100,6 +101,7 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     from . import push_notifications
     from . import app_settings
     from . import notifications
+    from . import knowledge
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -661,6 +663,7 @@ class NoteIn(BaseModel):
     supplier_id: str = ""
     sla_days: int = DEFAULT_SLA_DAYS
     reminder_interval_days: int = 3
+    related_article_ids: List[str] = []
 
     @field_validator("status")
     @classmethod
@@ -716,6 +719,7 @@ class NotePatch(BaseModel):
     supplier_id: Optional[str] = None
     sla_days: Optional[int] = None
     reminder_interval_days: Optional[int] = None
+    related_article_ids: Optional[List[str]] = None
 
     @field_validator("status")
     @classmethod
@@ -813,6 +817,7 @@ class SupplierIn(BaseModel):
     notes: str = ""
     labels: List[str] = []
     contacts: List[SupplierContact] = []
+    related_article_ids: List[str] = []
 
     @field_validator("name")
     @classmethod
@@ -858,6 +863,8 @@ class TaskIn(BaseModel):
     pinned: bool = False
     remind_minutes_before: Optional[int] = None
     notes: str = ""
+    source_article_id: str = ""
+    source_action_id: str = ""
 
     @field_validator("priority")
     @classmethod
@@ -886,6 +893,8 @@ class TaskPatch(BaseModel):
     pinned: Optional[bool] = None
     remind_minutes_before: Optional[int] = None
     notes: Optional[str] = None
+    source_article_id: Optional[str] = None
+    source_action_id: Optional[str] = None
 
     @field_validator("priority")
     @classmethod
@@ -2563,6 +2572,133 @@ async def purge_task(task_id: str):
     return {"ok": True}
 
 
+# ---------- Centro de Conhecimento (artigos permanentes a partir do Correio Semanal) ----------
+class KnowledgeArticlePatch(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    pinned: Optional[bool] = None
+    archived: Optional[bool] = None
+    tags: Optional[List[str]] = None
+
+
+class KnowledgeCreateTaskIn(BaseModel):
+    action_id: str
+
+
+@api_router.get("/knowledge/articles")
+async def list_knowledge_articles(article_type: Optional[str] = None, pinned: Optional[bool] = None,
+                                   archived: Optional[bool] = None):
+    q = {}
+    if article_type:
+        q["article_type"] = article_type
+    if pinned is not None:
+        q["pinned"] = pinned
+    q["archived"] = archived if archived is not None else {"$ne": True}
+    return await db.knowledge_articles.find(
+        q, {"_id": 0, "sections": 0, "deadlines_calendar": 0},
+    ).sort("created_at", -1).to_list(500)
+
+
+@api_router.get("/knowledge/articles/{article_id}")
+async def get_knowledge_article(article_id: str):
+    article = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
+    if not article:
+        raise HTTPException(status_code=404, detail="Artigo não encontrado")
+    grouped = knowledge.group_sections_by_bucket(
+        article.get("sections") or [], article.get("deadlines_calendar") or [],
+        article.get("attachment_count") or 0)
+    themes = await knowledge.recurring_themes(db, article)
+    implementation = await knowledge.implementation_state(db, article)
+    linked_tasks = await db.tasks.find(
+        {"source_article_id": article_id},
+        {"_id": 0, "id": 1, "title": 1, "status": 1, "done": 1, "source_action_id": 1},
+    ).to_list(200)
+    related_notes = await db.notes.find(
+        {"related_article_ids": article_id}, {"_id": 0, "id": 1, "customer_name": 1, "description": 1},
+    ).to_list(50)
+    related_suppliers = await db.suppliers.find(
+        {"related_article_ids": article_id}, {"_id": 0, "id": 1, "name": 1},
+    ).to_list(50)
+    history = await db.knowledge_article_history.find(
+        {"article_id": article_id}, {"_id": 0},
+    ).sort("created_at", 1).to_list(200)
+    return {
+        **article, "grouped_sections": grouped, "recurring_themes": themes,
+        "implementation": implementation, "linked_tasks": linked_tasks,
+        "related_notes": related_notes, "related_suppliers": related_suppliers,
+        "history": history,
+    }
+
+
+@api_router.post("/knowledge/articles/{article_id}/open")
+async def open_knowledge_article(article_id: str):
+    ok = await knowledge.register_open(db, article_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Artigo não encontrado")
+    return {"ok": True}
+
+
+@api_router.patch("/knowledge/articles/{article_id}")
+async def patch_knowledge_article(article_id: str, payload: KnowledgeArticlePatch):
+    current = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Artigo não encontrado")
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if update:
+        update["updated_at"] = now_iso()
+        if "archived" in update:
+            update["archived_at"] = now_iso() if update["archived"] else None
+        await db.knowledge_articles.update_one({"id": article_id}, {"$set": update})
+        if "pinned" in update:
+            await knowledge.log_activity(
+                db, article_id, "pinned" if update["pinned"] else "unpinned",
+                "Adicionado aos favoritos" if update["pinned"] else "Removido dos favoritos")
+        if "archived" in update:
+            await knowledge.log_activity(
+                db, article_id, "archived" if update["archived"] else "unarchived",
+                "Arquivado" if update["archived"] else "Desarquivado")
+    return await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
+
+
+@api_router.get("/knowledge/articles/{article_id}/files")
+async def list_knowledge_article_files(article_id: str):
+    return await _list_attachments("knowledge_article", article_id)
+
+
+@api_router.post("/knowledge/articles/{article_id}/files")
+async def upload_knowledge_article_files(article_id: str, files: List[UploadFile] = File(...)):
+    if not await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Artigo não encontrado")
+    return await _upload_attachments("knowledge_article", article_id, files)
+
+
+@api_router.post("/knowledge/articles/{article_id}/create-task")
+async def create_task_from_article_action(article_id: str, payload: KnowledgeCreateTaskIn, request: Request):
+    """Botão manual "➕ Criar tarefa" de uma ação específica do artigo —
+    distinto das tarefas sugeridas automáticas do Correio (essas
+    continuam a existir tal e qual, ver _process_correio_semanal)."""
+    article = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
+    if not article:
+        raise HTTPException(status_code=404, detail="Artigo não encontrado")
+    fields = knowledge.build_task_from_action(article, payload.action_id)
+    if not fields:
+        raise HTTPException(status_code=404, detail="Ação não encontrada neste artigo")
+    task_in = TaskIn(**fields)
+    doc = _with_subtask_ids(task_in.model_dump())
+    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso(), "status": "todo", "status_changed_at": now_iso()})
+    await db.tasks.insert_one(dict(doc))
+    actor = request.headers.get("x-actor-name") or None
+    await log_task_activity(doc["id"], "created", "Tarefa criada", actor=actor)
+    await _notify_task_urgent(doc)
+    await knowledge.log_activity(db, article_id, "task_created", f"Tarefa criada: {doc['title']}")
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/knowledge/stats")
+async def knowledge_stats():
+    return await knowledge.get_stats(db)
+
+
 # ---------- Workspace: pesquisa global + IA contextual ----------
 @api_router.get("/search")
 async def global_search(q: str = ""):
@@ -2571,7 +2707,7 @@ async def global_search(q: str = ""):
     só chamada, para abrir o painel certo sem sair de onde se está."""
     term = (q or "").strip()
     if len(term) < 2:
-        return {"notes": [], "suppliers": [], "tasks": [], "emails": []}
+        return {"notes": [], "suppliers": [], "tasks": [], "emails": [], "knowledge_articles": []}
     rx = {"$regex": re.escape(term), "$options": "i"}
     note_or = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"reference": rx}]
     digits = re.sub(r"\D", "", term)
@@ -2594,7 +2730,12 @@ async def global_search(q: str = ""):
         {"_id": 0, "id": 1, "subject": 1, "from_name": 1, "from_email": 1, "supplier_name": 1,
          "received_at": 1, "note_id": 1},
     ).sort("received_at", -1).limit(6).to_list(6)
-    return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails}
+    knowledge_articles = await db.knowledge_articles.find(
+        {"archived": {"$ne": True}, "$or": [{"title": rx}, {"tags": rx}]},
+        {"_id": 0, "id": 1, "title": 1, "csn_number": 1, "issue_date": 1, "important_count": 1},
+    ).sort("created_at", -1).limit(6).to_list(6)
+    return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails,
+            "knowledge_articles": knowledge_articles}
 
 
 @api_router.get("/system/status")
@@ -4532,6 +4673,12 @@ async def poll_supplier_replies():
                 body=f"{from_label}: {m['subject'] or '(sem assunto)'}", url="/emails", note_id=note_id or None)
         except Exception as e:
             logger.warning(f"Notificação falhou (email {email_id}): {e}")
+        if correio_semanal_result:
+            try:
+                await knowledge.create_article_from_correio_semanal(
+                    db, email_id=email_id, correio_semanal_result=correio_semanal_result)
+            except Exception as e:
+                logger.warning(f"Criação do artigo do Centro de Conhecimento falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
             quem = supplier_name or m.get("from_name") or m["from_email"]
@@ -6400,6 +6547,10 @@ async def ensure_indexes():
                         ("task_history", "task_id"), ("collaborators", "name"),
                         ("task_templates", "pinned"), ("task_templates", "daily_trigger_time"),
                         ("tasks", "source_template_id"),
+                        ("tasks", "source_article_id"),
+                        ("knowledge_articles", "article_type"), ("knowledge_articles", "pinned"),
+                        ("knowledge_articles", "archived"), ("knowledge_articles", "csn_number"),
+                        ("knowledge_article_history", "article_id"),
                         ("auth_devices", "token"),
                         ("auth_devices", "device_id"),
                         ("pushed_alerts", "alert_id"),
