@@ -41,6 +41,7 @@ import AttachmentPreviewDialog, { previewKind } from "@/components/AttachmentPre
 import EntityStackBar from "@/components/EntityStackBar";
 import PhoneInput from "@/components/PhoneInput";
 import { formatPhoneDisplay } from "@/lib/phoneFormat";
+import NameInput from "@/components/NameInput";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
@@ -1200,7 +1201,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label>Nome do cliente</Label>
-                        <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
+                        <NameInput testId="input-customer-name" value={form.customer_name} onChange={(v) => set("customer_name", v)} placeholder="Ex.: Teresa Mera" />
                       </div>
                       <div className="space-y-1.5">
                         <Label>Telefone</Label>
@@ -1349,7 +1350,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 {editMode ? (
                   <div className="space-y-1.5">
                     <Label>Nome do cliente</Label>
-                    <Input data-testid="input-customer-name" value={form.customer_name} onChange={(e) => set("customer_name", e.target.value)} placeholder="Ex.: Teresa Mera" />
+                    <NameInput testId="input-customer-name" value={form.customer_name} onChange={(v) => set("customer_name", v)} placeholder="Ex.: Teresa Mera" />
                   </div>
                 ) : (
                   <ViewField label="Nome do cliente" value={form.customer_name} />
