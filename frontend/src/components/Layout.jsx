@@ -308,7 +308,7 @@ function SupplierEmailAlert() {
   );
 }
 
-function MobileBrand({ activeApp }) {
+function MobileBrand() {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <BrandMark className="h-9 w-9 rounded-xl" />
@@ -316,11 +316,6 @@ function MobileBrand({ activeApp }) {
         <p className="truncate font-heading text-sm font-extrabold text-foreground">
           BRICO OS
         </p>
-        {activeApp?.shortTitle ? (
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-            {activeApp.shortTitle}
-          </p>
-        ) : null}
       </div>
     </div>
   );
@@ -1054,7 +1049,7 @@ function LayoutInner() {
           </Sheet>
           <header className="mobile-os-header sticky top-0 z-30 p-2 pb-0 pt-[calc(0.5rem+env(safe-area-inset-top))]">
             <div className="mobile-os-island flex items-center justify-between gap-2 rounded-[22px] border border-border px-3 py-2 shadow-[0_16px_38px_-18px_rgba(16,17,20,0.3)]">
-              <MobileBrand activeApp={homeVisible ? null : activeRouteApp} />
+              <MobileBrand />
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
