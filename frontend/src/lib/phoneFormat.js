@@ -101,6 +101,26 @@ export function formatNational(country, digits) {
   return groups ? groupDigits(digits, groups) : digits;
 }
 
+// Comprimento nacional esperado (mín/máx) por país — só para um indicador
+// suave em tempo real (✓ quando bate certo), nunca bloqueia escrever mais
+// ou menos: a validação que interessa mesmo continua a ser a do backend
+// (normalize_phone, 9-15 dígitos, país-agnóstica).
+const EXPECTED_LENGTH = {
+  "+351": [9, 9], "+34": [9, 9], "+33": [9, 9], "+44": [10, 10],
+  "+49": [10, 11], "+31": [9, 9], "+41": [9, 9], "+352": [9, 9],
+  "+55": [10, 11], "+238": [7, 7], "+244": [9, 9], "+258": [9, 9],
+};
+
+// "empty" (nada escrito ainda) | "short" | "long" | "ok"
+export function phoneLengthStatus(country, digits) {
+  if (!digits) return "empty";
+  const range = EXPECTED_LENGTH[country];
+  if (!range) return "ok";
+  if (digits.length < range[0]) return "short";
+  if (digits.length > range[1]) return "long";
+  return "ok";
+}
+
 // Cursor: ao formatar, o texto mostrado fica mais comprido do que o que a
 // pessoa escreveu (espaços/parênteses/hífen inseridos automaticamente) — sem
 // isto, o cursor saltaria sempre para o fim do campo a cada tecla, tornando

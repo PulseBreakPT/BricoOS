@@ -38,3 +38,43 @@ export function normalizeName(value) {
   const collapsed = String(value ?? "").trim().replace(/\s+/g, " ");
   return capitalizeName(collapsed);
 }
+
+// A partir daqui, comprimento a partir do qual mostrar um contador discreto
+// — nomes de clientes desta loja raramente passam disto; serve só de aviso
+// suave, nunca bloqueia escrever mais.
+export const NAME_LONG_THRESHOLD = 40;
+
+// Aviso (não bloqueia) quando o nome tem dígitos ou símbolos fora do
+// habitual — letras (com acentos), espaços, hífen e apóstrofo são sempre
+// aceites (nomes compostos, "O'Neil", etc.).
+const NAME_SAFE_RE = /^[\p{L}\s'-]*$/u;
+export function nameHasUnexpectedChars(value) {
+  const str = String(value ?? "");
+  return str.length > 0 && !NAME_SAFE_RE.test(str);
+}
+
+// "Detalhe que impressiona" — ao colar uma linha inteira tipo
+// "Bernardo Santos - 917100512" ou "Bernardo Santos 917100512
+// bernardo@gmail.com" no campo de nome, separa automaticamente o que
+// parecer email/telefone, deixando só o nome limpo. Devolve null quando
+// não há nada a extrair (colou só um nome normal) — nesse caso quem chama
+// isto trata o valor como um "paste" normal, sem qualquer efeito extra.
+const EMAIL_TOKEN_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+const PHONE_TOKEN_RE = /\+?\d[\d\s().-]{6,}\d/;
+
+export function parseContactPaste(text) {
+  const str = String(text ?? "");
+  const emailMatch = str.match(EMAIL_TOKEN_RE);
+  const withoutEmail = emailMatch ? str.replace(emailMatch[0], " ") : str;
+  const phoneMatch = withoutEmail.match(PHONE_TOKEN_RE);
+  if (!emailMatch && !phoneMatch) return null;
+  const phoneDigits = phoneMatch ? phoneMatch[0].replace(/\D/g, "") : "";
+  if (phoneMatch && (phoneDigits.length < 9 || phoneDigits.length > 15)) return null; // não parece um telefone real, ignora
+  const namePart = (phoneMatch ? withoutEmail.replace(phoneMatch[0], " ") : withoutEmail)
+    .replace(/[-–,·]/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    name: namePart ? capitalizeName(namePart) : "",
+    phone: phoneMatch ? (phoneMatch[0].trim().startsWith("+") ? `+${phoneDigits}` : phoneDigits) : "",
+    email: emailMatch ? emailMatch[0].toLowerCase() : "",
+  };
+}

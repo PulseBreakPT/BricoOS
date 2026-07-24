@@ -1,17 +1,31 @@
 import { useLayoutEffect, useRef } from "react";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { capitalizeName, normalizeName } from "@/lib/nameFormat";
+import {
+  capitalizeName, normalizeName, NAME_LONG_THRESHOLD, nameHasUnexpectedChars, parseContactPaste,
+} from "@/lib/nameFormat";
+import { haptics } from "@/lib/haptics";
 
 // Campo de nome com capitalização automática em tempo real (§ pedido do
 // utilizador) — "bernardo santos" -> "Bernardo Santos", mantendo em
 // minúsculas as partículas de nomes compostos (da/de/do/das/dos/e) quando
-// não são a primeira palavra: "maria da conceição" -> "Maria da Conceição".
-// Ao colar cai na mesma via do onChange (React trata paste como uma
-// mudança de valor normal), por isso não precisa de handler à parte. No
-// onBlur faz uma passagem final que também apara espaços a mais.
-export default function NameInput({ value, onChange, onBlur, testId = "input-name", placeholder }) {
+// não são a primeira palavra: "maria da conceição" -> "Maria da
+// Conceição". Ao colar cai na mesma via do onChange (React trata paste
+// como uma mudança de valor normal), por isso não precisa de handler à
+// parte para a capitalização — mas TEM um onPaste próprio para o
+// "detalhe que impressiona": colar uma linha como "Bernardo Santos -
+// 917100512" ou "Bernardo Santos 917100512 bernardo@gmail.com" separa o
+// telefone/email automaticamente, se `onDetectContact` for passado (só
+// faz sentido onde o telefone/email também são campos editáveis ao lado).
+// No onBlur faz uma passagem final que também apara espaços a mais.
+export default function NameInput({
+  value, onChange, onBlur, onKeyDown, testId = "input-name", placeholder, onDetectContact, inputRef: externalRef,
+}) {
   const inputRef = useRef(null);
   const pendingCursor = useRef(null);
+  const tooLong = value.length > NAME_LONG_THRESHOLD;
+  const unexpected = nameHasUnexpectedChars(value);
+  const valid = value.trim().length > 0 && !unexpected;
 
   // capitalizeName nunca muda o comprimento da string (só a capitalização
   // de cada letra), por isso a posição do cursor pode ser reaproveitada
@@ -23,19 +37,45 @@ export default function NameInput({ value, onChange, onBlur, testId = "input-nam
   });
 
   return (
-    <Input
-      ref={inputRef}
-      data-testid={testId}
-      value={value}
-      onChange={(e) => {
-        pendingCursor.current = e.target.selectionStart ?? e.target.value.length;
-        onChange(capitalizeName(e.target.value));
-      }}
-      onBlur={(e) => {
-        onChange(normalizeName(e.target.value));
-        onBlur?.(e);
-      }}
-      placeholder={placeholder}
-    />
+    <div className="space-y-1">
+      <div className="relative">
+        <Input
+          ref={(el) => { inputRef.current = el; if (externalRef) externalRef.current = el; }}
+          data-testid={testId}
+          value={value}
+          onChange={(e) => {
+            pendingCursor.current = e.target.selectionStart ?? e.target.value.length;
+            onChange(capitalizeName(e.target.value));
+          }}
+          onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            if (!onDetectContact) return;
+            const pasted = e.clipboardData?.getData("text");
+            const parsed = pasted ? parseContactPaste(pasted) : null;
+            if (!parsed) return; // só um nome normal — segue o fluxo habitual do onChange
+            e.preventDefault();
+            onDetectContact(parsed);
+          }}
+          onBlur={(e) => {
+            const finalValue = normalizeName(e.target.value);
+            onChange(finalValue);
+            if (nameHasUnexpectedChars(finalValue)) haptics.warning();
+            onBlur?.(e);
+          }}
+          onFocus={(e) => e.target.select()}
+          placeholder={placeholder}
+          className={`pr-8 transition-colors duration-150 ${unexpected ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+        />
+        {valid ? (
+          <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500 duration-150 animate-in zoom-in-50" />
+        ) : unexpected ? (
+          <AlertTriangle className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-500" />
+        ) : null}
+      </div>
+      <div className="flex items-center justify-between gap-2 text-[10px] font-semibold">
+        {unexpected ? <span className="text-amber-600">Nome com números ou símbolos pouco habituais</span> : <span />}
+        {tooLong ? <span className="text-muted-foreground">{value.length} caracteres</span> : null}
+      </div>
+    </div>
   );
 }

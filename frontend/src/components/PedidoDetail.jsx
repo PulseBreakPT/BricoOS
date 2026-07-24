@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -42,6 +42,9 @@ import EntityStackBar from "@/components/EntityStackBar";
 import PhoneInput from "@/components/PhoneInput";
 import { formatPhoneDisplay } from "@/lib/phoneFormat";
 import NameInput from "@/components/NameInput";
+import EmailInput from "@/components/EmailInput";
+import { haptics } from "@/lib/haptics";
+import { DEFAULT_COUNTRY_CODE } from "@/lib/phoneFormat";
 import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
@@ -178,6 +181,11 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const isBricoavalEligible = !isCreate && !note?.caixilharia && !!((form.customer_name || "").trim() || (form.email || "").trim());
   const dirty = useRef(false);
   const contentScrollRef = useRef(null);
+  // Passo "Cliente" do assistente — foco automático no primeiro campo com
+  // erro e Enter a avançar para o campo seguinte (§ pedido do utilizador).
+  const clientNameRef = useRef(null);
+  const clientPhoneRef = useRef(null);
+  const clientEmailRef = useRef(null);
   const set = (k, v) => { dirty.current = true; setForm((f) => ({ ...f, [k]: v })); };
 
   const loadSub = useCallback(async (nid) => {
@@ -411,17 +419,29 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const createSteps = createMode === "band" ? ["Cliente", "Caixilharia"] : ["Cliente", "Pedido", "Confirmar"];
   const isLastStep = createStep === createSteps.length - 1;
 
-  const validClientStep = () => {
+  // Recalculado a cada mudança de nome/telefone/email — alimenta tanto o
+  // botão "Continuar" (só ativa quando não há problema) como o foco
+  // automático no primeiro campo com erro.
+  const clientStepIssue = useMemo(() => {
     if (!form.customer_name.trim() && !form.phone.trim()) {
-      toast.error("Indica pelo menos o nome ou o telefone do cliente."); return false;
+      return { field: "name", ref: clientNameRef, message: "Indica pelo menos o nome ou o telefone do cliente." };
     }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      toast.error("O email do cliente não parece válido."); return false;
+      return { field: "email", ref: clientEmailRef, message: "O email do cliente não parece válido." };
     }
     if (form.phone && form.phone.replace(/\D/g, "").length < 9) {
-      toast.error("O telefone do cliente parece incompleto."); return false;
+      return { field: "phone", ref: clientPhoneRef, message: "O telefone do cliente parece incompleto." };
     }
-    return true;
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customer_name, form.phone, form.email]);
+
+  const validClientStep = () => {
+    if (!clientStepIssue) return true;
+    toast.error(clientStepIssue.message);
+    haptics.warning();
+    clientStepIssue.ref.current?.focus();
+    return false;
   };
 
   const wizardBack = () => {
@@ -435,6 +455,28 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
       toast.error("Descreve o pedido do cliente."); return;
     }
     setCreateStep((s) => s + 1);
+  };
+
+  // Enter avança para o campo seguinte (Nome -> Telefone -> Email -> avança
+  // de passo), em vez de submeter o formulário sem querer.
+  const handleClientEnter = (nextRef) => (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (nextRef) nextRef.current?.focus();
+    else wizardNext();
+  };
+
+  // "Detalhe que impressiona": colar "Bernardo Santos - 917100512" (ou
+  // .../ + email) no campo de nome separa automaticamente os três campos.
+  const handleDetectContact = (parsed) => {
+    if (parsed.name) set("customer_name", parsed.name);
+    if (parsed.phone) set("phone", parsed.phone.startsWith("+") ? parsed.phone : `${DEFAULT_COUNTRY_CODE}${parsed.phone}`);
+    if (parsed.email) set("email", parsed.email);
+    const filled = [parsed.phone ? "telefone" : null, parsed.email ? "email" : null].filter(Boolean).join(" e ");
+    if (filled) {
+      toast.success(`Nome e ${filled} preenchidos automaticamente.`);
+      haptics.success();
+    }
   };
 
   const createBandPedido = async () => {
@@ -1201,16 +1243,36 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label>Nome do cliente</Label>
-                        <NameInput testId="input-customer-name" value={form.customer_name} onChange={(v) => set("customer_name", v)} placeholder="Ex.: Teresa Mera" />
+                        <NameInput
+                          testId="input-customer-name"
+                          value={form.customer_name}
+                          onChange={(v) => set("customer_name", v)}
+                          onKeyDown={handleClientEnter(clientPhoneRef)}
+                          onDetectContact={handleDetectContact}
+                          inputRef={clientNameRef}
+                          placeholder="Ex.: Teresa Mera"
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <Label>Telefone</Label>
-                        <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
+                        <PhoneInput
+                          value={form.phone}
+                          onChange={(v) => set("phone", v)}
+                          onKeyDown={handleClientEnter(clientEmailRef)}
+                          inputRef={clientPhoneRef}
+                        />
                       </div>
                     </div>
                     <div className="mt-4 space-y-1.5">
                       <Label>Email do cliente (opcional)</Label>
-                      <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+                      <EmailInput
+                        testId="input-email"
+                        value={form.email}
+                        onChange={(v) => set("email", v)}
+                        onKeyDown={handleClientEnter(null)}
+                        inputRef={clientEmailRef}
+                        placeholder="cliente@email.com"
+                      />
                     </div>
                   </>
                 ) : null}
@@ -1220,7 +1282,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <>
                     <div className="space-y-1.5">
                       <Label>Pedido do cliente</Label>
-                      <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Motosserra a bateria 40V, cor, prazo, condições..." />
+                      <Textarea
+                        data-testid="input-description"
+                        value={form.description}
+                        onChange={(e) => set("description", e.target.value)}
+                        onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = `${e.target.scrollHeight}px`; }}
+                        rows={3}
+                        className="transition-[height] duration-150"
+                        placeholder="Ex.: Motosserra a bateria 40V, cor, prazo, condições..."
+                      />
                     </div>
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
@@ -1296,7 +1366,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
                   </Button>
                   {!isLastStep ? (
-                    <Button data-testid="wizard-next" onClick={wizardNext} className="flex-1 rounded-xl">
+                    <Button
+                      data-testid="wizard-next"
+                      onClick={wizardNext}
+                      disabled={createStep === 0 && !!clientStepIssue}
+                      className="flex-1 rounded-xl transition-opacity duration-150"
+                    >
                       Continuar <ChevronRight className="ml-1.5 h-4 w-4" />
                     </Button>
                   ) : createMode === "band" ? (
@@ -1367,7 +1442,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {editMode ? (
                 <div className="mt-4 space-y-1.5">
                   <Label>Email do cliente</Label>
-                  <Input data-testid="input-email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="cliente@email.com" />
+                  <EmailInput testId="input-email" value={form.email} onChange={(v) => set("email", v)} placeholder="cliente@email.com" />
                 </div>
               ) : (
                 <div className="mt-4">
@@ -1379,7 +1454,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {editMode ? (
                 <div className="mt-3 space-y-1.5">
                   <Label>Pedido do cliente</Label>
-                  <Textarea data-testid="input-description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..." />
+                  <Textarea
+                    data-testid="input-description"
+                    value={form.description}
+                    onChange={(e) => set("description", e.target.value)}
+                    onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = `${e.target.scrollHeight}px`; }}
+                    rows={3}
+                    className="transition-[height] duration-150"
+                    placeholder="Ex.: Janela de correr alumínio, cor, prazo, condições..."
+                  />
                 </div>
               ) : (
                 <div className="mt-3">
