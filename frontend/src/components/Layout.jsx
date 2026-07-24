@@ -912,6 +912,18 @@ function LayoutInner() {
     setPrimaryMinimized(false);
   }, [location.pathname, location.search]);
 
+  // No telemóvel a página inteira é a área de scroll (ver .mobile-workspace,
+  // sem overflow próprio) — sem isto, trocar de app ou voltar ao início
+  // mantinha o scroll onde ia na página anterior. Só reage à rota (não a
+  // location.search) para não repor o scroll da lista quando se fecha um
+  // painel de detalhe aberto por "?open=" por cima dela. `scroll-behavior:
+  // smooth` já está definido no <html> (index.css), por isso este scrollTo
+  // já sai suave sem mais nada.
+  useEffect(() => {
+    if (isDesktop) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, [isDesktop, location.pathname, homeVisible]);
+
   const openRoute = useCallback(
     (path) => {
       setHomeVisible(false);
