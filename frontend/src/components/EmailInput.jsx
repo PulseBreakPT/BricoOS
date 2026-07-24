@@ -27,7 +27,7 @@ export default function EmailInput({
         <Input
           ref={(el) => { inputRef.current = el; if (externalRef) externalRef.current = el; }}
           data-testid={testId}
-          type="email"
+          inputMode="email"
           value={value}
           onChange={(e) => {
             const raw = e.target.value;
