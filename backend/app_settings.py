@@ -25,6 +25,7 @@ SETTINGS_DEFAULTS = {
         "processing_error": True, "document_read_failure": True, "price_change": True,
         "task_reminder": True, "tasks_overdue_digest": True,
         "knowledge_new_article": True, "knowledge_engine_updated": True,
+        "bricoaval_backfill": True,
     },
     "material_margins": {
         "pvc": 15.0, "aluminio": 18.0, "portada": 18.0, "rede": 18.0, "desconhecido": 20.0,
