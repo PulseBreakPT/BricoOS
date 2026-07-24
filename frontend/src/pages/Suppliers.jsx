@@ -22,9 +22,10 @@ import { CategoryBadge } from "@/components/CategoryBadge";
 import PhoneInput from "@/components/PhoneInput";
 import LabelEditor from "@/components/LabelEditor";
 import AttachmentManager from "@/components/AttachmentManager";
+import KnowledgeArticlePicker from "@/components/KnowledgeArticlePicker";
 import { toast } from "sonner";
 
-const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", labels: [], contacts: [] };
+const empty = { name: "", email: "", phone: "", category: "construcao", notes: "", labels: [], contacts: [], related_article_ids: [] };
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PHONE_DIGITS = 9;
 const MAX_CONTACTS = 10;
@@ -422,6 +423,14 @@ export default function Suppliers() {
             <div className="space-y-1.5">
               <Label>Etiquetas</Label>
               <LabelEditor testIdPrefix="supplier-label" labels={form.labels || []} onChange={(labels) => set("labels", labels)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Artigos relacionados (Centro de Conhecimento)</Label>
+              <KnowledgeArticlePicker
+                testIdPrefix="supplier-knowledge"
+                selectedIds={form.related_article_ids || []}
+                onChange={(ids) => set("related_article_ids", ids)}
+              />
             </div>
             {editing ? (
               <div className="space-y-1.5">

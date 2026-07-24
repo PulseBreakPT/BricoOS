@@ -67,6 +67,7 @@ CATEGORY_PRIORITY = {
     "price_change": "alta",
     "task_reminder": "alta",
     "tasks_overdue_digest": "alta",
+    "knowledge_new_article": "media",
     "supplier": "media",
     "correio_semanal": "media",
     "forgotten": "media",
