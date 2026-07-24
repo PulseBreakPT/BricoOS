@@ -406,6 +406,8 @@ def build_client_pdf(quote, logo_png_bytes):
         line3.append(f"Data: {quote['date']}")
     if quote.get("obra"):
         line3.append(f"Obra: {quote['obra']}")
+    if quote.get("bricoaval_number"):
+        line3.append(f"Nº BricoAval: {quote['bricoaval_number']}")
     if line3:
         info.append("   ".join(line3))
     for ln in info:

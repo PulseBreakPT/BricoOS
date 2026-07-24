@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import {
   Ruler, Phone, AlertTriangle, ArrowRight, Tag, MoreVertical, Send,
   PhoneCall, PhoneMissed, CheckCircle2, Copy, ArchiveRestore, Clock, CalendarClock,
-  MailCheck, Camera,
+  MailCheck, Camera, Hash,
 } from "lucide-react";
 import {
   formatDateTime, getNextActionCta, getPriorityCfg, getStatusCfg, timeAgo,
@@ -142,6 +142,7 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
           <CategoryBadge category={note.category} />
           {note.measurements ? <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground"><Ruler className="h-3 w-3" /> {note.measurements}</span> : null}
           {note.photo_count > 0 ? <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground"><Camera className="h-3 w-3" /> {note.photo_count}</span> : null}
+          {note.bricoaval_number ? <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 font-mono text-[11px] font-semibold text-foreground"><Hash className="h-3 w-3" /> {note.bricoaval_number}</span> : null}
           {(note.labels || []).slice(0, 2).map((l) => <span key={l} className="inline-flex items-center gap-1 rounded-full bg-foreground/5 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"><Tag className="h-2.5 w-2.5" /> {l}</span>)}
         </div>
 
