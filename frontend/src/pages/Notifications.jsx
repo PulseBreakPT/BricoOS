@@ -159,7 +159,6 @@ export default function Notifications() {
         <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
           Notificações
         </h1>
-        <p className="text-sm text-muted-foreground">Histórico completo, com pesquisa e filtros — nada desaparece sozinho.</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

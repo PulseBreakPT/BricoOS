@@ -236,7 +236,6 @@ export default function Dashboard() {
         <div className="flex flex-col gap-1">
           <p className="kicker capitalize">{today}</p>
           <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Painel da loja</h1>
-          <p className="text-sm text-muted-foreground">A fotografia do momento: pedidos, prazos e fornecedores em tempo real.</p>
         </div>
         {hiddenWidgets.length > 0 ? (
           <DropdownMenu>

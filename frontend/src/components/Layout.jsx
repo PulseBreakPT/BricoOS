@@ -315,9 +315,11 @@ function MobileBrand({ activeApp }) {
         <p className="truncate font-heading text-sm font-extrabold text-foreground">
           BRICO OS
         </p>
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-          {activeApp?.shortTitle || "Sistema da loja"}
-        </p>
+        {activeApp?.shortTitle ? (
+          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+            {activeApp.shortTitle}
+          </p>
+        ) : null}
       </div>
     </div>
   );

@@ -668,7 +668,6 @@ export default function Tasks() {
         <div className="flex flex-col gap-1">
           <p className="kicker">Coisas por fazer</p>
           <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Tarefas</h1>
-          <p className="text-sm text-muted-foreground">Por secção: construção, bricolagem, decoração e jardim.</p>
         </div>
         <div className="flex items-center gap-3">
           {tasks.length > 0 ? (

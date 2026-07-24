@@ -345,9 +345,6 @@ export default function Knowledge() {
         <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
           Centro de Conhecimento
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Cada edição fica guardada como um artigo permanente, organizado por assunto.
-        </p>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">

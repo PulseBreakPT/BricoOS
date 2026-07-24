@@ -112,9 +112,6 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity, onOpenT
             <span className={`led ${online ? "led-ok" : "led-alert"}`} />
             Ambiente 01
           </span>
-          <span className="rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-[9px] font-bold text-muted-foreground">
-            {online ? "Sistema sincronizado" : "Modo local"}
-          </span>
         </div>
 
         <div className="relative mt-8 sm:mt-10">
@@ -138,10 +135,6 @@ export default function MobileHomeSurface({ onOpenRoute, onOpenActivity, onOpenT
           <h1 className="mt-6 max-w-2xl font-heading text-2xl font-extrabold tracking-tight sm:text-4xl">
             {greetingFor(now.getHours())}, Tiago.
           </h1>
-          <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-muted-foreground">
-            A bancada digital está pronta. Entra numa aplicação ou encontra
-            qualquer pedido sem perder o contexto do turno.
-          </p>
         </div>
 
         <div className="relative mt-6 sm:max-w-md">

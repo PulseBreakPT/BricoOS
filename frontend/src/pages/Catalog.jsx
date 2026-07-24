@@ -103,9 +103,6 @@ export default function Catalog() {
               <h1 className="mt-2 font-heading text-2xl font-black tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                 Compara primeiro. Escolhe depois.
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Rankings, classificações, normas e fontes ficam concentrados aqui, sem alongar o preenchimento do pedido.
-              </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-[var(--pastel-emerald-bg)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--pastel-emerald-text)]">
                   <ShieldCheck className="h-3 w-3" /> Apenas dados verificáveis
