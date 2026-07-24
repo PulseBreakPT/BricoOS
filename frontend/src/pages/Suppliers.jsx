@@ -425,7 +425,7 @@ export default function Suppliers() {
               <LabelEditor testIdPrefix="supplier-label" labels={form.labels || []} onChange={(labels) => set("labels", labels)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Artigos relacionados (Centro de Conhecimento)</Label>
+              <Label>Artigos relacionados (Correio Semanal)</Label>
               <KnowledgeArticlePicker
                 testIdPrefix="supplier-knowledge"
                 selectedIds={form.related_article_ids || []}

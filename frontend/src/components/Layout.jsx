@@ -114,16 +114,9 @@ const ROUTE_APPS = [
     testid: "nav-tarefas",
   },
   {
-    path: "/grupos-tarefas",
-    title: "Grupos de Tarefas",
-    shortTitle: "Grupos",
-    icon: FolderTree,
-    testid: "nav-grupos-tarefas",
-  },
-  {
     path: "/conhecimento",
-    title: "Centro de Conhecimento",
-    shortTitle: "Conhecimento",
+    title: "Correio Semanal",
+    shortTitle: "Correio Semanal",
     icon: Library,
     testid: "nav-conhecimento",
   },
@@ -157,13 +150,22 @@ const ROUTE_APPS = [
   },
 ];
 
+// Por caminho em vez de índice numérico — um item a mais/a menos em
+// ROUTE_APPS não desalinha silenciosamente os grupos abaixo.
+function routeApp(path) {
+  return ROUTE_APPS.find((app) => app.path === path);
+}
+
 const NAV_GROUPS = [
   { label: "Operação", items: ROUTE_APPS.slice(0, 3) },
   {
     label: "Organização",
-    items: [ROUTE_APPS[3], ROUTE_APPS[4], ROUTE_APPS[5], ROUTE_APPS[7], ROUTE_APPS[6]],
+    items: [
+      routeApp("/tarefas"), routeApp("/conhecimento"),
+      routeApp("/catalogo-tecnico"), routeApp("/estatisticas"),
+    ],
   },
-  { label: "Sistema", items: [ROUTE_APPS[8], ROUTE_APPS[9]] },
+  { label: "Sistema", items: [routeApp("/definicoes"), routeApp("/notificacoes")] },
 ];
 
 function getRouteApp(pathname) {
@@ -1130,7 +1132,7 @@ function LayoutInner() {
 }
 
 // Monta o mesmo componente usado pelos painéis flutuantes do computador
-// (lib/panelRegistry.js) — sem duplicar Explorador/Calculadora/etc., só
+// (lib/panelRegistry.js) — sem duplicar Explorador/Downloads/etc., só
 // muda o invólucro (folha inferior em vez de janela flutuante).
 function MobileToolPanelBody({ type }) {
   const meta = PANEL_TYPES[type];

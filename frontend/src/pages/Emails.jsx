@@ -33,11 +33,11 @@ import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
 import KnowledgeArticleDialog from "@/components/KnowledgeArticleDialog";
 import { toast } from "sonner";
 
-// Estado de processamento do Centro de Conhecimento por email (ver
+// Estado de processamento do Correio Semanal por email (ver
 // GET /emails/correio-semanal/status) — um só sítio a mapear estado →
 // ícone/texto, reaproveitado na linha expandida da caixa de entrada.
 const CSN_STATUS_META = {
-  nao_processado: { icon: "⚪", label: "Nunca processado", action: "Processar para o Centro de Conhecimento" },
+  nao_processado: { icon: "⚪", label: "Nunca processado", action: "Processar para o Correio Semanal" },
   processado: { icon: "🟢", label: "Processado", action: "Atualizar artigo" },
   desatualizado: { icon: "🟡", label: "Motor antigo", action: "Atualizar artigo" },
   erro: { icon: "🔴", label: "Erro no processamento", action: "Tentar novamente" },
@@ -48,7 +48,7 @@ function CorreioSemanalStatusPanel({ status, busy, onProcess, onOpenArticle }) {
   return (
     <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2.5">
       <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-        {meta.icon} Centro de Conhecimento: {meta.label}
+        {meta.icon} Correio Semanal: {meta.label}
       </span>
       {status.status === "erro" && status.error_message ? (
         <span className="text-[11px] text-[color:var(--pastel-red-text)]">{status.error_message}</span>
@@ -60,7 +60,7 @@ function CorreioSemanalStatusPanel({ status, busy, onProcess, onOpenArticle }) {
             size="sm" variant="outline" onClick={() => onOpenArticle(status.article_id)}
             className="h-7 rounded-lg px-2.5 text-xs"
           >
-            Ver no Centro de Conhecimento
+            Ver no Correio Semanal
           </Button>
         ) : null}
         <Button
@@ -370,7 +370,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     setProcessingCsn((prev) => new Set(prev).add(emailId));
     try {
       const { data } = await api.post(`/emails/${emailId}/process-correio-semanal`);
-      toast.success("Correio Semanal processado", { description: "Artigo atualizado no Centro de Conhecimento." });
+      toast.success("Correio Semanal processado", { description: "Artigo do arquivo atualizado." });
       await loadCsnStatus();
       setOpenArticleId(data.article_id);
     } catch (e) {

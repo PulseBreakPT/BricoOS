@@ -575,8 +575,8 @@ export default function Settings() {
           { key: "price_change", label: "Alteração importante de preços", type: "switch" },
           { key: "task_reminder", label: "Lembrete de tarefa", type: "switch" },
           { key: "tasks_overdue_digest", label: "Aviso diário de tarefas atrasadas", type: "switch" },
-          { key: "knowledge_new_article", label: "Novo artigo no Centro de Conhecimento", type: "switch" },
-          { key: "knowledge_engine_updated", label: "Motor de análise do Centro de Conhecimento atualizado", type: "switch" },
+          { key: "knowledge_new_article", label: "Novo artigo no Correio Semanal", type: "switch" },
+          { key: "knowledge_engine_updated", label: "Motor de análise do Correio Semanal atualizado", type: "switch" },
         ]}
       />
 
@@ -624,7 +624,7 @@ export default function Settings() {
           { key: "deadline_warning_days", label: "Avisar antes do prazo terminar", type: "number", suffix: "dias" },
           { key: "price_change_alert_pct", label: "Variação de preço que gera alerta", type: "number", suffix: "%" },
           { key: "notification_scan_minutes", label: "Verificar alertas de pedidos parados/urgentes a cada", type: "number", suffix: "min" },
-          { key: "auto_process_correio_semanal", label: "Processar automaticamente novos Correios Semanais para o Centro de Conhecimento", type: "switch" },
+          { key: "auto_process_correio_semanal", label: "Processar automaticamente novas edições do Correio Semanal", type: "switch" },
         ]}
       />
 

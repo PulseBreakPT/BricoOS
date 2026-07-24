@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import TaskDialog from "@/components/TaskDialog";
+import TaskGroupsDialog from "@/components/TaskGroupsDialog";
 import DailyOperationsView from "@/components/tasks/DailyOperationsView";
 import { haptics } from "@/lib/haptics";
 import { toast } from "sonner";
@@ -368,6 +369,7 @@ export default function Tasks() {
   const [stats, setStats] = useState(null);
   const [dayView, setDayView] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [groupsDialogOpen, setGroupsDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -692,6 +694,9 @@ export default function Tasks() {
           >
             <Sunrise className="mr-2 h-4 w-4" /> Operação do Dia
           </Button>
+          <Button data-testid="task-groups-btn" variant="outline" onClick={() => setGroupsDialogOpen(true)} className="hidden rounded-xl sm:inline-flex">
+            <FolderTree className="mr-2 h-4 w-4" /> Grupos
+          </Button>
           <Button data-testid="add-task-btn" onClick={openNew} className="hidden rounded-xl shadow-lg shadow-slate-400/30 transition-all hover:-translate-y-0.5 hover:shadow-xl sm:inline-flex">
             <Plus className="mr-2 h-4 w-4" /> Nova tarefa
           </Button>
@@ -920,6 +925,12 @@ export default function Tasks() {
         allTasks={tasks}
         collaborators={collaborators}
         onSaved={() => { reload(); loadGroups(); loadTemplates(); }}
+      />
+
+      <TaskGroupsDialog
+        open={groupsDialogOpen}
+        onOpenChange={setGroupsDialogOpen}
+        onChanged={loadGroups}
       />
 
       <Dialog open={!!snoozeTask} onOpenChange={(v) => { if (!v) setSnoozeTask(null); }}>

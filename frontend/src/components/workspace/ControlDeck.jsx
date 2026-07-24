@@ -71,9 +71,6 @@ const OPERATING_APPS = [
 const TOOL_TYPES = [
   "explorer",
   "downloads",
-  "calculator",
-  "scratchpad",
-  "stopwatch",
   "health",
 ];
 

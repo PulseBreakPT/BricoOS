@@ -1,17 +1,13 @@
-import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Library, Calculator as CalculatorIcon, StickyNote, Timer, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
+import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Library, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
 import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
-import TaskGroups from "@/pages/TaskGroups";
 import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import Knowledge from "@/pages/Knowledge";
-import Calculator from "@/components/miniapps/Calculator";
-import Scratchpad from "@/components/miniapps/Scratchpad";
-import Stopwatch from "@/components/miniapps/Stopwatch";
 import HealthPanel from "@/components/HealthPanel";
 import DownloadsCenter from "@/components/DownloadsCenter";
 import Explorer from "@/components/workspace/Explorer";
@@ -19,31 +15,28 @@ import Explorer from "@/components/workspace/Explorer";
 // Registo único de "aplicações" que podem abrir como painel na Área de
 // Trabalho — usado pelo lançador da barra lateral/taskbar, pelas janelas
 // flutuantes (desktop) e pelo alternador (mobile). As páginas normais são
-// reutilizadas tal e qual, sem alterações; as mini-apps (calculadora, bloco
-// de notas, cronómetro, painel de saúde) só existem como painel flutuante —
-// não têm rota própria, por isso ficam de fora de PANEL_ROUTES.
+// reutilizadas tal e qual, sem alterações; o painel de saúde só existe como
+// painel flutuante — não tem rota própria, por isso fica de fora de
+// PANEL_ROUTES. Os grupos de tarefas deixaram de ser uma aplicação própria —
+// vivem agora dentro de Tarefas (ver components/TaskGroupsDialog.jsx).
 export const PANEL_TYPES = {
   notes: { title: "Pedidos", icon: ClipboardList, Component: Notes },
   emails: { title: "Emails", icon: Mail, Component: Emails },
   suppliers: { title: "Fornecedores", icon: Truck, Component: Suppliers },
   tasks: { title: "Tarefas", icon: ListChecks, Component: Tasks },
-  taskGroups: { title: "Grupos de Tarefas", icon: FolderTree, Component: TaskGroups },
   dashboard: { title: "Estatísticas", icon: BarChart3, Component: Dashboard },
   catalog: { title: "Catálogo técnico", icon: BookOpenCheck, Component: Catalog },
-  knowledge: { title: "Centro de Conhecimento", icon: Library, Component: Knowledge },
+  knowledge: { title: "Correio Semanal", icon: Library, Component: Knowledge },
   health: { title: "Painel de Saúde", icon: HeartPulse, Component: HealthPanel },
   downloads: { title: "Downloads", icon: FolderDown, Component: DownloadsCenter },
   explorer: { title: "Explorador", icon: FolderTree, Component: Explorer },
-  calculator: { title: "Calculadora", icon: CalculatorIcon, Component: Calculator },
-  scratchpad: { title: "Bloco de notas", icon: StickyNote, Component: Scratchpad },
-  stopwatch: { title: "Cronómetro", icon: Timer, Component: Stopwatch },
   settings: { title: "Definições", icon: SettingsIcon, Component: Settings },
   notifications: { title: "Notificações", icon: Bell, Component: Notifications },
 };
 
 export const PANEL_ORDER = [
-  "notes", "emails", "suppliers", "tasks", "taskGroups", "knowledge", "dashboard", "catalog",
-  "explorer", "health", "downloads", "calculator", "scratchpad", "stopwatch", "settings", "notifications",
+  "notes", "emails", "suppliers", "tasks", "knowledge", "dashboard", "catalog",
+  "explorer", "health", "downloads", "settings", "notifications",
 ];
 
 // Caminho da rota "normal" de cada tipo — usado para impedir abrir um
@@ -56,7 +49,6 @@ export const PANEL_ROUTES = {
   emails: "/emails",
   suppliers: "/fornecedores",
   tasks: "/tarefas",
-  taskGroups: "/grupos-tarefas",
   knowledge: "/conhecimento",
   dashboard: "/estatisticas",
   catalog: "/catalogo-tecnico",
@@ -69,7 +61,7 @@ export const PANEL_ROUTES = {
 // MobileToolPanelBody, components/workspace/MobileHomeSurface.jsx), sem
 // duplicar componente nenhum. As páginas normais (notes/emails/tasks/...)
 // já têm rota própria no telemóvel, por isso ficam de fora desta lista.
-export const MOBILE_TOOL_TYPES = ["explorer", "downloads", "calculator", "scratchpad", "stopwatch", "health"];
+export const MOBILE_TOOL_TYPES = ["explorer", "downloads", "health"];
 
 export function routeMatchesPanelType(pathname, type) {
   const route = PANEL_ROUTES[type];

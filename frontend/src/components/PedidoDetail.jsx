@@ -1577,7 +1577,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   />
                 ) : (form.related_article_ids || []).length > 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    {form.related_article_ids.length} artigo{form.related_article_ids.length === 1 ? "" : "s"} do Centro de Conhecimento ligado{form.related_article_ids.length === 1 ? "" : "s"}.
+                    {form.related_article_ids.length} artigo{form.related_article_ids.length === 1 ? "" : "s"} do Correio Semanal ligado{form.related_article_ids.length === 1 ? "" : "s"}.
                   </p>
                 ) : (
                   <p className="text-sm italic text-muted-foreground">Sem artigos relacionados.</p>

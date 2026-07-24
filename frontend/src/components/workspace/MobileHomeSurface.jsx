@@ -38,7 +38,7 @@ const HOME_APPS = [
   },
   {
     path: "/conhecimento",
-    label: "Conhecimento",
+    label: "Correio Semanal",
     detail: "Correio guardado",
     icon: Library,
     gradient: "from-cyan-500 to-teal-700",

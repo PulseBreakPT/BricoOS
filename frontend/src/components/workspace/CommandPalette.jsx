@@ -201,7 +201,7 @@ export default function CommandPalette({ open, onOpenChange, onLaunch }) {
                 </ResultGroup>
               ) : null}
               {(results?.knowledge_articles || []).length ? (
-                <ResultGroup label="Centro de Conhecimento" icon={Library}>
+                <ResultGroup label="Correio Semanal" icon={Library}>
                   {results.knowledge_articles.map((a) => (
                     <ResultRow
                       key={a.id} testid={`search-knowledge-${a.id}`} title={a.title}

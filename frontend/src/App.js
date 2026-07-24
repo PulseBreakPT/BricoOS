@@ -8,7 +8,6 @@ import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import Suppliers from "@/pages/Suppliers";
 import Tasks from "@/pages/Tasks";
-import TaskGroups from "@/pages/TaskGroups";
 import Catalog from "@/pages/Catalog";
 import Emails from "@/pages/Emails";
 import Settings from "@/pages/Settings";
@@ -20,6 +19,13 @@ import Knowledge from "@/pages/Knowledge";
 function LegacyClientesRedirect() {
   const location = useLocation();
   return <Navigate to={{ pathname: "/", search: location.search }} replace />;
+}
+
+// Grupos de Tarefas deixou de ser uma página própria — vive agora dentro de
+// Tarefas (botão "Grupos"). Links antigos para /grupos-tarefas continuam a
+// funcionar, só que abrem "/tarefas" em vez de uma página dedicada.
+function LegacyTaskGroupsRedirect() {
+  return <Navigate to="/tarefas" replace />;
 }
 
 function App() {
@@ -38,7 +44,7 @@ function App() {
               <Route path="/fornecedores" element={<Suppliers />} />
               <Route path="/emails" element={<Emails />} />
               <Route path="/tarefas" element={<Tasks />} />
-              <Route path="/grupos-tarefas" element={<TaskGroups />} />
+              <Route path="/grupos-tarefas" element={<LegacyTaskGroupsRedirect />} />
               <Route path="/conhecimento" element={<Knowledge />} />
               <Route path="/catalogo-tecnico" element={<Catalog />} />
               <Route path="/definicoes" element={<Settings />} />

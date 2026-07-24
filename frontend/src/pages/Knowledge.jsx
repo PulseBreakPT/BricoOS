@@ -239,7 +239,7 @@ export default function Knowledge() {
       const { data } = await api.get("/knowledge/articles", { params });
       setArticles(filter === "arquivadas" ? data : data.filter((a) => !a.archived));
     } catch (e) {
-      toast.error(getErrorMessage(e, "Erro ao carregar o Centro de Conhecimento"));
+      toast.error(getErrorMessage(e, "Erro ao carregar o Correio Semanal"));
     } finally {
       setLoading(false);
     }
@@ -300,7 +300,7 @@ export default function Knowledge() {
     setSingleBusy((prev) => new Set(prev).add(emailId));
     try {
       const { data } = await api.post(`/emails/${emailId}/process-correio-semanal`);
-      toast.success("Correio Semanal processado", { description: "Artigo atualizado no Centro de Conhecimento." });
+      toast.success("Correio Semanal processado", { description: "Artigo do arquivo atualizado." });
       await loadCsnStatus();
       setOpenArticleId(data.article_id);
     } catch (e) {
@@ -343,7 +343,7 @@ export default function Knowledge() {
       <div className="flex flex-col gap-1">
         <p className="kicker">Correio Semanal, sempre à mão</p>
         <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
-          Centro de Conhecimento
+          Correio Semanal
         </h1>
       </div>
 

@@ -28,7 +28,7 @@ const WIDGETS = [
   { key: "suppliers", title: "Fornecedores mais rápidos", wide: false },
   { key: "priorities", title: "Por prioridade", wide: false },
   { key: "gmail", title: "Envio de emails", wide: false },
-  { key: "knowledge", title: "Centro de Conhecimento", wide: false },
+  { key: "knowledge", title: "Correio Semanal", wide: false },
 ];
 const WIDGET_KEYS = WIDGETS.map((w) => w.key);
 
@@ -440,7 +440,7 @@ export default function Dashboard() {
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-foreground">
-                  <Library className="h-4 w-4 text-muted-foreground" /> Centro de Conhecimento
+                  <Library className="h-4 w-4 text-muted-foreground" /> Correio Semanal
                 </h2>
                 <Button
                   data-testid="knowledge-widget-open"
