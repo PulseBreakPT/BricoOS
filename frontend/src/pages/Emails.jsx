@@ -6,7 +6,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X,
   BellRing, Forward, BarChart3, FileStack, MessagesSquare,
-  MoreHorizontal, ListChecks, Link2, Unlink2, FileDiff, Check, Trash2, MailPlus,
+  MoreHorizontal, ListChecks, Link2, Unlink2, FileDiff, Check, Trash2, MailPlus, Zap,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -30,7 +30,51 @@ import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import { ListSkeleton } from "@/components/LoadingSkeletons";
 import TaskDialog from "@/components/TaskDialog";
 import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
+import KnowledgeArticleDialog from "@/components/KnowledgeArticleDialog";
 import { toast } from "sonner";
+
+// Estado de processamento do Centro de Conhecimento por email (ver
+// GET /emails/correio-semanal/status) — um só sítio a mapear estado →
+// ícone/texto, reaproveitado na linha expandida da caixa de entrada.
+const CSN_STATUS_META = {
+  nao_processado: { icon: "⚪", label: "Nunca processado", action: "Processar para o Centro de Conhecimento" },
+  processado: { icon: "🟢", label: "Processado", action: "Atualizar artigo" },
+  desatualizado: { icon: "🟡", label: "Motor antigo", action: "Atualizar artigo" },
+  erro: { icon: "🔴", label: "Erro no processamento", action: "Tentar novamente" },
+};
+
+function CorreioSemanalStatusPanel({ status, busy, onProcess, onOpenArticle }) {
+  const meta = CSN_STATUS_META[status.status] || CSN_STATUS_META.nao_processado;
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2.5">
+      <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+        {meta.icon} Centro de Conhecimento: {meta.label}
+      </span>
+      {status.status === "erro" && status.error_message ? (
+        <span className="text-[11px] text-[color:var(--pastel-red-text)]">{status.error_message}</span>
+      ) : null}
+      <div className="ml-auto flex items-center gap-1.5">
+        {status.article_id ? (
+          <Button
+            data-testid={`csn-open-article-${status.email_id}`}
+            size="sm" variant="outline" onClick={() => onOpenArticle(status.article_id)}
+            className="h-7 rounded-lg px-2.5 text-xs"
+          >
+            Ver no Centro de Conhecimento
+          </Button>
+        ) : null}
+        <Button
+          data-testid={`csn-process-${status.email_id}`}
+          size="sm" variant="outline" disabled={busy} onClick={onProcess}
+          className="h-7 rounded-lg px-2.5 text-xs"
+        >
+          {busy ? <Spinner className="mr-1.5 h-3 w-3" /> : <Zap className="mr-1.5 h-3 w-3" />}
+          {meta.action}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const PAGE_SIZE = 30;
 
@@ -304,8 +348,36 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [markingAllSeen, setMarkingAllSeen] = useState(false);
+  const [csnStatus, setCsnStatus] = useState({});
+  const [processingCsn, setProcessingCsn] = useState(() => new Set());
+  const [openArticleId, setOpenArticleId] = useState(null);
   const navigate = useNavigate();
   const loadSeq = useRef(0);
+
+  const loadCsnStatus = useCallback(async () => {
+    try {
+      const { data } = await api.get("/emails/correio-semanal/status");
+      setCsnStatus(Object.fromEntries(data.map((item) => [item.email_id, item])));
+    } catch {
+      // silencioso — não bloqueia a caixa de entrada por causa disto
+    }
+  }, []);
+  useEffect(() => { loadCsnStatus(); }, [loadCsnStatus]);
+
+  const processCsnEmail = async (emailId) => {
+    if (processingCsn.has(emailId)) return;
+    setProcessingCsn((prev) => new Set(prev).add(emailId));
+    try {
+      const { data } = await api.post(`/emails/${emailId}/process-correio-semanal`);
+      toast.success("Correio Semanal processado", { description: "Artigo atualizado no Centro de Conhecimento." });
+      await loadCsnStatus();
+      setOpenArticleId(data.article_id);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Não foi possível processar este Correio Semanal"));
+    } finally {
+      setProcessingCsn((prev) => { const next = new Set(prev); next.delete(emailId); return next; });
+    }
+  };
 
   const load = useCallback(async (opts = {}) => {
     const seq = ++loadSeq.current;
@@ -585,6 +657,14 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               </button>
               {expanded === m.id ? (
                 <div className="mt-3 border-t border-border pt-3">
+                  {csnStatus[m.id] ? (
+                    <CorreioSemanalStatusPanel
+                      status={csnStatus[m.id]}
+                      busy={processingCsn.has(m.id)}
+                      onProcess={() => processCsnEmail(m.id)}
+                      onOpenArticle={setOpenArticleId}
+                    />
+                  ) : null}
                   {m.edition_summary ? (
                     <div className="mb-2 rounded-lg border border-indigo-200 bg-[var(--pastel-indigo-bg)] p-3">
                       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-indigo-text)]">
@@ -820,6 +900,11 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         email={linkDialogFor}
         onOpenChange={(v) => !v && setLinkDialogFor(null)}
         onLinked={() => { setLinkDialogFor(null); load({ silent: true }); }}
+      />
+      <KnowledgeArticleDialog
+        articleId={openArticleId}
+        onOpenChange={(v) => !v && setOpenArticleId(null)}
+        onChanged={loadCsnStatus}
       />
     </div>
   );

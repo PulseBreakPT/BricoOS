@@ -2625,7 +2625,7 @@ async def get_knowledge_article(article_id: str):
         **article, "grouped_sections": grouped, "recurring_themes": themes,
         "implementation": implementation, "linked_tasks": linked_tasks,
         "related_notes": related_notes, "related_suppliers": related_suppliers,
-        "history": history,
+        "history": history, "current_engine_version": knowledge.ENGINE_VERSION,
     }
 
 
@@ -2696,7 +2696,12 @@ async def create_task_from_article_action(article_id: str, payload: KnowledgeCre
 
 @api_router.get("/knowledge/stats")
 async def knowledge_stats():
-    return await knowledge.get_stats(db)
+    stats = await knowledge.get_stats(db)
+    items = await _correio_semanal_status_list()
+    stats["unprocessed_count"] = sum(1 for i in items if i["status"] == "nao_processado")
+    stats["outdated_count"] = sum(1 for i in items if i["status"] == "desatualizado")
+    stats["error_count"] = sum(1 for i in items if i["status"] == "erro")
+    return stats
 
 
 # ---------- Workspace: pesquisa global + IA contextual ----------
@@ -4199,10 +4204,16 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
     prev = (prev_list[0]["structured"] if prev_list else None)
     diff = correio_semanal.diff_digest_versions(prev, structured) if prev else None
 
-    await db.correio_semanal_digests.insert_one({
-        "id": str(uuid.uuid4()), "email_id": email_id, "csn_number": structured["csn_number"],
-        "week_label": structured.get("week_label"), "issue_date": structured.get("issue_date"),
-        "structured": structured, "diff_since_previous": diff, "created_at": now_iso()})
+    # upsert por email_id (não insert_one): reprocessar o mesmo email (botão
+    # manual, lote de importação/reprocessamento) não deve duplicar este
+    # histórico interno — cada email só tem uma tentativa de digest.
+    await db.correio_semanal_digests.update_one(
+        {"email_id": email_id},
+        {"$set": {"csn_number": structured["csn_number"], "week_label": structured.get("week_label"),
+                   "issue_date": structured.get("issue_date"), "structured": structured,
+                   "diff_since_previous": diff, "created_at": now_iso()},
+         "$setOnInsert": {"id": str(uuid.uuid4())}},
+        upsert=True)
 
     created = 0
     base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
@@ -4241,6 +4252,118 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
                                               source="correio_semanal", edition_ref=structured["csn_number"])
 
     return {"digest": structured, "diff": diff, "suggested_tasks_created": created, "prev_digest": prev}
+
+
+# Nomes de email a meio de processamento manual/automático — evita dois
+# processamentos da mesma edição em simultâneo (duplo clique, duas abas, ou
+# o automático e o manual a coincidir). Em memória, não persistido: um
+# reinício do servidor limpa-o sozinho, o que é o comportamento certo (nada
+# fica "preso" para sempre).
+_processing_email_ids = set()
+
+CORREIO_SEMANAL_MAX_AUTO_RETRIES = 5
+
+
+async def _process_correio_semanal_email(email_id):
+    """Reprocessa um único email já em db.received_emails — usado pelo
+    botão manual (Emails.jsx), pelo lote de importar/reprocessar
+    (Knowledge.jsx, um pedido de cada vez) e pela verificação automática
+    ao arrancar/sincronizar. Levanta ValueError com uma mensagem amigável
+    em vez de HTTPException — quem chama decide se converte (endpoint) ou
+    só regista e continua (lote)."""
+    if email_id in _processing_email_ids:
+        raise ValueError("Este Correio Semanal já está a ser processado.")
+    _processing_email_ids.add(email_id)
+    try:
+        email = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
+        if not email:
+            raise ValueError("Email não encontrado.")
+        atts = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(20)
+        pdf_atts = [a for a in atts if (a.get("filename") or "").lower().endswith(".pdf")]
+        if not pdf_atts:
+            raise ValueError("Este email não tem PDF do Correio Semanal para processar.")
+        pdf_bytes_list = [base64.b64decode(a["content_b64"]) for a in pdf_atts]
+        try:
+            result = await _process_correio_semanal(email.get("subject"), pdf_bytes_list, email_id)
+        except Exception as e:
+            await knowledge.mark_processing_error(db, email_id, str(e))
+            raise ValueError(f"Falha ao processar: {e}")
+        if not result:
+            msg = "Não foi possível reconhecer o número da edição neste PDF."
+            await knowledge.mark_processing_error(db, email_id, msg)
+            raise ValueError(msg)
+        return await knowledge.upsert_article_from_correio_semanal(
+            db, email_id=email_id, correio_semanal_result=result)
+    finally:
+        _processing_email_ids.discard(email_id)
+
+
+async def _correio_semanal_status_list():
+    """Estado de processamento do Centro de Conhecimento por cada email
+    reconhecido como Correio Semanal (inclui os anteriores a esta
+    funcionalidade) — fonte única para o badge em Emails.jsx, as
+    ferramentas de Knowledge.jsx e as contagens do Dashboard."""
+    docs = await db.received_emails.find(
+        {"from_email": CORREIO_SEMANAL_SENDER},
+        {"_id": 0, "id": 1, "subject": 1, "received_at": 1, "attachments": 1,
+         "correio_semanal_process_error": 1, "correio_semanal_process_error_at": 1,
+         "correio_semanal_process_error_count": 1},
+    ).sort("received_at", -1).to_list(500)
+    articles = await db.knowledge_articles.find(
+        {"article_type": "correio_semanal"},
+        {"_id": 0, "email_id": 1, "id": 1, "engine_version": 1, "last_processed_at": 1},
+    ).to_list(500)
+    by_email = {a["email_id"]: a for a in articles if a.get("email_id")}
+    items = []
+    for d in docs:
+        att_names = [a.get("filename") for a in d.get("attachments") or []]
+        if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject"), att_names):
+            continue
+        article = by_email.get(d["id"])
+        status = knowledge.processing_status(d, article)
+        items.append({
+            "email_id": d["id"], "subject": d.get("subject"), "received_at": d.get("received_at"),
+            "status": status, "article_id": article.get("id") if article else None,
+            "error_message": d.get("correio_semanal_process_error") if status == "erro" else None,
+        })
+    return items
+
+
+async def _auto_process_correio_semanal():
+    """Verificação automática (arranque + fim de POST /emails/sync):
+    processa tudo o que ainda não tem artigo e tenta de novo o que falhou
+    (até CORREIO_SEMANAL_MAX_AUTO_RETRIES, para não martelar um PDF
+    permanentemente corrompido) — nunca os "desatualizados" (esses só por
+    ação explícita, ver Knowledge.jsx: "Reprocessar desatualizados"). Nunca
+    bloqueia quem a chamou; lançada sempre como tarefa solta. Avisa por
+    notificação se ficarem artigos desatualizados depois desta verificação
+    (motor de análise atualizado entretanto)."""
+    try:
+        automation = await app_settings.get_group(db, "automation_prefs")
+        if not automation.get("auto_process_correio_semanal", True):
+            return
+        items = await _correio_semanal_status_list()
+        for item in items:
+            if item["status"] in ("processado", "desatualizado"):
+                continue
+            if item["status"] == "erro":
+                email = await db.received_emails.find_one(
+                    {"id": item["email_id"]}, {"_id": 0, "correio_semanal_process_error_count": 1})
+                if (email or {}).get("correio_semanal_process_error_count", 0) >= CORREIO_SEMANAL_MAX_AUTO_RETRIES:
+                    continue
+            try:
+                await _process_correio_semanal_email(item["email_id"])
+            except Exception as e:
+                logger.warning(f"Processamento automático do Centro de Conhecimento falhou ({item['email_id']}): {e}")
+        outdated = [i for i in items if i["status"] == "desatualizado"]
+        if outdated:
+            await notifications.create_notification(
+                db, dedup_key=f"engine-outdated-{knowledge.ENGINE_VERSION}",
+                category="knowledge_engine_updated", title="Motor de análise atualizado",
+                body=f"{len(outdated)} artigo(s) do Centro de Conhecimento podem ser melhorados com o motor mais recente.",
+                url="/conhecimento?filtro=atencao")
+    except Exception as e:
+        logger.error(f"Verificação automática do Centro de Conhecimento falhou: {e}")
 
 
 ANEXOS_EDICAO_ACTIONABLE = {
@@ -4675,7 +4798,7 @@ async def poll_supplier_replies():
             logger.warning(f"Notificação falhou (email {email_id}): {e}")
         if correio_semanal_result:
             try:
-                await knowledge.create_article_from_correio_semanal(
+                await knowledge.upsert_article_from_correio_semanal(
                     db, email_id=email_id, correio_semanal_result=correio_semanal_result)
             except Exception as e:
                 logger.warning(f"Criação do artigo do Centro de Conhecimento falhou (email {email_id}): {e}")
@@ -4798,6 +4921,31 @@ async def emails_sync():
     except Exception as e:
         logger.error(f"Sincronização IMAP falhou: {e}")
         raise HTTPException(status_code=502, detail="Não foi possível verificar a caixa de entrada.")
+    finally:
+        # Não bloqueia a resposta do sync — corre à parte, mesmo espírito
+        # do backfill de resumos já disparado no arranque.
+        auto_task = asyncio.create_task(_auto_process_correio_semanal())
+        _background_tasks.add(auto_task)
+        auto_task.add_done_callback(_background_tasks.discard)
+
+
+@api_router.get("/emails/correio-semanal/status")
+async def correio_semanal_status():
+    return await _correio_semanal_status_list()
+
+
+@api_router.post("/emails/{email_id}/process-correio-semanal")
+async def process_correio_semanal_email(email_id: str):
+    """Botão manual "⚡ Processar para o Centro de Conhecimento" / "🔄
+    Atualizar artigo" / "Tentar novamente" em Emails.jsx — funciona para
+    qualquer email reconhecido como Correio Semanal, incluindo os
+    recebidos antes desta funcionalidade existir."""
+    try:
+        article_id = await _process_correio_semanal_email(email_id)
+    except ValueError as e:
+        status_code = 409 if "já está a ser processado" in str(e) else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+    return {"ok": True, "article_id": article_id}
 
 
 @api_router.get("/notes/{note_id}/emails")
@@ -6912,6 +7060,9 @@ async def on_startup():
     backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
     _background_tasks.add(backfill_task)
     backfill_task.add_done_callback(_background_tasks.discard)
+    knowledge_task = asyncio.create_task(_auto_process_correio_semanal())
+    _background_tasks.add(knowledge_task)
+    knowledge_task.add_done_callback(_background_tasks.discard)
     _spawn_supervised("daily_maintenance", _daily_maintenance_loop)
     _spawn_supervised("notification_retry", _notification_retry_loop)
     _spawn_supervised("notification_scan", _notification_scan_loop)

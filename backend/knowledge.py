@@ -24,6 +24,15 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
     from . import severity as severity_engine
 
 
+# Data da última alteração relevante ao motor de extração/classificação/
+# agrupamento — texto (não número), para se perceber de imediato "quando"
+# um artigo foi processado e comparar ao longo do tempo. Incrementada à
+# mão sempre que o motor mudar de forma que valha a pena reprocessar
+# edições antigas (não há deteção automática — é uma decisão humana ao
+# editar este ficheiro, como as outras migrações desta sessão).
+ENGINE_VERSION = "2026.07.24"
+
+
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -156,48 +165,82 @@ async def log_activity(db, article_id, type_, message):
         "message": message, "created_at": _now_iso()})
 
 
-async def create_article_from_correio_semanal(db, *, email_id, correio_semanal_result):
-    """Chamado a partir de poll_supplier_replies (server.py), logo a
-    seguir a `db.received_emails.insert_one` — nunca bloqueia nem altera
-    o processamento do Correio em si; falhas ficam só num log
-    (ver o try/except no ponto de chamada)."""
+async def _copy_email_attachments(db, email_id, article_id, existing_filenames=()):
+    """Copia os PDFs do email (db.email_attachments, ver server.py:
+    poll_supplier_replies/_process_correio_semanal_email) para
+    db.attachments — o artigo é permanente e tem de sobreviver
+    independentemente do email que o originou. `existing_filenames` evita
+    duplicar PDFs já copiados numa atualização (reprocessamento)."""
+    copied = 0
+    now = _now_iso()
+    email_atts = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(20)
+    for att in email_atts:
+        filename = att.get("filename") or ""
+        if not filename.lower().endswith(".pdf") or filename in existing_filenames:
+            continue
+        content_b64 = att.get("content_b64") or ""
+        await db.attachments.insert_one({
+            "id": str(uuid.uuid4()), "owner_kind": "knowledge_article", "owner_id": article_id,
+            "group_id": str(uuid.uuid4()), "version": 1, "filename": filename,
+            "content_type": "application/pdf", "size": len(base64.b64decode(content_b64)) if content_b64 else 0,
+            "content_b64": content_b64, "created_at": now,
+        })
+        copied += 1
+    return copied
+
+
+async def upsert_article_from_correio_semanal(db, *, email_id, correio_semanal_result):
+    """Chamado a partir de poll_supplier_replies (processamento automático
+    de um email novo) e de _process_correio_semanal_email (botão manual,
+    lote de importação/reprocessamento, verificação automática ao
+    arrancar) — nunca bloqueia nem altera o processamento do Correio em
+    si. Cria o artigo se for a primeira vez que esta edição (csn_number)
+    é vista; caso já exista, atualiza-o no próprio lugar em vez de o
+    ignorar ou duplicar — mantém `id`, favoritos, arquivo, etiquetas e
+    histórico de leitura."""
     digest = (correio_semanal_result or {}).get("digest")
     if not digest or not digest.get("csn_number"):
         return None
     csn_number = digest["csn_number"]
 
-    existing = await db.knowledge_articles.find_one(
-        {"csn_number": csn_number, "article_type": "correio_semanal"}, {"_id": 0, "id": 1})
-    if existing:
-        return existing["id"]
-
     sections = _assign_action_ids(digest.get("sections") or [])
     important_count = sum(1 for s in sections if s.get("severity") in SEVERE_LEVELS)
     action_count = sum(1 for s in sections if s.get("action_id"))
-    article_id = str(uuid.uuid4())
     now = _now_iso()
-
-    # Copia os PDFs do email (db.email_attachments, ver server.py:
-    # poll_supplier_replies) para db.attachments — o artigo é permanente e
-    # tem de sobreviver independentemente do email que o originou.
-    attachment_count = 0
-    email_atts = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(20)
-    for att in email_atts:
-        if not (att.get("filename") or "").lower().endswith(".pdf"):
-            continue
-        content_b64 = att.get("content_b64") or ""
-        await db.attachments.insert_one({
-            "id": str(uuid.uuid4()), "owner_kind": "knowledge_article", "owner_id": article_id,
-            "group_id": str(uuid.uuid4()), "version": 1, "filename": att["filename"],
-            "content_type": "application/pdf", "size": len(base64.b64decode(content_b64)) if content_b64 else 0,
-            "content_b64": content_b64, "created_at": now,
-        })
-        attachment_count += 1
-
     week_label = digest.get("week_label") or ""
+    title = f"Correio Semanal {csn_number}" + (f" — {week_label}" if week_label else "")
+
+    existing = await db.knowledge_articles.find_one(
+        {"csn_number": csn_number, "article_type": "correio_semanal"}, {"_id": 0})
+
+    if existing:
+        article_id = existing["id"]
+        existing_filenames = set()
+        async for att in db.attachments.find(
+                {"owner_kind": "knowledge_article", "owner_id": article_id}, {"_id": 0, "filename": 1}):
+            existing_filenames.add(att.get("filename"))
+        new_attachments = await _copy_email_attachments(db, email_id, article_id, existing_filenames)
+        update = {
+            "title": title, "week_label": week_label, "issue_date": digest.get("issue_date") or "",
+            "email_id": email_id, "sections": sections,
+            "deadlines_calendar": digest.get("deadlines_calendar") or [],
+            "by_category": digest.get("by_category") or {}, "by_severity": digest.get("by_severity") or {},
+            "important_count": important_count, "action_count": action_count,
+            "attachment_count": (existing.get("attachment_count") or 0) + new_attachments,
+            "highlights": _top_highlights(sections),
+            "diff_since_previous": correio_semanal_result.get("diff"),
+            "engine_version": ENGINE_VERSION, "last_processed_at": now,
+            "reprocess_count": (existing.get("reprocess_count") or 0) + 1,
+            "last_error": None, "last_error_at": None, "updated_at": now,
+        }
+        await db.knowledge_articles.update_one({"id": article_id}, {"$set": update})
+        await log_activity(db, article_id, "reprocessed", "Artigo atualizado (reprocessado)")
+        return article_id
+
+    article_id = str(uuid.uuid4())
+    attachment_count = await _copy_email_attachments(db, email_id, article_id)
     article = {
-        "id": article_id, "article_type": "correio_semanal",
-        "title": f"Correio Semanal {csn_number}" + (f" — {week_label}" if week_label else ""),
+        "id": article_id, "article_type": "correio_semanal", "title": title,
         "csn_number": csn_number, "week_label": week_label,
         "issue_date": digest.get("issue_date") or "", "email_id": email_id,
         "sections": sections, "deadlines_calendar": digest.get("deadlines_calendar") or [],
@@ -208,6 +251,8 @@ async def create_article_from_correio_semanal(db, *, email_id, correio_semanal_r
         "read_count": 0, "first_read_at": None, "last_read_at": None,
         "pinned": False, "archived": False, "archived_at": None,
         "diff_since_previous": correio_semanal_result.get("diff"),
+        "engine_version": ENGINE_VERSION, "last_processed_at": now, "reprocess_count": 0,
+        "last_error": None, "last_error_at": None,
         "created_at": now, "updated_at": now,
     }
     await db.knowledge_articles.insert_one(dict(article))
@@ -226,6 +271,34 @@ async def create_article_from_correio_semanal(db, *, email_id, correio_semanal_r
         title="Novo artigo no Centro de Conhecimento",
         body=article["title"], url=f"/conhecimento?open={article_id}")
     return article_id
+
+
+async def mark_processing_error(db, email_id, message):
+    """Chamado por _process_correio_semanal_email (server.py) quando o
+    processamento de um email falha — grava no email (para o badge em
+    Emails.jsx) e, se já existir artigo, também nele (para
+    KnowledgeArticleDialog), sem as duas superfícies se terem de cruzar."""
+    now = _now_iso()
+    await db.received_emails.update_one(
+        {"id": email_id},
+        {"$set": {"correio_semanal_process_error": message, "correio_semanal_process_error_at": now},
+         "$inc": {"correio_semanal_process_error_count": 1}})
+    await db.knowledge_articles.update_one(
+        {"email_id": email_id}, {"$set": {"last_error": message, "last_error_at": now}})
+
+
+def processing_status(email_doc, article):
+    """Um só sítio a decidir o estado — reaproveitado pelo endpoint de
+    estado (Emails.jsx/Knowledge.jsx) e por get_stats."""
+    error = (email_doc or {}).get("correio_semanal_process_error")
+    error_at = (email_doc or {}).get("correio_semanal_process_error_at")
+    if error and (not article or (error_at or "") >= (article.get("last_processed_at") or "")):
+        return "erro"
+    if not article:
+        return "nao_processado"
+    if (article.get("engine_version") or "") != ENGINE_VERSION:
+        return "desatualizado"
+    return "processado"
 
 
 async def register_open(db, article_id):
@@ -265,6 +338,7 @@ async def get_stats(db):
     last_edition_at = last_list[0]["created_at"] if last_list else None
     unread_count = await db.knowledge_articles.count_documents(
         {"archived": {"$ne": True}, "read_count": {"$in": [0, None]}})
+    total_articles = await db.knowledge_articles.count_documents({"archived": {"$ne": True}})
     # Ações pendentes: aproximação barata (nº de ações registadas menos
     # tarefas concluídas ligadas a artigos) — o cálculo exato por artigo
     # é implementation_state(), caro de somar em todos os artigos só para
@@ -275,5 +349,6 @@ async def get_stats(db):
     done_tasks = await db.tasks.count_documents({"source_article_id": {"$ne": ""}, "status": "done"})
     return {
         "last_edition_at": last_edition_at, "unread_count": unread_count,
+        "total_articles": total_articles, "engine_version": ENGINE_VERSION,
         "pending_actions_count": max(total_actions - done_tasks, 0), "updated_at": _now_iso(),
     }

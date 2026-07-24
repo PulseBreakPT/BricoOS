@@ -68,6 +68,7 @@ CATEGORY_PRIORITY = {
     "task_reminder": "alta",
     "tasks_overdue_digest": "alta",
     "knowledge_new_article": "media",
+    "knowledge_engine_updated": "media",
     "supplier": "media",
     "correio_semanal": "media",
     "forgotten": "media",
