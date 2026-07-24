@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Send, Paperclip, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import api, { getErrorMessage } from "@/lib/api";
+import PedidoPicker from "@/components/PedidoPicker";
 
 const MAX_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024;
 
@@ -35,12 +36,13 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
   const [contacts, setContacts] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [attachments, setAttachments] = useState([]);
+  const [pedido, setPedido] = useState(null);
   const fileInputRef = useRef(null);
   const contactsSeq = useRef(0);
 
   useEffect(() => {
     if (!open) {
-      setTo(""); setSubject(""); setBody(""); setAttachments([]);
+      setTo(""); setSubject(""); setBody(""); setAttachments([]); setPedido(null);
       return;
     }
     if (forward) setSubject(forward.subject || "");
@@ -91,13 +93,16 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
     setSending(true);
     try {
       if (forward) {
-        await api.post(`/emails/${forward.emailId}/forward`, { to: to.trim(), note: body });
+        await api.post(`/emails/${forward.emailId}/forward`, {
+          to: to.trim(), note: body, note_id: pedido?.note_id || "", pedido_type: pedido?.pedido_type || "",
+        });
         toast.success(`Email reencaminhado para ${to.trim()}`);
       } else {
         const label = contacts.find((c) => c.email === to.trim())?.label || "";
         const payload = {
           to: to.trim(), subject: subject.trim(), body, to_label: label,
           attachments: attachments.map((a) => ({ filename: a.filename, data_b64: a.data_b64 })),
+          note_id: pedido?.note_id || "", pedido_type: pedido?.pedido_type || "",
         };
         await api.post("/emails/compose", payload);
         toast.success(`Email enviado a ${to.trim()}`);
@@ -121,12 +126,22 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
             {forward ? "Reencaminhar email" : "Novo email"}
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            {forward ? `Assunto original: ${forward.subject || "(sem assunto)"}` : "Escreve livremente — não fica associado a nenhum pedido."}
+            {forward ? `Assunto original: ${forward.subject || "(sem assunto)"}` : "Escreve livremente — associa a um pedido em baixo, ou envia sem associação."}
           </p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-1.5">
+            <Label>Associar a um pedido (opcional)</Label>
+            <PedidoPicker
+              testIdPrefix="compose-pedido"
+              selected={pedido}
+              onSelect={setPedido}
+              onClear={() => setPedido(null)}
+            />
+          </div>
+
+          <div className="mt-3 space-y-1.5">
             <Label>Para</Label>
             <Input
               data-testid="compose-to"

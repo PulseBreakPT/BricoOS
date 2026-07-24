@@ -348,6 +348,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [markingAllSeen, setMarkingAllSeen] = useState(false);
+  const [unassociatedOnly, setUnassociatedOnly] = useState(false);
   const [csnStatus, setCsnStatus] = useState({});
   const [processingCsn, setProcessingCsn] = useState(() => new Set());
   const [openArticleId, setOpenArticleId] = useState(null);
@@ -427,7 +428,9 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
     return () => { cancelled = true; controller.abort(); };
   }, [smartQuery]);
 
-  const displayItems = smartQuery ? (smartResult?.items || []) : items;
+  const allDisplayItems = smartQuery ? (smartResult?.items || []) : items;
+  const unassociatedCount = allDisplayItems.filter((m) => !m.matched).length;
+  const displayItems = unassociatedOnly ? allDisplayItems.filter((m) => !m.matched) : allDisplayItems;
   const displayTotal = smartQuery ? (smartResult?.total || 0) : total;
   const displayLoading = smartQuery ? smartLoading : loading;
 
@@ -582,6 +585,14 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
           <p className="text-sm text-muted-foreground">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-testid="emails-filter-unassociated"
+            onClick={() => setUnassociatedOnly((v) => !v)}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold transition-colors sm:px-3 ${unassociatedOnly ? "bg-foreground text-background" : "border border-border bg-card text-muted-foreground hover:bg-muted"}`}
+          >
+            <Unlink2 className="h-3.5 w-3.5" /> Por associar{unassociatedCount ? ` (${unassociatedCount})` : ""}
+          </button>
           <Button data-testid="emails-mark-all-seen" size="sm" variant="outline" disabled={markingAllSeen} onClick={markAllSeen} className="h-8 rounded-lg px-2.5 text-xs sm:px-3">
             {markingAllSeen ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <CheckCheck className="mr-1.5 h-3.5 w-3.5" />} Marcar vistos
           </Button>
@@ -628,7 +639,10 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
       {displayLoading ? (
         <ListSkeleton rows={4} />
       ) : displayItems.length === 0 ? (
-        <EmptyState icon={smartQuery ? Sparkles : Inbox} text={smartQuery ? "Sem resultados para esta pesquisa." : "Sem emails na caixa de entrada."} />
+        <EmptyState
+          icon={smartQuery ? Sparkles : unassociatedOnly ? Unlink2 : Inbox}
+          text={smartQuery ? "Sem resultados para esta pesquisa." : unassociatedOnly ? "Tudo associado — sem emails por associar." : "Sem emails na caixa de entrada."}
+        />
       ) : (
         <div className="mt-3 space-y-2">
           {displayItems.map((m) => (

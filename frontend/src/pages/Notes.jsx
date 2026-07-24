@@ -49,7 +49,7 @@ const PRESETS = [
   { key: "arquivados", label: "Arquivados", filters: { archived: true } },
 ];
 
-const DETAIL_TABS = ["detalhes", "orcamentos", "cronologia", "tarefas"];
+const DETAIL_TABS = ["detalhes", "orcamentos", "comunicacao", "cronologia", "tarefas"];
 
 // Modo recuperação: se a página fechar/recarregar por interrupção (não por
 // fechar o pedido de propósito), a próxima visita retoma exatamente onde
