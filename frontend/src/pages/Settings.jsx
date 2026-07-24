@@ -516,9 +516,6 @@ export default function Settings() {
         <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
           Definições
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Notificações, instalação e informação sobre este dispositivo.
-        </p>
       </div>
 
       <SettingsSection

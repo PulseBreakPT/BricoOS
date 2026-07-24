@@ -1287,9 +1287,6 @@ export default function Emails() {
             </span>
             Emails
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Caixa de entrada completa, enviados e rascunhos por confirmar — mesmo sem relação com um pedido registado.
-          </p>
         </div>
         <div className="mt-2 flex shrink-0 gap-2 sm:mt-1">
           <DropdownMenu>
