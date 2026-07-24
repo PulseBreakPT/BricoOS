@@ -76,6 +76,7 @@ CATEGORY_PRIORITY = {
     "deadline_approaching": "media",
     "processing_error": "media",
     "client_new_note": "media",
+    "bricoaval_backfill": "media",
     "unmatched": "baixa",
 }
 

@@ -1438,6 +1438,8 @@ async def create_note(payload: NoteIn):
                 "created_at": now_iso(), "updated_at": now_iso(), "status_updated_at": now_iso()})
     await db.notes.insert_one(dict(doc))
     await log_activity(doc["id"], "created", f"Pedido criado para {doc.get('customer_name') or 'cliente'}")
+    if doc.get("bricoaval_number"):
+        await _backfill_bricoaval_matches(doc["id"], doc["bricoaval_number"])
     return enrich_note(doc)
 
 
@@ -1491,6 +1493,11 @@ async def update_note(note_id: str, payload: NotePatch):
     if bricoaval_push is not None:
         mongo_update["$push"] = {"bricoaval_history": bricoaval_push}
     await db.notes.update_one({"id": note_id}, mongo_update)
+    if bricoaval_push is not None and update["bricoaval_number"]:
+        # Associação retroativa — só quando o número é atribuído pela
+        # primeira vez ou alterado para um novo valor (nunca ao limpar o
+        # campo, nem quando nenhum outro campo mudou).
+        await _backfill_bricoaval_matches(note_id, update["bricoaval_number"])
     return enrich_note(await db.notes.find_one({"id": note_id}, {"_id": 0}))
 
 
@@ -5026,6 +5033,110 @@ async def _match_note_by_bricoaval(subject, body, attachments, index):
     return None
 
 
+def _attachments_with_data(email_attachment_docs):
+    """Converte docs de db.email_attachments (com content_b64) para a forma
+    {filename, data} usada por _match_note_by_bricoaval/_apply_matched_reply_effects
+    — a mesma forma que os anexos já chegam quando vêm do IMAP ao vivo.
+    Mantém o nome do ficheiro mesmo quando o conteúdo não ficou guardado
+    (caso legado) — _match_note_by_bricoaval também procura no nome do
+    anexo, não só no texto extraído do PDF, por isso não deve deixar de
+    considerar esse anexo só porque falta o conteúdo binário."""
+    out = []
+    for a in email_attachment_docs:
+        data = base64.b64decode(a["content_b64"]) if a.get("content_b64") else b""
+        out.append({"filename": a.get("filename") or "", "data": data})
+    return out
+
+
+async def _backfill_bricoaval_matches(note_id, bricoaval_number):
+    """Associação retroativa: quando um pedido ganha (ou muda) o nº
+    BricoAval, procura no histórico já guardado — sem voltar a consultar o
+    servidor de email — emails/anexos que já mencionam esse número mas
+    ainda não estão ligados a nenhum pedido. Reutiliza integralmente
+    _match_note_by_bricoaval e _apply_matched_reply_effects (a mesma
+    infraestrutura do processamento ao vivo, ver poll_supplier_replies) —
+    não existe uma segunda implementação da correspondência.
+
+    Idempotente: só considera emails com note_id vazio (nunca reatribui uma
+    associação já existente, seja qual for o mecanismo que a resolveu), por
+    isso repetir a chamada nunca duplica nada nem volta a escrever nos
+    emails já processados."""
+    if not bricoaval_number:
+        return
+    note = await db.notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        return
+    index = {bricoaval_number: {"note_id": note_id}}
+    unassociated = {"$or": [{"note_id": {"$exists": False}}, {"note_id": ""}]}
+
+    matched_emails = 0
+    matched_documents = 0
+    matched_pdfs = 0
+
+    received = await db.received_emails.find(unassociated).sort("received_at", 1).to_list(2000)
+    for r in received:
+        atts = await db.email_attachments.find({"email_id": r["id"], "direction": "received"}).to_list(50)
+        att_dicts = _attachments_with_data(atts)
+        hit = await _match_note_by_bricoaval(r.get("subject") or "", r.get("body") or "", att_dicts, index)
+        if not hit:
+            continue
+        reply_kind = await _infer_kind_for_recipient(r.get("from_email") or "", note)
+        if reply_kind == "other":
+            reply_kind = "supplier"
+        await db.received_emails.update_one({"id": r["id"]}, {"$set": {
+            "note_id": note_id, "matched": True, "reply_kind": reply_kind, "match_method": "bricoaval_number"}})
+        await db.email_attachments.update_many({"email_id": r["id"]}, {"$set": {"note_id": note_id}})
+        supplier_name = None
+        if reply_kind == "supplier" and note.get("supplier_id"):
+            sup = await db.suppliers.find_one({"id": note["supplier_id"]}, {"_id": 0, "name": 1})
+            supplier_name = sup.get("name") if sup else None
+        fake_m = {"uid": r.get("uid"), "from_email": r.get("from_email") or "",
+                  "from_name": r.get("from_name") or "", "subject": r.get("subject") or "", "attachments": att_dicts}
+        attachments_meta = r.get("attachments") or []
+        await _apply_matched_reply_effects(
+            note_id, reply_kind, r["id"], fake_m, attachments_meta, supplier_name, log_individual=False)
+        matched_emails += 1
+        matched_documents += len(attachments_meta)
+        matched_pdfs += sum(1 for a in attachments_meta if (a.get("filename") or "").lower().endswith(".pdf"))
+
+    sent = await db.sent_emails.find(unassociated).sort("sent_at", 1).to_list(2000)
+    if sent:
+        pedido_type = await _pedido_type_for_note(note)
+    for s in sent:
+        atts = await db.email_attachments.find({"email_id": s["id"], "direction": "sent"}).to_list(50)
+        att_dicts = _attachments_with_data(atts)
+        hit = await _match_note_by_bricoaval(s.get("subject") or "", s.get("body") or "", att_dicts, index)
+        if not hit:
+            continue
+        await db.sent_emails.update_one({"id": s["id"]}, {"$set": {
+            "note_id": note_id, "match_method": "bricoaval_number", "pedido_type": pedido_type}})
+        await db.email_attachments.update_many({"email_id": s["id"]}, {"$set": {"note_id": note_id}})
+        matched_emails += 1
+        atts_meta = s.get("attachments") or []
+        matched_documents += len(atts_meta)
+        matched_pdfs += sum(1 for a in atts_meta if (a.get("filename") or "").lower().endswith(".pdf"))
+
+    if matched_emails == 0:
+        return
+
+    parts = [f"{matched_emails} email(s) histórico(s)"]
+    if matched_pdfs:
+        parts.append(f"{matched_pdfs} PDF(s)")
+    if matched_documents:
+        parts.append(f"{matched_documents} documento(s) em anexo")
+    await log_activity(note_id, "bricoaval_backfill",
+                       f"Associados automaticamente pelo nº BricoAval {bricoaval_number}: " + ", ".join(parts))
+    try:
+        await notifications.create_notification(
+            db, dedup_key=f"bricoaval-backfill-{note_id}-{bricoaval_number}-{matched_emails}",
+            category="bricoaval_backfill", title="Histórico atualizado",
+            body=f"{matched_emails} email(s) histórico(s) foram associados automaticamente ao pedido "
+                 f"através do nº BricoAval {bricoaval_number}.",
+            url=f"/?open={note_id}", note_id=note_id)
+    except Exception as e:
+        logger.warning(f"Notificação de backfill BricoAval falhou (pedido {note_id}): {e}")
+
+
 async def _match_note_by_headers(m):
     """Sinais 1-5 da cadeia de correspondência (Message-ID, In-Reply-To,
     References, thread do Gmail, identificador interno) — ao contrário de
@@ -5082,7 +5193,8 @@ async def _match_note_by_headers(m):
     return note_id, reply_kind, supplier_id, supplier_name, method
 
 
-async def _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachments_meta, supplier_name=None):
+async def _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachments_meta, supplier_name=None,
+                                        log_individual=True):
     """Efeitos de uma resposta identificada como associada a um pedido —
     avança o estado (fornecedor), analisa PDF de fornecedor e gera PDF de
     cliente automaticamente, ou regista a resposta do cliente (sem avançar
@@ -5091,13 +5203,18 @@ async def _apply_matched_reply_effects(note_id, reply_kind, email_id, m, attachm
     (_match_note_by_headers, sinais 1-5) como pela correspondência por
     assunto/remetente (_match_note_for_reply/_match_client_reply, sinais
     6-7) — os mesmos efeitos, qualquer que seja o sinal que resolveu a
-    associação, para não haver duas versões da mesma lógica."""
-    quem = supplier_name or m.get("from_name") or m["from_email"]
-    verbo = "Resposta recebida de" if reply_kind == "supplier" else "Resposta recebida do cliente"
-    await log_activity(note_id, "email_received",
-                       f"{verbo} {quem}: {m['subject'] or '(sem assunto)'}"
-                       + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
-                       {"from": m["from_email"], "uid": m["uid"], "reply_kind": reply_kind})
+    associação, para não haver duas versões da mesma lógica. `log_individual
+    =False` (usado só por _backfill_bricoaval_matches) suprime a entrada
+    "Resposta recebida" por email — o backfill grava um único evento
+    agregado em vez de inundar a cronologia com dezenas de entradas
+    individuais; o resto dos efeitos (estado, PDF, anexos) é idêntico."""
+    if log_individual:
+        quem = supplier_name or m.get("from_name") or m["from_email"]
+        verbo = "Resposta recebida de" if reply_kind == "supplier" else "Resposta recebida do cliente"
+        await log_activity(note_id, "email_received",
+                           f"{verbo} {quem}: {m['subject'] or '(sem assunto)'}"
+                           + (f" · {len(attachments_meta)} PDF em anexo" if attachments_meta else ""),
+                           {"from": m["from_email"], "uid": m["uid"], "reply_kind": reply_kind})
     if reply_kind == "supplier":
         n = await db.notes.find_one({"id": note_id}, {"_id": 0, "status": 1})
         if n and n.get("status") in WAITING_SUPPLIER:
