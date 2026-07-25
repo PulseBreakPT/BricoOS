@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Spinner } from "@/components/ui/spinner";
 import { useSystemStatus } from "@/context/SystemStatusContext";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -31,7 +32,7 @@ function SettingsSection({ title, description, children }) {
   return (
     <section className="mt-5 first:mt-0">
       <p className="kicker">{title}</p>
-      {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
+      {description ? <p className="mt-0.5 text-sm text-text-body">{description}</p> : null}
       <div className="mt-3 rounded-2xl border border-border bg-card">{children}</div>
     </section>
   );
@@ -47,7 +48,7 @@ function SettingsRow({ icon: Icon, label, description, control, testid }) {
       ) : null}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-foreground">{label}</p>
-        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+        {description ? <p className="mt-0.5 text-xs text-text-body">{description}</p> : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>
@@ -57,7 +58,7 @@ function SettingsRow({ icon: Icon, label, description, control, testid }) {
 function AboutRow({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-2.5 last:border-b-0">
-      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
+      <span className="text-label uppercase text-text-tertiary">{label}</span>
       <span className="text-right font-mono text-xs font-bold text-foreground">{value}</span>
     </div>
   );
@@ -147,9 +148,9 @@ function SettingsFieldsCard({ group, title, description, fields }) {
             type="button"
             disabled={!dirty || saving}
             onClick={handleSave}
-            className="rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="relative rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            Guardar
+            {saving ? <Spinner className="mx-auto h-3.5 w-3.5" /> : "Guardar"}
           </button>
         </div>
       ) : null}
@@ -222,24 +223,24 @@ function ChangePinSection() {
   return (
     <SettingsSection title="Alterar PIN" description="O PIN protege o acesso à app neste e nos outros dispositivos.">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-4">
-        <label className="flex flex-col gap-1 text-xs font-bold text-muted-foreground">
+        <label className="flex flex-col gap-1 text-label uppercase text-text-tertiary">
           PIN atual
           <Input type="password" inputMode="numeric" autoComplete="off" value={current} onChange={(e) => setCurrent(e.target.value)} className="h-9" />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-bold text-muted-foreground">
+        <label className="flex flex-col gap-1 text-label uppercase text-text-tertiary">
           Novo PIN
           <Input type="password" inputMode="numeric" autoComplete="off" value={next} onChange={(e) => setNext(e.target.value)} className="h-9" />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-bold text-muted-foreground">
+        <label className="flex flex-col gap-1 text-label uppercase text-text-tertiary">
           Confirmar novo PIN
           <Input type="password" inputMode="numeric" autoComplete="off" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="h-9" />
         </label>
         <button
           type="submit"
           disabled={busy}
-          className="self-end rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="relative self-end rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          Alterar PIN
+          {busy ? <Spinner className="mx-auto h-3.5 w-3.5" /> : "Alterar PIN"}
         </button>
       </form>
     </SettingsSection>
@@ -323,7 +324,7 @@ function CollaboratorsSection() {
           disabled={saving || !name.trim()}
           className="flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-1.5 text-xs font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          <UserPlus className="h-3.5 w-3.5" /> {editingId ? "Guardar" : "Adicionar"}
+          {saving ? <Spinner className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />} {editingId ? "Guardar" : "Adicionar"}
         </button>
       </div>
       {collaborators === null ? (
@@ -346,7 +347,7 @@ function CollaboratorsSection() {
                   type="button"
                   disabled={busyId === c.id}
                   onClick={() => remove(c)}
-                  className="rounded-lg p-2 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-600 disabled:opacity-40"
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-destructive disabled:opacity-40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

@@ -52,8 +52,8 @@ function pillClass(active) {
 function NotificationBadges({ n }) {
   const badges = [];
   if (n.status === "new" && (n.occurrence_count || 1) <= 1) badges.push({ key: "nova", label: "NOVA", cls: "bg-foreground text-background" });
-  if (n.status === "new" && (n.occurrence_count || 1) > 1) badges.push({ key: "atualizada", label: "ATUALIZADA", cls: "bg-amber-600 text-white" });
-  if (n.computed_priority === "critica") badges.push({ key: "urgente", label: "URGENTE", cls: "bg-red-600 text-white" });
+  if (n.status === "new" && (n.occurrence_count || 1) > 1) badges.push({ key: "atualizada", label: "ATUALIZADA", cls: "bg-warning text-warning-foreground" });
+  if (n.computed_priority === "critica") badges.push({ key: "urgente", label: "URGENTE", cls: "bg-destructive text-destructive-foreground" });
   if (!badges.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -108,12 +108,12 @@ function ContextPanel({ notificationId, navigate }) {
 
       {note ? (
         <div className="flex flex-wrap gap-1.5 text-[10px] font-bold text-muted-foreground">
-          {note.is_overdue ? <span className="rounded-full bg-red-100 px-2 py-1 text-red-700">Atrasado</span> : null}
+          {note.is_overdue ? <span className="rounded-full bg-destructive/10 px-2 py-1 text-destructive">Atrasado</span> : null}
           {note.waiting_on && note.waiting_on !== "none" ? (
             <span className="rounded-full bg-muted px-2 py-1">À espera de {note.waiting_on === "supplier" ? "fornecedor" : note.waiting_on === "client" ? "cliente" : "mim"}</span>
           ) : null}
-          {note.needs_callback ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Recontacto pendente</span> : null}
-          {(note.measurement_warnings || []).length ? <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Medidas a confirmar</span> : null}
+          {note.needs_callback ? <span className="rounded-full bg-warning-bg px-2 py-1 text-warning">Recontacto pendente</span> : null}
+          {(note.measurement_warnings || []).length ? <span className="rounded-full bg-warning-bg px-2 py-1 text-warning">Medidas a confirmar</span> : null}
         </div>
       ) : null}
 
@@ -217,10 +217,10 @@ function NotificationRow({
             <div className="flex items-center gap-2">
               {n.pinned ? <Pin className="h-3 w-3 shrink-0 text-foreground" /> : null}
               <p className="min-w-0 flex-1 truncate text-sm font-bold text-foreground">{n.title}</p>
-              <span className="shrink-0 text-[10px] font-bold text-muted-foreground">{timeAgo(n.created_at)}</span>
+              <span className="shrink-0 text-meta text-text-tertiary">{timeAgo(n.created_at)}</span>
               <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
             </div>
-            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs text-text-body">{n.body}</p>
           </button>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <NotificationBadges n={n} />
@@ -407,7 +407,7 @@ export default function Notifications() {
       </div>
 
       {summary ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2 text-[11px] font-bold text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2 text-meta text-text-tertiary">
           <span>{summary.by_status?.new || 0} novas</span>
           <span>{summary.by_priority?.critica || 0} críticas ativas</span>
           <span>{summary.pinned_count || 0} fixadas</span>

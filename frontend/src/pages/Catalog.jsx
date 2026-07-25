@@ -136,9 +136,9 @@ export default function Catalog() {
           </div>
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-[var(--pastel-red-bg)] p-4 text-[color:var(--pastel-red-text)]">
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/[0.06] p-4 text-destructive">
           <p className="flex items-start gap-2 text-sm font-bold"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {error}</p>
-          <Button ref={retryBtnRef} type="button" variant="outline" disabled={refreshing} onClick={() => loadCatalog()} className="mt-3 rounded-xl border-red-200 bg-card text-[color:var(--pastel-red-text)]">
+          <Button ref={retryBtnRef} type="button" variant="outline" disabled={refreshing} onClick={() => loadCatalog()} className="mt-3 rounded-xl border-destructive/20 bg-card text-destructive">
             {refreshing ? <Spinner className="mr-1.5 h-4 w-4" /> : <RefreshCw className="mr-1.5 h-4 w-4" />} Tentar novamente
           </Button>
         </div>
