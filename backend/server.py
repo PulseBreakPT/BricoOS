@@ -5379,103 +5379,141 @@ async def poll_supplier_replies():
         except DuplicateKeyError:
             logger.debug(f"IMAP: uid {m['uid']} já reclamado por outra execução — a ignorar.")
             continue
-        attachments_meta = []
-        for att in m.get("attachments", []):
-            att_id = str(uuid.uuid4())
-            await db.email_attachments.insert_one({
-                "id": att_id, "email_id": email_id, "note_id": note_id or "",
-                "filename": att["filename"], "content_b64": base64.b64encode(att["data"]).decode(),
-                "direction": "received", "created_at": now_iso()})
-            attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
-        classification = await _classify_email(m["subject"], m["body"])
-        rules_result = await _apply_rules(m["subject"], m["body"], m["from_email"], classification["category"])
-        if rules_result["priority_override"]:
-            classification["priority"] = rules_result["priority_override"]
-            classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
-        correio_semanal_summary = ""
-        correio_semanal_result = None
-        anexos_result = None
-        att_filenames = [att["filename"] for att in m.get("attachments", [])]
-        if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
-            # O boletim e o pacote de anexos (Anexos_Edição.zip) chegam no
-            # mesmo email mas são processados por módulos diferentes — só o
-            # PDF vai para o resumo do Correio Semanal, só o zip para o
-            # anexos_edicao.
-            pdf_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".pdf")]
-            zip_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".zip")]
-            if pdf_atts:
-                pdf_bytes_list = [a["data"] for a in pdf_atts]
-                correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
-                correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
-            if zip_atts:
-                fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
-                anexos_result = await _process_anexos_edicao(
-                    zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
-        elif (m["from_email"] or "").strip().lower() == CORREIO_SEMANAL_SENDER:
-            # Veio do remetente dedicado ao Correio Semanal — que, por
-            # design, só envia este boletim, sempre em PDF (ver comentário
-            # em CORREIO_SEMANAL_SENDER) — mas não foi reconhecido: nem o
-            # assunto nem o nome de nenhum anexo bateram com o padrão
-            # esperado, ou não trouxe qualquer anexo. Nunca deixar isto
-            # passar como um email normal sem qualquer sinal — fica
-            # marcado como erro de processamento, visível no mesmo painel
-            # de "Reprocessar" usado para falhas a meio da extração.
-            await knowledge.mark_processing_error(
-                db, email_id,
-                "Não foi possível reconhecer este email como Correio Semanal "
-                "(assunto vazio ou anexo sem nome reconhecível)."
-                if m.get("attachments") else
-                "Chegou sem qualquer anexo — o Correio Semanal vem sempre em PDF.")
-        edition_summary_result = None
-        if correio_semanal_result or anexos_result:
-            # Resumo único da edição — junta o que veio do boletim com o
-            # que veio do zip (um dos dois pode faltar) no formato pedido:
-            # nº de documentos, assuntos novos, alterações, tarefas
-            # criadas, campanhas iniciadas/terminadas, prazos desta
-            # semana, incidências críticas, informativos e erros.
-            edition_summary_result = edition_summary.build_summary(
-                (correio_semanal_result or {}).get("digest"),
-                (anexos_result or {}).get("processed"),
-                (correio_semanal_result or {}).get("diff"),
-                (anexos_result or {}).get("diff"),
-                (correio_semanal_result or {}).get("prev_digest"),
-                (anexos_result or {}).get("prev_processed"))
-            edition_summary_result["stats"]["tarefas_criadas"] = (
-                ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
-                + ((anexos_result or {}).get("suggested_tasks_created") or 0))
-            edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
-        # O documento já existe (reclamado acima, logo no início) — o resto
-        # dos campos é preenchido agora, calculado com o processamento feito
-        # entretanto. "id"/"uid"/"received_at" já lá estão, não voltam a
-        # entrar aqui.
-        await db.received_emails.update_one({"id": email_id}, {"$set": {
-            "note_id": note_id or "",
-            "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
-            "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
-            "matched": bool(note_id or supplier_id),
-            "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
-            "body_html": m.get("body_html") or "",
-            "attachments": attachments_meta,
-            "has_pdf": any(a["filename"].lower().endswith(".pdf") for a in attachments_meta),
-            **classification,
-            "correio_semanal_summary": correio_semanal_summary,
-            "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
-            "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
-            "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
-            "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
-            "anexos_edicao_number": (anexos_result or {}).get("processed", {}).get("edition_number") or "",
-            "anexos_edicao_summary": {
-                "file_count": (anexos_result or {}).get("processed", {}).get("file_count"),
-                "by_category": (anexos_result or {}).get("processed", {}).get("by_category"),
-            } if anexos_result else None,
-            "anexos_edicao_diff": (anexos_result or {}).get("diff"),
-            "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
-            "edition_summary": edition_summary_result,
-            "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
-            "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
-            "match_method": match_method or "",
-            "seen": False,
-        }})
+        # A partir daqui o email já está "reclamado" (uid único inserido) —
+        # se qualquer passo abaixo (anexos, classificação IA, Correio
+        # Semanal, Anexos_Edição, resumo da edição) rebentar com uma
+        # exceção não apanhada, o índice único em "uid" impede para sempre
+        # que este email volte a ser tentado num próximo sync — ficaria
+        # preso com só {id, uid, received_at}, sem assunto, sem remetente,
+        # sem nada, e nunca mais reprocessável. Por isso todo este bloco
+        # está protegido: se algo falhar a meio, grava-se pelo menos o que
+        # já se sabia de forma segura antes de começar (remetente, assunto,
+        # corpo, a que pedido ficou associado) em vez de deixar um vestígio
+        # inútil e invisível.
+        try:
+            attachments_meta = []
+            for att in m.get("attachments", []):
+                att_id = str(uuid.uuid4())
+                await db.email_attachments.insert_one({
+                    "id": att_id, "email_id": email_id, "note_id": note_id or "",
+                    "filename": att["filename"], "content_b64": base64.b64encode(att["data"]).decode(),
+                    "direction": "received", "created_at": now_iso()})
+                attachments_meta.append({"id": att_id, "filename": att["filename"], "size": len(att["data"])})
+            classification = await _classify_email(m["subject"], m["body"])
+            rules_result = await _apply_rules(m["subject"], m["body"], m["from_email"], classification["category"])
+            if rules_result["priority_override"]:
+                classification["priority"] = rules_result["priority_override"]
+                classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
+            correio_semanal_summary = ""
+            correio_semanal_result = None
+            anexos_result = None
+            att_filenames = [att["filename"] for att in m.get("attachments", [])]
+            if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
+                # O boletim e o pacote de anexos (Anexos_Edição.zip) chegam no
+                # mesmo email mas são processados por módulos diferentes — só o
+                # PDF vai para o resumo do Correio Semanal, só o zip para o
+                # anexos_edicao.
+                pdf_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".pdf")]
+                zip_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".zip")]
+                if pdf_atts:
+                    pdf_bytes_list = [a["data"] for a in pdf_atts]
+                    correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
+                    correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
+                if zip_atts:
+                    fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
+                    anexos_result = await _process_anexos_edicao(
+                        zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
+            elif (m["from_email"] or "").strip().lower() == CORREIO_SEMANAL_SENDER:
+                # Veio do remetente dedicado ao Correio Semanal — que, por
+                # design, só envia este boletim, sempre em PDF (ver comentário
+                # em CORREIO_SEMANAL_SENDER) — mas não foi reconhecido: nem o
+                # assunto nem o nome de nenhum anexo bateram com o padrão
+                # esperado, ou não trouxe qualquer anexo. Nunca deixar isto
+                # passar como um email normal sem qualquer sinal — fica
+                # marcado como erro de processamento, visível no mesmo painel
+                # de "Reprocessar" usado para falhas a meio da extração.
+                await knowledge.mark_processing_error(
+                    db, email_id,
+                    "Não foi possível reconhecer este email como Correio Semanal "
+                    "(assunto vazio ou anexo sem nome reconhecível)."
+                    if m.get("attachments") else
+                    "Chegou sem qualquer anexo — o Correio Semanal vem sempre em PDF.")
+            edition_summary_result = None
+            if correio_semanal_result or anexos_result:
+                # Resumo único da edição — junta o que veio do boletim com o
+                # que veio do zip (um dos dois pode faltar) no formato pedido:
+                # nº de documentos, assuntos novos, alterações, tarefas
+                # criadas, campanhas iniciadas/terminadas, prazos desta
+                # semana, incidências críticas, informativos e erros.
+                edition_summary_result = edition_summary.build_summary(
+                    (correio_semanal_result or {}).get("digest"),
+                    (anexos_result or {}).get("processed"),
+                    (correio_semanal_result or {}).get("diff"),
+                    (anexos_result or {}).get("diff"),
+                    (correio_semanal_result or {}).get("prev_digest"),
+                    (anexos_result or {}).get("prev_processed"))
+                edition_summary_result["stats"]["tarefas_criadas"] = (
+                    ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
+                    + ((anexos_result or {}).get("suggested_tasks_created") or 0))
+                edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
+            # O documento já existe (reclamado acima, logo no início) — o resto
+            # dos campos é preenchido agora, calculado com o processamento feito
+            # entretanto. "id"/"uid"/"received_at" já lá estão, não voltam a
+            # entrar aqui.
+            await db.received_emails.update_one({"id": email_id}, {"$set": {
+                "note_id": note_id or "",
+                "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
+                "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
+                "matched": bool(note_id or supplier_id),
+                "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
+                "body_html": m.get("body_html") or "",
+                "attachments": attachments_meta,
+                "has_pdf": any(a["filename"].lower().endswith(".pdf") for a in attachments_meta),
+                **classification,
+                "correio_semanal_summary": correio_semanal_summary,
+                "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
+                "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
+                "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
+                "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
+                "anexos_edicao_number": (anexos_result or {}).get("processed", {}).get("edition_number") or "",
+                "anexos_edicao_summary": {
+                    "file_count": (anexos_result or {}).get("processed", {}).get("file_count"),
+                    "by_category": (anexos_result or {}).get("processed", {}).get("by_category"),
+                } if anexos_result else None,
+                "anexos_edicao_diff": (anexos_result or {}).get("diff"),
+                "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
+                "edition_summary": edition_summary_result,
+                "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
+                "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
+                "match_method": match_method or "",
+                "seen": False,
+            }})
+        except Exception as e:
+            logger.error(
+                f"Processamento do email {email_id} (uid {m['uid']}) falhou a meio "
+                f"— a gravar só os dados base para não ficar um vestígio inútil: {e}")
+            # Os dados base (quem enviou, assunto, corpo, a que pedido ficou
+            # associado) já eram conhecidos ANTES deste bloco arriscado
+            # começar — não dependem de nada do que rebentou, por isso
+            # gravam-se na mesma. "ingest_error" fica visível para
+            # diagnóstico (não há UI dedicada para isto além do Correio
+            # Semanal, mas pelo menos deixa de ser um email invisível).
+            await db.received_emails.update_one({"id": email_id}, {"$set": {
+                "note_id": note_id or "",
+                "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
+                "from_name": m.get("from_name") or "", "reply_kind": reply_kind,
+                "matched": bool(note_id or supplier_id),
+                "from_email": m["from_email"], "subject": m["subject"], "body": m["body"],
+                "body_html": m.get("body_html") or "",
+                "attachments": [], "has_pdf": False,
+                "priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": "",
+                "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
+                "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
+                "match_method": match_method or "",
+                "seen": False,
+                "ingest_error": str(e),
+            }})
+            continue
         try:
             from_label = supplier_name or m.get("from_name") or m["from_email"]
             if correio_semanal_result or anexos_result:
