@@ -92,10 +92,10 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
         className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-5xl xl:max-w-6xl"
       >
         <DialogHeader className="shrink-0 border-b border-border px-3 py-3 sm:px-6 sm:py-4">
-          <DialogTitle className="pr-8 font-heading text-base font-extrabold tracking-tight sm:text-xl">
+          <DialogTitle className="pr-8 font-heading text-base font-bold sm:text-h3">
             Caixilharia à medida — BandAluminios
           </DialogTitle>
-          <DialogDescription className="pr-8 text-xs text-muted-foreground sm:text-sm">
+          <DialogDescription className="pr-8 text-xs text-text-body sm:text-sm">
             Combine vários elementos e compare PVC com alumínio no mesmo pedido.
           </DialogDescription>
         </DialogHeader>
@@ -117,7 +117,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
                   </div>
                 </div>
                 {note?.supplier_id && bandSupplier && note.supplier_id === bandSupplier.id ? (
-                  <span className="shrink-0 rounded-full bg-[var(--pastel-emerald-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-emerald-text)]">Associado ao pedido</span>
+                  <span className="shrink-0 rounded-full bg-success-bg px-2.5 py-1 text-[11px] font-bold text-success">Associado ao pedido</span>
                 ) : (
                   <Button data-testid="caix-add-supplier" size="sm" variant="outline" onClick={addBandSupplier} disabled={addingSupplier} className="h-8 shrink-0 rounded-lg text-xs">
                     {addingSupplier ? <Spinner className="mr-1 h-3.5 w-3.5" /> : null}
@@ -146,7 +146,7 @@ export default function CaixilhariaDialog({ open, onOpenChange, note, suppliers,
               <span className="hidden sm:inline">{hasSpec ? "Guardar alterações" : "Guardar especificação"}</span>
             </Button>
             {hasSpec ? (
-              <Button data-testid="caix-remove" variant="outline" disabled={removing} onClick={remove} className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]">
+              <Button data-testid="caix-remove" variant="outline" disabled={removing} onClick={remove} className="rounded-xl border-destructive/30 text-destructive hover:bg-[var(--pastel-red-bg)]">
                 {removing ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             ) : null}

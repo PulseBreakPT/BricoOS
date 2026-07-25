@@ -46,7 +46,7 @@ export default function AttachmentPreviewDialog({ open, onOpenChange, attachment
             ) : kind === "pdf" ? (
               <iframe title={attachment.filename} src={attachment.url} onError={() => setPreviewFailed(true)} className="h-[75vh] w-full border-0 bg-card" />
             ) : (
-              <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+              <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-warning">
                 <FileWarning className="h-6 w-6" />
                 Pré-visualização não disponível para este tipo de ficheiro.
               </div>

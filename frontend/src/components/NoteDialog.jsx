@@ -170,10 +170,10 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
         className="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
         <DialogHeader className="border-b border-border px-6 py-5">
-          <DialogTitle className="font-heading text-xl font-bold tracking-tight">
+          <DialogTitle className="font-heading text-h3">
             {isEdit ? "Editar nota" : "Nova nota de cliente"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
+          <DialogDescription className="text-text-body">
             {isEdit ? "Detalhes, medidas e orçamentos de fornecedores." : "Regista o pedido do cliente."}
           </DialogDescription>
         </DialogHeader>
@@ -281,7 +281,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   data-testid="delete-note-btn"
                   variant="outline"
                   onClick={remove}
-                  className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]"
+                  className="rounded-xl border-destructive/30 text-destructive hover:bg-[var(--pastel-red-bg)]"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -299,7 +299,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
               </div>
 
               {!gmailStatus?.connected ? (
-                <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-sm text-[color:var(--pastel-amber-text)]">
+                <div className="mt-3 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-bg p-3 text-sm text-warning">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <div>
                     <p className="font-semibold">Gmail ainda não está ligado</p>
@@ -311,7 +311,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                         data-testid="connect-gmail-inline"
                         size="sm"
                         onClick={connectGmail}
-                        className="mt-2 h-8 rounded-lg bg-amber-600 hover:bg-amber-700"
+                        className="mt-2 h-8 rounded-lg bg-warning hover:bg-warning/90"
                       >
                         Ligar Gmail
                       </Button>
@@ -321,7 +321,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-2.5 text-xs font-medium text-[color:var(--pastel-emerald-text)]">
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-success/30 bg-success-bg p-2.5 text-xs font-medium text-success">
                   <CheckCircle2 className="h-4 w-4" /> Ligado como {gmailStatus.email}
                 </div>
               )}
@@ -338,7 +338,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                   emptyText='Sem fornecedores. Adiciona em "Fornecedores".'
                 />
                 {selectedSupplier && !selectedSupplier.email ? (
-                  <p className="text-xs text-red-500">Este fornecedor não tem email. Adiciona em "Fornecedores".</p>
+                  <p className="text-xs text-destructive">Este fornecedor não tem email. Adiciona em "Fornecedores".</p>
                 ) : null}
               </div>
 
@@ -386,7 +386,7 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
 
               <div className="mt-3 space-y-2">
                 {quotes.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-text-body">
                     Ainda sem orçamentos. Adiciona os preços recebidos abaixo.
                   </p>
                 ) : (
@@ -397,29 +397,29 @@ export default function NoteDialog({ open, onOpenChange, note, suppliers, gmailS
                         key={q.id}
                         data-testid={`quote-row-${q.id}`}
                         className={`flex items-center justify-between rounded-xl border p-3 ${
-                          isBest ? "border-emerald-300 bg-[var(--pastel-emerald-bg)]" : "border-border bg-card"
+                          isBest ? "border-success/30 bg-success-bg" : "border-border bg-card"
                         }`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-semibold text-foreground">{q.supplier_name}</p>
                             {isBest ? (
-                              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                              <span className="rounded-full bg-success px-2 py-0.5 text-[10px] font-bold uppercase text-success-foreground">
                                 Melhor preço
                               </span>
                             ) : null}
                           </div>
-                          {q.product ? <p className="truncate text-xs text-muted-foreground">{q.product}</p> : null}
-                          {q.notes ? <p className="truncate text-xs text-muted-foreground">{q.notes}</p> : null}
+                          {q.product ? <p className="truncate text-xs text-text-tertiary">{q.product}</p> : null}
+                          {q.notes ? <p className="truncate text-xs text-text-tertiary">{q.notes}</p> : null}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className={`font-mono text-base font-bold ${isBest ? "text-[color:var(--pastel-emerald-text)]" : "text-foreground"}`}>
+                          <span className={`font-mono text-base font-bold ${isBest ? "text-success" : "text-foreground"}`}>
                             {q.price.toFixed(2)} €
                           </span>
                           <button
                             data-testid={`delete-quote-${q.id}`}
                             onClick={() => deleteQuote(q.id)}
-                            className="rounded-lg p-1 text-muted-foreground hover:text-red-500"
+                            className="rounded-lg p-1 text-text-tertiary hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

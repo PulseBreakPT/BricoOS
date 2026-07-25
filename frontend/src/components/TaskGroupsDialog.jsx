@@ -84,7 +84,7 @@ export default function TaskGroupsDialog({ open, onOpenChange, onChanged }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="taskgroups-dialog" className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
+          <DialogTitle className="flex items-center gap-2 font-heading text-h3">
             {form ? (
               <button type="button" onClick={() => setForm(null)} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Voltar à lista">
                 <ArrowLeft className="h-4 w-4" />
@@ -126,7 +126,7 @@ export default function TaskGroupsDialog({ open, onOpenChange, onChanged }) {
               </EmptyMedia>
               <EmptyHeader className="gap-1">
                 <EmptyTitle className="font-heading font-extrabold text-foreground">Ainda sem grupos</EmptyTitle>
-                <EmptyDescription className="text-muted-foreground">Cria grupos para organizar as tarefas por obra, área ou projeto.</EmptyDescription>
+                <EmptyDescription className="text-text-body">Cria grupos para organizar as tarefas por obra, área ou projeto.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button data-testid="add-taskgroup-btn-empty" onClick={openNew} className="rounded-xl">
@@ -147,7 +147,7 @@ export default function TaskGroupsDialog({ open, onOpenChange, onChanged }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-foreground">{g.name}</p>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <p className="mt-0.5 flex items-center gap-1 text-meta text-text-tertiary">
                       <ListChecks className="h-3 w-3" /> {g.tasks_count || 0} tarefa{g.tasks_count === 1 ? "" : "s"}
                     </p>
                   </div>
@@ -155,7 +155,7 @@ export default function TaskGroupsDialog({ open, onOpenChange, onChanged }) {
                     <button data-testid={`edit-taskgroup-${g.id}`} onClick={() => openEdit(g)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button data-testid={`delete-taskgroup-${g.id}`} disabled={deletingId === g.id} onClick={() => remove(g)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-[var(--pastel-red-bg)] hover:text-red-600 disabled:opacity-50">
+                    <button data-testid={`delete-taskgroup-${g.id}`} disabled={deletingId === g.id} onClick={() => remove(g)} className="rounded-lg p-2 text-text-tertiary transition-colors hover:bg-[var(--pastel-red-bg)] hover:text-destructive disabled:opacity-50">
                       {deletingId === g.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                     </button>
                   </div>
