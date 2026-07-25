@@ -6,18 +6,28 @@ import { cn } from "@/lib/utils"
 import { Spinner } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none active:scale-[0.97] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  // Hover/active em cor sólida usam brightness em vez de opacidade — a
+  // opacidade dilui a cor para o fundo claro (fica mais pálido, não mais
+  // intenso); brightness escurece a própria cor, lendo como "mais firme"
+  // ao passar o rato/premir, não como "mais transparente".
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:hover:brightness-100 active:scale-[0.97] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-lg",
+          "bg-primary text-primary-foreground shadow hover:brightness-125 hover:-translate-y-0.5 hover:shadow-lg active:brightness-110",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-destructive/25",
+          "bg-destructive text-destructive-foreground shadow-sm hover:brightness-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-destructive/35 active:brightness-75",
         outline:
-          "border border-input shadow-sm hover:bg-accent hover:text-accent-foreground hover:-translate-y-0.5 hover:shadow-md",
+          "border-2 border-input shadow-sm hover:border-primary hover:bg-accent hover:text-accent-foreground hover:-translate-y-0.5 hover:shadow-md",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 hover:-translate-y-0.5 hover:shadow-md",
+          "bg-secondary text-secondary-foreground shadow-sm hover:brightness-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-secondary/35 active:brightness-75",
+        success:
+          "bg-success text-success-foreground shadow-sm hover:brightness-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-success/35 active:brightness-75",
+        warning:
+          "bg-warning text-warning-foreground shadow-sm hover:brightness-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-warning/35 active:brightness-75",
+        info:
+          "bg-info text-info-foreground shadow-sm hover:brightness-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-info/35 active:brightness-75",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
