@@ -13,7 +13,6 @@ import {
   FolderDown,
   FolderTree,
   LayoutGrid,
-  Library,
   ListChecks,
   Lock,
   Mail,
@@ -115,13 +114,6 @@ const ROUTE_APPS = [
     testid: "nav-tarefas",
   },
   {
-    path: "/conhecimento",
-    title: "Correio Semanal",
-    shortTitle: "Correio Semanal",
-    icon: Library,
-    testid: "nav-conhecimento",
-  },
-  {
     path: "/estatisticas",
     title: "Centro de Análise",
     shortTitle: "Estatísticas",
@@ -162,7 +154,7 @@ const NAV_GROUPS = [
   {
     label: "Organização",
     items: [
-      routeApp("/tarefas"), routeApp("/conhecimento"),
+      routeApp("/tarefas"),
       routeApp("/catalogo-tecnico"), routeApp("/estatisticas"),
     ],
   },

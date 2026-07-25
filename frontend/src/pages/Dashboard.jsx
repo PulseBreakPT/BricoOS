@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import {
   ClipboardList, Clock, AlertTriangle, Timer, Mail, ArrowRight, CheckCircle2,
   Link2, Zap, Trophy, GripVertical, EyeOff, Eye, LayoutGrid, RefreshCw, ShieldAlert,
-  Library,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER, timeAgo } from "@/lib/pedido";
@@ -30,7 +29,6 @@ const WIDGETS = [
   { key: "suppliers", title: "Fornecedores mais rápidos", wide: false },
   { key: "priorities", title: "Por prioridade", wide: false },
   { key: "gmail", title: "Envio de emails", wide: false },
-  { key: "knowledge", title: "Correio Semanal", wide: false },
 ];
 const WIDGET_KEYS = WIDGETS.map((w) => w.key);
 
@@ -87,7 +85,6 @@ export default function Dashboard() {
   const [notifs, setNotifs] = useState({ items: [], count: 0 });
   const [needsReview, setNeedsReview] = useState({ items: [], count: 0 });
   const [gmail, setGmail] = useState({ connected: false, configured: false });
-  const [knowledgeStats, setKnowledgeStats] = useState(null);
   const [widgetPrefs, setWidgetPrefs] = useState(loadWidgetPrefs);
   const [loadError, setLoadError] = useState("");
   const [gmailBusy, setGmailBusy] = useState(false);
@@ -119,9 +116,9 @@ export default function Dashboard() {
   const load = useCallback(async (signal) => {
     const seq = ++requestSeq.current;
     try {
-      const [s, t, g, nr, ks] = await Promise.all([
+      const [s, t, g, nr] = await Promise.all([
         api.get("/stats", { signal }), api.get("/today", { signal }), api.get("/gmail/status", { signal }),
-        api.get("/notes/needs-review", { signal }), api.get("/knowledge/stats", { signal }),
+        api.get("/notes/needs-review", { signal }),
       ]);
       if (seq !== requestSeq.current) return; // resposta ultrapassada por um load() mais recente
       setStats(s.data);
@@ -129,7 +126,7 @@ export default function Dashboard() {
       // (build_notifications, via GET /today) que alimenta o Centro de
       // Operações — não o histórico persistido de db.notifications.
       setNotifs({ items: t.data.attention || [], count: t.data.attention_count || 0 });
-      setGmail(g.data); setNeedsReview(nr.data); setKnowledgeStats(ks.data);
+      setGmail(g.data); setNeedsReview(nr.data);
       setLoadError("");
     } catch (e) {
       if (axios.isCancel(e) || seq !== requestSeq.current) return;
@@ -396,90 +393,6 @@ export default function Dashboard() {
                   );
                 })}
               </div>
-            </div>
-          ),
-          knowledge: (
-            <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
-              <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-2 font-heading text-base font-extrabold text-foreground">
-                  <Library className="h-4 w-4 text-muted-foreground" /> Correio Semanal
-                </h2>
-                <Button
-                  data-testid="knowledge-widget-open"
-                  size="sm" variant="outline"
-                  onClick={() => navigate("/conhecimento")}
-                  className="h-7 rounded-lg px-2.5 text-xs"
-                >
-                  Abrir
-                </Button>
-              </div>
-              <div className="mt-4 space-y-2.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Última edição recebida</span>
-                  <span className="font-mono text-xs font-bold tabular-nums text-foreground">
-                    {knowledgeStats?.last_edition_at ? timeAgo(knowledgeStats.last_edition_at) : "–"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Edições por ler</span>
-                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.unread_count ? "text-amber-600" : "text-foreground"}`}>
-                    {knowledgeStats?.unread_count ?? "–"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Artigos ao todo</span>
-                  <span className="font-mono text-xs font-bold tabular-nums text-foreground">
-                    {knowledgeStats?.total_articles ?? "–"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  data-testid="knowledge-widget-unprocessed"
-                  onClick={() => navigate("/conhecimento?filtro=atencao")}
-                  className="flex w-full items-center justify-between text-left disabled:cursor-default"
-                  disabled={!knowledgeStats?.unprocessed_count}
-                >
-                  <span className="text-muted-foreground">Por processar</span>
-                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.unprocessed_count ? "text-amber-600 underline" : "text-foreground"}`}>
-                    {knowledgeStats?.unprocessed_count ?? "–"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  data-testid="knowledge-widget-outdated"
-                  onClick={() => navigate("/conhecimento?filtro=atencao")}
-                  className="flex w-full items-center justify-between text-left disabled:cursor-default"
-                  disabled={!knowledgeStats?.outdated_count}
-                >
-                  <span className="text-muted-foreground">Desatualizados</span>
-                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.outdated_count ? "text-amber-600 underline" : "text-foreground"}`}>
-                    {knowledgeStats?.outdated_count ?? "–"}
-                  </span>
-                </button>
-                {knowledgeStats?.error_count ? (
-                  <button
-                    type="button"
-                    data-testid="knowledge-widget-errors"
-                    onClick={() => navigate("/conhecimento?filtro=atencao")}
-                    className="flex w-full items-center justify-between text-left"
-                  >
-                    <span className="text-muted-foreground">Com erro</span>
-                    <span className="font-mono text-xs font-bold tabular-nums text-red-600 underline">
-                      {knowledgeStats.error_count}
-                    </span>
-                  </button>
-                ) : null}
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Ações pendentes</span>
-                  <span className={`font-mono text-xs font-bold tabular-nums ${knowledgeStats?.pending_actions_count ? "text-red-600" : "text-foreground"}`}>
-                    {knowledgeStats?.pending_actions_count ?? "–"}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-3 text-[10px] font-semibold text-muted-foreground">
-                {knowledgeStats?.updated_at ? `Atualizado ${timeAgo(knowledgeStats.updated_at)}` : ""}
-                {knowledgeStats?.engine_version ? ` · motor ${knowledgeStats.engine_version}` : ""}
-              </p>
             </div>
           ),
           gmail: (

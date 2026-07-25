@@ -6,7 +6,7 @@ import {
   CheckCheck, ArrowRight, Truck, User, Paperclip, UserPlus, Reply, Pencil,
   Sparkles, AlertTriangle, ArrowDown, Wand2, X,
   BellRing, Forward, BarChart3, FileStack, MessagesSquare,
-  MoreHorizontal, ListChecks, Link2, Unlink2, FileDiff, Check, Trash2, MailPlus, Zap,
+  MoreHorizontal, ListChecks, Link2, Unlink2,
 } from "lucide-react";
 import api, { API, getErrorMessage } from "@/lib/api";
 import { withDeviceToken } from "@/lib/deviceAuth";
@@ -30,51 +30,7 @@ import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog";
 import { ListSkeleton } from "@/components/LoadingSkeletons";
 import TaskDialog from "@/components/TaskDialog";
 import LinkEmailToNoteDialog from "@/components/LinkEmailToNoteDialog";
-import KnowledgeArticleDialog from "@/components/KnowledgeArticleDialog";
 import { toast } from "sonner";
-
-// Estado de processamento do Correio Semanal por email (ver
-// GET /emails/correio-semanal/status) — um só sítio a mapear estado →
-// ícone/texto, reaproveitado na linha expandida da caixa de entrada.
-const CSN_STATUS_META = {
-  nao_processado: { icon: "⚪", label: "Nunca processado", action: "Processar para o Correio Semanal" },
-  processado: { icon: "🟢", label: "Processado", action: "Atualizar artigo" },
-  desatualizado: { icon: "🟡", label: "Motor antigo", action: "Atualizar artigo" },
-  erro: { icon: "🔴", label: "Erro no processamento", action: "Tentar novamente" },
-};
-
-function CorreioSemanalStatusPanel({ status, busy, onProcess, onOpenArticle }) {
-  const meta = CSN_STATUS_META[status.status] || CSN_STATUS_META.nao_processado;
-  return (
-    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2.5">
-      <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-        {meta.icon} Correio Semanal: {meta.label}
-      </span>
-      {status.status === "erro" && status.error_message ? (
-        <span className="text-[11px] text-[color:var(--pastel-red-text)]">{status.error_message}</span>
-      ) : null}
-      <div className="ml-auto flex items-center gap-1.5">
-        {status.article_id ? (
-          <Button
-            data-testid={`csn-open-article-${status.email_id}`}
-            size="sm" variant="outline" onClick={() => onOpenArticle(status.article_id)}
-            className="h-7 rounded-lg px-2.5 text-xs"
-          >
-            Ver no Correio Semanal
-          </Button>
-        ) : null}
-        <Button
-          data-testid={`csn-process-${status.email_id}`}
-          size="sm" variant="outline" disabled={busy} onClick={onProcess}
-          className="h-7 rounded-lg px-2.5 text-xs"
-        >
-          {busy ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
-          {meta.action}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 const PAGE_SIZE = 30;
 
@@ -184,148 +140,6 @@ function EmptyState({ icon: Icon, text }) {
   );
 }
 
-const ANEXOS_CATEGORY_LABELS = {
-  tabela_precos: "tabela(s) de preços", nota_encomenda: "nota(s) de encomenda",
-  incidencia: "incidência(s)", lista_limpeza: "lista(s) de limpeza",
-  dossier_gama: "dossier(s) de gama", planograma: "planograma(s)",
-  campanha: "campanha(s)", catalogo: "catálogo(s)", outro: "outro(s)",
-  informativo: "informativo(s)", tecnico: "técnico(s)",
-};
-
-const SEVERITY_BADGE_CFG = {
-  critico: { label: "Crítico", cls: "bg-[var(--pastel-red-bg)] text-[color:var(--pastel-red-text)]" },
-  urgente: { label: "Urgente", cls: "bg-[var(--pastel-orange-bg)] text-[color:var(--pastel-orange-text)]" },
-  importante: { label: "Importante", cls: "bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)]" },
-  informacao: { label: "Informação", cls: "bg-[var(--pastel-blue-bg)] text-[color:var(--pastel-blue-text)]" },
-  arquivo: { label: "Arquivo", cls: "bg-muted text-muted-foreground" },
-};
-
-function SeverityBadge({ severity }) {
-  const cfg = SEVERITY_BADGE_CFG[severity];
-  if (!cfg) return null;
-  return <span className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold 3xl:text-[11px] ${cfg.cls}`}>{cfg.label}</span>;
-}
-
-// Uma linha de tarefa sugerida — 3 formas conforme t.kind: "task" simples
-// (Aceitar/Dispensar), "email_draft" (+ link mailto para o rascunho) e
-// "new_category_suggestion" (pede o nome da categoria antes de aceitar —
-// ver classification_rules.py: um tipo de documento que se repete sem
-// bater com nenhuma categoria conhecida chega aqui para um humano decidir
-// o nome; a partir daí fica gravado na base de dados, nunca no código).
-function SuggestedTaskRow({ task, busy, onAccept, onDismiss, testId }) {
-  const [categoryName, setCategoryName] = useState("");
-  if (task.kind === "new_category_suggestion") {
-    return (
-      <div data-testid={testId} className="rounded-lg border border-violet-200 bg-card px-2.5 py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{task.title}</span>
-        </div>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <input
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            placeholder="Nome da categoria"
-            className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-[11px] text-foreground"
-          />
-          <button type="button" disabled={busy || !categoryName.trim()} onClick={() => onAccept(categoryName.trim())}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/90 disabled:opacity-50">
-            <Check className="h-3.5 w-3.5" /> Criar categoria
-          </button>
-          <button type="button" disabled={busy} onClick={onDismiss}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-[11px] font-bold text-destructive hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div data-testid={testId} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
-      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{task.title}</span>
-      <SeverityBadge severity={task.severity} />
-      {task.kind === "email_draft" ? (
-        <a href={task.mailto} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground">
-          <MailPlus className="h-3.5 w-3.5" /> Abrir rascunho
-        </a>
-      ) : null}
-      <button type="button" disabled={busy} onClick={() => onAccept()}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/90 disabled:opacity-50">
-        <Check className="h-3.5 w-3.5" /> Aceitar
-      </button>
-      <button type="button" disabled={busy} onClick={onDismiss}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-[11px] font-bold text-destructive hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
-        <Trash2 className="h-3.5 w-3.5" /> Dispensar
-      </button>
-    </div>
-  );
-}
-
-// Tarefas sugeridas a partir do Correio Semanal ou do Anexos_Edição.zip —
-// nunca entram na lista de tarefas normal sozinhas, ficam aqui para
-// aceitar ou dispensar uma a uma (mesmo princípio de confirmação humana
-// usado no resto da app). `filterField`/`filterValue` escolhem a origem:
-// "csn_number" para o boletim, "edition_number" para os anexos.
-function SuggestedTasksPanel({ filterField, filterValue, heading }) {
-  const [tasks, setTasks] = useState(null);
-  const [busyId, setBusyId] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    api.get("/tasks", { params: { suggested: true } })
-      .then(({ data }) => { if (alive) setTasks((data || []).filter((t) => t[filterField] === filterValue)); })
-      .catch(() => { if (alive) setTasks([]); });
-    return () => { alive = false; };
-  }, [filterField, filterValue]);
-
-  const accept = async (task, categoryName) => {
-    setBusyId(task.id);
-    try {
-      if (task.kind === "new_category_suggestion") {
-        await api.post(`/tasks/${task.id}/accept-new-category`, { category: categoryName });
-        toast.success(`Categoria "${categoryName}" criada — passa a reconhecer-se sozinha nas próximas edições.`);
-      } else {
-        await api.post(`/tasks/${task.id}/accept-suggestion`);
-        toast.success("Tarefa aceite — já está na lista de tarefas.");
-      }
-      setTasks((prev) => prev.filter((t) => t.id !== task.id));
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível aceitar a sugestão"));
-    } finally {
-      setBusyId(null);
-    }
-  };
-  const dismiss = async (id) => {
-    setBusyId(id);
-    try {
-      await api.delete(`/tasks/${id}`);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível dispensar a sugestão"));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  if (!tasks || tasks.length === 0) return null;
-  return (
-    <div className="mb-2 rounded-lg border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-3">
-      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-emerald-text)]">
-        <ListChecks className="h-3.5 w-3.5" /> {heading} ({tasks.length})
-      </p>
-      <div className="space-y-1.5">
-        {tasks.map((t) => (
-          <SuggestedTaskRow
-            key={t.id} task={t} busy={busyId === t.id}
-            testId={`suggested-task-${t.id}`}
-            onAccept={(categoryName) => accept(t, categoryName)}
-            onDismiss={() => dismiss(t.id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // Caixa de entrada — TODOS os emails recebidos, mesmo sem relação com um
 // pedido (esses ficam com etiqueta "Sem pedido associado").
 function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
@@ -349,36 +163,8 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [markingAllSeen, setMarkingAllSeen] = useState(false);
   const [unassociatedOnly, setUnassociatedOnly] = useState(false);
-  const [csnStatus, setCsnStatus] = useState({});
-  const [processingCsn, setProcessingCsn] = useState(() => new Set());
-  const [openArticleId, setOpenArticleId] = useState(null);
   const navigate = useNavigate();
   const loadSeq = useRef(0);
-
-  const loadCsnStatus = useCallback(async () => {
-    try {
-      const { data } = await api.get("/emails/correio-semanal/status");
-      setCsnStatus(Object.fromEntries(data.map((item) => [item.email_id, item])));
-    } catch {
-      // silencioso — não bloqueia a caixa de entrada por causa disto
-    }
-  }, []);
-  useEffect(() => { loadCsnStatus(); }, [loadCsnStatus]);
-
-  const processCsnEmail = async (emailId) => {
-    if (processingCsn.has(emailId)) return;
-    setProcessingCsn((prev) => new Set(prev).add(emailId));
-    try {
-      const { data } = await api.post(`/emails/${emailId}/process-correio-semanal`);
-      toast.success("Correio Semanal processado", { description: "Artigo do arquivo atualizado." });
-      await loadCsnStatus();
-      setOpenArticleId(data.article_id);
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Não foi possível processar este Correio Semanal"));
-    } finally {
-      setProcessingCsn((prev) => { const next = new Set(prev); next.delete(emailId); return next; });
-    }
-  };
 
   const load = useCallback(async (opts = {}) => {
     const seq = ++loadSeq.current;
@@ -671,119 +457,6 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               </button>
               {expanded === m.id ? (
                 <div className="mt-3 border-t border-border pt-3">
-                  {csnStatus[m.id] ? (
-                    <CorreioSemanalStatusPanel
-                      status={csnStatus[m.id]}
-                      busy={processingCsn.has(m.id)}
-                      onProcess={() => processCsnEmail(m.id)}
-                      onOpenArticle={setOpenArticleId}
-                    />
-                  ) : null}
-                  {m.edition_summary ? (
-                    <div className="mb-2 rounded-lg border border-indigo-200 bg-[var(--pastel-indigo-bg)] p-3">
-                      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-indigo-text)]">
-                        <BarChart3 className="h-3.5 w-3.5" /> Resumo da edição
-                      </p>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-text-body sm:grid-cols-3 3xl:grid-cols-5">
-                        <p>{m.edition_summary.stats.documentos_analisados} documentos analisados</p>
-                        <p>{m.edition_summary.stats.assuntos_novos} assuntos novos</p>
-                        <p>{m.edition_summary.stats.alteracoes} alterações</p>
-                        <p>{m.edition_summary.stats.tarefas_criadas} tarefas criadas</p>
-                        <p>{m.edition_summary.stats.campanhas_iniciadas} campanhas iniciadas</p>
-                        <p>{m.edition_summary.stats.campanhas_terminadas} campanhas terminadas</p>
-                        <p>{m.edition_summary.stats.prazos_esta_semana} prazos esta semana</p>
-                        <p className={m.edition_summary.stats.incidencias_criticas ? "font-bold text-[color:var(--pastel-red-text)]" : ""}>
-                          {m.edition_summary.stats.incidencias_criticas} incidência(s) crítica(s)
-                        </p>
-                        <p>{m.edition_summary.stats.documentos_informativos} documentos informativos</p>
-                        <p>{m.edition_summary.stats.erros_processamento} erros de processamento</p>
-                      </div>
-                      {m.edition_summary.related_entities?.fornecedores?.length ? (
-                        <p className="mt-1.5 text-[11px] text-text-body">
-                          Fornecedores mencionados: {m.edition_summary.related_entities.fornecedores.join(", ")}
-                        </p>
-                      ) : null}
-                      {m.edition_summary.related_entities?.campanhas?.length ? (
-                        <p className="mt-0.5 text-[11px] text-text-body">
-                          Campanhas: {m.edition_summary.related_entities.campanhas.join(", ")}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {m.correio_semanal_diff ? (
-                    <div className="mb-2 rounded-lg border border-amber-200 bg-[var(--pastel-amber-bg)] p-3">
-                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-amber-text)]">
-                        <FileDiff className="h-3.5 w-3.5" /> Alterações desde o Correio Semanal Nº{m.correio_semanal_diff.prev_csn_number}
-                      </p>
-                      {m.correio_semanal_diff.has_changes ? (
-                        <div className="space-y-1 text-[11px] text-text-body">
-                          {m.correio_semanal_diff.added_sections?.length ? <p>🆕 Novos assuntos: {m.correio_semanal_diff.added_sections.join(", ")}</p> : null}
-                          {m.correio_semanal_diff.removed_sections?.length ? <p>❌ Assuntos que saíram: {m.correio_semanal_diff.removed_sections.join(", ")}</p> : null}
-                          {m.correio_semanal_diff.added_deadlines?.length ? <p>📅 Novos prazos: {m.correio_semanal_diff.added_deadlines.join("; ")}</p> : null}
-                          {m.correio_semanal_diff.removed_deadlines?.length ? <p>✅ Prazos que já saíram da lista: {m.correio_semanal_diff.removed_deadlines.join("; ")}</p> : null}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-text-body">Sem alterações estruturais desde a edição anterior.</p>
-                      )}
-                    </div>
-                  ) : null}
-                  {m.correio_semanal_csn_number ? (
-                    <SuggestedTasksPanel filterField="csn_number" filterValue={m.correio_semanal_csn_number}
-                      heading="Tarefas sugeridas" />
-                  ) : null}
-                  {m.anexos_edicao_number ? (
-                    <div className="mb-2 rounded-lg border border-violet-200 bg-[var(--pastel-violet-bg)] p-3">
-                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-violet-text)]">
-                        <FileStack className="h-3.5 w-3.5" /> Anexos da Edição Nº{m.anexos_edicao_number}
-                      </p>
-                      <p className="mb-1 text-[11px] text-text-body">
-                        {m.anexos_edicao_summary?.file_count ?? 0} ficheiro(s) processado(s)
-                        {m.anexos_edicao_summary?.by_category
-                          ? " · " + Object.entries(m.anexos_edicao_summary.by_category)
-                              .map(([k, v]) => `${v} ${ANEXOS_CATEGORY_LABELS[k] || k}`).join(", ")
-                          : ""}
-                      </p>
-                      {m.anexos_edicao_diff ? (
-                        m.anexos_edicao_diff.has_changes ? (
-                          <div className="space-y-1 text-[11px] text-text-body">
-                            <p>Desde a edição Nº{m.anexos_edicao_diff.prev_edition}:</p>
-                            {m.anexos_edicao_diff.new_files?.length ? <p>🆕 {m.anexos_edicao_diff.new_files.length} ficheiro(s) novo(s)</p> : null}
-                            {m.anexos_edicao_diff.removed_files?.length ? <p>❌ {m.anexos_edicao_diff.removed_files.length} ficheiro(s) removido(s)</p> : null}
-                            {m.anexos_edicao_diff.updated_files?.length ? <p>✏️ {m.anexos_edicao_diff.updated_files.length} ficheiro(s) atualizado(s)</p> : null}
-                            {m.anexos_edicao_diff.price_changes_count ? <p>💶 {m.anexos_edicao_diff.price_changes_count} alteração(ões) de preço</p> : null}
-                            {m.anexos_edicao_diff.new_products_count ? <p>🟢 {m.anexos_edicao_diff.new_products_count} produto(s) novo(s)</p> : null}
-                            {m.anexos_edicao_diff.discontinued_products_count ? <p>🔴 {m.anexos_edicao_diff.discontinued_products_count} produto(s) descontinuado(s)</p> : null}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-text-body">Sem alterações desde a edição anterior.</p>
-                        )
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {m.anexos_edicao_number ? (
-                    <SuggestedTasksPanel filterField="edition_number" filterValue={m.anexos_edicao_number}
-                      heading="Tarefas sugeridas dos anexos" />
-                  ) : null}
-                  {m.correio_semanal_summary ? (
-                    <div className="mb-2 rounded-lg border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
-                      <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-blue-text)]">
-                        <ListChecks className="h-3.5 w-3.5" /> Resumo do Correio Semanal
-                      </p>
-                      {m.correio_semanal_summary.startsWith("<") ? (
-                        <div
-                          className={"max-h-96 overflow-y-auto text-xs text-foreground "
-                            + "[&_h3]:mb-2 [&_h3]:font-heading [&_h3]:text-sm [&_h3]:font-extrabold [&_h3]:tracking-tight [&_h3]:text-[color:var(--pastel-blue-text)] "
-                            + "[&_h4]:mb-1 [&_h4]:mt-4 [&_h4]:border-b [&_h4]:border-blue-200 [&_h4]:pb-1 [&_h4]:text-[13px] [&_h4]:font-extrabold [&_h4]:text-[color:var(--pastel-blue-text)] [&_h3+h4]:mt-0 "
-                            + "[&_ul]:mb-2 [&_ul]:space-y-1 [&_ul]:pl-1 [&_li]:rounded-md [&_li]:bg-card/70 [&_li]:px-2 [&_li]:py-1 "
-                            + "[&_p]:mb-1.5 [&_strong]:font-bold [&_strong]:text-[color:var(--pastel-blue-text)] "
-                            + "[&_.csn-action]:mb-2 [&_.csn-action]:inline-flex [&_.csn-action]:rounded-full [&_.csn-action]:bg-[var(--pastel-amber-bg)] [&_.csn-action]:px-2 [&_.csn-action]:py-0.5 [&_.csn-action]:text-[10px] [&_.csn-action]:font-bold [&_.csn-action]:text-[color:var(--pastel-amber-text)]"}
-                          dangerouslySetInnerHTML={{ __html: m.correio_semanal_summary }}
-                        />
-                      ) : (
-                        <p className="max-h-96 overflow-y-auto whitespace-pre-wrap text-xs text-[color:var(--pastel-blue-text)]">{m.correio_semanal_summary}</p>
-                      )}
-                    </div>
-                  ) : null}
                   <EmailBody html={m.body_html} text={m.body} />
                   {(m.attachments || []).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -914,11 +587,6 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
         email={linkDialogFor}
         onOpenChange={(v) => !v && setLinkDialogFor(null)}
         onLinked={() => { setLinkDialogFor(null); load({ silent: true }); }}
-      />
-      <KnowledgeArticleDialog
-        articleId={openArticleId}
-        onOpenChange={(v) => !v && setOpenArticleId(null)}
-        onChanged={loadCsnStatus}
       />
     </div>
   );

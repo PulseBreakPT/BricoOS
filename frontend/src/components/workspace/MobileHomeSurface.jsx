@@ -4,7 +4,6 @@ import {
   BarChart3,
   BookOpenCheck,
   ClipboardList,
-  Library,
   ListChecks,
   Mail,
   Truck,
@@ -35,13 +34,6 @@ const HOME_APPS = [
     detail: "Prioridades",
     icon: ListChecks,
     gradient: "from-emerald-500 to-teal-700",
-  },
-  {
-    path: "/conhecimento",
-    label: "Correio Semanal",
-    detail: "Correio guardado",
-    icon: Library,
-    gradient: "from-cyan-500 to-teal-700",
   },
   {
     path: "/fornecedores",

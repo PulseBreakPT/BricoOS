@@ -158,40 +158,6 @@ function SettingsFieldsCard({ group, title, description, fields }) {
   );
 }
 
-// Painel só de leitura com as categorias/palavras-chave que o motor de
-// classificação já reconhece automaticamente (anexos_edicao.py,
-// correio_semanal.py) — não é editável aqui, é o mesmo risco identificado
-// no plano para VALID_CATEGORIES: mudar isto à mão parte lógica espalhada
-// pelo código, por isso fica só como visibilidade.
-function ClassificationRulesPanel() {
-  const [rules, setRules] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get("/classification-rules")
-      .then(({ data }) => { if (!cancelled) setRules(data.categories || []); })
-      .catch(() => { if (!cancelled) setRules([]); });
-    return () => { cancelled = true; };
-  }, []);
-
-  return (
-    <SettingsSection
-      title="Classificação automática"
-      description="Categorias que o sistema já reconhece sozinho nos documentos recebidos."
-    >
-      {rules === null ? (
-        <div className="p-4 text-sm text-muted-foreground">A carregar…</div>
-      ) : rules.length === 0 ? (
-        <div className="p-4 text-sm text-muted-foreground">Sem categorias configuradas.</div>
-      ) : (
-        rules.map((r) => (
-          <AboutRow key={r.category} label={r.category} value={`${r.keyword_count} palavras-chave`} />
-        ))
-      )}
-    </SettingsSection>
-  );
-}
-
 // Formulário de alteração do PIN de acesso — hoje não existia nenhuma forma
 // de o fazer sem editar a base de dados à mão.
 function ChangePinSection() {
@@ -559,7 +525,6 @@ export default function Settings() {
         fields={[
           { key: "supplier", label: "Respostas de fornecedores", type: "switch" },
           { key: "client", label: "Respostas de clientes", type: "switch" },
-          { key: "correio_semanal", label: "Correio Semanal e Anexos_Edição", type: "switch" },
           { key: "unmatched", label: "Emails sem pedido associado", type: "switch" },
           { key: "waiting_supplier", label: "Pedido parado à espera do fornecedor", type: "switch" },
           { key: "forgotten", label: "Pedido esquecido", type: "switch" },
@@ -567,17 +532,12 @@ export default function Settings() {
           { key: "reminder_overdue", label: "Lembrete atrasado", type: "switch" },
           { key: "quote_quality_issue", label: "Problema de qualidade no orçamento do fornecedor", type: "switch" },
           { key: "quote_changed", label: "Orçamento do fornecedor atualizado", type: "switch" },
-          { key: "anexos_incidencia_critica", label: "Incidência crítica no Anexos_Edição", type: "switch" },
           { key: "client_new_note", label: "Novo pedido de cliente", type: "switch" },
           { key: "task_urgent", label: "Tarefa urgente criada", type: "switch" },
           { key: "deadline_approaching", label: "Prazo prestes a terminar", type: "switch" },
-          { key: "document_read_failure", label: "Falha na leitura de um documento", type: "switch" },
           { key: "processing_error", label: "Erro de processamento", type: "switch" },
-          { key: "price_change", label: "Alteração importante de preços", type: "switch" },
           { key: "task_reminder", label: "Lembrete de tarefa", type: "switch" },
           { key: "tasks_overdue_digest", label: "Aviso diário de tarefas atrasadas", type: "switch" },
-          { key: "knowledge_new_article", label: "Novo artigo no Correio Semanal", type: "switch" },
-          { key: "knowledge_engine_updated", label: "Motor de análise do Correio Semanal atualizado", type: "switch" },
         ]}
       />
 
@@ -620,12 +580,9 @@ export default function Settings() {
           { key: "auto_close_months", label: "Arquivar pedidos inativos após", type: "number", suffix: "meses" },
           { key: "default_sla_days", label: "Prazo padrão de resposta a um pedido", type: "number", suffix: "dias" },
           { key: "reminder_interval_days", label: "Intervalo padrão entre lembretes", type: "number", suffix: "dias" },
-          { key: "category_suggestion_threshold", label: "Edições repetidas antes de sugerir categoria nova", type: "number" },
           { key: "supplier_quote_history_limit", label: "Versões do orçamento guardadas no histórico", type: "number" },
           { key: "deadline_warning_days", label: "Avisar antes do prazo terminar", type: "number", suffix: "dias" },
-          { key: "price_change_alert_pct", label: "Variação de preço que gera alerta", type: "number", suffix: "%" },
           { key: "notification_scan_minutes", label: "Verificar alertas de pedidos parados/urgentes a cada", type: "number", suffix: "min" },
-          { key: "auto_process_correio_semanal", label: "Processar automaticamente novas edições do Correio Semanal", type: "switch" },
         ]}
       />
 
@@ -646,10 +603,9 @@ export default function Settings() {
       <SettingsFieldsCard
         group="upload_limits"
         title="Limites de anexos"
-        description="Tamanhos e quantidades máximas aceites em PDFs de fornecedores, no Anexos_Edição e nos emails enviados."
+        description="Tamanhos e quantidades máximas aceites em PDFs de fornecedores e nos emails enviados."
         fields={[
           { key: "max_supplier_pdf_mb", label: "Tamanho máximo de um PDF de fornecedor", type: "number", suffix: "MB" },
-          { key: "max_anexos_zip_mb", label: "Tamanho máximo do Anexos_Edição.zip", type: "number", suffix: "MB" },
           { key: "max_email_attachment_total_mb", label: "Tamanho máximo total de anexos por email enviado", type: "number", suffix: "MB" },
           { key: "max_attachments_per_email", label: "Anexos aceites por email recebido", type: "number" },
         ]}
@@ -680,11 +636,10 @@ export default function Settings() {
       <SettingsFieldsCard
         group="email_prefs"
         title="Email"
-        description="Estilo e remetente esperado das mensagens enviadas e recebidas pela app."
+        description="Estilo das mensagens enviadas pela app."
         fields={[
           { key: "include_signature", label: "Incluir assinatura nas mensagens enviadas", type: "switch" },
           { key: "auto_greeting", label: "Usar saudação automática consoante a hora do dia", type: "switch" },
-          { key: "correio_semanal_sender", label: "Remetente esperado do Correio Semanal", type: "text" },
         ]}
       />
 
@@ -698,8 +653,6 @@ export default function Settings() {
           { key: "correio_limit", label: "Emails em \"Correio por ver\"", type: "number" },
         ]}
       />
-
-      <ClassificationRulesPanel />
 
       <SettingsSection title="Aplicação">
         {showInstallOption ? (

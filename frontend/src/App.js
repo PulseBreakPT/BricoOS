@@ -12,7 +12,6 @@ import Catalog from "@/pages/Catalog";
 import Emails from "@/pages/Emails";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
-import Knowledge from "@/pages/Knowledge";
 import { usePortraitLock } from "@/hooks/usePortraitLock";
 
 // A antiga página "Hoje" fundiu-se com "Pedidos" em "/". Links antigos para
@@ -49,7 +48,6 @@ function App() {
               <Route path="/emails" element={<Emails />} />
               <Route path="/tarefas" element={<Tasks />} />
               <Route path="/grupos-tarefas" element={<LegacyTaskGroupsRedirect />} />
-              <Route path="/conhecimento" element={<Knowledge />} />
               <Route path="/catalogo-tecnico" element={<Catalog />} />
               <Route path="/definicoes" element={<Settings />} />
               <Route path="/notificacoes" element={<Notifications />} />
