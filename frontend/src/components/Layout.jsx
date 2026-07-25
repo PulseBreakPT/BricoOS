@@ -362,7 +362,7 @@ function MobileNavigation({
       <button
         type="button"
         onClick={onOpenSearch}
-        className="mt-5 flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-muted px-3.5 text-left text-sm text-muted-foreground transition-colors hover:border-input hover:bg-accent hover:text-foreground"
+        className="mt-4 flex min-h-11 items-center gap-2 rounded-2xl border border-border bg-muted px-3 text-left text-sm text-muted-foreground transition-colors hover:border-input hover:bg-accent hover:text-foreground"
       >
         <Search className="h-4 w-4" />{" "}
         <span className="flex-1">Pesquisar tudo</span>
@@ -376,7 +376,7 @@ function MobileNavigation({
           haptics.tap();
           onShowHome?.();
         }}
-        className={`mt-3 flex min-h-12 items-center gap-3 rounded-2xl border px-3.5 text-left text-sm font-bold transition-colors ${homeVisible ? "border-foreground bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+        className={`mt-2 flex min-h-11 items-center gap-3 rounded-2xl border px-3 text-left text-sm font-bold transition-colors ${homeVisible ? "border-foreground bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"}`}
       >
         <MonitorUp
           className={`h-[18px] w-[18px] ${homeVisible ? "text-red-600" : ""}`}
@@ -384,10 +384,10 @@ function MobileNavigation({
         <span className="flex-1">Ambiente de trabalho</span>
         <span className="led led-ok" />
       </button>
-      <nav className="scroll-chrome mt-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
+      <nav className="scroll-chrome mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="engraved px-3 pb-2">{group.label}</p>
+            <p className="engraved px-3 pb-1">{group.label}</p>
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
@@ -403,7 +403,7 @@ function MobileNavigation({
                       onNavigate?.(item.path);
                     }}
                     className={({ isActive }) =>
-                      `relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-sm font-bold transition-all ${isActive && !homeVisible ? "bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`
+                      `relative flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-bold transition-all ${isActive && !homeVisible ? "bg-foreground text-background shadow-[0_12px_28px_-14px_rgba(0,0,0,0.35)]" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`
                     }
                   >
                     {({ isActive }) => (
@@ -428,7 +428,7 @@ function MobileNavigation({
           </div>
         ))}
         <div>
-          <p className="engraved px-3 pb-2">Ferramentas</p>
+          <p className="engraved px-3 pb-1">Ferramentas</p>
           <div className="space-y-1">
             {MOBILE_TOOL_TYPES.map((type) => {
               const meta = PANEL_TYPES[type];
@@ -443,7 +443,7 @@ function MobileNavigation({
                     haptics.tap();
                     onOpenTool?.(type);
                   }}
-                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3.5 text-left text-sm font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-2xl px-3 text-left text-sm font-bold text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
                 >
                   <Icon className="h-[18px] w-[18px]" />
                   <span className="flex-1">{meta.title}</span>
@@ -453,18 +453,18 @@ function MobileNavigation({
           </div>
         </div>
       </nav>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={onOpenActivity}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Activity className="h-4 w-4" /> Atividade
         </button>
         <button
           type="button"
           onClick={onOpenTrash}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Trash2 className="h-4 w-4" /> Lixeira
         </button>
