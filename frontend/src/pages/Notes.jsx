@@ -37,19 +37,22 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
+// Etiquetas curtas de propósito — no telemóvel a lista é uma fila com
+// scroll horizontal, cada filtro deve dar para ler de imediato sem
+// ocupar mais espaço do que o necessário.
 const PRESETS = [
   { key: "todos", label: "Todos", filters: {} },
   { key: "novos", label: "Novos", filters: { status: "novo" } },
-  { key: "waiting_me", label: "À espera da minha ação", filters: { waiting: "me" } },
-  { key: "callback", label: "Voltar a ligar", filters: { callback: true } },
+  { key: "waiting_me", label: "Ação", filters: { waiting: "me" } },
+  { key: "callback", label: "Recontactar", filters: { callback: true } },
   { key: "supplier", label: "Sem resposta", filters: { waiting: "supplier" } },
-  { key: "client", label: "Clientes à espera", filters: { waiting: "client" } },
+  { key: "client", label: "À espera", filters: { waiting: "client" } },
   { key: "overdue", label: "Atrasados", filters: { overdue: true } },
   { key: "urgente", label: "Urgentes", filters: { priority: "urgente" } },
   { key: "recebidos", label: "Recebidos", filters: { status: "orcamento_recebido" } },
   { key: "aprovados", label: "Aprovados", filters: { status: "aprovado,encomendado" } },
-  { key: "com_bricoaval", label: "Com nº BricoAval", filters: { has_bricoaval: true } },
-  { key: "arquivados", label: "Arquivados", filters: { archived: true } },
+  { key: "com_bricoaval", label: "BricoAval", filters: { has_bricoaval: true } },
+  { key: "arquivados", label: "Arquivo", filters: { archived: true } },
 ];
 
 const DETAIL_TABS = ["detalhes", "orcamentos", "comunicacao", "cronologia", "tarefas"];
