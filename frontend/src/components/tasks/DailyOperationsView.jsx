@@ -13,7 +13,7 @@ function StatTile({ label, value, tone }) {
   return (
     <div className="rounded-xl border border-border bg-card p-2.5 text-center">
       <p className={`font-mono text-lg font-black tabular-nums ${tone || "text-foreground"}`}>{value ?? "–"}</p>
-      <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[9px] font-bold uppercase tracking-wide text-text-tertiary">{label}</p>
     </div>
   );
 }
@@ -37,7 +37,7 @@ export default function DailyOperationsView({ tasks, stats, togglingIds, onToggl
           <StatTile label="Em execução" value={stats.in_progress} />
           <StatTile label="Concluídas hoje" value={stats.done_today} />
           <StatTile label="Por fazer" value={stats.pending} />
-          <StatTile label="Atrasadas" value={stats.overdue} tone={stats.overdue > 0 ? "text-red-600" : undefined} />
+          <StatTile label="Atrasadas" value={stats.overdue} tone={stats.overdue > 0 ? "text-destructive" : undefined} />
         </div>
       ) : null}
 
@@ -53,13 +53,13 @@ export default function DailyOperationsView({ tasks, stats, togglingIds, onToggl
                 <p className="font-heading text-sm font-extrabold text-foreground">{c.label}</p>
               </div>
               {total > 0 ? (
-                <span className="text-xs font-bold text-muted-foreground">
+                <span className="text-meta font-bold text-text-tertiary">
                   {progressEmoji(doneCount, total)} {doneCount}/{total} concluídas
                 </span>
               ) : null}
             </div>
             {total === 0 ? (
-              <p className="mt-1.5 text-xs text-muted-foreground">Sem tarefas para hoje nesta secção.</p>
+              <p className="mt-1.5 text-xs text-text-body">Sem tarefas para hoje nesta secção.</p>
             ) : (
               <div className="mt-2 space-y-1.5">
                 {c.items.map((t) => (
@@ -81,7 +81,7 @@ export default function DailyOperationsView({ tasks, stats, togglingIds, onToggl
                       </span>
                     </button>
                     {t.due_date ? (
-                      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">{formatDue(t.due_date)}</span>
+                      <span className="shrink-0 text-meta font-bold text-text-tertiary">{formatDue(t.due_date)}</span>
                     ) : null}
                   </div>
                 ))}

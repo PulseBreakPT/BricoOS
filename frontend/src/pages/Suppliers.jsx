@@ -56,7 +56,7 @@ function PhoneActions({ phone }) {
       <a href={`tel:${phone}`} title="Ligar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
         <Phone className="h-3.5 w-3.5" />
       </a>
-      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-muted-foreground hover:bg-[var(--pastel-emerald-bg)] hover:text-emerald-600">
+      <a href={wa} target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp" className="rounded-md p-1 text-muted-foreground hover:bg-[var(--pastel-emerald-bg)] hover:text-success">
         <MessageCircle className="h-3.5 w-3.5" />
       </a>
     </span>
@@ -190,8 +190,8 @@ export default function Suppliers() {
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <p className="kicker">Contactos</p>
-          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Fornecedores</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="mt-0.5 font-heading text-h1 text-foreground">Fornecedores</h1>
+          <p className="text-body text-text-body">
             {suppliers.length > 0
               ? `${suppliers.length} contacto${suppliers.length === 1 ? "" : "s"} pronto${suppliers.length === 1 ? "" : "s"} a receber pedidos de orçamento.`
               : "Para onde enviar os pedidos de orçamento."}
@@ -224,7 +224,7 @@ export default function Suppliers() {
                     {initials}
                   </span>
                   <div className="min-w-0">
-                    <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-foreground">{s.name}</h3>
+                    <h3 className="truncate font-heading text-h3 text-foreground">{s.name}</h3>
                     {s.category ? <div className="mt-1"><CategoryBadge category={s.category} /></div> : null}
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export default function Suppliers() {
                   <button data-testid={`edit-supplier-${s.id}`} onClick={() => openEdit(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-muted hover:text-foreground active:scale-90">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button data-testid={`delete-supplier-${s.id}`} disabled={deletingId === s.id} onClick={() => remove(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-red-600 active:scale-90 disabled:opacity-50">
+                  <button data-testid={`delete-supplier-${s.id}`} disabled={deletingId === s.id} onClick={() => remove(s)} className="rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:scale-110 hover:bg-[var(--pastel-red-bg)] hover:text-destructive active:scale-90 disabled:opacity-50">
                     {deletingId === s.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 </div>
@@ -241,7 +241,7 @@ export default function Suppliers() {
                 <p className="flex items-center justify-between gap-2 text-muted-foreground">
                   <span className="flex min-w-0 items-center gap-2">
                     <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    {s.email ? <span className="truncate font-mono text-xs">{s.email}</span> : <span className="text-xs text-red-400">Sem email definido</span>}
+                    {s.email ? <span className="truncate font-mono text-xs">{s.email}</span> : <span className="text-xs text-destructive">Sem email definido</span>}
                   </span>
                   <EmailAction email={s.email} />
                 </p>
@@ -270,7 +270,7 @@ export default function Suppliers() {
                     </span>
                   </p>
                 ))}
-                {s.notes ? <p className="pt-1 text-xs text-muted-foreground">{s.notes}</p> : null}
+                {s.notes ? <p className="pt-1 text-xs text-text-body">{s.notes}</p> : null}
                 {(s.labels || []).length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {s.labels.slice(0, 4).map((l) => (
@@ -341,7 +341,7 @@ export default function Suppliers() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent data-testid="supplier-dialog" className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-heading text-xl font-bold tracking-tight">
+            <DialogTitle className="font-heading text-h2">
               {editing ? "Editar fornecedor" : "Novo fornecedor"}
             </DialogTitle>
           </DialogHeader>
@@ -407,7 +407,7 @@ export default function Suppliers() {
                         type="button"
                         data-testid={`remove-supplier-contact-${i}`}
                         onClick={() => removeContact(i)}
-                        className="mt-1 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-red-500"
+                        className="mt-1 shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -439,8 +439,7 @@ export default function Suppliers() {
                 <AttachmentManager ownerKind="supplier" ownerId={editing.id} />
               </div>
             ) : null}
-            <Button data-testid="save-supplier-btn" onClick={save} disabled={saving} className="w-full rounded-xl">
-              {saving ? <Spinner className="mr-2 h-4 w-4" /> : null}
+            <Button data-testid="save-supplier-btn" onClick={save} disabled={saving} loading={saving} className="w-full rounded-xl">
               {editing ? "Guardar" : "Adicionar"}
             </Button>
           </div>
