@@ -11,6 +11,7 @@ import {
 import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER, timeAgo } from "@/lib/pedido";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
+import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -72,57 +73,6 @@ function DashboardWidget({ widgetKey, title, wide, onDragStartKey, onDropOnKey, 
     </div>
   );
 }
-
-// Contagem animada — os números "sobem" até ao valor real quando os dados
-// chegam. Só anima valores numéricos; strings (ex.: "3h") passam direto.
-function CountUp({ value }) {
-  const [display, setDisplay] = useState(0);
-  const rafRef = useRef(null);
-  useEffect(() => {
-    if (typeof value !== "number") return undefined;
-    const start = performance.now();
-    const dur = 700;
-    const tick = (now) => {
-      const p = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setDisplay(Math.round(value * eased));
-      if (p < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [value]);
-  if (typeof value !== "number") return <>{value}</>;
-  return <span className="tabular-nums">{display}</span>;
-}
-
-const StatCard = ({ icon: Icon, label, value, accent, testid, danger, index = 0 }) => (
-  <div
-    data-testid={testid}
-    className={`group relative animate-fade-up overflow-hidden rounded-2xl border bg-card p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-border hover:border-input"}`}
-    style={{ "--stagger-i": index }}
-  >
-    {/* Barra de sinal — mesma linguagem dos alertas: margem vermelha =
-        este número exige intervenção. */}
-    {danger && value > 0 ? (
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-red-500 via-red-600 to-red-700" />
-    ) : null}
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-[0.07] blur-2xl transition-opacity duration-300 group-hover:opacity-[0.16]"
-      style={{ backgroundColor: accent }}
-    />
-    <div
-      className="flex h-9 w-9 items-center justify-center rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6 sm:h-10 sm:w-10"
-      style={{ backgroundColor: `${accent}1a`, color: accent }}
-    >
-      <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
-    </div>
-    <p className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-foreground sm:mt-4 sm:text-4xl">
-      <CountUp value={value} />
-    </p>
-    <p className="mt-0.5 text-xs font-semibold text-muted-foreground sm:text-sm">{label}</p>
-  </div>
-);
 
 const SEV_ICON = {
   high: { bg: "bg-[var(--pastel-red-bg)] text-red-600", ring: "border-red-100 bg-[var(--pastel-red-bg)]" },
@@ -281,9 +231,9 @@ export default function Dashboard() {
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4 3xl:gap-6">
         <StatCard index={0} testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#7C3AED" />
-        <StatCard index={1} testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#2563EB" />
-        <StatCard index={2} testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="#DC2626" danger />
-        <StatCard index={3} testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="#16A34A" />
+        <StatCard index={1} testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="info" />
+        <StatCard index={2} testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="destructive" danger />
+        <StatCard index={3} testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="success" />
       </div>
 
       {(() => {
@@ -291,7 +241,7 @@ export default function Dashboard() {
           alerts: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                <h2 className="font-heading text-h3 text-foreground">
                   Precisa de atenção {notifs.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-red-text)]">{notifs.count}</span> : null}
                 </h2>
                 <Link to="/" data-testid="link-ver-pedidos" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
@@ -326,14 +276,14 @@ export default function Dashboard() {
           needs_review: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                <h2 className="font-heading text-h3 text-foreground">
                   Precisa de decisão {needsReview.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-amber-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-amber-text)]">{needsReview.count}</span> : null}
                 </h2>
                 <Link to="/" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
                   Ver pedidos <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                 </Link>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-text-body">
                 Orçamentos de fornecedor com leitura incompleta, alterados desde a última versão, ou prontos a enviar mas por confirmar.
               </p>
               <div className="mt-4 space-y-2">
@@ -368,7 +318,7 @@ export default function Dashboard() {
           pipeline: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-baseline justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">Pipeline por estado</h2>
+                <h2 className="font-heading text-h3 text-foreground">Pipeline por estado</h2>
                 {pipelineTotal > 0 ? <span className="font-mono text-xs font-bold tabular-nums text-muted-foreground">{pipelineTotal} no total</span> : null}
               </div>
               {pipeline.length === 0 ? (

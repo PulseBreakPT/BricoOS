@@ -1024,7 +1024,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <Building2 className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-heading text-base font-extrabold text-foreground">{s.name}</p>
+              <p className="truncate font-heading text-h3 text-foreground">{s.name}</p>
               <p className="text-xs text-muted-foreground">Fornecedor</p>
             </div>
           </div>
@@ -1033,7 +1033,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <a href={`mailto:${s.email}`} className="flex items-center gap-2 font-mono text-xs text-foreground hover:underline">
                 <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {s.email}
               </a>
-            ) : <p className="text-xs text-red-400">Sem email definido</p>}
+            ) : <p className="text-xs text-destructive">Sem email definido</p>}
             {s.phone ? (
               <a href={`tel:${s.phone}`} className="flex items-center gap-2 font-mono text-xs text-foreground hover:underline">
                 <PhoneCall className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> {formatPhoneDisplay(s.phone)}
@@ -1042,7 +1042,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
           </div>
           {(s.contacts || []).filter((c) => c.name || c.phone || c.email).length > 0 ? (
             <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contactos</p>
+              <p className="text-label uppercase text-muted-foreground">Contactos</p>
               {s.contacts.filter((c) => c.name || c.phone || c.email).map((c, i) => (
                 <div key={i} className="rounded-xl border border-border bg-card p-2.5 text-xs">
                   {c.name ? <span className="font-bold text-foreground">{c.name}</span> : null}
@@ -1189,7 +1189,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
         <DialogHeader className="shrink-0 space-y-0 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <DialogTitle className="truncate font-heading text-lg font-bold tracking-tight sm:text-xl">
+              <DialogTitle className="truncate font-heading text-h3">
                 {isCreate
                   ? (createMode === "band" ? "Pedido à medida — BandAluminios" : "Novo pedido de orçamento")
                   : (form.customer_name || "Pedido")}
@@ -1212,8 +1212,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     )
                     : "Sem telefone")}
                 {!isCreate && autoState === "saving" ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Spinner className="h-3 w-3" /> a guardar…</span> : null}
-                {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-emerald-500"><Check className="h-3 w-3" /> guardado</span> : null}
-                {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-red-500" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
+                {!isCreate && autoState === "saved" ? <span className="inline-flex items-center gap-1 text-success"><Check className="h-3 w-3" /> guardado</span> : null}
+                {!isCreate && autoState === "error" ? <span className="inline-flex items-center gap-1 text-destructive" title={autoError}><AlertTriangle className="h-3 w-3" /> {autoError}</span> : null}
               </p>
               {!isCreate && note ? (
                 <p className="mt-0.5 text-[10px] text-muted-foreground" title={`Atualizado ${timeAgo(note.updated_at)}`}>
@@ -1264,7 +1264,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   modo de edição. */}
               {editMode ? (
                 <>
-                  <Button data-testid="detail-save" size="sm" onClick={saveDetails} disabled={saving} className="col-span-2 h-9 w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 sm:col-span-1 sm:w-auto sm:shrink-0">
+                  <Button data-testid="detail-save" size="sm" onClick={saveDetails} disabled={saving} className="col-span-2 h-9 w-full rounded-lg bg-success hover:bg-success/90 sm:col-span-1 sm:w-auto sm:shrink-0">
                     {saving ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Check className="mr-1.5 h-3.5 w-3.5" />} Guardar
                   </Button>
                   <Button data-testid="detail-cancel-edit" size="sm" variant="outline" onClick={cancelEdit} disabled={saving} className="h-9 w-full rounded-lg sm:w-auto sm:shrink-0">
@@ -1277,7 +1277,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 </Button>
               )}
 
-              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] sm:ml-auto sm:w-auto sm:shrink-0">
+              <Button data-testid="detail-delete" size="sm" variant="outline" onClick={remove} className="h-9 w-full rounded-lg border-destructive/30 text-destructive hover:bg-[var(--pastel-red-bg)] sm:ml-auto sm:w-auto sm:shrink-0">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -1308,7 +1308,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold text-foreground">Caixilharia à medida — BandAluminios</span>
-                    <span className="block text-xs text-muted-foreground">Janelas, portas, portadas e redes mosquiteiras com medidas, para pedir cotação ao fornecedor</span>
+                    <span className="block text-xs text-text-body">Janelas, portas, portadas e redes mosquiteiras com medidas, para pedir cotação ao fornecedor</span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
@@ -1322,7 +1322,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold text-foreground">Pedido normal de loja</span>
-                    <span className="block text-xs text-muted-foreground">Qualquer outro artigo: preço, encomenda ou disponibilidade junto de um fornecedor</span>
+                    <span className="block text-xs text-text-body">Qualquer outro artigo: preço, encomenda ou disponibilidade junto de um fornecedor</span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
@@ -1333,7 +1333,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {createSteps.map((label, i) => (
                     <div key={label} className="flex items-center gap-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-emerald-500 text-white" : i === createStep ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${i < createStep ? "bg-success text-success-foreground" : i === createStep ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}>
                         {i < createStep ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </span>
                       <span className={`text-xs font-semibold ${i === createStep ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
@@ -1589,7 +1589,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <div className="space-y-1.5">
                     <Label className="flex items-center">
                       Nome do cliente
-                      {fieldChanged("customer_name") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                      {fieldChanged("customer_name") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-info" title="Alterado desde a abertura" /> : null}
                     </Label>
                     <NameInput testId="input-customer-name" value={form.customer_name} onChange={(v) => set("customer_name", v)} placeholder="Ex.: Teresa Mera" />
                   </div>
@@ -1600,7 +1600,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <div className="space-y-1.5">
                     <Label className="flex items-center">
                       Telefone
-                      {fieldChanged("phone") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                      {fieldChanged("phone") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-info" title="Alterado desde a abertura" /> : null}
                     </Label>
                     <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                   </div>
@@ -1612,7 +1612,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <div className="mt-4 space-y-1.5">
                   <Label className="flex items-center">
                     Email do cliente
-                    {fieldChanged("email") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Alterado desde a abertura" /> : null}
+                    {fieldChanged("email") ? <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-info" title="Alterado desde a abertura" /> : null}
                   </Label>
                   <EmailInput testId="input-email" value={form.email} onChange={(v) => set("email", v)} placeholder="cliente@email.com" />
                 </div>
@@ -1799,7 +1799,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <span key={l} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
                         <Tag className="h-3 w-3" /> {l}
                         {editMode ? (
-                          <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-muted-foreground hover:text-red-500"><X className="h-3 w-3" /></button>
+                          <button data-testid={`remove-label-${l}`} onClick={() => removeLabel(l)} className="ml-0.5 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
                         ) : null}
                       </span>
                     ))}
@@ -1881,15 +1881,15 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <>
                   <SectionTitle title="Estado de completude" />
                   <div data-testid="preflight-panel" className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
-                    <p className={`flex items-center gap-1.5 text-xs font-extrabold ${preflight.ready ? "text-emerald-700" : "text-amber-700"}`}>
+                    <p className={`flex items-center gap-1.5 text-xs font-extrabold ${preflight.ready ? "text-success" : "text-warning"}`}>
                       {preflight.ready ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                       {preflight.ready ? "Informação completa" : "Falta informação para avançar"}
                     </p>
                     {preflight.missing?.length ? (
-                      <p className="mt-1.5 text-[11px] font-semibold text-amber-700">Em falta: {preflight.missing.join(", ")}</p>
+                      <p className="mt-1.5 text-[11px] font-semibold text-warning">Em falta: {preflight.missing.join(", ")}</p>
                     ) : null}
                     {preflight.warnings?.length ? (
-                      <p className="mt-1 text-[11px] text-amber-600">{preflight.warnings.join(" ")}</p>
+                      <p className="mt-1 text-[11px] text-warning">{preflight.warnings.join(" ")}</p>
                     ) : null}
                     {preflight.checklist?.length ? (
                       <details className="mt-2 text-[11px] text-muted-foreground">
@@ -1952,7 +1952,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
 
               {editMode ? (
                 <div className="mt-6 flex gap-2">
-                  <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700">
+                  <Button data-testid="save-note-btn" onClick={saveDetails} disabled={saving} className="flex-1 rounded-xl bg-success hover:bg-success/90">
                     {showSaveSpinner ? <Spinner className="mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
                     Guardar
                   </Button>
@@ -1972,7 +1972,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <section className="rounded-2xl border border-border bg-muted/60 p-4 sm:p-5">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-foreground" />
-                  <h4 className="font-heading text-sm font-extrabold text-foreground">Pedir preço a fornecedor</h4>
+                  <h4 className="font-heading text-h3 text-foreground">Pedir preço a fornecedor</h4>
                 </div>
                 {!gmailStatus?.connected ? (
                   <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-[var(--pastel-amber-bg)] p-3 text-sm text-[color:var(--pastel-amber-text)]">
@@ -1981,7 +1981,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <p className="font-semibold">Gmail não ligado</p>
                       <p className="text-xs">Liga o Gmail para enviar automaticamente, ou copia o email.</p>
                       {gmailStatus?.configured ? (
-                        <Button data-testid="connect-gmail-inline" size="sm" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-2 h-8 rounded-lg bg-amber-600 hover:bg-amber-700">Ligar Gmail</Button>
+                        <Button data-testid="connect-gmail-inline" size="sm" onClick={() => { window.location.href = `${API}/gmail/connect`; }} className="mt-2 h-8 rounded-lg bg-warning hover:bg-warning/90">Ligar Gmail</Button>
                       ) : null}
                     </div>
                   </div>
@@ -2014,7 +2014,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     emptyText="Sem fornecedores."
                   />
                   {selectedSupplier && !selectedSupplier.email ? (
-                    <p className="text-xs text-red-500">Este fornecedor não tem email.</p>
+                    <p className="text-xs text-destructive">Este fornecedor não tem email.</p>
                   ) : null}
                 </div>
                 <label className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -2044,8 +2044,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                 <section data-testid="pending-send-panel" className="mt-6 rounded-2xl border border-emerald-300 bg-[var(--pastel-emerald-bg)] p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-[color:var(--pastel-emerald-text)]">
-                        <Send className="h-4 w-4 text-emerald-600" /> Pronto para enviar ao cliente
+                      <h4 className="flex items-center gap-2 font-heading text-h3 text-[color:var(--pastel-emerald-text)]">
+                        <Send className="h-4 w-4 text-[color:var(--pastel-emerald-text)]" /> Pronto para enviar ao cliente
                       </h4>
                       <p className="mt-0.5 text-xs text-[color:var(--pastel-emerald-text)]/80">
                         {note.pending_client_send.pdf_filename || "PDF"} anexado
@@ -2057,7 +2057,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <Button
                       data-testid="open-confirm-send"
                       onClick={() => setConfirmSendOpen(true)}
-                      className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                      className="rounded-xl bg-success hover:bg-success/90"
                     >
                       <Send className="mr-2 h-4 w-4" /> Rever e enviar
                     </Button>
@@ -2071,9 +2071,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                   <div>
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-foreground" />
-                      <h4 className="font-heading text-sm font-extrabold text-foreground">Orçamento do fornecedor (PDF)</h4>
+                      <h4 className="font-heading text-h3 text-foreground">Orçamento do fornecedor (PDF)</h4>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-text-body">
                       Envia o PDF da BandAluminios: a app lê as linhas, sugere preços de venda e gera o PDF com a marca da loja para entregar ao cliente.
                     </p>
                   </div>
@@ -2141,8 +2141,8 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                         }`}
                       >
                         <p className={`flex items-center gap-1.5 text-xs font-extrabold ${
-                          sq.quality_report.status === "ok" ? "text-emerald-700"
-                          : sq.quality_report.status === "error" ? "text-red-700" : "text-amber-700"
+                          sq.quality_report.status === "ok" ? "text-success"
+                          : sq.quality_report.status === "error" ? "text-destructive" : "text-warning"
                         }`}>
                           {sq.quality_report.status === "ok" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                           {sq.quality_report.status === "ok" ? "Pronto para enviar — nenhum problema encontrado" : "Verificar antes de enviar"}
@@ -2251,7 +2251,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                                   {itemEffMargin(i) != null ? (
                                     <>
                                       <span className="mx-1.5">·</span>
-                                      Margem final: <span data-testid={`sq-eff-margin-${i.n}`} className={`font-mono font-bold ${itemEffMargin(i) + 0.05 < (parseFloat(i.margin_pct) || 0) ? "text-red-600" : "text-emerald-600"}`}>{itemEffMargin(i).toFixed(1)}%</span>
+                                      Margem final: <span data-testid={`sq-eff-margin-${i.n}`} className={`font-mono font-bold ${itemEffMargin(i) + 0.05 < (parseFloat(i.margin_pct) || 0) ? "text-destructive" : "text-success"}`}>{itemEffMargin(i).toFixed(1)}%</span>
                                     </>
                                   ) : null}
                                 </p>
@@ -2303,9 +2303,9 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     <div>
                       <div className="flex items-center gap-2">
                         <Send className="h-4 w-4 text-[color:var(--pastel-blue-text)]" />
-                        <h4 className="font-heading text-sm font-extrabold text-foreground">Responder ao cliente</h4>
+                        <h4 className="font-heading text-h3 text-foreground">Responder ao cliente</h4>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
+                      <p className="mt-1 text-xs text-text-body">Mensagem no teu formato habitual. Abre o email, anexa o orçamento e só depois regista o envio.</p>
                     </div>
                     {clientTemplateLoading ? <Spinner className="h-4 w-4 shrink-0 text-blue-500" /> : null}
                   </div>
@@ -2355,22 +2355,22 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               {communication.summary ? (
                 <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
-                    <p className="font-mono text-base font-black tabular-nums text-foreground">{communication.summary.total_emails}</p>
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Emails trocados</p>
+                    <p className="font-mono text-value-lg tabular-nums text-foreground">{communication.summary.total_emails}</p>
+                    <p className="text-label uppercase text-muted-foreground">Emails trocados</p>
                   </div>
                   <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
-                    <p className="font-mono text-base font-black tabular-nums text-foreground">{communication.summary.total_attachments}</p>
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Anexos</p>
+                    <p className="font-mono text-value-lg tabular-nums text-foreground">{communication.summary.total_attachments}</p>
+                    <p className="text-label uppercase text-muted-foreground">Anexos</p>
                   </div>
                   <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
                     <p className="text-xs font-black text-foreground">
                       {communication.summary.last_activity_at ? timeAgo(communication.summary.last_activity_at) : "–"}
                     </p>
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Última atividade</p>
+                    <p className="text-label uppercase text-muted-foreground">Última atividade</p>
                   </div>
                   <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
                     <p className="text-xs font-black text-foreground">{COMM_STATUS_LABEL[communication.summary.status] || "–"}</p>
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Estado</p>
+                    <p className="text-label uppercase text-muted-foreground">Estado</p>
                   </div>
                 </section>
               ) : null}
@@ -2445,10 +2445,10 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
               <section data-testid="photos-panel">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h4 className="flex items-center gap-2 font-heading text-sm font-extrabold text-foreground">
+                    <h4 className="flex items-center gap-2 font-heading text-h3 text-foreground">
                       <Camera className="h-4 w-4 text-foreground" /> Fotos do pedido
                     </h4>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-text-body">
                       Fotos do local, do vão, de danos ou de referência — até {MAX_PHOTOS_PER_NOTE} por pedido.
                     </p>
                   </div>
@@ -2504,7 +2504,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                           data-testid={`photo-delete-${p.id}`}
                           onClick={() => deletePhoto(p.id)}
                           disabled={deletingPhotoId === p.id}
-                          className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-red-600 active:scale-90 group-hover:opacity-100"
+                          className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition-all duration-150 hover:scale-110 hover:bg-destructive active:scale-90 group-hover:opacity-100"
                         >
                           {deletingPhotoId === p.id ? <Spinner className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
@@ -2518,7 +2518,7 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
             {/* CRONOLOGIA */}
             <TabsContent value="cronologia" className="mt-0 focus-visible:outline-none">
               <section className="rounded-2xl border border-border bg-muted/60 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Registo rápido</p>
+                <p className="text-label uppercase text-muted-foreground">Registo rápido</p>
                 {(note?.client_no_answer_count > 0 || note?.supplier_no_answer_count > 0) ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {note?.client_no_answer_count > 0 ? (
@@ -2597,12 +2597,12 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                       <div className="min-w-0 flex-1">
                         <p className={`text-sm font-medium text-foreground ${t.done ? "line-through opacity-50" : ""}`}>{t.title}</p>
                         {t.due_date ? (
-                          <p className={`mt-0.5 flex items-center gap-1 text-xs ${overdue ? "font-semibold text-red-600" : "text-muted-foreground"}`}>
+                          <p className={`mt-0.5 flex items-center gap-1 text-xs ${overdue ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
                             <Calendar className="h-3 w-3" /> {new Date(t.due_date).toLocaleDateString("pt-PT")}{overdue ? " · em atraso" : ""}
                           </p>
                         ) : null}
                       </div>
-                      <button data-testid={`delete-note-task-${t.id}`} onClick={() => deleteTask(t.id)} className="rounded-lg p-1 text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      <button data-testid={`delete-note-task-${t.id}`} onClick={() => deleteTask(t.id)} className="rounded-lg p-1 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   );
                 })}
@@ -2679,7 +2679,7 @@ function ViewField({ label, value, mono = false, link = null, multiline = false 
   const content = empty ? "—" : value;
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-label uppercase text-muted-foreground">{label}</p>
       {link && !empty ? (
         <a href={link} className={`block text-sm font-semibold text-foreground hover:underline ${mono ? "font-mono" : ""}`}>
           {content}
@@ -2698,7 +2698,7 @@ function SectionTitle({ title, first = false }) {
   return (
     <div className={`flex items-center gap-3 ${first ? "" : "mt-5 sm:mt-6"}`}>
       <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
-      <h3 className="shrink-0 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">{title}</h3>
+      <h3 className="shrink-0 text-label uppercase text-muted-foreground">{title}</h3>
       <span aria-hidden className="flex-1 border-t-2 border-dashed border-border" />
     </div>
   );

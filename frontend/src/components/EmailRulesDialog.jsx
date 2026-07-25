@@ -90,10 +90,10 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="email-rules-dialog" className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
+          <DialogTitle className="flex items-center gap-2 font-heading text-h3">
             <Wand2 className="h-5 w-5" /> Regras automáticas
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">Aplicadas a cada email recebido — se todas as condições corresponderem, todas as ações são executadas.</p>
+          <p className="text-xs text-text-body">Aplicadas a cada email recebido — se todas as condições corresponderem, todas as ações são executadas.</p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -120,7 +120,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                       <div className="flex items-center gap-1.5">
                         <Input value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} placeholder="valor" className="h-8 flex-1 text-xs" />
                         {form.conditions.length > 1 ? (
-                          <button type="button" onClick={() => removeCondition(i)} aria-label="Remover condição" title="Remover condição" className="shrink-0 text-muted-foreground hover:text-red-600"><X className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => removeCondition(i)} aria-label="Remover condição" title="Remover condição" className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></button>
                         ) : null}
                       </div>
                     </div>
@@ -143,7 +143,7 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                         <option value="baixa">baixa</option>
                       </select>
                       {form.actions.length > 1 ? (
-                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-muted-foreground hover:text-red-600"><X className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => removeAction(i)} aria-label="Remover ação" title="Remover ação" className="shrink-0 text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></button>
                       ) : null}
                     </div>
                   ))}
@@ -176,14 +176,14 @@ export default function EmailRulesDialog({ open, onOpenChange }) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-foreground">{r.name}</p>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          <p className="mt-0.5 text-meta text-text-tertiary">
                             {r.conditions.length} condição(ões) · {r.actions.map((a) => ACTION_LABELS[a.type] || a.type).join(", ")}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <Switch checked={r.enabled} onCheckedChange={() => toggleEnabled(r)} aria-label={r.enabled ? "Desativar regra" : "Ativar regra"} />
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(r)} aria-label="Editar regra" title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-[var(--pastel-red-bg)]" onClick={() => remove(r)} aria-label="Eliminar regra" title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-[var(--pastel-red-bg)]" onClick={() => remove(r)} aria-label="Eliminar regra" title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </div>
                     </div>

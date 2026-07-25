@@ -399,7 +399,7 @@ export default function CatalogIntelligence({ analysis, initialModelId = "", sta
                     <button key={model.id} type="button" onClick={() => setSelectedId(model.id)} className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition-colors ${selected.id === model.id ? "bg-foreground text-background shadow-md shadow-slate-400/30" : "hover:bg-muted"}`}>
                       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-mono text-[10px] font-black ${selected.id === model.id ? scoreTone(model.overall.score) : "border-border bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]"}`}>{model.overall.score ?? "N/D"}</span>
                       <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{model.name}</span><span className={`block truncate text-[9px] ${selected.id === model.id ? "text-white/50" : "text-muted-foreground"}`}>{model.category_label}</span></span>
-                      {model.conflicts.length ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> : null}
+                      {model.conflicts.length ? <AlertTriangle className="h-3.5 w-3.5 text-warning" /> : null}
                     </button>
                   ))}
                 </div>

@@ -16,7 +16,7 @@ function KanbanPeekContent({ note, cfg }) {
       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: cfg.bg, color: cfg.text }}>
         <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cfg.dot }} />{cfg.label}
       </span>
-      {note.description ? <p className="line-clamp-3 text-xs text-muted-foreground">{note.description}</p> : null}
+      {note.description ? <p className="line-clamp-3 text-xs text-text-body">{note.description}</p> : null}
       {last ? <p className="text-xs text-muted-foreground">{last.message} <span className="text-muted-foreground">· {timeAgo(last.created_at)}</span></p> : null}
       {note.next_action ? <p className="text-xs font-semibold text-foreground">Próximo: {note.next_action}</p> : null}
     </div>
@@ -59,7 +59,7 @@ function KanbanCard({ note, onOpen, onMove, moving }) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {note.description ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{note.description}</p> : null}
+        {note.description ? <p className="mt-1 line-clamp-2 text-xs text-text-body">{note.description}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={note.category} />
           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: pr.bg, color: pr.text }}>
@@ -105,7 +105,7 @@ export default function PedidoKanban({ items, onOpen, onMove, isActionBusy }) {
           <div key={status} data-testid={`kanban-column-${status}`} className="flex w-64 shrink-0 flex-col rounded-2xl bg-muted sm:w-72">
             <div className="flex items-center gap-2 rounded-t-2xl border-b border-border px-3 py-2.5">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cfg.dot }} />
-              <p className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide text-muted-foreground">{cfg.label}</p>
+              <p className="min-w-0 flex-1 truncate text-label uppercase text-muted-foreground">{cfg.label}</p>
               <span className="shrink-0 rounded-full bg-card px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{notes.length}</span>
             </div>
             <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto p-2">

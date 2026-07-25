@@ -331,7 +331,7 @@ export default function PinGate({ children }) {
               })}
             </div>
 
-            <p className={`mt-3 h-5 text-center text-xs font-semibold ${error ? "text-red-600" : "text-[color:var(--chrome-faint)]"}`}>
+            <p className={`mt-3 h-5 text-center text-xs font-semibold ${error ? "text-destructive" : "text-[color:var(--chrome-faint)]"}`}>
               {error || (attemptsLeft < 3 ? `${attemptsLeft} tentativa${attemptsLeft === 1 ? "" : "s"} restante${attemptsLeft === 1 ? "" : "s"}` : "")}
             </p>
 

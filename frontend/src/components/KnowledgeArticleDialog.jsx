@@ -573,9 +573,9 @@ export default function KnowledgeArticleDialog({ articleId, onOpenChange, onChan
             <DialogHeader>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div ref={titleRef} className="min-w-0">
-                  <DialogTitle className="font-heading text-xl font-bold tracking-tight">{article.title}</DialogTitle>
+                  <DialogTitle className="font-heading text-h3">{article.title}</DialogTitle>
                   {article.week_label || article.issue_date ? (
-                    <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                    <p className="mt-0.5 text-meta text-text-tertiary">
                       {[article.week_label, article.issue_date].filter(Boolean).join(" · ")}
                     </p>
                   ) : null}
@@ -630,7 +630,7 @@ export default function KnowledgeArticleDialog({ articleId, onOpenChange, onChan
                         key={bucket.key} ref={(el) => { sectionRefs.current[bucket.key] = el; }}
                         className="rounded-2xl border border-amber-200 bg-card p-3.5 sm:p-4"
                       >
-                        <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                        <p className="mb-2 flex items-center gap-2 text-label uppercase text-text-tertiary">
                           <span>{bucket.emoji}</span> {bucket.label}
                         </p>
                         <BucketItems
@@ -681,13 +681,13 @@ export default function KnowledgeArticleDialog({ articleId, onOpenChange, onChan
                     <p className="font-heading text-sm font-extrabold text-foreground">Comparar com a semana anterior</p>
                     {diff?.added_sections?.length ? (
                       <div className="mt-2">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-emerald-600">Novidades</p>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-success">Novidades</p>
                         {diff.added_sections.map((t, i) => <p key={i} className="text-xs text-foreground">+ {t}</p>)}
                       </div>
                     ) : null}
                     {diff?.removed_sections?.length ? (
                       <div className="mt-2">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-red-600">Removido</p>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-destructive">Removido</p>
                         {diff.removed_sections.map((t, i) => <p key={i} className="text-xs text-foreground">− {t}</p>)}
                       </div>
                     ) : null}
@@ -766,14 +766,14 @@ export default function KnowledgeArticleDialog({ articleId, onOpenChange, onChan
                       </p>
                       {article.last_processed_at ? <p>Último processamento: {formatDateTime(article.last_processed_at)}</p> : null}
                       <p>Reprocessado {article.reprocess_count || 0}×</p>
-                      {article.last_error ? <p className="text-[color:var(--pastel-red-text)]">Último erro: {article.last_error}</p> : null}
+                      {article.last_error ? <p className="text-destructive">Último erro: {article.last_error}</p> : null}
                     </CollapsibleContent>
                   </Collapsible>
                 ) : null}
 
                 {!readingMode ? (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-bold text-muted-foreground">Etiquetas</p>
+                    <p className="text-label uppercase text-text-tertiary">Etiquetas</p>
                     <LabelEditor
                       testIdPrefix="knowledge-label"
                       labels={tags}

@@ -95,7 +95,7 @@ function BatchProgress({ state, onCancel, onClose }) {
         </div>
         <Progress value={pct} className="mt-2 h-1.5" />
         {state.current ? (
-          <p className="mt-1.5 truncate text-[11px] text-muted-foreground">{state.current}</p>
+          <p className="mt-1.5 truncate text-meta text-text-tertiary">{state.current}</p>
         ) : null}
       </div>
     );
@@ -113,18 +113,18 @@ function BatchProgress({ state, onCancel, onClose }) {
         </Button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold">
-        <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> {ok} processado{ok === 1 ? "" : "s"}</span>
+        <span className="flex items-center gap-1 text-success"><CheckCircle2 className="h-3.5 w-3.5" /> {ok} processado{ok === 1 ? "" : "s"}</span>
         {failed.length ? (
           <span className="flex items-center gap-1 text-[color:var(--pastel-red-text)]"><XCircle className="h-3.5 w-3.5" /> {failed.length} erro{failed.length === 1 ? "" : "s"}</span>
         ) : null}
         {skipped ? (
-          <span className="flex items-center gap-1 text-muted-foreground">⏭️ {skipped} ignorado{skipped === 1 ? "" : "s"} (cancelado)</span>
+          <span className="flex items-center gap-1 text-text-tertiary">⏭️ {skipped} ignorado{skipped === 1 ? "" : "s"} (cancelado)</span>
         ) : null}
-        <span className="flex items-center gap-1 text-muted-foreground"><Clock className="h-3.5 w-3.5" /> {seconds}s</span>
+        <span className="flex items-center gap-1 text-text-tertiary"><Clock className="h-3.5 w-3.5" /> {seconds}s</span>
       </div>
       {failed.length ? (
         <details className="mt-2 text-xs">
-          <summary className="cursor-pointer font-semibold text-muted-foreground">Ver detalhes dos erros</summary>
+          <summary className="cursor-pointer font-semibold text-text-tertiary">Ver detalhes dos erros</summary>
           <ul className="mt-1.5 space-y-1">
             {failed.map((r) => (
               <li key={r.email_id} className="flex flex-col gap-0.5 rounded-lg bg-[var(--pastel-red-bg)] p-2 text-[color:var(--pastel-red-text)]">
@@ -150,7 +150,7 @@ function ArticleCard({ article, onOpen }) {
     >
       <div className="flex w-full items-start gap-2.5">
         <span
-          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${read ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${read ? "bg-success" : "bg-muted-foreground/30"}`}
           title={read ? "Já aberto" : "Nunca aberto"}
         />
         <div className="min-w-0 flex-1">
@@ -158,13 +158,13 @@ function ArticleCard({ article, onOpen }) {
             <p className="truncate font-heading text-sm font-extrabold text-foreground">{article.title}</p>
             {article.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 text-foreground" /> : null}
           </div>
-          <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+          <p className="mt-0.5 flex items-center gap-1.5 text-meta text-text-tertiary">
             <CalendarDays className="h-3 w-3" /> {formatDate(article.issue_date || article.created_at)}
           </p>
         </div>
       </div>
       {article.highlights?.[0] ? (
-        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-start gap-1.5 text-xs text-text-body">
           <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
           <span className="line-clamp-2">{article.highlights[0]}</span>
         </p>
@@ -201,7 +201,7 @@ function AttentionRow({ item, busy, onProcess, onOpenArticle }) {
         <p className="flex items-center gap-1.5 truncate text-sm font-bold text-foreground">
           {meta.icon} {item.subject}
         </p>
-        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+        <p className="mt-0.5 text-meta text-text-tertiary">
           {meta.label} · {formatDate(item.received_at)}
           {item.status === "erro" && item.error_message ? ` · ${item.error_message}` : ""}
         </p>
@@ -410,13 +410,13 @@ export default function Knowledge() {
         attention.length === 0 ? (
           <Empty className="mt-10 rounded-3xl border-2 border-dashed border-border bg-card/60 px-6 py-14">
             <EmptyMedia>
-              <div className="card-elevated flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-gradient-to-br from-white to-slate-50 text-emerald-600">
+              <div className="card-elevated flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-gradient-to-br from-white to-slate-50 text-success">
                 <CheckCircle2 className="h-7 w-7" />
               </div>
             </EmptyMedia>
             <EmptyHeader className="max-w-xs gap-1">
               <EmptyTitle className="font-heading font-extrabold text-foreground">Tudo em dia</EmptyTitle>
-              <EmptyDescription className="text-muted-foreground">
+              <EmptyDescription className="text-text-body">
                 Não há Correios Semanais por processar, desatualizados ou com erro.
               </EmptyDescription>
             </EmptyHeader>
@@ -445,7 +445,7 @@ export default function Knowledge() {
             <EmptyTitle className="font-heading font-extrabold text-foreground">
               {articles.length === 0 ? "Ainda sem artigos" : "Nada por aqui"}
             </EmptyTitle>
-            <EmptyDescription className="text-muted-foreground">
+            <EmptyDescription className="text-text-body">
               {articles.length === 0
                 ? "Assim que chegar o próximo Correio Semanal, o artigo aparece aqui automaticamente."
                 : "Experimenta outro filtro ou termo de pesquisa."}
@@ -487,7 +487,7 @@ export default function Knowledge() {
                   onCheckedChange={() => toggleImportSelected(item.email_id)}
                 />
                 <span className="min-w-0 flex-1 truncate">{item.subject}</span>
-                <span className="shrink-0 text-[10px] font-normal text-muted-foreground">{formatDate(item.received_at)}</span>
+                <span className="shrink-0 text-meta font-normal text-text-tertiary">{formatDate(item.received_at)}</span>
               </label>
             ))}
             {unprocessed.length === 0 ? (

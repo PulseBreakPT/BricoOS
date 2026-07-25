@@ -69,10 +69,10 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="confirm-send-dialog" className="flex max-h-[94vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">
+          <DialogTitle className="font-heading text-h3">
             Confirmar envio ao cliente
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-text-body">
             {note.customer_name || "Cliente"} · preparado automaticamente — revê e confirma. Nada é enviado sem a tua confirmação.
           </p>
         </DialogHeader>
@@ -87,12 +87,12 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               rel="noreferrer"
               className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3 transition-colors hover:border-input"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--pastel-red-bg)] text-red-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--pastel-red-bg)] text-destructive">
                 <FileText className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold text-foreground">{pending.pdf_filename || "Orçamento (PDF)"}</span>
-                <span className="block text-xs text-muted-foreground">
+                <span className="block text-meta text-text-tertiary">
                   {pending.total != null ? `${Number(pending.total).toFixed(2)} € c/ IVA` : ""}
                   {pending.eff_margin_pct != null ? ` · margem final ${Number(pending.eff_margin_pct).toFixed(1)}%` : ""}
                   {" · toca para rever o PDF"}
@@ -100,7 +100,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               </span>
             </a>
           ) : (
-            <div data-testid="confirm-send-pdf-missing" className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted p-3 text-xs text-muted-foreground">
+            <div data-testid="confirm-send-pdf-missing" className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted p-3 text-meta text-text-tertiary">
               <FileText className="h-5 w-5 shrink-0" /> PDF não disponível para pré-visualização.
             </div>
           )}
@@ -122,12 +122,12 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               data-testid="confirm-send-quality-report"
               className={`mt-3 rounded-xl border p-3 ${
                 pending.quality_report.status === "error"
-                  ? "border-red-200 bg-[var(--pastel-red-bg)]"
-                  : "border-amber-200 bg-[var(--pastel-amber-bg)]"
+                  ? "border-destructive/30 bg-[var(--pastel-red-bg)]"
+                  : "border-warning/30 bg-[var(--pastel-amber-bg)]"
               }`}
             >
               <p className={`flex items-center gap-1.5 text-xs font-extrabold ${
-                pending.quality_report.status === "error" ? "text-red-700" : "text-amber-700"
+                pending.quality_report.status === "error" ? "text-destructive" : "text-warning"
               }`}>
                 <AlertTriangle className="h-4 w-4" /> Verificar antes de enviar
               </p>
@@ -141,13 +141,13 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               </ul>
             </div>
           ) : pending.quality_report ? (
-            <p data-testid="confirm-send-quality-ok" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+            <p data-testid="confirm-send-quality-ok" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-success">
               <CheckCircle2 className="h-3.5 w-3.5" /> Leitura do PDF do fornecedor sem problemas.
             </p>
           ) : null}
 
           {pending.diff_since_previous?.has_changes ? (
-            <div data-testid="confirm-send-diff" className="mt-3 rounded-xl border border-blue-200 bg-[var(--pastel-blue-bg)] p-3">
+            <div data-testid="confirm-send-diff" className="mt-3 rounded-xl border border-info/30 bg-[var(--pastel-blue-bg)] p-3">
               <p className="flex items-center gap-1.5 text-xs font-extrabold text-[color:var(--pastel-blue-text)]">
                 <FileWarning className="h-4 w-4" /> Orçamento alterado desde a última importação
               </p>
@@ -171,7 +171,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
           </div>
           <div className="mt-3 space-y-1.5">
             <Label>Assunto</Label>
-            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-amber-400 bg-[var(--pastel-amber-bg)]" : ""} />
+            <Input data-testid="confirm-send-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={pending.subject_needs_review ? "border-warning bg-[var(--pastel-amber-bg)]" : ""} />
             {pending.subject_needs_review ? (
               <p data-testid="subject-review-warning" className="text-xs text-[color:var(--pastel-amber-text)]">
                 {(pending.obra_candidates || []).length > 1
@@ -179,7 +179,7 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
                   : "Não foi possível ler o número da obra no PDF — confirma o assunto antes de enviar."}
               </p>
             ) : (
-              pending.obra ? <p className="text-[11px] text-muted-foreground">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
+              pending.obra ? <p className="text-meta text-text-tertiary">Nº da obra lido automaticamente do PDF: {pending.obra}</p> : null
             )}
           </div>
           <div className="mt-3 space-y-1.5">
@@ -194,15 +194,15 @@ export default function ConfirmSendDialog({ open, onOpenChange, note, onDone }) 
               {sending ? <Spinner className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
               Confirmar e enviar
             </Button>
-            <Button data-testid="confirm-send-discard" variant="outline" onClick={discard} disabled={sending || discarding} className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)]">
+            <Button data-testid="confirm-send-discard" variant="outline" onClick={discard} disabled={sending || discarding} className="rounded-xl border-destructive/30 text-destructive hover:bg-[var(--pastel-red-bg)]">
               {discarding ? <Spinner className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Descartar
             </Button>
-            <p className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
+            <p className="ml-auto flex items-center gap-1 text-meta text-text-tertiary">
               <ShieldCheck className="h-3.5 w-3.5" /> Envio só com confirmação
             </p>
           </div>
-          {!to.trim() ? <p className="mt-1.5 text-xs text-amber-600">Falta o email do cliente — preenche «Para» ou adiciona-o nos Detalhes do pedido.</p> : null}
+          {!to.trim() ? <p className="mt-1.5 text-xs text-warning">Falta o email do cliente — preenche «Para» ou adiciona-o nos Detalhes do pedido.</p> : null}
         </div>
       </DialogContent>
     </Dialog>

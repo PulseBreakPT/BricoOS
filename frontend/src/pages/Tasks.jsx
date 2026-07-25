@@ -200,12 +200,12 @@ function Row({
             <span key={l} className="rounded-full bg-foreground/5 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{l}</span>
           ))}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10.5px] font-semibold text-muted-foreground">
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-meta font-semibold text-text-tertiary">
           <span className="flex items-center gap-1">
             <User className="h-3 w-3" /> {assigneeName || "Sem colaborador"}
           </span>
           {t.due_date ? (
-            <span className={`flex items-center gap-1 ${overdue ? "text-red-600" : ""}`}>
+            <span className={`flex items-center gap-1 ${overdue ? "text-destructive" : ""}`}>
               · <CalendarDays className="h-3 w-3" /> {formatDue(t.due_date)}{t.due_time ? ` ${t.due_time}` : ""}
               {t.repeat && t.repeat !== "none" ? <Repeat className="h-3 w-3" /> : null}
             </span>
@@ -233,7 +233,7 @@ function Row({
           <DropdownMenuItem onClick={onArchive}>
             <Archive className="mr-2 h-3.5 w-3.5" /> Arquivar
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDelete} disabled={deleting} className="text-red-600 focus:text-red-600">
+          <DropdownMenuItem onClick={onDelete} disabled={deleting} className="text-destructive focus:text-destructive">
             {deleting ? <Spinner className="mr-2 h-3.5 w-3.5" /> : <Trash2 className="mr-2 h-3.5 w-3.5" />} Apagar
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -245,7 +245,7 @@ function Row({
     <SwipeRow
       onComplete={onToggle}
       actions={[
-        { key: "delete", label: "Apagar", icon: Trash2, className: "bg-red-600", onClick: onDelete, testid: `swipe-delete-${t.id}` },
+        { key: "delete", label: "Apagar", icon: Trash2, className: "bg-destructive", onClick: onDelete, testid: `swipe-delete-${t.id}` },
         { key: "archive", label: "Arquivar", icon: Archive, className: "bg-violet-600", onClick: onArchive, testid: `swipe-archive-${t.id}` },
         { key: "snooze", label: "Adiar", icon: CalendarDays, className: "bg-amber-600", onClick: onSnooze, testid: `swipe-snooze-${t.id}` },
       ]}
@@ -286,7 +286,7 @@ function TaskDashboard({ stats, collaboratorsById }) {
           <p className="font-heading text-sm font-extrabold text-foreground">
             Hoje tens {stats.total} tarefa{stats.total === 1 ? "" : "s"}. {doneToday} concluída{doneToday === 1 ? "" : "s"}, {stats.in_progress || 0} em execução e {stats.pending || 0} por fazer.
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Dashboard de tarefas</p>
+          <p className="mt-0.5 text-meta text-text-tertiary">Dashboard de tarefas</p>
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -296,7 +296,7 @@ function TaskDashboard({ stats, collaboratorsById }) {
             <StatTile label="Total" value={stats.total} />
             <StatTile label="Pendentes" value={stats.pending} />
             <StatTile label="Em execução" value={stats.in_progress} />
-            <StatTile label="Atrasadas" value={stats.overdue} tone={stats.overdue > 0 ? "text-red-600" : undefined} />
+            <StatTile label="Atrasadas" value={stats.overdue} tone={stats.overdue > 0 ? "text-destructive" : undefined} />
           </div>
           <div className="mt-4 flex flex-col items-center gap-3 sm:flex-row">
             <ChartContainer config={pieConfig} className="aspect-square max-h-[140px] shrink-0">
@@ -313,13 +313,13 @@ function TaskDashboard({ stats, collaboratorsById }) {
                 <span className="font-mono tabular-nums text-foreground">{pct}%</span>
               </div>
               <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-muted">
-                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-success" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Por secção</p>
+              <p className="text-label uppercase text-text-tertiary">Por secção</p>
               <div className="mt-1.5 space-y-1">
                 {byCategory.map(([key, count]) => (
                   <div key={key} className="flex items-center justify-between text-xs">
@@ -330,7 +330,7 @@ function TaskDashboard({ stats, collaboratorsById }) {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Por colaborador</p>
+              <p className="text-label uppercase text-text-tertiary">Por colaborador</p>
               <div className="mt-1.5 space-y-1">
                 {byAssignee.map(([id, count]) => (
                   <div key={id || "sem"} className="flex items-center justify-between text-xs">
@@ -351,7 +351,7 @@ function StatTile({ label, value, tone }) {
   return (
     <div className="rounded-xl border border-border bg-muted/40 p-2.5 text-center">
       <p className={`font-mono text-lg font-black tabular-nums ${tone || "text-foreground"}`}>{value ?? "–"}</p>
-      <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[9px] font-bold uppercase tracking-wide text-text-tertiary">{label}</p>
     </div>
   );
 }
@@ -669,20 +669,20 @@ export default function Tasks() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <p className="kicker">Coisas por fazer</p>
-          <h1 className="mt-0.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">Tarefas</h1>
+          <h1 className="mt-0.5 font-heading text-h1 text-foreground">Tarefas</h1>
         </div>
         <div className="flex items-center gap-3">
           {tasks.length > 0 ? (
             <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
               <div className="leading-tight">
-                <p className="font-mono text-lg font-bold tabular-nums text-foreground">{allDone}<span className="text-muted-foreground">/{tasks.length}</span></p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">concluídas</p>
+                <p className="font-mono text-lg font-bold tabular-nums text-foreground">{allDone}<span className="text-text-tertiary">/{tasks.length}</span></p>
+                <p className="text-label uppercase text-text-tertiary">concluídas</p>
               </div>
               <div className="w-24 sm:w-32">
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-emerald-500" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? "bg-success" : "bg-foreground"}`} style={{ width: `${pct}%` }} />
                 </div>
-                <p className="mt-1 text-right font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{pct}%</p>
+                <p className="mt-1 text-right font-mono text-meta tabular-nums text-text-tertiary">{pct}%</p>
               </div>
             </div>
           ) : null}
@@ -812,7 +812,7 @@ export default function Tasks() {
                 selecionada{selected.size === 1 ? "" : "s"}
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                <Button data-testid="task-bulk-complete" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkComplete} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
+                <Button data-testid="task-bulk-complete" size="sm" variant="outline" disabled={bulkBusy} loading={bulkBusy} onClick={bulkComplete} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
                   Concluir
                 </Button>
                 <DropdownMenu>
@@ -860,7 +860,7 @@ export default function Tasks() {
                     <DropdownMenuItem onClick={() => bulkLabel("remove")}>Remover etiqueta…</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button data-testid="task-bulk-trash" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-[var(--pastel-red-bg)] px-2.5 text-xs text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]">
+                <Button data-testid="task-bulk-trash" size="sm" variant="outline" disabled={bulkBusy} loading={bulkBusy} onClick={bulkTrash} className="h-8 rounded-lg border-red-200 bg-[var(--pastel-red-bg)] px-2.5 text-xs text-[color:var(--pastel-red-text)] hover:bg-[var(--pastel-red-bg)]">
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Mover para a lixeira
                 </Button>
                 <Button data-testid="task-bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -876,7 +876,7 @@ export default function Tasks() {
 
           {done.length > 0 ? (
             <div className="mt-8">
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">Concluídas ({done.length})</p>
+              <p className="mb-2 text-label uppercase text-text-tertiary">Concluídas ({done.length})</p>
               <div className="space-y-2">
                 {done.map(renderRow)}
               </div>
@@ -936,7 +936,7 @@ export default function Tasks() {
       <Dialog open={!!snoozeTask} onOpenChange={(v) => { if (!v) setSnoozeTask(null); }}>
         <DialogContent data-testid="snooze-dialog" className="sm:max-w-xs">
           <DialogHeader>
-            <DialogTitle className="font-heading text-lg font-bold tracking-tight">Adiar tarefa</DialogTitle>
+            <DialogTitle className="font-heading text-h3">Adiar tarefa</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input type="date" data-testid="snooze-date-input" value={snoozeDate} onChange={(e) => setSnoozeDate(e.target.value)} />

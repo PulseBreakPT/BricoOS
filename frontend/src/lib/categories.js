@@ -1,4 +1,4 @@
-import { Hammer, Wrench, Sofa, Flower2 } from "lucide-react";
+import { Hammer, Wrench, Sofa, Flower2, Circle, Send, Inbox, CheckCircle2 } from "lucide-react";
 
 // bg/text/border usam variáveis CSS (index.css, :root — tema claro único)
 // — os badges de categoria/estado, usados um pouco por toda a app via
@@ -47,10 +47,10 @@ export const CATEGORIES = {
 export const CATEGORY_LIST = Object.values(CATEGORIES);
 
 export const STATUS = {
-  aberto: { label: "Aberto", color: "var(--badge-aberto-text)", bg: "var(--badge-aberto-bg)" },
-  preco_pedido: { label: "Preço pedido", color: "var(--badge-preco_pedido-text)", bg: "var(--badge-preco_pedido-bg)" },
-  preco_recebido: { label: "Preço recebido", color: "var(--badge-preco_recebido-text)", bg: "var(--badge-preco_recebido-bg)" },
-  concluido: { label: "Concluído", color: "var(--badge-concluido-text)", bg: "var(--badge-concluido-bg)" },
+  aberto: { label: "Aberto", color: "var(--badge-aberto-text)", bg: "var(--badge-aberto-bg)", icon: Circle },
+  preco_pedido: { label: "Preço pedido", color: "var(--badge-preco_pedido-text)", bg: "var(--badge-preco_pedido-bg)", icon: Send },
+  preco_recebido: { label: "Preço recebido", color: "var(--badge-preco_recebido-text)", bg: "var(--badge-preco_recebido-bg)", icon: Inbox },
+  concluido: { label: "Concluído", color: "var(--badge-concluido-text)", bg: "var(--badge-concluido-bg)", icon: CheckCircle2 },
 };
 
 export const getCategory = (key) => CATEGORIES[key] || CATEGORIES.construcao;

@@ -122,10 +122,10 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="compose-email-dialog" className="flex max-h-[94vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">
+          <DialogTitle className="font-heading text-h3">
             {forward ? "Reencaminhar email" : "Novo email"}
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-text-body">
             {forward ? `Assunto original: ${forward.subject || "(sem assunto)"}` : "Escreve livremente — associa a um pedido em baixo, ou envia sem associação."}
           </p>
         </DialogHeader>
@@ -190,11 +190,11 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
           </div>
 
           {forward ? (
-            <div className="mt-3 rounded-lg border border-border bg-muted p-3 text-xs text-muted-foreground">
-              <p className="font-bold text-muted-foreground">Mensagem original</p>
+            <div className="mt-3 rounded-lg border border-border bg-muted p-3 text-xs text-text-tertiary">
+              <p className="text-label uppercase text-text-tertiary">Mensagem original</p>
               <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap font-sans">{forward.body || "(sem texto)"}</pre>
               {forward.attachmentsCount ? (
-                <p className="mt-2 text-[11px]">{forward.attachmentsCount} anexo(s) original(is) incluído(s) automaticamente.</p>
+                <p className="mt-2 text-meta text-text-tertiary">{forward.attachmentsCount} anexo(s) original(is) incluído(s) automaticamente.</p>
               ) : null}
             </div>
           ) : (
@@ -211,7 +211,7 @@ export default function ComposeEmailDialog({ open, onOpenChange, onSent, forward
                     {attachments.map((a, i) => (
                       <span key={i} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
                         <FileText className="h-3.5 w-3.5 shrink-0" /> <span className="max-w-[45vw] truncate sm:max-w-[200px]">{a.filename}</span>
-                        <button type="button" onClick={() => removeAttachment(i)} aria-label={`Remover anexo ${a.filename}`} title="Remover anexo" className="shrink-0 text-muted-foreground hover:text-red-600">
+                        <button type="button" onClick={() => removeAttachment(i)} aria-label={`Remover anexo ${a.filename}`} title="Remover anexo" className="shrink-0 text-muted-foreground hover:text-destructive">
                           <X className="h-3 w-3" />
                         </button>
                       </span>

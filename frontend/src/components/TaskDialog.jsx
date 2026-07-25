@@ -278,10 +278,10 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="task-dialog" className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl font-bold tracking-tight">
+          <DialogTitle className="font-heading text-h3">
             {isEdit ? "Editar tarefa" : "Nova tarefa"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
+          <DialogDescription className="text-text-body">
             Prazo, prioridade, repetição e subtarefas.
           </DialogDescription>
         </DialogHeader>
@@ -420,7 +420,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
           </div>
         </div>
         {!form.due_date && form.repeat !== "none" ? (
-          <p className="text-xs text-amber-600">Define uma data limite para poder repetir a tarefa.</p>
+          <p className="text-xs text-warning">Define uma data limite para poder repetir a tarefa.</p>
         ) : null}
 
         <div className="space-y-1.5">
@@ -436,7 +436,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
             </SelectContent>
           </Select>
           {(!form.due_date || !form.due_time) ? (
-            <p className="text-xs text-muted-foreground">Define data e hora limite para poder agendar um lembrete.</p>
+            <p className="text-xs text-text-body">Define data e hora limite para poder agendar um lembrete.</p>
           ) : null}
         </div>
 
@@ -467,7 +467,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
               <div key={s.id || idx} data-testid={`task-dialog-subtask-${idx}`} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
                 <Checkbox checked={s.done} onCheckedChange={() => toggleSubtask(idx)} className="h-4 w-4" />
                 <span className={`flex-1 text-sm ${s.done ? "text-muted-foreground line-through" : "text-foreground"}`}>{s.title}</span>
-                <button onClick={() => removeSubtask(idx)} aria-label={`Remover subtarefa ${s.title}`} title="Remover subtarefa" className="text-muted-foreground hover:text-red-500">
+                <button onClick={() => removeSubtask(idx)} aria-label={`Remover subtarefa ${s.title}`} title="Remover subtarefa" className="text-text-tertiary hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -540,7 +540,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
               data-testid="task-dialog-delete"
               variant="outline"
               onClick={remove}
-              className="rounded-xl border-red-200 text-red-600 hover:bg-[var(--pastel-red-bg)] hover:text-[color:var(--pastel-red-text)]"
+              className="rounded-xl border-destructive/30 text-destructive hover:bg-[var(--pastel-red-bg)]"
             >
               <Trash2 className="mr-1.5 h-4 w-4" /> Eliminar
             </Button>
@@ -551,7 +551,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent data-testid="task-history-panel" className="flex w-full flex-col sm:max-w-md">
           <SheetHeader>
-            <SheetTitle className="font-heading text-xl font-bold tracking-tight">Histórico da tarefa</SheetTitle>
+            <SheetTitle className="font-heading text-h3">Histórico da tarefa</SheetTitle>
           </SheetHeader>
           <div className="mt-4 flex-1 space-y-2 overflow-y-auto">
             {historyLoading ? (
@@ -563,7 +563,7 @@ export default function TaskDialog({ open, onOpenChange, task, allTasks = [], co
               return (
                 <div key={entry.id} data-testid={`task-history-entry-${entry.id}`} className="rounded-lg border border-border p-2.5">
                   <p className="text-sm text-foreground">{entry.message}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{when}{who}</p>
+                  <p className="mt-1 text-meta text-text-tertiary">{when}{who}</p>
                 </div>
               );
             })}

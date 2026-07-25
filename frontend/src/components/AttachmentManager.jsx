@@ -84,7 +84,7 @@ export default function AttachmentManager({ ownerKind, ownerId }) {
               <a href={withDeviceToken(`${API}/attachments/${f.id}`)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground hover:underline">
                 {f.filename}
               </a>
-              <button type="button" data-testid={`attachment-remove-${f.id}`} disabled={removingId === f.id} onClick={() => remove(f.id)} className="shrink-0 rounded p-1 text-muted-foreground hover:text-red-500 disabled:opacity-50">
+              <button type="button" data-testid={`attachment-remove-${f.id}`} disabled={removingId === f.id} onClick={() => remove(f.id)} className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive disabled:opacity-50">
                 {removingId === f.id ? <Spinner className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
               </button>
             </div>

@@ -68,7 +68,7 @@ function CorreioSemanalStatusPanel({ status, busy, onProcess, onOpenArticle }) {
           size="sm" variant="outline" disabled={busy} onClick={onProcess}
           className="h-7 rounded-lg px-2.5 text-xs"
         >
-          {busy ? <Spinner className="mr-1.5 h-3 w-3" /> : <Zap className="mr-1.5 h-3 w-3" />}
+          {busy ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
           {meta.action}
         </Button>
       </div>
@@ -104,7 +104,7 @@ function KindBadge({ kind }) {
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.cls}`}>
-      <Icon className="h-3 w-3" /> {cfg.label}
+      <Icon className="h-3.5 w-3.5" /> {cfg.label}
     </span>
   );
 }
@@ -115,14 +115,14 @@ function PriorityBadge({ priority }) {
   if (priority === "alta") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-red-text)]">
-        <AlertTriangle className="h-3 w-3" /> Urgente
+        <AlertTriangle className="h-3.5 w-3.5" /> Urgente
       </span>
     );
   }
   if (priority === "baixa") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-green-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-green-text)]">
-        <ArrowDown className="h-3 w-3" /> Baixa
+        <ArrowDown className="h-3.5 w-3.5" /> Baixa
       </span>
     );
   }
@@ -228,12 +228,12 @@ function SuggestedTaskRow({ task, busy, onAccept, onDismiss, testId }) {
             className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-[11px] text-foreground"
           />
           <button type="button" disabled={busy || !categoryName.trim()} onClick={() => onAccept(categoryName.trim())}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-            <Check className="h-3 w-3" /> Criar categoria
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/90 disabled:opacity-50">
+            <Check className="h-3.5 w-3.5" /> Criar categoria
           </button>
           <button type="button" disabled={busy} onClick={onDismiss}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
-            <Trash2 className="h-3 w-3" />
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-[11px] font-bold text-destructive hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -245,16 +245,16 @@ function SuggestedTaskRow({ task, busy, onAccept, onDismiss, testId }) {
       <SeverityBadge severity={task.severity} />
       {task.kind === "email_draft" ? (
         <a href={task.mailto} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-bold text-muted-foreground hover:text-foreground">
-          <MailPlus className="h-3 w-3" /> Abrir rascunho
+          <MailPlus className="h-3.5 w-3.5" /> Abrir rascunho
         </a>
       ) : null}
       <button type="button" disabled={busy} onClick={() => onAccept()}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-        <Check className="h-3 w-3" /> Aceitar
+        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/90 disabled:opacity-50">
+        <Check className="h-3.5 w-3.5" /> Aceitar
       </button>
       <button type="button" disabled={busy} onClick={onDismiss}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
-        <Trash2 className="h-3 w-3" /> Dispensar
+        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-[11px] font-bold text-destructive hover:bg-[var(--pastel-red-bg)] disabled:opacity-50">
+        <Trash2 className="h-3.5 w-3.5" /> Dispensar
       </button>
     </div>
   );
@@ -582,7 +582,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
               onCheckedChange={toggleSelectAll}
             />
           ) : null}
-          <p className="text-sm text-muted-foreground">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
+          <p className="text-sm text-text-body">{displayTotal} email{displayTotal === 1 ? "" : "s"} {smartQuery ? "encontrado(s) pela pesquisa IA" : "na caixa de entrada"}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -604,9 +604,9 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
 
       {selected.size > 0 ? (
         <div className="card-elevated mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
-          <span className="text-xs font-bold text-foreground"><span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-red-600 px-1 font-mono text-[11px] font-black text-white">{selected.size}</span> selecionado{selected.size === 1 ? "" : "s"}</span>
+          <span className="text-xs font-bold text-foreground"><span className="mr-1 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground px-1 font-mono text-[11px] font-black text-background">{selected.size}</span> selecionado{selected.size === 1 ? "" : "s"}</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button data-testid="bulk-seen" size="sm" variant="outline" disabled={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
+            <Button data-testid="bulk-seen" size="sm" variant="outline" loading={bulkBusy} onClick={bulkMarkSeen} className="h-8 rounded-lg border-border bg-muted px-2.5 text-xs text-foreground hover:bg-muted hover:text-foreground">
               <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Marcar visto
             </Button>
             <Button data-testid="bulk-clear" size="sm" variant="ghost" onClick={clearSelection} className="h-8 rounded-lg px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
@@ -631,7 +631,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
             </span>
           ) : <span>Pesquisa por "{smartQuery.q}"</span>}
           <button onClick={onClearSmart} className="ml-auto inline-flex items-center gap-0.5 font-bold hover:underline">
-            <X className="h-3 w-3" /> Limpar
+            <X className="h-3.5 w-3.5" /> Limpar
           </button>
         </div>
       ) : null}
@@ -664,9 +664,9 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                     <CategoryBadge category={m.category} />
                     {m.has_pdf ? <FileText className="h-3.5 w-3.5 text-red-500" title="Com PDF em anexo" /> : null}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</p>
-                  {m.ai_summary ? <p className="mt-0.5 truncate text-[11px] italic text-violet-600">{m.ai_summary}</p> : null}
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{m.from_email} · {timeAgo(m.received_at)}</p>
+                  <p className="truncate text-meta text-text-tertiary">{m.subject || "(sem assunto)"}</p>
+                  {m.ai_summary ? <p className="mt-0.5 truncate text-meta italic text-violet-600">{m.ai_summary}</p> : null}
+                  <p className="mt-0.5 text-meta text-text-tertiary">{m.from_email} · {timeAgo(m.received_at)}</p>
                 </div>
               </button>
               {expanded === m.id ? (
@@ -684,7 +684,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-indigo-text)]">
                         <BarChart3 className="h-3.5 w-3.5" /> Resumo da edição
                       </p>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-foreground/80 sm:grid-cols-3 3xl:grid-cols-5">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-text-body sm:grid-cols-3 3xl:grid-cols-5">
                         <p>{m.edition_summary.stats.documentos_analisados} documentos analisados</p>
                         <p>{m.edition_summary.stats.assuntos_novos} assuntos novos</p>
                         <p>{m.edition_summary.stats.alteracoes} alterações</p>
@@ -699,12 +699,12 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         <p>{m.edition_summary.stats.erros_processamento} erros de processamento</p>
                       </div>
                       {m.edition_summary.related_entities?.fornecedores?.length ? (
-                        <p className="mt-1.5 text-[11px] text-foreground/80">
+                        <p className="mt-1.5 text-[11px] text-text-body">
                           Fornecedores mencionados: {m.edition_summary.related_entities.fornecedores.join(", ")}
                         </p>
                       ) : null}
                       {m.edition_summary.related_entities?.campanhas?.length ? (
-                        <p className="mt-0.5 text-[11px] text-foreground/80">
+                        <p className="mt-0.5 text-[11px] text-text-body">
                           Campanhas: {m.edition_summary.related_entities.campanhas.join(", ")}
                         </p>
                       ) : null}
@@ -716,14 +716,14 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                         <FileDiff className="h-3.5 w-3.5" /> Alterações desde o Correio Semanal Nº{m.correio_semanal_diff.prev_csn_number}
                       </p>
                       {m.correio_semanal_diff.has_changes ? (
-                        <div className="space-y-1 text-[11px] text-foreground/80">
+                        <div className="space-y-1 text-[11px] text-text-body">
                           {m.correio_semanal_diff.added_sections?.length ? <p>🆕 Novos assuntos: {m.correio_semanal_diff.added_sections.join(", ")}</p> : null}
                           {m.correio_semanal_diff.removed_sections?.length ? <p>❌ Assuntos que saíram: {m.correio_semanal_diff.removed_sections.join(", ")}</p> : null}
                           {m.correio_semanal_diff.added_deadlines?.length ? <p>📅 Novos prazos: {m.correio_semanal_diff.added_deadlines.join("; ")}</p> : null}
                           {m.correio_semanal_diff.removed_deadlines?.length ? <p>✅ Prazos que já saíram da lista: {m.correio_semanal_diff.removed_deadlines.join("; ")}</p> : null}
                         </div>
                       ) : (
-                        <p className="text-[11px] text-foreground/80">Sem alterações estruturais desde a edição anterior.</p>
+                        <p className="text-[11px] text-text-body">Sem alterações estruturais desde a edição anterior.</p>
                       )}
                     </div>
                   ) : null}
@@ -736,7 +736,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       <p className="mb-1 flex items-center gap-1.5 text-xs font-bold text-[color:var(--pastel-violet-text)]">
                         <FileStack className="h-3.5 w-3.5" /> Anexos da Edição Nº{m.anexos_edicao_number}
                       </p>
-                      <p className="mb-1 text-[11px] text-foreground/80">
+                      <p className="mb-1 text-[11px] text-text-body">
                         {m.anexos_edicao_summary?.file_count ?? 0} ficheiro(s) processado(s)
                         {m.anexos_edicao_summary?.by_category
                           ? " · " + Object.entries(m.anexos_edicao_summary.by_category)
@@ -745,7 +745,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                       </p>
                       {m.anexos_edicao_diff ? (
                         m.anexos_edicao_diff.has_changes ? (
-                          <div className="space-y-1 text-[11px] text-foreground/80">
+                          <div className="space-y-1 text-[11px] text-text-body">
                             <p>Desde a edição Nº{m.anexos_edicao_diff.prev_edition}:</p>
                             {m.anexos_edicao_diff.new_files?.length ? <p>🆕 {m.anexos_edicao_diff.new_files.length} ficheiro(s) novo(s)</p> : null}
                             {m.anexos_edicao_diff.removed_files?.length ? <p>❌ {m.anexos_edicao_diff.removed_files.length} ficheiro(s) removido(s)</p> : null}
@@ -755,7 +755,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                             {m.anexos_edicao_diff.discontinued_products_count ? <p>🔴 {m.anexos_edicao_diff.discontinued_products_count} produto(s) descontinuado(s)</p> : null}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-foreground/80">Sem alterações desde a edição anterior.</p>
+                          <p className="text-[11px] text-text-body">Sem alterações desde a edição anterior.</p>
                         )
                       ) : null}
                     </div>
@@ -808,7 +808,7 @@ function InboxTab({ search, smartQuery, onClearSmart, onForward }) {
                           variant="outline"
                           disabled={unlinkingId === m.id}
                           onClick={() => unlinkNote(m)}
-                          className="h-8 rounded-lg border-red-200 text-xs text-red-600 hover:bg-[var(--pastel-red-bg)]"
+                          className="h-8 rounded-lg border-destructive/30 text-xs text-destructive hover:bg-[var(--pastel-red-bg)]"
                         >
                           {unlinkingId === m.id ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Unlink2 className="mr-1.5 h-3.5 w-3.5" />}
                           Desassociar
@@ -971,7 +971,7 @@ function SentTab({ search }) {
   return (
     <div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-text-body">
           {total} email{total === 1 ? "" : "s"} {awaitingOnly ? "sem resposta há mais de 3 dias" : "enviado" + (total === 1 ? "" : "s")}
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -982,8 +982,8 @@ function SentTab({ search }) {
             </button>
           ))}
           <button data-testid="sent-awaiting-toggle" onClick={() => setAwaitingOnly((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${awaitingOnly ? "bg-amber-500 text-white" : "border border-amber-200 bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)] hover:bg-[var(--pastel-amber-bg)]"}`}>
-            <BellRing className="h-3 w-3" /> Aguardam resposta
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${awaitingOnly ? "bg-warning text-warning-foreground" : "border border-amber-200 bg-[var(--pastel-amber-bg)] text-[color:var(--pastel-amber-text)] hover:bg-[var(--pastel-amber-bg)]"}`}>
+            <BellRing className="h-3.5 w-3.5" /> Aguardam resposta
           </button>
         </div>
       </div>
@@ -1008,8 +1008,8 @@ function SentTab({ search }) {
                     ) : null}
                     {(m.attachments || []).length > 0 ? <Paperclip className="h-3.5 w-3.5 text-muted-foreground" title="Com anexo" /> : null}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{m.subject || "(sem assunto)"}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{m.to} · {timeAgo(m.sent_at)}</p>
+                  <p className="truncate text-meta text-text-tertiary">{m.subject || "(sem assunto)"}</p>
+                  <p className="mt-0.5 text-meta text-text-tertiary">{m.to} · {timeAgo(m.sent_at)}</p>
                 </div>
               </button>
               {expanded === m.id ? (
@@ -1032,7 +1032,7 @@ function SentTab({ search }) {
                       ))}
                     </div>
                   ) : null}
-                  <p className="mt-2 text-[11px] text-muted-foreground">{formatDateTime(m.sent_at)}</p>
+                  <p className="mt-2 text-meta text-text-tertiary">{formatDateTime(m.sent_at)}</p>
                   {m.note_id ? (
                     <button onClick={() => navigate(`/?open=${m.note_id}&tab=cronologia`)} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground">
                       Abrir pedido associado <ArrowRight className="h-3.5 w-3.5" />
@@ -1105,7 +1105,7 @@ function ThreadsTab({ search }) {
 
   return (
     <div>
-      <p className="mt-3 text-sm text-muted-foreground">{filtered.length} conversa{filtered.length === 1 ? "" : "s"}</p>
+      <p className="mt-3 text-sm text-text-body">{filtered.length} conversa{filtered.length === 1 ? "" : "s"}</p>
       {loading ? (
         <ListSkeleton rows={4} />
       ) : filtered.length === 0 ? (
@@ -1120,8 +1120,8 @@ function ThreadsTab({ search }) {
                     <span className="truncate text-sm font-bold text-foreground">{t.label || "(sem nome)"}</span>
                     {t.unseen > 0 ? <span className="inline-flex rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{t.unseen} nova(s)</span> : null}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{t.last_preview || "(sem texto)"}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{t.count} mensagem{t.count === 1 ? "" : "s"} · {timeAgo(t.last_at)}</p>
+                  <p className="truncate text-meta text-text-tertiary">{t.last_preview || "(sem texto)"}</p>
+                  <p className="mt-0.5 text-meta text-text-tertiary">{t.count} mensagem{t.count === 1 ? "" : "s"} · {timeAgo(t.last_at)}</p>
                 </div>
               </button>
               {openKey === t.key ? (
@@ -1136,8 +1136,8 @@ function ThreadsTab({ search }) {
                         <span className="font-bold text-foreground">{m.direction === "out" ? `Enviado a ${m.to_label || m.to}` : `Recebido de ${m.supplier_name || m.from_name || m.from_email}`}</span>
                         <span className="shrink-0 text-muted-foreground">{formatDateTime(m.at)}</span>
                       </div>
-                      <p className="mt-1 truncate text-muted-foreground">{m.subject || "(sem assunto)"}</p>
-                      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{(m.body || "").slice(0, 400)}</p>
+                      <p className="mt-1 truncate text-text-tertiary">{m.subject || "(sem assunto)"}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-text-body">{(m.body || "").slice(0, 400)}</p>
                     </div>
                   ))}
                   {t.note_id ? (
@@ -1191,7 +1191,7 @@ function DraftsTab({ search }) {
 
   return (
     <div>
-      <p className="mt-3 text-sm text-muted-foreground">{filtered.length} rascunho{filtered.length === 1 ? "" : "s"} por confirmar</p>
+      <p className="mt-3 text-sm text-text-body">{filtered.length} rascunho{filtered.length === 1 ? "" : "s"} por confirmar</p>
 
       {loading ? (
         <ListSkeleton rows={4} />
@@ -1211,14 +1211,14 @@ function DraftsTab({ search }) {
                       <span className="inline-flex rounded-full bg-[var(--pastel-amber-bg)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--pastel-amber-text)]">Há mais de 24h</span>
                     ) : null}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{p?.subject}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="truncate text-meta text-text-tertiary">{p?.subject}</p>
+                  <p className="mt-0.5 text-meta text-text-tertiary">
                     {p?.pdf_filename ? `${p.pdf_filename} · ` : ""}
                     {p?.total != null ? `${Number(p.total).toFixed(2)} € c/ IVA · ` : ""}
                     {timeAgo(p?.created_at)}
                   </p>
                 </div>
-                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">
+                <span className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-xs font-bold text-success-foreground">
                   <Send className="h-3.5 w-3.5" /> Rever e enviar
                 </span>
               </button>
@@ -1281,7 +1281,7 @@ export default function Emails() {
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <p className="kicker">Toda a atividade de email</p>
-          <h1 className="mt-0.5 flex items-center gap-2.5 font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+          <h1 className="mt-0.5 flex items-center gap-2.5 font-heading text-h1 text-foreground">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-black text-white shadow-lg shadow-slate-400/30 sm:h-11 sm:w-11">
               <Mail className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>

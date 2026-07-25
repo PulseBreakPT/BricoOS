@@ -83,16 +83,16 @@ export default function NameInput({
           placeholder={placeholder}
           autoComplete="name"
           autoCapitalize="words"
-          className={`pr-8 transition-all duration-150 ${unexpected ? "border-amber-400 focus-visible:ring-amber-400" : ""} ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
+          className={`pr-8 transition-all duration-150 ${unexpected ? "border-warning focus-visible:ring-warning" : ""} ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
         />
         {valid ? (
-          <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500 duration-150 animate-in zoom-in-50" />
+          <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-success duration-150 animate-in zoom-in-50" />
         ) : unexpected ? (
-          <AlertTriangle className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-500" />
+          <AlertTriangle className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-warning" />
         ) : null}
       </div>
       <div className="flex items-center justify-between gap-2 text-[10px] font-semibold">
-        {unexpected ? <span className="text-amber-600">Nome com números ou símbolos pouco habituais</span> : <span />}
+        {unexpected ? <span className="text-warning">Nome com números ou símbolos pouco habituais</span> : <span />}
         {tooLong ? <span className="text-muted-foreground">{value.length} caracteres</span> : null}
       </div>
     </div>

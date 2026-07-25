@@ -66,10 +66,10 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="email-templates-dialog" className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 font-heading text-lg font-extrabold tracking-tight">
+          <DialogTitle className="flex items-center gap-2 font-heading text-h3">
             <FileStack className="h-5 w-5" /> Modelos de resposta
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">Respostas reutilizáveis para inserir rapidamente ao escrever um email.</p>
+          <p className="text-xs text-text-body">Respostas reutilizáveis para inserir rapidamente ao escrever um email.</p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -109,11 +109,11 @@ export default function EmailTemplatesDialog({ open, onOpenChange }) {
                     <div key={t.id} data-testid={`template-${t.id}`} className="flex items-start justify-between gap-2 rounded-xl border border-border p-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold text-foreground">{t.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{t.subject}</p>
+                        <p className="truncate text-meta text-text-tertiary">{t.subject}</p>
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs" onClick={() => startEdit(t)}><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button>
-                        <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs text-red-600 hover:bg-[var(--pastel-red-bg)]" onClick={() => remove(t)}><Trash2 className="mr-1 h-3.5 w-3.5" /> Eliminar</Button>
+                        <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2 text-xs text-destructive hover:bg-[var(--pastel-red-bg)]" onClick={() => remove(t)}><Trash2 className="mr-1 h-3.5 w-3.5" /> Eliminar</Button>
                       </div>
                     </div>
                   ))}
