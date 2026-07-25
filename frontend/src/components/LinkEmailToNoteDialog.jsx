@@ -30,8 +30,8 @@ export default function LinkEmailToNoteDialog({ email, onOpenChange, onLinked })
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="link-email-dialog" className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4">
-          <DialogTitle className="font-heading text-lg font-extrabold tracking-tight">Associar a um pedido</DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
+          <DialogTitle className="font-heading text-h3">Associar a um pedido</DialogTitle>
+          <DialogDescription className="text-meta text-text-tertiary">
             {email ? `${email.from_name || email.from_email} — ${email.subject || "(sem assunto)"}` : ""}
           </DialogDescription>
         </DialogHeader>
