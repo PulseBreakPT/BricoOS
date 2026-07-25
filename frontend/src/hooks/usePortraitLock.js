@@ -14,9 +14,17 @@ async function lockPortrait() {
   try {
     await orientation.lock("portrait-primary");
   } catch {
-    // iOS Safari/PWA, por exemplo, não implementa lock() nenhum — e mesmo
-    // em browsers que implementam, o pedido pode ser recusado consoante o
-    // contexto (fora de fullscreen, etc.). Nada a fazer, nada a mostrar.
+    // Alguns motores aceitam "portrait" mas rejeitam a distinção primary/
+    // secondary de "portrait-primary" — tenta a variante mais permissiva
+    // antes de desistir de vez.
+    try {
+      await orientation.lock("portrait");
+    } catch {
+      // iOS Safari/PWA, por exemplo, não implementa lock() nenhum — e mesmo
+      // em browsers que implementam, o pedido pode ser recusado consoante o
+      // contexto (fora de fullscreen, etc.). Nada a fazer, nada a mostrar
+      // — o aviso "roda o ecrã" do index.css cobre este caso.
+    }
   }
 }
 

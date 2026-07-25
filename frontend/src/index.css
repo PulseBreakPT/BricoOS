@@ -1747,16 +1747,41 @@ code {
 /* A app instalada é bloqueada em vertical via manifest.json
    ("orientation": "portrait-primary") e, em tempo de execução, via
    screen.orientation.lock() (ver frontend/src/hooks/usePortraitLock.js).
-   Isto aqui NÃO roda a interface — é só uma rede de segurança para o caso
-   raro de algum browser ignorar os dois bloqueios acima e mesmo assim
-   reportar landscape: mantém as dimensões do layout em proporção vertical
-   (a UI foi toda desenhada para isso) em vez de deixar grids/painéis
-   esticarem para uma proporção larga e partirem visualmente. */
-@media (orientation: landscape) {
-  html,
-  body,
+   Nenhum dos dois é garantido — o bloqueio do manifest só é lido pelo
+   Android no momento em que a app é instalada (uma app já instalada antes
+   desta alteração continua com o valor antigo até ser desinstalada e
+   reinstalada) e screen.orientation.lock() pode falhar consoante o
+   browser/aparelho. Esta rede de segurança só se aplica à app INSTALADA
+   (display-mode standalone/fullscreen/minimal-ui/window-controls-overlay —
+   os quatro modos do manifest, ver display_override) — no browser normal
+   o utilizador continua a poder rodar o ecrã livremente, como esperado.
+   Em vez de esticar o layout numa proporção vertical dentro de um ecrã
+   largo (o que só criava uma coluna estreita com muito espaço morto ao
+   lado — o problema reportado), mostra um aviso simples a pedir para
+   rodar o ecrã, sem tentar adivinhar/rodar visualmente o conteúdo por
+   CSS (essa técnica depende de saber para que lado o ecrã rodou, que o
+   CSS sozinho não sabe — arriscava mostrar tudo de pernas para o ar). */
+@media (orientation: landscape) and (display-mode: standalone),
+  (orientation: landscape) and (display-mode: fullscreen),
+  (orientation: landscape) and (display-mode: minimal-ui),
+  (orientation: landscape) and (display-mode: window-controls-overlay) {
   #root {
-    width: 100vh;
-    height: 100vw;
+    display: none;
+  }
+  body::before {
+    content: "Roda o ecrã para vertical para continuares a usar a Brico OS.";
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.5;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
