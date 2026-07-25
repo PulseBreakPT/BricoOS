@@ -242,6 +242,17 @@ a,
     outline-offset: 2px;
     border-radius: 4px;
   }
+
+  /* Campos de formulário (secção H): halo suave adicional por fora do
+     outline sólido — usa --signal-glow (já existia, sem consumidor) —
+     em vez de um redesign paralelo do foco. Mantém a regra global acima
+     como única fonte de verdade sobre "o que é foco" em toda a app. */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="combobox"]:focus-visible {
+    box-shadow: 0 0 0 4px var(--signal-glow);
+  }
 }
 
 /* ------------------------------------------------------------------ */

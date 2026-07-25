@@ -11,33 +11,54 @@ function warnIfUnknown(map, key, kind) {
   }
 }
 
-export const CategoryBadge = ({ category, size = "sm" }) => {
-  warnIfUnknown(CATEGORIES, category, "categoria");
-  const c = getCategory(category);
-  const Icon = c.icon;
+// Primitivo partilhado: pastel bg + texto saturado + ícone (ou dot),
+// a linguagem visual de badge usada em toda a app (categoria, estado,
+// prioridade). CategoryBadge e StatusPill só escolhem os dados — o
+// span/tamanhos/ícone vivem aqui uma única vez.
+function PastelBadge({ bg, text, icon: Icon, dot, label, size = "sm", testid }) {
   const pad = size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs";
   return (
     <span
-      data-testid={`category-badge-${c.key}`}
+      data-testid={testid}
       className={`inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-wide ${pad}`}
-      style={{ backgroundColor: c.bg, color: c.text }}
+      style={{ backgroundColor: bg, color: text }}
     >
-      <Icon className="h-3 w-3" strokeWidth={2.6} />
-      {c.label}
+      {Icon ? (
+        <Icon className="h-3 w-3 shrink-0" strokeWidth={2.6} />
+      ) : dot ? (
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: dot }} />
+      ) : null}
+      {label}
     </span>
+  );
+}
+
+export const CategoryBadge = ({ category, size = "sm" }) => {
+  warnIfUnknown(CATEGORIES, category, "categoria");
+  const c = getCategory(category);
+  return (
+    <PastelBadge
+      testid={`category-badge-${c.key}`}
+      bg={c.bg}
+      text={c.text}
+      icon={c.icon}
+      label={c.label}
+      size={size}
+    />
   );
 };
 
-export const StatusPill = ({ status }) => {
+export const StatusPill = ({ status, size = "sm" }) => {
   warnIfUnknown(STATUS, status, "estado");
   const s = getStatus(status);
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-      style={{ backgroundColor: s.bg, color: s.color }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
-      {s.label}
-    </span>
+    <PastelBadge
+      bg={s.bg}
+      text={s.color}
+      icon={s.icon}
+      dot={s.icon ? undefined : s.color}
+      label={s.label}
+      size={size}
+    />
   );
 };

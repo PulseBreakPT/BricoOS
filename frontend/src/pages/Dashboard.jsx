@@ -11,6 +11,7 @@ import {
 import api, { API, getErrorMessage } from "@/lib/api";
 import { getStatusCfg, getPriorityCfg, PRIORITY_ORDER, formatHours, STATUS_ORDER, timeAgo } from "@/lib/pedido";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
+import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -72,57 +73,6 @@ function DashboardWidget({ widgetKey, title, wide, onDragStartKey, onDropOnKey, 
     </div>
   );
 }
-
-// Contagem animada — os números "sobem" até ao valor real quando os dados
-// chegam. Só anima valores numéricos; strings (ex.: "3h") passam direto.
-function CountUp({ value }) {
-  const [display, setDisplay] = useState(0);
-  const rafRef = useRef(null);
-  useEffect(() => {
-    if (typeof value !== "number") return undefined;
-    const start = performance.now();
-    const dur = 700;
-    const tick = (now) => {
-      const p = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setDisplay(Math.round(value * eased));
-      if (p < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [value]);
-  if (typeof value !== "number") return <>{value}</>;
-  return <span className="tabular-nums">{display}</span>;
-}
-
-const StatCard = ({ icon: Icon, label, value, accent, testid, danger, index = 0 }) => (
-  <div
-    data-testid={testid}
-    className={`group relative animate-fade-up overflow-hidden rounded-2xl border bg-card p-4 card-elevated card-elevated-hover transition-all duration-200 hover:-translate-y-1 sm:p-5 ${danger && value > 0 ? "border-red-200" : "border-border hover:border-input"}`}
-    style={{ "--stagger-i": index }}
-  >
-    {/* Barra de sinal — mesma linguagem dos alertas: margem vermelha =
-        este número exige intervenção. */}
-    {danger && value > 0 ? (
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-red-500 via-red-600 to-red-700" />
-    ) : null}
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-[0.07] blur-2xl transition-opacity duration-300 group-hover:opacity-[0.16]"
-      style={{ backgroundColor: accent }}
-    />
-    <div
-      className="flex h-9 w-9 items-center justify-center rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6 sm:h-10 sm:w-10"
-      style={{ backgroundColor: `${accent}1a`, color: accent }}
-    >
-      <Icon className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
-    </div>
-    <p className="mt-3 font-heading text-3xl font-extrabold tracking-tight text-foreground sm:mt-4 sm:text-4xl">
-      <CountUp value={value} />
-    </p>
-    <p className="mt-0.5 text-xs font-semibold text-muted-foreground sm:text-sm">{label}</p>
-  </div>
-);
 
 const SEV_ICON = {
   high: { bg: "bg-[var(--pastel-red-bg)] text-red-600", ring: "border-red-100 bg-[var(--pastel-red-bg)]" },
