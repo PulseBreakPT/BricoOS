@@ -58,17 +58,17 @@ a,
     --popover-foreground: 228 8% 11%;
     --primary: 228 8% 11%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 72% 46%;
+    --secondary: 0 88% 42%;
     --secondary-foreground: 0 0% 100%;
     --muted: 60 5% 93%;
     --muted-foreground: 228 5% 40%;
     --accent: 0 86% 96%;
-    --accent-foreground: 0 74% 32%;
-    --destructive: 0 72% 46%;
+    --accent-foreground: 0 84% 30%;
+    --destructive: 0 88% 42%;
     --destructive-foreground: 0 0% 100%;
     --border: 50 6% 88%;
     --input: 50 6% 88%;
-    --ring: 0 72% 46%;
+    --ring: 0 88% 42%;
     --radius: 0.75rem;
 
     /* --- Escala de contraste de texto (hierarquia tipográfica) ---
@@ -87,15 +87,15 @@ a,
        cores com o mesmo nível de contraste (~5:1+ vs branco e vs a
        própria -bg pastel), ancoradas nas cores já espalhadas pela app
        (--led-ok, --worklight/--led-warn, badges azuis existentes). */
-    --success: 152 68% 28%;
+    --success: 152 85% 26%;
     --success-foreground: 0 0% 100%;
-    --success-bg: 152 62% 94%;
-    --warning: 32 92% 32%;
+    --success-bg: 152 70% 91%;
+    --warning: 28 96% 32%;
     --warning-foreground: 0 0% 100%;
-    --warning-bg: 45 96% 92%;
-    --info: 217 78% 45%;
+    --warning-bg: 32 96% 89%;
+    --info: 221 92% 46%;
     --info-foreground: 0 0% 100%;
-    --info-bg: 214 90% 94%;
+    --info-bg: 218 95% 91%;
 
     /* --- Chrome da máquina (agora alumínio claro / vidro) ------- */
     --chrome-deep: #e9e7e2;
@@ -109,15 +109,18 @@ a,
     --chrome-muted: #5d6068;
     --chrome-faint: #9a9da4;
 
-    /* --- Sinal (a única cor com significado) ------------------- */
-    --signal: #d92626;
-    --signal-strong: #b91c1c;
-    --signal-glow: rgba(217, 38, 38, 0.45);
-    --worklight: #f2b84b;
+    /* --- Sinal (a única cor com significado) ---------------------
+       Mais saturado/intenso que a versão anterior (era hsl(0,70%,50%))
+       — o mesmo vermelho de --destructive/--secondary/--ring, para que
+       o "sinal" da app seja visualmente uma única cor em todo o lado. */
+    --signal: #d50b0b;
+    --signal-strong: #ae0909;
+    --signal-glow: rgba(213, 11, 11, 0.5);
+    --worklight: #faa82e;
 
     /* --- LEDs de estado ---------------------------------------- */
-    --led-ok: #34d399;
-    --led-warn: #fbbf24;
+    --led-ok: #18dc95;
+    --led-warn: #fdb017;
 
     /* --- Elevação (sombras em camadas, luz vinda de cima) ------ */
     --shadow-e1:
@@ -168,55 +171,55 @@ a,
        lib/categories.js) para que os badges usados em toda a app
        (Pedidos, Tarefas, Fornecedores, Kanban, Explorador) troquem de
        tom sozinhos ao mudar de tema, sem qualquer alteração de código. */
-    --badge-novo-bg: #ecfdca; --badge-novo-text: #395c0b;
-    --badge-pendente-bg: #fdf3c8; --badge-pendente-text: #924307;
-    --badge-em_preparacao-bg: #e1e8fe; --badge-em_preparacao-text: #382fb0;
-    --badge-enviado_fornecedor-bg: #dbeafe; --badge-enviado_fornecedor-text: #1943b9;
-    --badge-aguarda_fornecedor-bg: #cffafe; --badge-aguarda_fornecedor-text: #0b5a6f;
-    --badge-orcamento_recebido-bg: #ede9fe; --badge-orcamento_recebido-text: #5e21bc;
-    --badge-aguarda_cliente-bg: #feedd6; --badge-aguarda_cliente-text: #a0360a;
-    --badge-aprovado-bg: #dbfde7; --badge-aprovado-text: #10612e;
-    --badge-rejeitado-bg: #fee5e7; --badge-rejeitado-text: #9d0f32;
-    --badge-encomendado-bg: #cafdf2; --badge-encomendado-text: #0b5650;
-    --badge-concluido-bg: #cffce5; --badge-concluido-text: #104b27;
-    --badge-cancelado-bg: #fde6f3; --badge-cancelado-text: #9e144d;
+    --badge-novo-bg: #ecfdca; --badge-novo-text: #3a6205;
+    --badge-pendente-bg: #fdf3c8; --badge-pendente-text: #964203;
+    --badge-em_preparacao-bg: #e1e8fe; --badge-em_preparacao-text: #2c22bd;
+    --badge-enviado_fornecedor-bg: #dbeafe; --badge-enviado_fornecedor-text: #0c3dc6;
+    --badge-aguarda_fornecedor-bg: #d0f9fd; --badge-aguarda_fornecedor-text: #045e76;
+    --badge-orcamento_recebido-bg: #ede9fe; --badge-orcamento_recebido-text: #5b14c9;
+    --badge-aguarda_cliente-bg: #fdedd7; --badge-aguarda_cliente-text: #a73303;
+    --badge-aprovado-bg: #dbfde7; --badge-aprovado-text: #09682c;
+    --badge-rejeitado-bg: #fee5e7; --badge-rejeitado-text: #a7052d;
+    --badge-encomendado-bg: #cafdf2; --badge-encomendado-text: #055c55;
+    --badge-concluido-bg: #cefde5; --badge-concluido-text: #0b5026;
+    --badge-cancelado-bg: #fee5f3; --badge-cancelado-text: #a9094b;
 
-    --badge-urgente-bg: #fee2e2; --badge-urgente-text: #9a1717;
-    --badge-alta-bg: #feedd6; --badge-alta-text: #a0360a;
-    --badge-media-bg: #fdf8c4; --badge-media-text: #7f4d06;
-    --badge-baixa-bg: #dbfde7; --badge-baixa-text: #10612e;
+    --badge-urgente-bg: #fee2e2; --badge-urgente-text: #a50c0c;
+    --badge-alta-bg: #fdedd7; --badge-alta-text: #a73303;
+    --badge-media-bg: #fdf8c4; --badge-media-text: #824e03;
+    --badge-baixa-bg: #dbfde7; --badge-baixa-text: #09682c;
 
-    --badge-construcao-bg: #feedd6; --badge-construcao-text: #a0360a; --badge-construcao-border: #fdba74;
-    --badge-bricolage-bg: #dbeafe; --badge-bricolage-text: #1943b9; --badge-bricolage-border: #bfdbfe;
-    --badge-decoracao-bg: #f3e9fe; --badge-decoracao-text: #6b1daf; --badge-decoracao-border: #e9d5ff;
-    --badge-jardim-bg: #dbfde7; --badge-jardim-text: #10612e; --badge-jardim-border: #bbf7d0;
+    --badge-construcao-bg: #fdedd7; --badge-construcao-text: #a73303; --badge-construcao-border: #fdba74;
+    --badge-bricolage-bg: #dbeafe; --badge-bricolage-text: #0c3dc6; --badge-bricolage-border: #bfdbfe;
+    --badge-decoracao-bg: #f3e9fe; --badge-decoracao-text: #6c11bb; --badge-decoracao-border: #e9d5ff;
+    --badge-jardim-bg: #dbfde7; --badge-jardim-text: #09682c; --badge-jardim-border: #bbf7d0;
 
-    --badge-aberto-bg: #e0f2fe; --badge-aberto-text: #02527e;
-    --badge-preco_pedido-bg: #fdf3c8; --badge-preco_pedido-text: #924307;
-    --badge-preco_recebido-bg: #dbeafe; --badge-preco_recebido-text: #1943b9;
+    --badge-aberto-bg: #e0f2fe; --badge-aberto-text: #03527d;
+    --badge-preco_pedido-bg: #fdf3c8; --badge-preco_pedido-text: #964203;
+    --badge-preco_recebido-bg: #dbeafe; --badge-preco_recebido-text: #0c3dc6;
 
     /* --- Tons de resumo (chips do dia em Pedidos) ------------------ */
-    --tone-slate-bg: #f0f5fa; --tone-slate-text: #26303f;
-    --tone-blue-bg: #dbeafe; --tone-blue-text: #1943b9;
-    --tone-amber-bg: #fdf3c8; --tone-amber-text: #924307;
-    --tone-red-bg: #fee2e2; --tone-red-text: #9a1717;
-    --tone-green-bg: #cffce5; --tone-green-text: #035940;
-    --tone-purple-bg: #f3e9fe; --tone-purple-text: #6b1daf;
+    --tone-slate-bg: #eff5fb; --tone-slate-text: #202f45;
+    --tone-blue-bg: #dbeafe; --tone-blue-text: #0c3dc6;
+    --tone-amber-bg: #fdf3c8; --tone-amber-text: #964203;
+    --tone-red-bg: #fee2e2; --tone-red-text: #a50c0c;
+    --tone-green-bg: #cefde5; --tone-green-text: #025a40;
+    --tone-purple-bg: #f3e9fe; --tone-purple-text: #6c11bb;
 
-    --pastel-emerald-bg: #d1fae5; --pastel-emerald-text: #065f46;
-    --pastel-amber-bg: #fef3c7; --pastel-amber-text: #92400e;
-    --pastel-blue-bg: #dbeafe; --pastel-blue-text: #1e40af;
-    --pastel-purple-bg: #f3e8ff; --pastel-purple-text: #6b21a8;
-    --pastel-red-bg: #fee2e2; --pastel-red-text: #991b1b;
-    --pastel-rose-bg: #ffe4e6; --pastel-rose-text: #9f1239;
-    --pastel-orange-bg: #ffedd5; --pastel-orange-text: #9a3412;
-    --pastel-sky-bg: #e0f2fe; --pastel-sky-text: #075985;
-    --pastel-violet-bg: #ede9fe; --pastel-violet-text: #5b21b6;
-    --pastel-green-bg: #dcfce7; --pastel-green-text: #166534;
-    --pastel-indigo-bg: #e0e7ff; --pastel-indigo-text: #3730a3;
-    --pastel-teal-bg: #ccfbf1; --pastel-teal-text: #115e59;
-    --pastel-cyan-bg: #cffafe; --pastel-cyan-text: #155e75;
-    --pastel-pink-bg: #fce7f3; --pastel-pink-text: #9d174d;
+    --pastel-emerald-bg: #cefde5; --pastel-emerald-text: #026348;
+    --pastel-amber-bg: #fdf2c8; --pastel-amber-text: #9c3e04;
+    --pastel-blue-bg: #dbeafe; --pastel-blue-text: #1239bb;
+    --pastel-purple-bg: #f3e9fe; --pastel-purple-text: #6c15b4;
+    --pastel-red-bg: #fee2e2; --pastel-red-text: #a41010;
+    --pastel-rose-bg: #fee5e7; --pastel-rose-text: #aa0734;
+    --pastel-orange-bg: #fdedd7; --pastel-orange-text: #a42f08;
+    --pastel-sky-bg: #e0f2fe; --pastel-sky-text: #035a89;
+    --pastel-violet-bg: #ede9fe; --pastel-violet-text: #5814c3;
+    --pastel-green-bg: #dbfde7; --pastel-green-text: #0f6c32;
+    --pastel-indigo-bg: #e1e8fe; --pastel-indigo-text: #2c23b0;
+    --pastel-teal-bg: #cafdf2; --pastel-teal-text: #0a655f;
+    --pastel-cyan-bg: #d0f9fd; --pastel-cyan-text: #0d627d;
+    --pastel-pink-bg: #fee5f3; --pastel-pink-text: #a80c4b;
   }
 
 }
