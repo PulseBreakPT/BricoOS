@@ -4,6 +4,9 @@
 /node_modules
 /.pnp
 .pnp.js
+# lockfile não fazia parte do repo antes desta sessão (instalado só para
+# correr testes/dev server localmente) — não versionar por engano.
+yarn.lock
 
 # testing
 /coverage
