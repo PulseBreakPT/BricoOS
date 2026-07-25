@@ -111,31 +111,32 @@ function greeting() {
 
 // Chips de resumo do dia. Os que têm "preset" aplicam o filtro correspondente
 // na lista ao clicar — o resumo e a lista são o mesmo painel, não duas páginas.
+// Número grande em cima, label pequena por baixo — cada chip fica com
+// ~60px de altura em vez das duas linhas lado a lado de antes, para a
+// grelha de resumo não empurrar a lista de pedidos para longe do topo.
 function SummaryChip({ label, value, tone = "slate", icon: Icon, active, onClick }) {
   const tones = {
-    slate: { tile: "bg-[var(--tone-slate-bg)] text-[color:var(--tone-slate-text)]", value: "text-[color:var(--tone-slate-text)]" },
-    blue: { tile: "bg-[var(--tone-blue-bg)] text-[color:var(--tone-blue-text)]", value: "text-[color:var(--tone-blue-text)]" },
-    amber: { tile: "bg-[var(--tone-amber-bg)] text-[color:var(--tone-amber-text)]", value: "text-[color:var(--tone-amber-text)]" },
-    red: { tile: "bg-[var(--tone-red-bg)] text-[color:var(--tone-red-text)]", value: "text-[color:var(--tone-red-text)]" },
-    green: { tile: "bg-[var(--tone-green-bg)] text-[color:var(--tone-green-text)]", value: "text-[color:var(--tone-green-text)]" },
+    slate: "text-[color:var(--tone-slate-text)]",
+    blue: "text-[color:var(--tone-blue-text)]",
+    amber: "text-[color:var(--tone-amber-text)]",
+    red: "text-[color:var(--tone-red-text)]",
+    green: "text-[color:var(--tone-green-text)]",
   };
-  const t = tones[tone];
+  const toneCls = tones[tone];
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`flex min-w-0 items-center gap-2 rounded-xl border bg-card px-2.5 py-2 transition-all duration-150 sm:shrink-0 sm:px-3 ${
+      className={`flex min-w-0 flex-col items-start gap-0.5 rounded-xl border bg-card px-2.5 py-2 text-left transition-all duration-150 sm:min-w-[5.25rem] sm:shrink-0 ${
         active ? "border-foreground shadow-md ring-1 ring-foreground" : "border-border shadow-sm"
       } ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:border-input hover:shadow-md active:scale-95" : ""}`}
     >
-      {Icon ? (
-        <span className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:flex ${t.tile}`}>
-          <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
-        </span>
-      ) : null}
-      <span className={`shrink-0 font-heading text-base font-extrabold tabular-nums sm:text-lg ${t.value}`}>{value}</span>
-      <span className="truncate text-[11px] font-bold text-muted-foreground sm:text-xs">{label}</span>
+      <span className="flex items-center gap-1">
+        {Icon ? <Icon className={`h-3.5 w-3.5 shrink-0 ${toneCls}`} strokeWidth={2.4} /> : null}
+        <span className={`font-heading text-lg font-extrabold leading-none tabular-nums ${toneCls}`}>{value}</span>
+      </span>
+      <span className="truncate text-[11px] font-bold leading-none text-muted-foreground">{label}</span>
     </Tag>
   );
 }
@@ -570,14 +571,14 @@ export default function Notes() {
 
       {/* Resumo do dia — grelha compacta no telemóvel, sem scroll horizontal */}
       {today ? (
-        <div className="mt-4 grid grid-cols-2 gap-1.5 min-[420px]:grid-cols-3 sm:flex sm:flex-wrap sm:gap-2">
-          <SummaryChip label="novos" value={s.novo ?? 0} tone="slate" icon={Inbox} active={preset === "novos"} onClick={() => setPreset(preset === "novos" ? "todos" : "novos")} />
-          <SummaryChip label="pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
-          <SummaryChip label="a tratar por mim" value={counts.waiting_me ?? 0} tone="blue" icon={Zap} active={preset === "waiting_me"} onClick={() => setPreset(preset === "waiting_me" ? "todos" : "waiting_me")} />
-          <SummaryChip label="atrasados" value={s.atrasados ?? 0} tone="red" icon={AlertTriangle} active={preset === "overdue"} onClick={() => setPreset(preset === "overdue" ? "todos" : "overdue")} />
-          {counts.follow_up ? <SummaryChip label="a religar" value={counts.follow_up} tone="amber" icon={PhoneMissed} active={preset === "callback"} onClick={() => setPreset(preset === "callback" ? "todos" : "callback")} /> : null}
-          <SummaryChip label="novos hoje" value={s.novos_hoje ?? 0} tone="amber" icon={TrendingUp} />
-          <SummaryChip label="concluídos hoje" value={s.concluidos_hoje ?? 0} tone="green" icon={CheckCircle2} />
+        <div className="mt-4 grid grid-cols-3 gap-1.5 min-[420px]:grid-cols-4 sm:flex sm:flex-wrap sm:gap-2">
+          <SummaryChip label="Novos" value={s.novo ?? 0} tone="slate" icon={Inbox} active={preset === "novos"} onClick={() => setPreset(preset === "novos" ? "todos" : "novos")} />
+          <SummaryChip label="Pendentes" value={s.pendentes ?? 0} tone="blue" icon={Clock} />
+          <SummaryChip label="Ação" value={counts.waiting_me ?? 0} tone="blue" icon={Zap} active={preset === "waiting_me"} onClick={() => setPreset(preset === "waiting_me" ? "todos" : "waiting_me")} />
+          <SummaryChip label="Atrasados" value={s.atrasados ?? 0} tone="red" icon={AlertTriangle} active={preset === "overdue"} onClick={() => setPreset(preset === "overdue" ? "todos" : "overdue")} />
+          {counts.follow_up ? <SummaryChip label="Recontactar" value={counts.follow_up} tone="amber" icon={PhoneMissed} active={preset === "callback"} onClick={() => setPreset(preset === "callback" ? "todos" : "callback")} /> : null}
+          <SummaryChip label="Hoje" value={s.novos_hoje ?? 0} tone="amber" icon={TrendingUp} />
+          <SummaryChip label="Concluídos" value={s.concluidos_hoje ?? 0} tone="green" icon={CheckCircle2} />
         </div>
       ) : null}
 
