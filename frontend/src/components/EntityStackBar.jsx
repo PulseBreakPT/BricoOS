@@ -43,7 +43,7 @@ export default function EntityStackBar({ rootLabel, frames, onPopTo, onClose }) 
         data-testid="entity-stack-close"
         onClick={onClose}
         title="Fechar e voltar ao pedido"
-        className="ml-auto flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-red-600"
+        className="ml-auto flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <X className="h-3.5 w-3.5" />
       </button>

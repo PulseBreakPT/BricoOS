@@ -120,7 +120,7 @@ export default function TrashPanel({ open, onOpenChange, onRestored }) {
                         title="Eliminar definitivamente"
                         disabled={busy}
                         onClick={() => purge(it)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-600 disabled:opacity-50"
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-destructive disabled:opacity-50"
                       >
                         <X className="h-4 w-4" />
                       </button>

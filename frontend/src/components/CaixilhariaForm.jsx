@@ -287,7 +287,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               <button type="button" onClick={() => duplicateLine(lineIndex)} title="Duplicar elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-card hover:text-foreground">
                 <Copy className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-500 disabled:opacity-25">
+              <button type="button" onClick={() => removeLine(lineIndex)} disabled={normalized.linhas.length === 1} title="Remover elemento" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-destructive disabled:opacity-25">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -361,7 +361,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
                           size="sm"
                           disabled={added}
                           onClick={() => addCompanionLine(lineIndex, product)}
-                          className={`h-8 rounded-lg text-xs ${added ? "border-emerald-300 bg-[var(--pastel-emerald-bg)] text-[color:var(--pastel-emerald-text)] disabled:opacity-100" : ""}`}
+                          className={`h-8 rounded-lg text-xs ${added ? "border-success/30 bg-success-bg text-success disabled:opacity-100" : ""}`}
                         >
                           {added ? <Check className="mr-1 h-3.5 w-3.5" /> : <Plus className="mr-1 h-3.5 w-3.5" />}
                           {label}{added ? " adicionada" : ""}
@@ -446,7 +446,7 @@ export default function CaixilhariaForm({ catalog, spec, onChange }) {
               <div className="mt-2.5 space-y-1.5">
                 <Textarea value={line.observacoes} onChange={(event) => updateLine(lineIndex, { observacoes: event.target.value })} rows={2} placeholder="Só deste elemento — ex.: manter o desenho atual, soleira baixa..." />
               </div>
-              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-emerald-200 text-xs font-bold text-[color:var(--pastel-emerald-text)] hover:bg-[var(--pastel-emerald-bg)]">
+              <Button type="button" variant="outline" onClick={() => setExpandedLineId("")} className="mt-4 h-10 w-full rounded-xl border-success/30 text-xs font-bold text-success hover:bg-success-bg">
                 <Check className="mr-1.5 h-4 w-4" /> Concluir este elemento
               </Button>
             </div> : null}
@@ -489,7 +489,7 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
     <div data-testid={`caix-line-${lineIndex}-option-${optionIndex}`} className={`rounded-xl border p-3 ${line.opcoes.length > 1 ? "border-blue-200 bg-[var(--pastel-blue-bg)]" : "border-border bg-muted/50"}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-extrabold uppercase tracking-wide text-foreground">Opção {optionLetter(optionIndex)}</p>
-        <button type="button" onClick={onRemove} disabled={line.opcoes.length === 1} className="rounded-lg p-1 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-red-500 disabled:opacity-25">
+        <button type="button" onClick={onRemove} disabled={line.opcoes.length === 1} className="rounded-lg p-1 text-muted-foreground hover:bg-[var(--pastel-red-bg)] hover:text-destructive disabled:opacity-25">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -639,16 +639,16 @@ function OptionEditor({ catalog, line, lineIndex, option, optionIndex, onSet, on
 
 function SelectedModelSummary({ model, analysisId, overall }) {
   return (
-    <div className="mt-3 rounded-xl border border-emerald-200 bg-[var(--pastel-emerald-bg)] p-2.5">
+    <div className="mt-3 rounded-xl border border-success/30 bg-success-bg p-2.5">
       <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success text-success-foreground">
           <Check className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-extrabold text-foreground">
             {model.name}
             {overall ? (
-              <span className="ml-1.5 rounded-full bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-[color:var(--pastel-emerald-text)]">
+              <span className="ml-1.5 rounded-full bg-success/20 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-success">
                 {overall.score}{overall.medal ? ` · ${overall.medal}` : ""}
               </span>
             ) : null}

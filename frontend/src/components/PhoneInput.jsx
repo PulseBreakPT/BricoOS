@@ -146,17 +146,17 @@ export default function PhoneInput({
             onKeyDown={onKeyDown}
             autoComplete="tel"
             className={`min-w-0 flex-1 pr-8 font-mono transition-all duration-150 ${
-              lengthStatus === "short" || lengthStatus === "long" ? "border-amber-400 focus-visible:ring-amber-400" : ""
+              lengthStatus === "short" || lengthStatus === "long" ? "border-warning focus-visible:ring-warning" : ""
             } ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
             placeholder={placeholder}
           />
           {lengthStatus === "ok" ? (
-            <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500 duration-150 animate-in zoom-in-50" />
+            <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-success duration-150 animate-in zoom-in-50" />
           ) : null}
         </div>
       </div>
       {lengthStatus === "short" || lengthStatus === "long" ? (
-        <p className="text-[10px] font-semibold text-amber-600">
+        <p className="text-[10px] font-semibold text-warning">
           {lengthStatus === "short" ? "Número parece incompleto" : "Número parece ter dígitos a mais"}
         </p>
       ) : null}

@@ -43,10 +43,10 @@ export default function EmailInput({
           onFocus={(e) => { e.target.select(); e.target.scrollIntoView({ block: "center", behavior: "smooth" }); }}
           placeholder={placeholder}
           autoComplete="email"
-          className={`pr-8 transition-all duration-150 ${value && !valid ? "border-amber-400 focus-visible:ring-amber-400" : ""} ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
+          className={`pr-8 transition-all duration-150 ${value && !valid ? "border-warning focus-visible:ring-warning" : ""} ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
         />
         {valid ? (
-          <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500 duration-150 animate-in zoom-in-50" />
+          <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-success duration-150 animate-in zoom-in-50" />
         ) : null}
       </div>
       {domain ? (

@@ -32,7 +32,7 @@ function StatusRow({ ok, label, detail }) {
   return (
     <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs">
       <span className="flex items-center gap-2 font-semibold text-foreground">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${ok ? "bg-emerald-500" : "bg-slate-300"}`} />
+        <span className={`h-2 w-2 shrink-0 rounded-full ${ok ? "bg-success" : "bg-slate-300"}`} />
         {label}
       </span>
       <span className="text-muted-foreground">{detail}</span>
