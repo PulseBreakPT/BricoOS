@@ -197,10 +197,14 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
   const [replyResult, setReplyResult] = useState(null);
 
   const isCreate = !id;
-  // Mesma heurística de "Pedido de Cliente" usada em PedidoPicker.jsx e no
-  // backend (_pedido_type_for_note): segmento "geral" (não é Banda
-  // Alumínios) com nome ou email de cliente preenchido.
-  const isBricoavalEligible = !isCreate && !note?.caixilharia && !!((form.customer_name || "").trim() || (form.email || "").trim());
+  // O nº de Orçamento BricoAval aplica-se a qualquer pedido com nome ou
+  // email de cliente — incluindo Banda Alumínios: o PDF de venda
+  // (quote_pdf.build_client_pdf) já mostra este número quando definido,
+  // por isso a exclusão de `note?.caixilharia` aqui só escondia o campo
+  // sem nenhum motivo (a heurística "geral vs Banda Alumínios" de
+  // _pedido_type_for_note serve outro propósito — o tipo de segmento do
+  // email — não este campo).
+  const isBricoavalEligible = !isCreate && !!((form.customer_name || "").trim() || (form.email || "").trim());
   const dirty = useRef(false);
   const contentScrollRef = useRef(null);
   // Passo "Cliente" do assistente — foco automático no primeiro campo com
