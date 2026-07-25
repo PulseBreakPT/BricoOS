@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenCheck, CalendarDays, CheckCircle2, ClipboardList, Clock,
-  Download, Pin, RefreshCw, Search, Sparkles, X, XCircle, Zap,
+  Download, Pin, RefreshCw, Search, Sparkles, Upload, X, XCircle, Zap,
 } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api";
 import { Input } from "@/components/ui/input";
@@ -231,6 +231,8 @@ export default function Knowledge() {
   const [importOpen, setImportOpen] = useState(false);
   const [importSelected, setImportSelected] = useState(() => new Set());
   const [singleBusy, setSingleBusy] = useState(() => new Set());
+  const [uploading, setUploading] = useState(false);
+  const correioUploadRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -310,6 +312,33 @@ export default function Knowledge() {
     }
   };
 
+  // Quando o Correio Semanal não chegou por email (ex.: alguém reencaminha
+  // só o PDF por outra via) — carrega-se o ficheiro diretamente e o
+  // servidor gera o mesmo resumo/artigo, reaproveitando o pipeline normal.
+  const uploadCorreioSemanal = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const { data } = await api.post("/emails/correio-semanal/upload", fd);
+      toast.success("Correio Semanal importado", { description: "Artigo criado no arquivo." });
+      setImportOpen(false);
+      setOpenArticleId(data.article_id);
+    } catch (e) {
+      // Mesmo numa falha (ex.: PDF sem nº de edição reconhecível), o
+      // registo fica gravado do lado do servidor — refreshAll() traz-o
+      // para a lista de "atenção" com o botão "Tentar novamente", em vez
+      // de o PDF enviado simplesmente desaparecer.
+      toast.error(getErrorMessage(e, "Não foi possível processar o PDF"));
+    } finally {
+      setUploading(false);
+      if (correioUploadRef.current) correioUploadRef.current.value = "";
+      await refreshAll();
+    }
+  };
+
   const toggleImportSelected = (emailId) => {
     setImportSelected((prev) => {
       const next = new Set(prev);
@@ -351,7 +380,7 @@ export default function Knowledge() {
         <Button
           data-testid="knowledge-tool-import"
           size="sm" variant="outline" className="h-9 rounded-xl text-xs"
-          disabled={!unprocessed.length || batch.state?.running}
+          disabled={batch.state?.running}
           onClick={() => { setImportSelected(new Set(unprocessed.map((i) => i.email_id))); setImportOpen(true); }}
         >
           <Download className="mr-1.5 h-3.5 w-3.5" /> Importar Correios Semanais
@@ -465,6 +494,31 @@ export default function Knowledge() {
           <SheetHeader>
             <SheetTitle>Importar Correios Semanais</SheetTitle>
           </SheetHeader>
+
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 p-3">
+            <p className="text-xs font-bold text-foreground">Não chegou por email?</p>
+            <p className="mt-0.5 text-xs text-text-tertiary">Carrega o PDF diretamente — o resumo é gerado da mesma forma.</p>
+            <input
+              ref={correioUploadRef}
+              data-testid="correio-semanal-upload-input"
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => uploadCorreioSemanal(e.target.files)}
+            />
+            <Button
+              data-testid="correio-semanal-upload-trigger"
+              size="sm" variant="outline" disabled={uploading}
+              onClick={() => correioUploadRef.current?.click()}
+              className="mt-2 h-8 rounded-lg text-xs"
+            >
+              {uploading ? <Spinner className="mr-1.5 h-3 w-3" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+              {uploading ? "A processar…" : "Carregar PDF"}
+            </Button>
+          </div>
+
+          <p className="px-1 text-xs font-bold text-text-tertiary">Ou escolhe da lista de emails já recebidos</p>
           <div className="flex items-center justify-between px-1">
             <p className="text-xs text-muted-foreground">{importSelected.size} selecionado{importSelected.size === 1 ? "" : "s"}</p>
             <Button

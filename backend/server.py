@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -5657,6 +5657,61 @@ async def process_correio_semanal_email(email_id: str):
         status_code = 409 if "já está a ser processado" in str(e) else 400
         raise HTTPException(status_code=status_code, detail=str(e))
     return {"ok": True, "article_id": article_id}
+
+
+@api_router.post("/emails/correio-semanal/upload")
+async def upload_correio_semanal(files: List[UploadFile] = File(...), subject: str = Form("")):
+    """Botão "Importar Correios Semanais" em Knowledge.jsx quando o PDF não
+    chegou por email (ex.: alguém reencaminha só o ficheiro por outra via) —
+    permite carregar o PDF diretamente e gera o resumo/artigo na mesma.
+    Reaproveita tal e qual o pipeline de um email recebido: cria um registo
+    "received_emails" sintético (para a lista de atenção, o histórico de
+    erro e o botão "Tentar novamente" funcionarem sem duplicar lógica),
+    guarda o(s) PDF(s) como anexos desse registo, e chama o mesmo
+    _process_correio_semanal_email usado pelo botão "Reprocessar"."""
+    pdf_files = [f for f in files if (f.filename or "").lower().endswith(".pdf")]
+    if not pdf_files:
+        raise HTTPException(status_code=400, detail="Só são aceites ficheiros PDF.")
+    if len(pdf_files) > MAX_ATTACHMENTS_PER_EMAIL:
+        raise HTTPException(status_code=400, detail=f"Máximo de {MAX_ATTACHMENTS_PER_EMAIL} PDFs por importação.")
+    email_id = str(uuid.uuid4())
+    attachments_meta = []
+    for f in pdf_files:
+        data = await f.read()
+        if len(data) > MAX_SUPPLIER_PDF_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{f.filename}' é demasiado grande (máx. {MAX_SUPPLIER_PDF_BYTES // (1024 * 1024)} MB).")
+        att_id = str(uuid.uuid4())
+        await db.email_attachments.insert_one({
+            "id": att_id, "email_id": email_id, "note_id": "",
+            "filename": f.filename, "content_b64": base64.b64encode(data).decode(),
+            "direction": "received", "created_at": now_iso()})
+        attachments_meta.append({"id": att_id, "filename": f.filename, "size": len(data)})
+    # "uid" só existe para satisfazer o índice único de received_emails —
+    # este registo nunca passou pelo IMAP, por isso usa um valor sintético
+    # que nunca colide com um uid real (sempre numérico).
+    await db.received_emails.insert_one({
+        "id": email_id, "uid": f"manual-{email_id}", "received_at": now_iso(),
+        "note_id": "", "supplier_id": "", "supplier_name": "",
+        "from_email": CORREIO_SEMANAL_SENDER, "from_name": "Importação manual",
+        "reply_kind": "", "matched": False,
+        "subject": (subject or "").strip() or pdf_files[0].filename or "Correio Semanal (upload manual)",
+        "body": "", "body_html": "",
+        "attachments": attachments_meta, "has_pdf": True,
+        "priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": "",
+        "message_id": "", "in_reply_to": "", "references": [], "gm_thread_id": "",
+        "match_method": "manual_upload", "seen": True,
+    })
+    try:
+        article_id = await _process_correio_semanal_email(email_id)
+    except ValueError as e:
+        # O registo fica gravado — visível na lista de "atenção" (erro), com
+        # o mesmo botão "Tentar novamente" de qualquer outro Correio Semanal,
+        # para não se perder o PDF já enviado.
+        status_code = 409 if "já está a ser processado" in str(e) else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+    return {"ok": True, "article_id": article_id, "email_id": email_id}
 
 
 @api_router.get("/notes/{note_id}/emails")
