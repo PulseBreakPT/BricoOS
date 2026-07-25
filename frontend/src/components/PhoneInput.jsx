@@ -5,12 +5,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  COUNTRY_CODES, DEFAULT_COUNTRY_CODE, MAX_DIGITS, splitPhone, formatNational,
-  countDigitsUpTo, positionAfterNDigits, phoneLengthStatus, detectPastedCountry,
+  COUNTRY_CODES, DEFAULT_COUNTRY_CODE, OTHER_COUNTRY, MAX_DIGITS, OTHER_MAX_LENGTH,
+  splitPhone, formatNational, countDigitsUpTo, positionAfterNDigits, phoneLengthStatus,
+  detectPastedCountry,
 } from "@/lib/phoneFormat";
 import { haptics } from "@/lib/haptics";
 
-export { COUNTRY_CODES, DEFAULT_COUNTRY_CODE };
+export { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, OTHER_COUNTRY };
 
 // Lembra o último país escolhido manualmente — só usado como ponto de
 // partida de um número novo (ainda vazio); um valor já existente (a editar
@@ -60,7 +61,9 @@ export default function PhoneInput({
   });
 
   const emit = (nextCountry, nextDigits) => {
-    const combined = nextDigits ? `${nextCountry}${nextDigits}` : "";
+    // Modo "Outro": não há indicativo a colar à frente — o texto livre
+    // escrito já É o valor completo.
+    const combined = !nextDigits ? "" : nextCountry === OTHER_COUNTRY ? nextDigits : `${nextCountry}${nextDigits}`;
     lastEmitted.current = combined;
     onChange(combined);
   };
@@ -76,16 +79,23 @@ export default function PhoneInput({
           onValueChange={(c) => {
             setCountry(c);
             emit(c, digits);
-            try { localStorage.setItem(LAST_COUNTRY_KEY, c); } catch { /* noop */ }
+            // "Outro" não é um indicativo real — nunca vale a pena
+            // lembrá-lo como ponto de partida do próximo número novo.
+            if (c !== OTHER_COUNTRY) {
+              try { localStorage.setItem(LAST_COUNTRY_KEY, c); } catch { /* noop */ }
+            }
           }}
         >
           <SelectTrigger data-testid={`${testId}-country`} className="w-[4.5rem] shrink-0 px-2 font-mono text-xs">
-            <SelectValue>{country}</SelectValue>
+            <SelectValue>{country === OTHER_COUNTRY ? "🌍" : country}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {COUNTRY_CODES.map((c) => (
               <SelectItem key={c.code} value={c.code}>{c.flag} {c.name} · {c.code}</SelectItem>
             ))}
+            <SelectItem data-testid={`${testId}-country-other`} value={OTHER_COUNTRY}>
+              🌍 Outro país — escrever livremente
+            </SelectItem>
           </SelectContent>
         </Select>
         <div className="relative min-w-0 flex-1">
@@ -93,10 +103,19 @@ export default function PhoneInput({
             ref={(el) => { inputRef.current = el; if (externalRef) externalRef.current = el; }}
             data-testid={testId}
             value={formatted}
-            maxLength={24}
-            inputMode="tel"
+            maxLength={country === OTHER_COUNTRY ? OTHER_MAX_LENGTH : 24}
+            inputMode={country === OTHER_COUNTRY ? "text" : "tel"}
             onChange={(e) => {
               const raw = e.target.value;
+              // Modo "Outro": o país não está na lista, por isso não há
+              // indicativo fixo nem grelha de formatação a aplicar — aceita
+              // o texto tal como foi escrito (dígitos, "+", espaços, etc.).
+              if (country === OTHER_COUNTRY) {
+                const clean = raw.slice(0, OTHER_MAX_LENGTH);
+                setDigits(clean);
+                emit(OTHER_COUNTRY, clean);
+                return;
+              }
               // Colar um número completo com indicativo (+351917100512)
               // mesmo dentro deste campo só de dígitos — separa sozinho o
               // indicativo do resto, troca o país selecionado se for
@@ -130,6 +149,7 @@ export default function PhoneInput({
               if (onComplete && !wasComplete && nowComplete && clean.length > digits.length) onComplete();
             }}
             onPaste={(e) => {
+              if (country === OTHER_COUNTRY) return; // modo livre: cola normalmente, sem deteção de país
               const pasted = e.clipboardData?.getData("text") || "";
               if (!pasted || pasted.includes("+")) return; // "+..." já tratado acima, no onChange
               const detected = detectPastedCountry(pasted.replace(/\D/g, ""), country);
@@ -148,9 +168,11 @@ export default function PhoneInput({
             className={`min-w-0 flex-1 pr-8 font-mono transition-all duration-150 ${
               lengthStatus === "short" || lengthStatus === "long" ? "border-warning focus-visible:ring-warning" : ""
             } ${highlighted ? "ring-2 ring-emerald-300 focus-visible:ring-emerald-300" : ""}`}
-            placeholder={placeholder}
+            placeholder={country === OTHER_COUNTRY ? "Ex.: +48 123 456 789" : placeholder}
           />
-          {lengthStatus === "ok" ? (
+          {/* Em modo "Outro" não há comprimento esperado a validar — mostrar
+              o "✓" seria fingir uma certeza que não temos. */}
+          {lengthStatus === "ok" && country !== OTHER_COUNTRY ? (
             <CheckCircle2 className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-success duration-150 animate-in zoom-in-50" />
           ) : null}
         </div>
