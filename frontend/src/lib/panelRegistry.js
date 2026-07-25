@@ -1,4 +1,4 @@
-import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, Library, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
+import { ClipboardList, Mail, Truck, ListChecks, BarChart3, BookOpenCheck, HeartPulse, FolderDown, FolderTree, Settings as SettingsIcon, Bell } from "lucide-react";
 import Notes from "@/pages/Notes";
 import Emails from "@/pages/Emails";
 import Suppliers from "@/pages/Suppliers";
@@ -7,7 +7,6 @@ import Dashboard from "@/pages/Dashboard";
 import Catalog from "@/pages/Catalog";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
-import Knowledge from "@/pages/Knowledge";
 import HealthPanel from "@/components/HealthPanel";
 import DownloadsCenter from "@/components/DownloadsCenter";
 import Explorer from "@/components/workspace/Explorer";
@@ -26,7 +25,6 @@ export const PANEL_TYPES = {
   tasks: { title: "Tarefas", icon: ListChecks, Component: Tasks },
   dashboard: { title: "Estatísticas", icon: BarChart3, Component: Dashboard },
   catalog: { title: "Catálogo técnico", icon: BookOpenCheck, Component: Catalog },
-  knowledge: { title: "Correio Semanal", icon: Library, Component: Knowledge },
   health: { title: "Painel de Saúde", icon: HeartPulse, Component: HealthPanel },
   downloads: { title: "Downloads", icon: FolderDown, Component: DownloadsCenter },
   explorer: { title: "Explorador", icon: FolderTree, Component: Explorer },
@@ -35,7 +33,7 @@ export const PANEL_TYPES = {
 };
 
 export const PANEL_ORDER = [
-  "notes", "emails", "suppliers", "tasks", "knowledge", "dashboard", "catalog",
+  "notes", "emails", "suppliers", "tasks", "dashboard", "catalog",
   "explorer", "health", "downloads", "settings", "notifications",
 ];
 
@@ -49,7 +47,6 @@ export const PANEL_ROUTES = {
   emails: "/emails",
   suppliers: "/fornecedores",
   tasks: "/tarefas",
-  knowledge: "/conhecimento",
   dashboard: "/estatisticas",
   catalog: "/catalogo-tecnico",
   settings: "/definicoes",

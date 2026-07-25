@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell, Clock, AlarmClockOff, Zap, ShieldAlert, FileDiff, Mail, ClipboardList, AlertTriangle,
-  ListChecks, Link as LinkIcon, BookOpen, Cpu,
+  ListChecks, Link as LinkIcon,
 } from "lucide-react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
@@ -16,11 +16,10 @@ const CATEGORY_ICON = {
   waiting_supplier: Clock, deadline_approaching: Clock, forgotten: AlarmClockOff,
   urgent: Zap, task_urgent: Zap, reminder_overdue: Bell, task_reminder: ListChecks,
   tasks_overdue_digest: ListChecks,
-  quote_quality_issue: ShieldAlert, document_read_failure: ShieldAlert, processing_error: AlertTriangle,
-  quote_changed: FileDiff, price_change: FileDiff,
-  client_new_note: ClipboardList, supplier: Mail, client: Mail, correio_semanal: Mail, unmatched: Mail,
-  anexos_incidencia_critica: AlertTriangle, bricoaval_backfill: LinkIcon,
-  knowledge_new_article: BookOpen, knowledge_engine_updated: Cpu,
+  quote_quality_issue: ShieldAlert, processing_error: AlertTriangle,
+  quote_changed: FileDiff,
+  client_new_note: ClipboardList, supplier: Mail, client: Mail, unmatched: Mail,
+  bricoaval_backfill: LinkIcon,
 };
 const PRIORITY_STYLE = {
   critica: { ring: "border-red-200 bg-[var(--pastel-red-bg)]", icon: "bg-[var(--pastel-red-bg)] text-red-600" },

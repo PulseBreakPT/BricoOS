@@ -92,21 +92,15 @@ def _broadcast(event_type, notification_id):
 # um chamador específico escalar/desescalar caso a caso (ex.: um problema
 # de qualidade "warning" é menos grave que um "error").
 CATEGORY_PRIORITY = {
-    "anexos_incidencia_critica": "critica",
     "quote_quality_issue": "critica",
     "urgent": "critica",
     "task_urgent": "critica",
     "client": "alta",
     "quote_changed": "alta",
     "waiting_supplier": "alta",
-    "document_read_failure": "alta",
-    "price_change": "alta",
     "task_reminder": "alta",
     "tasks_overdue_digest": "alta",
-    "knowledge_new_article": "media",
-    "knowledge_engine_updated": "media",
     "supplier": "media",
-    "correio_semanal": "media",
     "forgotten": "media",
     "reminder_overdue": "media",
     "deadline_approaching": "media",
@@ -131,8 +125,7 @@ NOTIF_PRIORITY_BY_RANK = {v: k for k, v in NOTIF_PRIORITY_RANK.items()}
 # chave) — "evoluir" aí não corresponde à mesma situação, seria sempre uma
 # ocorrência nova a criar.
 EVOLVING_CATEGORIES = {
-    "task_reminder", "tasks_overdue_digest", "document_read_failure",
-    "processing_error", "knowledge_engine_updated",
+    "task_reminder", "tasks_overdue_digest", "processing_error",
 }
 
 # Texto fixo por categoria — o "Motivo" mostrado no card (regra que gerou a
@@ -148,17 +141,11 @@ CATEGORY_REASON = {
     "tasks_overdue_digest": "Regra: existem tarefas com data limite ultrapassada, por concluir.",
     "quote_quality_issue": "Regra: a leitura automática do PDF do fornecedor encontrou inconsistências.",
     "quote_changed": "Regra: o orçamento do fornecedor mudou desde a versão anterior.",
-    "price_change": "Regra: variação de preço acima do limite definido em Definições → Automação.",
-    "anexos_incidencia_critica": "Regra: incidência classificada como crítica no Anexos_Edição.",
-    "document_read_failure": "Regra: falha ao processar/ler um documento recebido.",
     "processing_error": "Regra: falha ao processar um PDF recebido por email.",
     "bricoaval_backfill": "Regra: encontrado histórico de emails com o mesmo nº BricoAval do pedido.",
     "client_new_note": "Regra: um cliente enviou um novo pedido por email.",
-    "knowledge_engine_updated": "Regra: o motor de análise de documentos foi atualizado.",
-    "knowledge_new_article": "Regra: novo artigo criado no Correio Semanal.",
     "client": "Regra: novo email recebido, identificado como resposta de cliente.",
     "supplier": "Regra: novo email recebido, identificado como resposta de fornecedor.",
-    "correio_semanal": "Regra: novo Correio Semanal recebido por email.",
     "unmatched": "Regra: novo email recebido sem associação automática a um pedido/fornecedor.",
 }
 
@@ -166,8 +153,7 @@ CATEGORY_REASON = {
 # só categorias cujo valor informativo cai naturalmente com o tempo.
 EXPIRES_AFTER_DAYS = {
     "task_reminder": 3, "tasks_overdue_digest": 2,
-    "knowledge_new_article": 14, "knowledge_engine_updated": 14,
-    "bricoaval_backfill": 30, "price_change": 14,
+    "bricoaval_backfill": 30,
 }
 
 # Backoff entre tentativas de entrega (minutos) — 1, 5, 15, 60, 120, 240;
@@ -627,21 +613,15 @@ def compute_priority(doc, note=None, task=None, now=None):
 # usado no frontend (notificationActions.js).
 
 DEFAULT_ACTION_BY_CATEGORY = {
-    "anexos_incidencia_critica": {"type": "open", "label": "Ver incidência"},
     "quote_quality_issue": {"type": "open", "label": "Rever orçamento"},
     "urgent": {"type": "open", "label": "Ver pedido"},
     "task_urgent": {"type": "complete_task", "label": "Concluir tarefa"},
     "client": {"type": "open", "label": "Ver pedido"},
     "quote_changed": {"type": "open", "label": "Rever alterações"},
     "waiting_supplier": {"type": "open", "label": "Ver pedido"},
-    "document_read_failure": {"type": "open", "label": "Ver detalhes"},
-    "price_change": {"type": "open", "label": "Ver alteração"},
     "task_reminder": {"type": "complete_task", "label": "Concluir tarefa"},
     "tasks_overdue_digest": {"type": "open", "label": "Ver tarefas"},
-    "knowledge_new_article": {"type": "open", "label": "Ler artigo"},
-    "knowledge_engine_updated": {"type": "open", "label": "Ver Correio Semanal"},
     "supplier": {"type": "open", "label": "Ver pedido"},
-    "correio_semanal": {"type": "open", "label": "Ver Correio Semanal"},
     "forgotten": {"type": "open", "label": "Ver pedido"},
     "reminder_overdue": {"type": "complete_task", "label": "Concluir tarefa"},
     "deadline_approaching": {"type": "open", "label": "Ver pedido"},

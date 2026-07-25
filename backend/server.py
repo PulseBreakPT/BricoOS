@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -60,15 +60,9 @@ try:
         build_quality_report, confidence_score, detect_urgency_signals,
         diff_quote_versions, diff_summary_text, duplicate_medidas,
     )
-    import correio_semanal
-    import anexos_edicao
-    import classification_rules
-    import severity as severity_engine
-    import edition_summary
     import push_notifications
     import app_settings
     import notifications
-    import knowledge
 except ImportError:  # Permite também executar como módulo: python -m backend.server
     from .email_templates import (
         business_greeting, client_quote_template, supplier_quote_template,
@@ -94,15 +88,9 @@ except ImportError:  # Permite também executar como módulo: python -m backend.
         build_quality_report, confidence_score, detect_urgency_signals,
         diff_quote_versions, diff_summary_text, duplicate_medidas,
     )
-    from . import correio_semanal
-    from . import anexos_edicao
-    from . import classification_rules
-    from . import severity as severity_engine
-    from . import edition_summary
     from . import push_notifications
     from . import app_settings
     from . import notifications
-    from . import knowledge
 
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -684,7 +672,6 @@ class NoteIn(BaseModel):
     supplier_id: str = ""
     sla_days: int = DEFAULT_SLA_DAYS
     reminder_interval_days: int = 3
-    related_article_ids: List[str] = []
 
     @field_validator("status")
     @classmethod
@@ -746,7 +733,6 @@ class NotePatch(BaseModel):
     supplier_id: Optional[str] = None
     sla_days: Optional[int] = None
     reminder_interval_days: Optional[int] = None
-    related_article_ids: Optional[List[str]] = None
 
     @field_validator("status")
     @classmethod
@@ -849,7 +835,6 @@ class SupplierIn(BaseModel):
     notes: str = ""
     labels: List[str] = []
     contacts: List[SupplierContact] = []
-    related_article_ids: List[str] = []
 
     @field_validator("name")
     @classmethod
@@ -895,8 +880,6 @@ class TaskIn(BaseModel):
     pinned: bool = False
     remind_minutes_before: Optional[int] = None
     notes: str = ""
-    source_article_id: str = ""
-    source_action_id: str = ""
 
     @field_validator("priority")
     @classmethod
@@ -925,8 +908,6 @@ class TaskPatch(BaseModel):
     pinned: Optional[bool] = None
     remind_minutes_before: Optional[int] = None
     notes: Optional[str] = None
-    source_article_id: Optional[str] = None
-    source_action_id: Optional[str] = None
 
     @field_validator("priority")
     @classmethod
@@ -2300,8 +2281,8 @@ async def list_tasks(note_id: Optional[str] = None, suggested: Optional[bool] = 
     q = {}
     if note_id:
         q["note_id"] = note_id
-    # Tarefas sugeridas pelo Correio Semanal ficam de fora da lista normal
-    # até serem aceites — só aparecem quando pedidas explicitamente
+    # Tarefas sugeridas (automáticas, por confirmar) ficam de fora da lista
+    # normal até serem aceites — só aparecem quando pedidas explicitamente
     # (suggested=true), para não intrometer sugestões por confirmar na
     # lista de tarefas já assumidas.
     q["suggested"] = suggested if suggested is not None else {"$ne": True}
@@ -2327,32 +2308,6 @@ async def accept_task_suggestion(task_id: str):
     t.update(update)
     return t
 
-
-class AcceptNewCategoryIn(BaseModel):
-    category: str
-
-
-@api_router.post("/tasks/{task_id}/accept-new-category")
-async def accept_new_category(task_id: str, payload: AcceptNewCategoryIn):
-    """Confirma uma sugestão de categoria nova (ver server.py:
-    _suggest_new_categories) — a categoria e as suas palavras-chave ficam
-    gravadas em classification_rules (base de dados, nunca código) e
-    aplicam-se já à próxima edição do Correio Semanal/Anexos_Edição
-    processada, sem precisar de deploy nenhum."""
-    t = await db.tasks.find_one({"id": task_id}, {"_id": 0})
-    if not t or t.get("kind") != "new_category_suggestion":
-        raise HTTPException(status_code=404, detail="Sugestão de categoria não encontrada")
-    category = (payload.category or "").strip()
-    if not category:
-        raise HTTPException(status_code=400, detail="Indique um nome para a categoria")
-    rules = await classification_rules.learn_new_category(
-        db, category, t.get("category_keywords") or [], source=t.get("source", ""))
-    if t.get("category_signature"):
-        await db.category_suggestions.update_one(
-            {"signature": t["category_signature"]},
-            {"$set": {"status": "accepted", "accepted_as": category, "updated_at": now_iso()}})
-    await db.tasks.delete_one({"id": task_id})
-    return {"category": category, "keywords": rules.get(category, [])}
 
 
 async def _notify_task_urgent(doc):
@@ -2670,139 +2625,6 @@ async def purge_task(task_id: str):
     return {"ok": True}
 
 
-# ---------- Centro de Conhecimento (artigos permanentes a partir do Correio Semanal) ----------
-class KnowledgeArticlePatch(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    pinned: Optional[bool] = None
-    archived: Optional[bool] = None
-    tags: Optional[List[str]] = None
-
-
-class KnowledgeCreateTaskIn(BaseModel):
-    action_id: str
-
-
-@api_router.get("/knowledge/articles")
-async def list_knowledge_articles(article_type: Optional[str] = None, pinned: Optional[bool] = None,
-                                   archived: Optional[bool] = None):
-    q = {}
-    if article_type:
-        q["article_type"] = article_type
-    if pinned is not None:
-        q["pinned"] = pinned
-    q["archived"] = archived if archived is not None else {"$ne": True}
-    return await db.knowledge_articles.find(
-        q, {"_id": 0, "sections": 0, "deadlines_calendar": 0},
-    ).sort("created_at", -1).to_list(500)
-
-
-@api_router.get("/knowledge/articles/{article_id}")
-async def get_knowledge_article(article_id: str):
-    article = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
-    if not article:
-        raise HTTPException(status_code=404, detail="Artigo não encontrado")
-    grouped = knowledge.group_sections_by_bucket(
-        article.get("sections") or [], article.get("deadlines_calendar") or [],
-        article.get("attachment_count") or 0)
-    themes = await knowledge.recurring_themes(db, article)
-    implementation = await knowledge.implementation_state(db, article)
-    linked_tasks = await db.tasks.find(
-        {"source_article_id": article_id},
-        {"_id": 0, "id": 1, "title": 1, "status": 1, "done": 1, "source_action_id": 1},
-    ).to_list(200)
-    related_notes = await db.notes.find(
-        {"related_article_ids": article_id}, {"_id": 0, "id": 1, "customer_name": 1, "description": 1},
-    ).to_list(50)
-    related_suppliers = await db.suppliers.find(
-        {"related_article_ids": article_id}, {"_id": 0, "id": 1, "name": 1},
-    ).to_list(50)
-    history = await db.knowledge_article_history.find(
-        {"article_id": article_id}, {"_id": 0},
-    ).sort("created_at", 1).to_list(200)
-    return {
-        **article, "grouped_sections": grouped, "recurring_themes": themes,
-        "implementation": implementation, "linked_tasks": linked_tasks,
-        "related_notes": related_notes, "related_suppliers": related_suppliers,
-        "history": history, "current_engine_version": knowledge.ENGINE_VERSION,
-        "executive_summary": knowledge.build_executive_summary(article),
-    }
-
-
-@api_router.post("/knowledge/articles/{article_id}/open")
-async def open_knowledge_article(article_id: str):
-    ok = await knowledge.register_open(db, article_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Artigo não encontrado")
-    return {"ok": True}
-
-
-@api_router.patch("/knowledge/articles/{article_id}")
-async def patch_knowledge_article(article_id: str, payload: KnowledgeArticlePatch):
-    current = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
-    if not current:
-        raise HTTPException(status_code=404, detail="Artigo não encontrado")
-    update = {k: v for k, v in payload.model_dump().items() if v is not None}
-    if update:
-        update["updated_at"] = now_iso()
-        if "archived" in update:
-            update["archived_at"] = now_iso() if update["archived"] else None
-        await db.knowledge_articles.update_one({"id": article_id}, {"$set": update})
-        if "pinned" in update:
-            await knowledge.log_activity(
-                db, article_id, "pinned" if update["pinned"] else "unpinned",
-                "Adicionado aos favoritos" if update["pinned"] else "Removido dos favoritos")
-        if "archived" in update:
-            await knowledge.log_activity(
-                db, article_id, "archived" if update["archived"] else "unarchived",
-                "Arquivado" if update["archived"] else "Desarquivado")
-    return await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
-
-
-@api_router.get("/knowledge/articles/{article_id}/files")
-async def list_knowledge_article_files(article_id: str):
-    return await _list_attachments("knowledge_article", article_id)
-
-
-@api_router.post("/knowledge/articles/{article_id}/files")
-async def upload_knowledge_article_files(article_id: str, files: List[UploadFile] = File(...)):
-    if not await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0, "id": 1}):
-        raise HTTPException(status_code=404, detail="Artigo não encontrado")
-    return await _upload_attachments("knowledge_article", article_id, files)
-
-
-@api_router.post("/knowledge/articles/{article_id}/create-task")
-async def create_task_from_article_action(article_id: str, payload: KnowledgeCreateTaskIn, request: Request):
-    """Botão manual "➕ Criar tarefa" de uma ação específica do artigo —
-    distinto das tarefas sugeridas automáticas do Correio (essas
-    continuam a existir tal e qual, ver _process_correio_semanal)."""
-    article = await db.knowledge_articles.find_one({"id": article_id}, {"_id": 0})
-    if not article:
-        raise HTTPException(status_code=404, detail="Artigo não encontrado")
-    fields = knowledge.build_task_from_action(article, payload.action_id)
-    if not fields:
-        raise HTTPException(status_code=404, detail="Ação não encontrada neste artigo")
-    task_in = TaskIn(**fields)
-    doc = _with_subtask_ids(task_in.model_dump())
-    doc.update({"id": str(uuid.uuid4()), "created_at": now_iso(), "status": "todo", "status_changed_at": now_iso()})
-    await db.tasks.insert_one(dict(doc))
-    actor = request.headers.get("x-actor-name") or None
-    await log_task_activity(doc["id"], "created", "Tarefa criada", actor=actor)
-    await _notify_task_urgent(doc)
-    await knowledge.log_activity(db, article_id, "task_created", f"Tarefa criada: {doc['title']}")
-    doc.pop("_id", None)
-    return doc
-
-
-@api_router.get("/knowledge/stats")
-async def knowledge_stats():
-    stats = await knowledge.get_stats(db)
-    items = await _correio_semanal_status_list()
-    stats["unprocessed_count"] = sum(1 for i in items if i["status"] == "nao_processado")
-    stats["outdated_count"] = sum(1 for i in items if i["status"] == "desatualizado")
-    stats["error_count"] = sum(1 for i in items if i["status"] == "erro")
-    return stats
-
-
 # ---------- Workspace: pesquisa global + IA contextual ----------
 @api_router.get("/search")
 async def global_search(q: str = ""):
@@ -2811,7 +2633,7 @@ async def global_search(q: str = ""):
     só chamada, para abrir o painel certo sem sair de onde se está."""
     term = (q or "").strip()
     if len(term) < 2:
-        return {"notes": [], "suppliers": [], "tasks": [], "emails": [], "knowledge_articles": []}
+        return {"notes": [], "suppliers": [], "tasks": [], "emails": []}
     rx = {"$regex": re.escape(term), "$options": "i"}
     note_or = [{"customer_name": rx}, {"description": rx}, {"phone": rx}, {"reference": rx}, {"bricoaval_number": rx}]
     digits = re.sub(r"\D", "", term)
@@ -2844,12 +2666,7 @@ async def global_search(q: str = ""):
         {"_id": 0, "id": 1, "subject": 1, "from_name": 1, "from_email": 1, "supplier_name": 1,
          "received_at": 1, "note_id": 1},
     ).sort("received_at", -1).limit(6).to_list(6)
-    knowledge_articles = await db.knowledge_articles.find(
-        {"archived": {"$ne": True}, "$or": [{"title": rx}, {"tags": rx}]},
-        {"_id": 0, "id": 1, "title": 1, "csn_number": 1, "issue_date": 1, "important_count": 1},
-    ).sort("created_at", -1).limit(6).to_list(6)
-    return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails,
-            "knowledge_articles": knowledge_articles}
+    return {"notes": notes, "suppliers": suppliers, "tasks": tasks, "emails": emails}
 
 
 @api_router.get("/system/status")
@@ -3373,9 +3190,6 @@ async def add_quote(note_id: str, payload: QuoteIn):
 BRICO_LOGO_PATH = ROOT_DIR / "assets" / "bricomarche_faro_logo.png"
 MAX_SUPPLIER_PDF_BYTES = 15 * 1024 * 1024
 MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024
-# O Anexos_Edição.zip do Correio Semanal (dossiers e planogramas incluídos)
-# ronda facilmente os 20 MB — bem acima do limite de um PDF de fornecedor.
-MAX_ANEXOS_ZIP_BYTES = 30 * 1024 * 1024
 MAX_ATTACHMENTS_PER_EMAIL = 5
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_PHOTOS_PER_NOTE = 30
@@ -4354,437 +4168,24 @@ def _email_body_html(msg, plain_fallback):
 
 
 def _email_pdf_attachments(msg):
-    """Extrai anexos PDF e ZIP (máx. 5 no total) — PDF até
-    MAX_SUPPLIER_PDF_BYTES, ZIP até MAX_ANEXOS_ZIP_BYTES (o
-    Anexos_Edição.zip do Correio Semanal chega a rondar os 20 MB)."""
+    """Extrai anexos PDF (máx. 5, cada um até MAX_SUPPLIER_PDF_BYTES)."""
     out = []
     for part in msg.walk():
         filename = _decode_mime_header(part.get_filename() or "")
         content_type = part.get_content_type()
         is_pdf = content_type == "application/pdf" or filename.lower().endswith(".pdf")
-        is_zip = (
-            content_type in ("application/zip", "application/x-zip-compressed")
-            or filename.lower().endswith(".zip")
-        )
-        if not is_pdf and not is_zip:
+        if not is_pdf:
             continue
         payload = part.get_payload(decode=True)
-        limit = MAX_ANEXOS_ZIP_BYTES if is_zip else MAX_SUPPLIER_PDF_BYTES
-        if payload and len(payload) <= limit:
-            out.append({"filename": filename or ("anexo.zip" if is_zip else "documento.pdf"), "data": payload})
+        if payload and len(payload) <= MAX_SUPPLIER_PDF_BYTES:
+            out.append({"filename": filename or "documento.pdf", "data": payload})
         if len(out) >= MAX_ATTACHMENTS_PER_EMAIL:
             break
     return out
 
 
-# ---------- Resumo automático do "Correio Semanal" (Mosqueteiros) ----------
-# Boletim interno semanal, sempre em PDF, sempre do mesmo remetente — mas o
-# conteúdo (secções, datas-limite, MEAs, promoções) muda todas as semanas,
-# por isso o resumo tem de reler o PDF de cada semana, nunca assumir nada
-# do anterior. O resumo em si (build_digest) é extração determinística —
-# sem IA, sem chamadas de rede — ver correio_semanal.py.
-CORREIO_SEMANAL_SENDER = "pdv11880@mousquetaires.com"
-# O boletim chama-se a si próprio "Correio Semanal" (é assim que o PDF e os
-# seus anexos se chamam), mas quem o reencaminha por email nem sempre usa
-# essas palavras no assunto — ex.: "FW: Correio da Semana Edição nº655
-# (Semana 29)". Por isso aceita as duas formas ("semanal" ou "da semana") e
-# verifica tanto o assunto como os nomes dos anexos, para não depender de
-# quem reencaminha escrever sempre da mesma forma.
-_CORREIO_SEMANAL_RE = re.compile(r"correio[\s_-]*(semanal|da[\s_-]*semana)", re.IGNORECASE)
-
-
-def _looks_like_correio_semanal(from_email, subject, attachment_filenames=None):
-    if (from_email or "").strip().lower() != CORREIO_SEMANAL_SENDER:
-        return False
-    if _CORREIO_SEMANAL_RE.search(_strip_accents(subject or "")):
-        return True
-    return any(_CORREIO_SEMANAL_RE.search(_strip_accents(name or "")) for name in (attachment_filenames or []))
-
-
-async def _summarize_correio_semanal(subject, pdf_bytes_list):
-    """Resumo exaustivo do Correio Semanal — extração determinística
-    (build_digest), corre em thread por ser só CPU (um PDF de 60+ páginas
-    demora o suficiente para não bloquear o event loop)."""
-    try:
-        return await asyncio.to_thread(correio_semanal.build_digest, pdf_bytes_list, subject)
-    except Exception as e:
-        logger.error(f"Resumo do Correio Semanal falhou: {e}")
-        content_hash = hashlib.sha256(pdf_bytes_list[0]).hexdigest()[:16] if pdf_bytes_list else "sem-pdf"
-        await notifications.create_notification(
-            db, dedup_key=f"doc-read-fail-csn-summary-{content_hash}", category="document_read_failure",
-            title="Falha na leitura de um documento",
-            body=f"Resumo do Correio Semanal ({subject or 'sem assunto'}) não foi possível gerar.", url="/emails")
-        return ""
-
-
-CATEGORY_SUGGESTION_THRESHOLD = 2  # nº de edições distintas com o mesmo padrão antes de sugerir
 DEADLINE_WARNING_DAYS = 1  # avisar X dias antes de um pedido ficar em atraso (definições → Automação)
-PRICE_CHANGE_ALERT_PCT = 15  # variação de preço (%) que gera notificação (definições → Automação)
 NOTIFICATION_SCAN_MINUTES = 5  # cadência do ciclo de alertas de estado (waiting_supplier/forgotten/urgent/...)
-
-
-async def _suggest_new_categories(fingerprints, source, edition_ref):
-    """A resposta determinística a "o sistema reconhece um tipo de
-    documento novo e cria a categoria sozinho": um documento que não bata
-    com nenhuma categoria conhecida fica em "outro" com uma "impressão
-    digital" das suas palavras mais distintivas (ver
-    classification_rules.unclassified_fingerprint). Se o mesmo padrão
-    aparecer em CATEGORY_SUGGESTION_THRESHOLD edições diferentes, é sinal
-    de que é mesmo um tipo de documento recorrente — sugere-se uma
-    categoria nova a um humano (POST /tasks/{id}/accept-new-category);
-    assim que aceite, fica gravada na base de dados (nunca no código) e
-    passa a aplicar-se sozinha a partir da próxima edição. Sem qualquer
-    ocorrência repetida, não há sinal nenhum para propor — esse é o limite
-    honesto de um motor sem IA."""
-    if not fingerprints:
-        return 0
-    created = 0
-    for item in fingerprints:
-        fp = item.get("fingerprint") or []
-        if len(fp) < 2:
-            continue
-        signature = "+".join(sorted(fp[:4]))
-        doc = await db.category_suggestions.find_one({"signature": signature})
-        example = {"source": source, "edition_ref": edition_ref, "label": item.get("path") or item.get("title")}
-        if doc:
-            if doc.get("status") != "pending" or edition_ref in {e.get("edition_ref") for e in doc.get("examples", [])}:
-                continue  # já decidido, ou a mesma edição já contou (evita inflar por reprocessamento)
-            await db.category_suggestions.update_one(
-                {"signature": signature},
-                {"$inc": {"occurrences": 1}, "$push": {"examples": example}, "$set": {"updated_at": now_iso()}})
-            occurrences = doc.get("occurrences", 1) + 1
-        else:
-            await db.category_suggestions.insert_one({
-                "id": str(uuid.uuid4()), "signature": signature, "keywords": fp[:6], "status": "pending",
-                "occurrences": 1, "examples": [example], "created_at": now_iso(), "updated_at": now_iso()})
-            occurrences = 1
-        if occurrences < CATEGORY_SUGGESTION_THRESHOLD:
-            continue
-        exists = await db.tasks.find_one({"suggested": True, "kind": "new_category_suggestion",
-                                           "category_signature": signature})
-        if exists:
-            continue
-        await db.tasks.insert_one({
-            "id": str(uuid.uuid4()), "category": "construcao", "done": False, "priority": "baixa",
-            "due_date": "", "repeat": "none", "subtasks": [], "labels": ["categoria-nova"],
-            "note_id": "", "group_id": "",
-            # csn_number/edition_number seguem o mesmo campo que o painel de
-            # tarefas sugeridas usa para filtrar por edição (ver
-            # SuggestedTasksPanel no frontend) — sem isto a sugestão nunca
-            # apareceria em lado nenhum.
-            "csn_number": edition_ref if source == "correio_semanal" else "",
-            "edition_number": edition_ref if source == "anexos_edicao" else "",
-            "title": f"[Categoria nova?] Documentos recorrentes não reconhecidos: {', '.join(fp[:4])}",
-            "created_at": now_iso(), "suggested": True, "source": source, "kind": "new_category_suggestion",
-            "category_signature": signature, "category_keywords": fp[:6]})
-        created += 1
-    return created
-
-
-async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
-    """Complementa o resumo em HTML com dados estruturados: guarda um
-    "digest" desta edição, compara com a edição anterior (se houver) e
-    sugere tarefas a partir das secções com "A Encomendar"/"A Fazer"
-    marcado, ou um rascunho de email quando a secção pede uma resposta de
-    adesão/não adesão. Nunca cria uma tarefa já confirmada nem envia
-    nada sozinho — fica marcada como sugestão (suggested=True) até
-    alguém aceitar, mesmo padrão de aprovação usado no resto da app.
-
-    A classificação por secção usa as regras partilhadas com o
-    Anexos_Edição (classification_rules.load_rules) — a prioridade da
-    tarefa sugerida segue a gravidade calculada por severity.py, em vez de
-    ser sempre "média"."""
-    rules = await classification_rules.load_rules(db)
-    try:
-        structured = await asyncio.to_thread(correio_semanal.extract_structured, pdf_bytes_list, subject, rules)
-    except Exception as e:
-        logger.error(f"Extração estruturada do Correio Semanal falhou: {e}")
-        await notifications.create_notification(
-            db, dedup_key=f"doc-read-fail-csn-extract-{email_id}", category="document_read_failure",
-            title="Falha na leitura de um documento",
-            body=f"Extração estruturada do Correio Semanal ({subject or 'sem assunto'}) falhou.", url="/emails")
-        # Marcado aqui (não só no retry manual) para que uma falha já na
-        # primeira passagem — durante o próprio "poll_supplier_replies" —
-        # também fique visível como "erro" em vez de o email ficar a
-        # parecer normal e nunca mais ninguém saber que isto aconteceu.
-        await knowledge.mark_processing_error(db, email_id, f"Extração estruturada falhou: {e}")
-        return None
-    if not structured or not structured.get("csn_number"):
-        await knowledge.mark_processing_error(
-            db, email_id, "Não foi possível reconhecer o número da edição neste PDF.")
-        return None
-
-    prev_list = await db.correio_semanal_digests.find(
-        {"csn_number": {"$ne": structured["csn_number"]}}, {"_id": 0},
-    ).sort("created_at", -1).to_list(1)
-    prev = (prev_list[0]["structured"] if prev_list else None)
-    diff = correio_semanal.diff_digest_versions(prev, structured) if prev else None
-
-    # upsert por email_id (não insert_one): reprocessar o mesmo email (botão
-    # manual, lote de importação/reprocessamento) não deve duplicar este
-    # histórico interno — cada email só tem uma tentativa de digest.
-    await db.correio_semanal_digests.update_one(
-        {"email_id": email_id},
-        {"$set": {"csn_number": structured["csn_number"], "week_label": structured.get("week_label"),
-                   "issue_date": structured.get("issue_date"), "structured": structured,
-                   "diff_since_previous": diff, "created_at": now_iso()},
-         "$setOnInsert": {"id": str(uuid.uuid4())}},
-        upsert=True)
-
-    created = 0
-    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
-                 "repeat": "none", "subtasks": [], "labels": ["correio-semanal"], "note_id": "", "group_id": ""}
-    for section in structured["sections"]:
-        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(section.get("severity"), "media")
-        for action in section.get("checked_actions") or []:
-            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
-                                               "source_page": section["page"], "kind": "task", "action": action})
-            if exists:
-                continue
-            await db.tasks.insert_one({
-                **base_task, "id": str(uuid.uuid4()), "priority": priority,
-                "title": f"[Correio Semanal {structured['csn_number']}] {action}: {section['title']}",
-                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
-                "csn_number": structured["csn_number"], "source_page": section["page"],
-                "kind": "task", "action": action, "severity": section.get("severity")})
-            created += 1
-        if section.get("requires_adhesion_email") and section.get("adhesion_emails"):
-            exists = await db.tasks.find_one({"suggested": True, "csn_number": structured["csn_number"],
-                                               "source_page": section["page"], "kind": "email_draft"})
-            if exists:
-                continue
-            to = ",".join(section["adhesion_emails"])
-            mailto = f"mailto:{to}?subject={urllib.parse.quote(section['title'])}"
-            await db.tasks.insert_one({
-                **base_task, "id": str(uuid.uuid4()), "priority": priority,
-                "title": f"[Correio Semanal {structured['csn_number']}] Responder por email: {section['title']}",
-                "created_at": now_iso(), "suggested": True, "source": "correio_semanal",
-                "csn_number": structured["csn_number"], "source_page": section["page"],
-                "kind": "email_draft", "mailto": mailto, "recipients": section["adhesion_emails"],
-                "severity": section.get("severity")})
-            created += 1
-
-    created += await _suggest_new_categories(structured.get("unclassified_fingerprints"),
-                                              source="correio_semanal", edition_ref=structured["csn_number"])
-
-    return {"digest": structured, "diff": diff, "suggested_tasks_created": created, "prev_digest": prev}
-
-
-# Nomes de email a meio de processamento manual/automático — evita dois
-# processamentos da mesma edição em simultâneo (duplo clique, duas abas, ou
-# o automático e o manual a coincidir). Em memória, não persistido: um
-# reinício do servidor limpa-o sozinho, o que é o comportamento certo (nada
-# fica "preso" para sempre).
-_processing_email_ids = set()
-
-CORREIO_SEMANAL_MAX_AUTO_RETRIES = 5
-
-
-async def _process_correio_semanal_email(email_id):
-    """Reprocessa um único email já em db.received_emails — usado pelo
-    botão manual (Emails.jsx), pelo lote de importar/reprocessar
-    (Knowledge.jsx, um pedido de cada vez) e pela verificação automática
-    ao arrancar/sincronizar. Levanta ValueError com uma mensagem amigável
-    em vez de HTTPException — quem chama decide se converte (endpoint) ou
-    só regista e continua (lote)."""
-    if email_id in _processing_email_ids:
-        raise ValueError("Este Correio Semanal já está a ser processado.")
-    _processing_email_ids.add(email_id)
-    try:
-        email = await db.received_emails.find_one({"id": email_id}, {"_id": 0})
-        if not email:
-            raise ValueError("Email não encontrado.")
-        atts = await db.email_attachments.find({"email_id": email_id}, {"_id": 0}).to_list(20)
-        pdf_atts = [a for a in atts if (a.get("filename") or "").lower().endswith(".pdf")]
-        if not pdf_atts:
-            raise ValueError("Este email não tem PDF do Correio Semanal para processar.")
-        pdf_bytes_list = [base64.b64decode(a["content_b64"]) for a in pdf_atts]
-        try:
-            result = await _process_correio_semanal(email.get("subject"), pdf_bytes_list, email_id)
-        except Exception as e:
-            await knowledge.mark_processing_error(db, email_id, str(e))
-            raise ValueError(f"Falha ao processar: {e}")
-        if not result:
-            # _process_correio_semanal já marcou o erro específico (extração
-            # falhou / nº de edição não reconhecido) — só resta ler de volta
-            # a mensagem para a propagar, sem voltar a marcar (evitaria
-            # contar o mesmo erro duas vezes em correio_semanal_process_error_count).
-            email_after = await db.received_emails.find_one(
-                {"id": email_id}, {"_id": 0, "correio_semanal_process_error": 1})
-            msg = (email_after or {}).get("correio_semanal_process_error") \
-                or "Não foi possível processar este Correio Semanal."
-            raise ValueError(msg)
-        return await knowledge.upsert_article_from_correio_semanal(
-            db, email_id=email_id, correio_semanal_result=result)
-    finally:
-        _processing_email_ids.discard(email_id)
-
-
-async def _correio_semanal_status_list():
-    """Estado de processamento do Centro de Conhecimento por cada email
-    reconhecido como Correio Semanal (inclui os anteriores a esta
-    funcionalidade) — fonte única para o badge em Emails.jsx, as
-    ferramentas de Knowledge.jsx e as contagens do Dashboard."""
-    docs = await db.received_emails.find(
-        {"from_email": CORREIO_SEMANAL_SENDER},
-        {"_id": 0, "id": 1, "subject": 1, "received_at": 1, "attachments": 1,
-         "correio_semanal_process_error": 1, "correio_semanal_process_error_at": 1,
-         "correio_semanal_process_error_count": 1},
-    ).sort("received_at", -1).to_list(500)
-    articles = await db.knowledge_articles.find(
-        {"article_type": "correio_semanal"},
-        {"_id": 0, "email_id": 1, "id": 1, "engine_version": 1, "last_processed_at": 1},
-    ).to_list(500)
-    by_email = {a["email_id"]: a for a in articles if a.get("email_id")}
-    items = []
-    for d in docs:
-        # O filtro por remetente já aconteceu na query acima — reaplicar
-        # _looks_like_correio_semanal aqui (que também exige o assunto ou o
-        # nome de um anexo bater com o padrão) escondia da lista qualquer
-        # email deste remetente cujo assunto tivesse chegado vazio/atípico:
-        # não ficava "erro" nem "não processado", simplesmente desaparecia,
-        # como se nunca tivesse sido recebido.
-        article = by_email.get(d["id"])
-        status = knowledge.processing_status(d, article)
-        items.append({
-            "email_id": d["id"], "subject": d.get("subject"), "received_at": d.get("received_at"),
-            "status": status, "article_id": article.get("id") if article else None,
-            "error_message": d.get("correio_semanal_process_error") if status == "erro" else None,
-        })
-    return items
-
-
-async def _auto_process_correio_semanal():
-    """Verificação automática (arranque + fim de POST /emails/sync):
-    processa tudo o que ainda não tem artigo e tenta de novo o que falhou
-    (até CORREIO_SEMANAL_MAX_AUTO_RETRIES, para não martelar um PDF
-    permanentemente corrompido) — nunca os "desatualizados" (esses só por
-    ação explícita, ver Knowledge.jsx: "Reprocessar desatualizados"). Nunca
-    bloqueia quem a chamou; lançada sempre como tarefa solta. Avisa por
-    notificação se ficarem artigos desatualizados depois desta verificação
-    (motor de análise atualizado entretanto)."""
-    try:
-        automation = await app_settings.get_group(db, "automation_prefs")
-        if not automation.get("auto_process_correio_semanal", True):
-            return
-        items = await _correio_semanal_status_list()
-        for item in items:
-            if item["status"] in ("processado", "desatualizado"):
-                continue
-            if item["status"] == "erro":
-                email = await db.received_emails.find_one(
-                    {"id": item["email_id"]}, {"_id": 0, "correio_semanal_process_error_count": 1})
-                if (email or {}).get("correio_semanal_process_error_count", 0) >= CORREIO_SEMANAL_MAX_AUTO_RETRIES:
-                    continue
-            try:
-                await _process_correio_semanal_email(item["email_id"])
-            except Exception as e:
-                logger.warning(f"Processamento automático do Centro de Conhecimento falhou ({item['email_id']}): {e}")
-        outdated = [i for i in items if i["status"] == "desatualizado"]
-        if outdated:
-            await notifications.create_notification(
-                db, dedup_key=f"engine-outdated-{knowledge.ENGINE_VERSION}",
-                category="knowledge_engine_updated", title="Motor de análise atualizado",
-                body=f"{len(outdated)} artigo(s) do Centro de Conhecimento podem ser melhorados com o motor mais recente.",
-                url="/conhecimento?filtro=atencao")
-    except Exception as e:
-        logger.error(f"Verificação automática do Centro de Conhecimento falhou: {e}")
-
-
-ANEXOS_EDICAO_ACTIONABLE = {
-    "nota_encomenda": "Responder/encomendar",
-    "incidencia": "Rever incidências",
-    "campanha": "Preparar campanha",
-    "planograma": "Atualizar exposição",
-}
-
-
-async def _process_anexos_edicao(zip_bytes, zip_filename, email_id, fallback_edition=None):
-    """Processa o Anexos_Edição.zip que costuma acompanhar o Correio
-    Semanal: descompacta (incl. zips aninhados), classifica e extrai cada
-    ficheiro pelo próprio conteúdo — nunca pelo nome (ver anexos_edicao.py)
-    — compara com a edição anterior (novos/removidos/atualizados, preços
-    alterados, produtos novos/descontinuados) e sugere tarefas a partir do
-    que precisar de ação. Sempre como sugestão (suggested=True), nunca
-    confirmada nem enviada sozinha.
-
-    A classificação usa as mesmas regras partilhadas com o correio_semanal
-    (classification_rules.load_rules) e a prioridade da tarefa sugerida
-    segue a gravidade calculada por severity.py."""
-    rules = await classification_rules.load_rules(db)
-    try:
-        processed = await asyncio.to_thread(anexos_edicao.process_zip, zip_bytes, zip_filename, rules)
-    except Exception as e:
-        logger.error(f"Processamento do Anexos_Edição falhou: {e}")
-        await notifications.create_notification(
-            db, dedup_key=f"doc-read-fail-anexos-{email_id}", category="document_read_failure",
-            title="Falha na leitura de um documento",
-            body=f"Processamento do Anexos_Edição ({zip_filename}) falhou.", url="/emails")
-        return None
-    if not processed.get("edition_number"):
-        processed["edition_number"] = fallback_edition
-    if not processed.get("edition_number"):
-        return None
-
-    prev_list = await db.anexos_edicoes.find(
-        {"edition_number": {"$ne": processed["edition_number"]}}, {"_id": 0},
-    ).sort("created_at", -1).to_list(1)
-    prev = prev_list[0]["processed"] if prev_list else None
-    diff = anexos_edicao.diff_edicao_versions(prev, processed) if prev else None
-
-    await db.anexos_edicoes.insert_one({
-        "id": str(uuid.uuid4()), "email_id": email_id, "edition_number": processed["edition_number"],
-        "zip_filename": zip_filename, "processed": processed, "diff_since_previous": diff,
-        "created_at": now_iso()})
-
-    if diff and diff.get("price_changes"):
-        big_changes = [c for c in diff["price_changes"]
-                       if c.get("variacao_pct") is not None and abs(c["variacao_pct"]) >= PRICE_CHANGE_ALERT_PCT]
-        if big_changes:
-            top = big_changes[0]
-            extra = f" e mais {len(big_changes) - 1}" if len(big_changes) > 1 else ""
-            await notifications.create_notification(
-                db, dedup_key=f"price-change-{processed['edition_number']}",
-                category="price_change", title="Alteração importante de preços",
-                body=f"{top.get('descricao') or top['key']}: {top['preco_antigo']}€ → {top['preco_novo']}€ "
-                     f"({top['variacao_pct']:+.1f}%){extra}",
-                url="/emails")
-
-    created = 0
-    base_task = {"category": "construcao", "done": False, "priority": "media", "due_date": "",
-                 "repeat": "none", "subtasks": [], "labels": ["anexos-edicao"], "note_id": "", "group_id": ""}
-    for f in processed.get("files", []):
-        verb = ANEXOS_EDICAO_ACTIONABLE.get(f["category"])
-        if not verb:
-            continue
-        filename = f["path"].rsplit("/", 1)[-1]
-        exists = await db.tasks.find_one({"suggested": True, "edition_number": processed["edition_number"],
-                                           "source_path": f["path"]})
-        if exists:
-            continue
-        priority = severity_engine.LEVEL_TO_TASK_PRIORITY.get(f.get("severity"), "media")
-        await db.tasks.insert_one({
-            **base_task, "id": str(uuid.uuid4()), "priority": priority,
-            "title": f"[Anexos Edição {processed['edition_number']}] {verb}: {filename}",
-            "created_at": now_iso(), "suggested": True, "source": "anexos_edicao",
-            "edition_number": processed["edition_number"], "source_path": f["path"], "kind": "task",
-            "severity": f.get("severity")})
-        created += 1
-        if f.get("category") == "incidencia" and f.get("severity") == "critico":
-            try:
-                await notifications.create_notification(
-                    db, dedup_key=f"anexos-incidencia-{processed['edition_number']}-{f['path']}",
-                    category="anexos_incidencia_critica",
-                    title=f"Incidência crítica — Edição {processed['edition_number']}",
-                    body=filename, url="/emails")
-            except Exception as e:
-                logger.warning(f"Notificação de incidência crítica falhou: {e}")
-
-    created += await _suggest_new_categories(processed.get("unclassified_fingerprints"),
-                                              source="anexos_edicao", edition_ref=processed["edition_number"])
-
-    return {"processed": processed, "diff": diff, "suggested_tasks_created": created, "prev_processed": prev}
-
 
 # Extensão IMAP do Gmail: agrupa mensagens na mesma conversa com um ID
 # estável, mesmo quando os cabeçalhos de threading (Message-ID/In-Reply-To/
@@ -5031,8 +4432,7 @@ async def _match_client_reply(from_email, subject):
 
 
 def _extract_pdf_text(pdf_bytes):
-    """Texto de um PDF anexado a um email recebido — mesmo padrão de extração
-    já usado em anexos_edicao.py/correio_semanal.py (PyMuPDF), só que sem
+    """Texto de um PDF anexado a um email recebido (via PyMuPDF), sem
     classificação nenhuma: aqui só interessa procurar o nº BricoAval no texto."""
     try:
         import fitz
@@ -5371,7 +4771,7 @@ async def poll_supplier_replies():
         # concorrentes (ciclo automático + "Sincronizar" manual) de
         # processarem o mesmo email: só uma consegue inserir, a outra apanha
         # o erro de duplicado aqui, ANTES de gastar trabalho a processar
-        # anexos/PDF/Correio Semanal ou a criar notificações — não só antes
+        # anexos/PDF ou a criar notificações — não só antes
         # do insert final. O resto dos campos é preenchido no fim, com
         # update_one sobre este mesmo documento.
         try:
@@ -5380,16 +4780,15 @@ async def poll_supplier_replies():
             logger.debug(f"IMAP: uid {m['uid']} já reclamado por outra execução — a ignorar.")
             continue
         # A partir daqui o email já está "reclamado" (uid único inserido) —
-        # se qualquer passo abaixo (anexos, classificação IA, Correio
-        # Semanal, Anexos_Edição, resumo da edição) rebentar com uma
-        # exceção não apanhada, o índice único em "uid" impede para sempre
-        # que este email volte a ser tentado num próximo sync — ficaria
-        # preso com só {id, uid, received_at}, sem assunto, sem remetente,
-        # sem nada, e nunca mais reprocessável. Por isso todo este bloco
-        # está protegido: se algo falhar a meio, grava-se pelo menos o que
-        # já se sabia de forma segura antes de começar (remetente, assunto,
-        # corpo, a que pedido ficou associado) em vez de deixar um vestígio
-        # inútil e invisível.
+        # se qualquer passo abaixo (anexos, classificação IA) rebentar com
+        # uma exceção não apanhada, o índice único em "uid" impede para
+        # sempre que este email volte a ser tentado num próximo sync —
+        # ficaria preso com só {id, uid, received_at}, sem assunto, sem
+        # remetente, sem nada, e nunca mais reprocessável. Por isso todo
+        # este bloco está protegido: se algo falhar a meio, grava-se pelo
+        # menos o que já se sabia de forma segura antes de começar
+        # (remetente, assunto, corpo, a que pedido ficou associado) em vez
+        # de deixar um vestígio inútil e invisível.
         try:
             attachments_meta = []
             for att in m.get("attachments", []):
@@ -5404,58 +4803,6 @@ async def poll_supplier_replies():
             if rules_result["priority_override"]:
                 classification["priority"] = rules_result["priority_override"]
                 classification["priority_rank"] = EMAIL_PRIORITY_RANK[rules_result["priority_override"]]
-            correio_semanal_summary = ""
-            correio_semanal_result = None
-            anexos_result = None
-            att_filenames = [att["filename"] for att in m.get("attachments", [])]
-            if m.get("attachments") and _looks_like_correio_semanal(m["from_email"], m["subject"], att_filenames):
-                # O boletim e o pacote de anexos (Anexos_Edição.zip) chegam no
-                # mesmo email mas são processados por módulos diferentes — só o
-                # PDF vai para o resumo do Correio Semanal, só o zip para o
-                # anexos_edicao.
-                pdf_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".pdf")]
-                zip_atts = [a for a in m["attachments"] if a["filename"].lower().endswith(".zip")]
-                if pdf_atts:
-                    pdf_bytes_list = [a["data"] for a in pdf_atts]
-                    correio_semanal_summary = await _summarize_correio_semanal(m["subject"], pdf_bytes_list)
-                    correio_semanal_result = await _process_correio_semanal(m["subject"], pdf_bytes_list, email_id)
-                if zip_atts:
-                    fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
-                    anexos_result = await _process_anexos_edicao(
-                        zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
-            elif (m["from_email"] or "").strip().lower() == CORREIO_SEMANAL_SENDER:
-                # Veio do remetente dedicado ao Correio Semanal — que, por
-                # design, só envia este boletim, sempre em PDF (ver comentário
-                # em CORREIO_SEMANAL_SENDER) — mas não foi reconhecido: nem o
-                # assunto nem o nome de nenhum anexo bateram com o padrão
-                # esperado, ou não trouxe qualquer anexo. Nunca deixar isto
-                # passar como um email normal sem qualquer sinal — fica
-                # marcado como erro de processamento, visível no mesmo painel
-                # de "Reprocessar" usado para falhas a meio da extração.
-                await knowledge.mark_processing_error(
-                    db, email_id,
-                    "Não foi possível reconhecer este email como Correio Semanal "
-                    "(assunto vazio ou anexo sem nome reconhecível)."
-                    if m.get("attachments") else
-                    "Chegou sem qualquer anexo — o Correio Semanal vem sempre em PDF.")
-            edition_summary_result = None
-            if correio_semanal_result or anexos_result:
-                # Resumo único da edição — junta o que veio do boletim com o
-                # que veio do zip (um dos dois pode faltar) no formato pedido:
-                # nº de documentos, assuntos novos, alterações, tarefas
-                # criadas, campanhas iniciadas/terminadas, prazos desta
-                # semana, incidências críticas, informativos e erros.
-                edition_summary_result = edition_summary.build_summary(
-                    (correio_semanal_result or {}).get("digest"),
-                    (anexos_result or {}).get("processed"),
-                    (correio_semanal_result or {}).get("diff"),
-                    (anexos_result or {}).get("diff"),
-                    (correio_semanal_result or {}).get("prev_digest"),
-                    (anexos_result or {}).get("prev_processed"))
-                edition_summary_result["stats"]["tarefas_criadas"] = (
-                    ((correio_semanal_result or {}).get("suggested_tasks_created") or 0)
-                    + ((anexos_result or {}).get("suggested_tasks_created") or 0))
-                edition_summary_result["text"] = edition_summary.render_text(edition_summary_result["stats"])
             # O documento já existe (reclamado acima, logo no início) — o resto
             # dos campos é preenchido agora, calculado com o processamento feito
             # entretanto. "id"/"uid"/"received_at" já lá estão, não voltam a
@@ -5470,19 +4817,6 @@ async def poll_supplier_replies():
                 "attachments": attachments_meta,
                 "has_pdf": any(a["filename"].lower().endswith(".pdf") for a in attachments_meta),
                 **classification,
-                "correio_semanal_summary": correio_semanal_summary,
-                "correio_semanal_summary_at": now_iso() if correio_semanal_summary else "",
-                "correio_semanal_csn_number": (correio_semanal_result or {}).get("digest", {}).get("csn_number") or "",
-                "correio_semanal_diff": (correio_semanal_result or {}).get("diff"),
-                "correio_semanal_suggested_tasks": (correio_semanal_result or {}).get("suggested_tasks_created") or 0,
-                "anexos_edicao_number": (anexos_result or {}).get("processed", {}).get("edition_number") or "",
-                "anexos_edicao_summary": {
-                    "file_count": (anexos_result or {}).get("processed", {}).get("file_count"),
-                    "by_category": (anexos_result or {}).get("processed", {}).get("by_category"),
-                } if anexos_result else None,
-                "anexos_edicao_diff": (anexos_result or {}).get("diff"),
-                "anexos_edicao_suggested_tasks": (anexos_result or {}).get("suggested_tasks_created") or 0,
-                "edition_summary": edition_summary_result,
                 "message_id": m.get("message_id") or "", "in_reply_to": m.get("in_reply_to") or "",
                 "references": m.get("references") or [], "gm_thread_id": m.get("gm_thread_id") or "",
                 "match_method": match_method or "",
@@ -5496,8 +4830,7 @@ async def poll_supplier_replies():
             # associado) já eram conhecidos ANTES deste bloco arriscado
             # começar — não dependem de nada do que rebentou, por isso
             # gravam-se na mesma. "ingest_error" fica visível para
-            # diagnóstico (não há UI dedicada para isto além do Correio
-            # Semanal, mas pelo menos deixa de ser um email invisível).
+            # diagnóstico direto na base de dados.
             await db.received_emails.update_one({"id": email_id}, {"$set": {
                 "note_id": note_id or "",
                 "supplier_id": supplier_id or "", "supplier_name": supplier_name or "",
@@ -5516,9 +4849,7 @@ async def poll_supplier_replies():
             continue
         try:
             from_label = supplier_name or m.get("from_name") or m["from_email"]
-            if correio_semanal_result or anexos_result:
-                push_category = "correio_semanal"
-            elif reply_kind == "supplier":
+            if reply_kind == "supplier":
                 push_category = "supplier"
             elif reply_kind == "client":
                 push_category = "client"
@@ -5530,12 +4861,6 @@ async def poll_supplier_replies():
                 body=f"{from_label}: {m['subject'] or '(sem assunto)'}", url="/emails", note_id=note_id or None)
         except Exception as e:
             logger.warning(f"Notificação falhou (email {email_id}): {e}")
-        if correio_semanal_result:
-            try:
-                await knowledge.upsert_article_from_correio_semanal(
-                    db, email_id=email_id, correio_semanal_result=correio_semanal_result)
-            except Exception as e:
-                logger.warning(f"Criação do artigo do Centro de Conhecimento falhou (email {email_id}): {e}")
         if note_id:
             matched += 1
             if match_method == "bricoaval_number":
@@ -5632,86 +4957,6 @@ async def emails_sync():
     except Exception as e:
         logger.error(f"Sincronização IMAP falhou: {e}")
         raise HTTPException(status_code=502, detail="Não foi possível verificar a caixa de entrada.")
-    finally:
-        # Não bloqueia a resposta do sync — corre à parte, mesmo espírito
-        # do backfill de resumos já disparado no arranque.
-        auto_task = asyncio.create_task(_auto_process_correio_semanal())
-        _background_tasks.add(auto_task)
-        auto_task.add_done_callback(_background_tasks.discard)
-
-
-@api_router.get("/emails/correio-semanal/status")
-async def correio_semanal_status():
-    return await _correio_semanal_status_list()
-
-
-@api_router.post("/emails/{email_id}/process-correio-semanal")
-async def process_correio_semanal_email(email_id: str):
-    """Botão manual "⚡ Processar para o Centro de Conhecimento" / "🔄
-    Atualizar artigo" / "Tentar novamente" em Emails.jsx — funciona para
-    qualquer email reconhecido como Correio Semanal, incluindo os
-    recebidos antes desta funcionalidade existir."""
-    try:
-        article_id = await _process_correio_semanal_email(email_id)
-    except ValueError as e:
-        status_code = 409 if "já está a ser processado" in str(e) else 400
-        raise HTTPException(status_code=status_code, detail=str(e))
-    return {"ok": True, "article_id": article_id}
-
-
-@api_router.post("/emails/correio-semanal/upload")
-async def upload_correio_semanal(files: List[UploadFile] = File(...), subject: str = Form("")):
-    """Botão "Importar Correios Semanais" em Knowledge.jsx quando o PDF não
-    chegou por email (ex.: alguém reencaminha só o ficheiro por outra via) —
-    permite carregar o PDF diretamente e gera o resumo/artigo na mesma.
-    Reaproveita tal e qual o pipeline de um email recebido: cria um registo
-    "received_emails" sintético (para a lista de atenção, o histórico de
-    erro e o botão "Tentar novamente" funcionarem sem duplicar lógica),
-    guarda o(s) PDF(s) como anexos desse registo, e chama o mesmo
-    _process_correio_semanal_email usado pelo botão "Reprocessar"."""
-    pdf_files = [f for f in files if (f.filename or "").lower().endswith(".pdf")]
-    if not pdf_files:
-        raise HTTPException(status_code=400, detail="Só são aceites ficheiros PDF.")
-    if len(pdf_files) > MAX_ATTACHMENTS_PER_EMAIL:
-        raise HTTPException(status_code=400, detail=f"Máximo de {MAX_ATTACHMENTS_PER_EMAIL} PDFs por importação.")
-    email_id = str(uuid.uuid4())
-    attachments_meta = []
-    for f in pdf_files:
-        data = await f.read()
-        if len(data) > MAX_SUPPLIER_PDF_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'{f.filename}' é demasiado grande (máx. {MAX_SUPPLIER_PDF_BYTES // (1024 * 1024)} MB).")
-        att_id = str(uuid.uuid4())
-        await db.email_attachments.insert_one({
-            "id": att_id, "email_id": email_id, "note_id": "",
-            "filename": f.filename, "content_b64": base64.b64encode(data).decode(),
-            "direction": "received", "created_at": now_iso()})
-        attachments_meta.append({"id": att_id, "filename": f.filename, "size": len(data)})
-    # "uid" só existe para satisfazer o índice único de received_emails —
-    # este registo nunca passou pelo IMAP, por isso usa um valor sintético
-    # que nunca colide com um uid real (sempre numérico).
-    await db.received_emails.insert_one({
-        "id": email_id, "uid": f"manual-{email_id}", "received_at": now_iso(),
-        "note_id": "", "supplier_id": "", "supplier_name": "",
-        "from_email": CORREIO_SEMANAL_SENDER, "from_name": "Importação manual",
-        "reply_kind": "", "matched": False,
-        "subject": (subject or "").strip() or pdf_files[0].filename or "Correio Semanal (upload manual)",
-        "body": "", "body_html": "",
-        "attachments": attachments_meta, "has_pdf": True,
-        "priority": "normal", "priority_rank": EMAIL_PRIORITY_RANK["normal"], "category": "", "ai_summary": "",
-        "message_id": "", "in_reply_to": "", "references": [], "gm_thread_id": "",
-        "match_method": "manual_upload", "seen": True,
-    })
-    try:
-        article_id = await _process_correio_semanal_email(email_id)
-    except ValueError as e:
-        # O registo fica gravado — visível na lista de "atenção" (erro), com
-        # o mesmo botão "Tentar novamente" de qualquer outro Correio Semanal,
-        # para não se perder o PDF já enviado.
-        status_code = 409 if "já está a ser processado" in str(e) else 400
-        raise HTTPException(status_code=status_code, detail=str(e))
-    return {"ok": True, "article_id": article_id, "email_id": email_id}
 
 
 @api_router.get("/notes/{note_id}/emails")
@@ -8012,19 +7257,11 @@ async def ensure_indexes():
                         ("received_emails", "message_id"), ("received_emails", "in_reply_to"),
                         ("received_emails", "gm_thread_id"), ("received_emails", "references"),
                         ("email_attachments", "email_id"), ("email_attachments", "direction"),
-                        ("correio_semanal_digests", "csn_number"), ("correio_semanal_digests", "created_at"),
-                        ("anexos_edicoes", "edition_number"), ("anexos_edicoes", "created_at"),
-                        ("category_suggestions", "signature"), ("category_suggestions", "status"),
-                        ("tasks", "suggested"), ("tasks", "csn_number"), ("tasks", "edition_number"),
-                        ("tasks", "category_signature"), ("tasks", "status"), ("tasks", "assignee_id"),
+                        ("tasks", "suggested"), ("tasks", "status"), ("tasks", "assignee_id"),
                         ("tasks", "pinned"), ("tasks", "priority"), ("tasks", "due_date"),
                         ("task_history", "task_id"), ("collaborators", "name"),
                         ("task_templates", "pinned"), ("task_templates", "daily_trigger_time"),
                         ("tasks", "source_template_id"),
-                        ("tasks", "source_article_id"),
-                        ("knowledge_articles", "article_type"), ("knowledge_articles", "pinned"),
-                        ("knowledge_articles", "archived"), ("knowledge_articles", "csn_number"),
-                        ("knowledge_article_history", "article_id"),
                         ("auth_devices", "token"),
                         ("auth_devices", "device_id"),
                         ("pushed_alerts", "alert_id"),
@@ -8053,7 +7290,7 @@ async def ensure_indexes():
     # de forma independente e sem nenhum bloqueio; sem este índice, os dois
     # podiam passar ambos pela verificação find_one({"uid": ...}) antes de
     # qualquer um inserir, duplicando o email (e os efeitos associados —
-    # notificação, PDF, Correio Semanal). O índice único é a garantia real;
+    # notificação, PDF). O índice único é a garantia real;
     # o find_one em poll_supplier_replies() continua a existir só como
     # otimização, para evitar trabalho desnecessário no caso comum.
     #
@@ -8193,41 +7430,13 @@ async def _imap_poll_loop():
         await asyncio.sleep(max(IMAP_POLL_MINUTES, 1) * 60)
 
 
-async def _backfill_correio_semanal_summaries():
-    """Regenera o resumo de todos os Correios Semanais já guardados — cobre
-    tanto os que ainda não tinham resumo (funcionalidade nova) como os que
-    tinham um resumo gerado por IA de uma versão anterior, substituído aqui
-    pelo resumo determinístico. Sem custo de API nem limite de taxa (é só
-    processamento local), por isso corre sempre, sem condição. Corre uma vez
-    no arranque, em segundo plano — nunca bloqueia o arranque do servidor."""
-    try:
-        docs = await db.received_emails.find(
-            {"from_email": CORREIO_SEMANAL_SENDER},
-            {"_id": 0, "id": 1, "subject": 1},
-        ).to_list(200)
-        for d in docs:
-            atts = await db.email_attachments.find({"email_id": d["id"]}, {"_id": 0}).to_list(10)
-            if not atts:
-                continue
-            att_filenames = [a.get("filename") for a in atts]
-            if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject"), att_filenames):
-                continue
-            pdf_bytes_list = [base64.b64decode(a["content_b64"]) for a in atts]
-            summary = await _summarize_correio_semanal(d.get("subject"), pdf_bytes_list)
-            if summary:
-                await db.received_emails.update_one({"id": d["id"]}, {"$set": {
-                    "correio_semanal_summary": summary, "correio_semanal_summary_at": now_iso()}})
-    except Exception as e:
-        logger.error(f"Resumo automático de Correios Semanais em atraso falhou: {e}")
-
-
 DAILY_MAINTENANCE_INTERVAL_HOURS = 24
 
 # Alertas do Centro de Notificações (build_notifications) que também geram
 # uma notificação persistente — mapeados para categorias de
-# notification_prefs. quote_quality_issue/quote_changed/anexos_incidencia_critica
-# ficam de fora: já são notificados no próprio instante em que acontecem
-# (ver _apply_supplier_pdf, _process_anexos_edicao) — repetir aqui duplicaria.
+# notification_prefs. quote_quality_issue/quote_changed ficam de fora: já
+# são notificados no próprio instante em que acontecem (ver
+# _apply_supplier_pdf) — repetir aqui duplicaria.
 _ALERT_NOTIFY_KINDS = {"waiting_supplier", "forgotten", "urgent", "reminder_overdue", "deadline_approaching"}
 
 
@@ -8380,34 +7589,30 @@ async def _refresh_runtime_settings():
     novo de imediato). Corre uma vez no arranque e outra vez sempre que
     um destes grupos é gravado (ver put_settings_group)."""
     global DEFAULT_SLA_DAYS, REMINDER_INTERVAL_DAYS_DEFAULT, AUTO_CLOSE_MONTHS
-    global CATEGORY_SUGGESTION_THRESHOLD, SUPPLIER_QUOTE_HISTORY_LIMIT, IMAP_POLL_MINUTES
+    global SUPPLIER_QUOTE_HISTORY_LIMIT, IMAP_POLL_MINUTES
     global PIN_MAX_ATTEMPTS, PIN_LOCK_MINUTES
-    global MAX_SUPPLIER_PDF_BYTES, MAX_ANEXOS_ZIP_BYTES, MAX_EMAIL_ATTACHMENT_TOTAL_BYTES
+    global MAX_SUPPLIER_PDF_BYTES, MAX_EMAIL_ATTACHMENT_TOTAL_BYTES
     global MAX_ATTACHMENTS_PER_EMAIL
-    global INCLUDE_EMAIL_SIGNATURE, AUTO_GREETING, CORREIO_SEMANAL_SENDER
-    global DEADLINE_WARNING_DAYS, PRICE_CHANGE_ALERT_PCT, NOTIFICATION_SCAN_MINUTES
+    global INCLUDE_EMAIL_SIGNATURE, AUTO_GREETING
+    global DEADLINE_WARNING_DAYS, NOTIFICATION_SCAN_MINUTES
     automation = await app_settings.get_group(db, "automation_prefs")
     DEFAULT_SLA_DAYS = automation["default_sla_days"]
     REMINDER_INTERVAL_DAYS_DEFAULT = automation["reminder_interval_days"]
     AUTO_CLOSE_MONTHS = automation["auto_close_months"]
-    CATEGORY_SUGGESTION_THRESHOLD = automation["category_suggestion_threshold"]
     SUPPLIER_QUOTE_HISTORY_LIMIT = automation["supplier_quote_history_limit"]
     IMAP_POLL_MINUTES = automation["imap_poll_minutes"]
     DEADLINE_WARNING_DAYS = automation["deadline_warning_days"]
-    PRICE_CHANGE_ALERT_PCT = automation["price_change_alert_pct"]
     NOTIFICATION_SCAN_MINUTES = automation["notification_scan_minutes"]
     security = await app_settings.get_group(db, "security_prefs")
     PIN_MAX_ATTEMPTS = security["pin_max_attempts"]
     PIN_LOCK_MINUTES = security["pin_lock_minutes"]
     uploads = await app_settings.get_group(db, "upload_limits")
     MAX_SUPPLIER_PDF_BYTES = uploads["max_supplier_pdf_mb"] * 1024 * 1024
-    MAX_ANEXOS_ZIP_BYTES = uploads["max_anexos_zip_mb"] * 1024 * 1024
     MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = uploads["max_email_attachment_total_mb"] * 1024 * 1024
     MAX_ATTACHMENTS_PER_EMAIL = uploads["max_attachments_per_email"]
     email_prefs = await app_settings.get_group(db, "email_prefs")
     INCLUDE_EMAIL_SIGNATURE = email_prefs["include_signature"]
     AUTO_GREETING = email_prefs["auto_greeting"]
-    CORREIO_SEMANAL_SENDER = email_prefs["correio_semanal_sender"]
 
 
 @app.on_event("startup")
@@ -8423,12 +7628,6 @@ async def on_startup():
         logger.error(f"Startup falhou: {e}")
     if SMTP_CONFIGURED and IMAP_POLL_MINUTES > 0:
         _spawn_supervised("imap_poll", _imap_poll_loop)
-    backfill_task = asyncio.create_task(_backfill_correio_semanal_summaries())
-    _background_tasks.add(backfill_task)
-    backfill_task.add_done_callback(_background_tasks.discard)
-    knowledge_task = asyncio.create_task(_auto_process_correio_semanal())
-    _background_tasks.add(knowledge_task)
-    knowledge_task.add_done_callback(_background_tasks.discard)
     _spawn_supervised("daily_maintenance", _daily_maintenance_loop)
     _spawn_supervised("notification_retry", _notification_retry_loop)
     _spawn_supervised("notification_scan", _notification_scan_loop)
@@ -8732,16 +7931,6 @@ async def revoke_device(device_id: str):
     if not result.deleted_count:
         raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
     return {"ok": True}
-
-
-@api_router.get("/classification-rules")
-async def get_classification_rules_summary():
-    """Só leitura — resumo do que o motor de classificação (partilhado entre
-    Correio Semanal e Anexos_Edição) já reconhece, para a secção
-    'Classificação automática' das definições."""
-    rules = await classification_rules.load_rules(db)
-    return {"categories": [
-        {"category": cat, "keyword_count": len(keywords)} for cat, keywords in rules.items()]}
 
 
 @app.middleware("http")

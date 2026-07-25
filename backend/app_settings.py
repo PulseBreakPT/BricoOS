@@ -18,13 +18,12 @@ from datetime import datetime, timezone
 
 SETTINGS_DEFAULTS = {
     "notification_prefs": {
-        "supplier": True, "client": True, "correio_semanal": True, "unmatched": True,
+        "supplier": True, "client": True, "unmatched": True,
         "waiting_supplier": True, "forgotten": True, "urgent": True, "reminder_overdue": True,
-        "quote_quality_issue": True, "quote_changed": True, "anexos_incidencia_critica": True,
+        "quote_quality_issue": True, "quote_changed": True,
         "client_new_note": True, "task_urgent": True, "deadline_approaching": True,
-        "processing_error": True, "document_read_failure": True, "price_change": True,
+        "processing_error": True,
         "task_reminder": True, "tasks_overdue_digest": True,
-        "knowledge_new_article": True, "knowledge_engine_updated": True,
         "bricoaval_backfill": True,
     },
     "material_margins": {
@@ -36,16 +35,15 @@ SETTINGS_DEFAULTS = {
     },
     "automation_prefs": {
         "imap_poll_minutes": 5, "auto_close_months": 6, "default_sla_days": 2,
-        "reminder_interval_days": 3, "category_suggestion_threshold": 2,
+        "reminder_interval_days": 3,
         "supplier_quote_history_limit": 5, "deadline_warning_days": 1,
-        "price_change_alert_pct": 15, "notification_scan_minutes": 5,
-        "auto_process_correio_semanal": True,
+        "notification_scan_minutes": 5,
     },
     "security_prefs": {
         "pin_max_attempts": 3, "pin_lock_minutes": 10, "auto_lock_minutes": 0,
     },
     "upload_limits": {
-        "max_supplier_pdf_mb": 15, "max_anexos_zip_mb": 30,
+        "max_supplier_pdf_mb": 15,
         "max_email_attachment_total_mb": 20, "max_attachments_per_email": 5,
     },
     "defaults_prefs": {
@@ -54,7 +52,6 @@ SETTINGS_DEFAULTS = {
     },
     "email_prefs": {
         "include_signature": True, "auto_greeting": True,
-        "correio_semanal_sender": "pdv11880@mousquetaires.com",
     },
     "desktop_widget_limits": {
         "agenda_limit": 4, "pedidos_limit": 3, "correio_limit": 3,
@@ -71,15 +68,15 @@ NUMERIC_BOUNDS = {
     "automation_prefs": {
         "imap_poll_minutes": (0, 1440), "auto_close_months": (1, 60),
         "default_sla_days": (1, 365), "reminder_interval_days": (1, 90),
-        "category_suggestion_threshold": (1, 20), "supplier_quote_history_limit": (1, 50),
-        "deadline_warning_days": (1, 30), "price_change_alert_pct": (1, 100),
+        "supplier_quote_history_limit": (1, 50),
+        "deadline_warning_days": (1, 30),
         "notification_scan_minutes": (1, 1440),
     },
     "security_prefs": {
         "pin_max_attempts": (1, 20), "pin_lock_minutes": (1, 1440), "auto_lock_minutes": (0, 1440),
     },
     "upload_limits": {
-        "max_supplier_pdf_mb": (1, 200), "max_anexos_zip_mb": (1, 200),
+        "max_supplier_pdf_mb": (1, 200),
         "max_email_attachment_total_mb": (1, 200), "max_attachments_per_email": (1, 50),
     },
     "desktop_widget_limits": {k: (1, 20) for k in SETTINGS_DEFAULTS["desktop_widget_limits"]},

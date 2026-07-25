@@ -50,13 +50,11 @@ import CaixilhariaForm, {
   caixilhariaLabels, createEmptyCaixilharia, getCaixilhariaCatalog,
   normalizeCaixilhariaSpec, validateCaixilhariaSpec,
 } from "@/components/CaixilhariaForm";
-import KnowledgeArticlePicker from "@/components/KnowledgeArticlePicker";
 
 const emptyForm = {
   customer_name: "", phone: "", email: "", description: "", details: "",
   category: "construcao", quantity: "", reference: "", bricoaval_number: "",
   priority: "media", labels: [], supplier_id: "", sla_days: 2, reminder_interval_days: 3,
-  related_article_ids: [],
 };
 
 const BRICOAVAL_STATUS_LABEL = {
@@ -1822,23 +1820,6 @@ export default function PedidoDetail({ open, onOpenChange, noteId, initialTab = 
                     ))}
                   </div>
                 ) : null}
-              </div>
-
-              <SectionTitle title="Artigos relacionados" />
-              <div className="mt-3">
-                {editMode ? (
-                  <KnowledgeArticlePicker
-                    testIdPrefix="pedido-knowledge"
-                    selectedIds={form.related_article_ids || []}
-                    onChange={(ids) => set("related_article_ids", ids)}
-                  />
-                ) : (form.related_article_ids || []).length > 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {form.related_article_ids.length} artigo{form.related_article_ids.length === 1 ? "" : "s"} do Correio Semanal ligado{form.related_article_ids.length === 1 ? "" : "s"}.
-                  </p>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">Sem artigos relacionados.</p>
-                )}
               </div>
 
               <SectionTitle title="Fornecedor e alertas" />
