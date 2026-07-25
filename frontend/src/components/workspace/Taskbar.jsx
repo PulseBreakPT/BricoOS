@@ -55,8 +55,11 @@ function DockRouteApp({ app, active, onOpen }) {
       >
         <Icon className="h-5 w-5" strokeWidth={2} />
       </span>
+      {/* Indicador "ativo": muda de forma (cresce) e de cor (sinal
+          vermelho) — a mesma linguagem usada na navegação mobile
+          (pill escura + ícone a vermelho), nunca só uma pista de cor. */}
       <span
-        className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full bg-neutral-900 transition-all ${active ? "w-4 opacity-100" : "w-1 opacity-0 group-hover:opacity-40"}`}
+        className={`absolute -bottom-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full transition-all ${active ? "w-4 bg-[color:var(--signal)] opacity-100" : "w-1 bg-neutral-900 opacity-0 group-hover:opacity-40"}`}
       />
       <span className="os-dock-tooltip">{meta.title}</span>
     </button>
