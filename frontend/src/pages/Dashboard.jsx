@@ -231,9 +231,9 @@ export default function Dashboard() {
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-7 sm:gap-4 lg:grid-cols-4 3xl:gap-6">
         <StatCard index={0} testid="stat-open" icon={ClipboardList} label="Pedidos abertos" value={stats?.open_notes ?? "–"} accent="#7C3AED" />
-        <StatCard index={1} testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="#2563EB" />
-        <StatCard index={2} testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="#DC2626" danger />
-        <StatCard index={3} testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="#16A34A" />
+        <StatCard index={1} testid="stat-waiting" icon={Clock} label="À espera de fornecedor" value={stats?.pending_supplier ?? "–"} accent="info" />
+        <StatCard index={2} testid="stat-overdue" icon={AlertTriangle} label="Atrasados" value={stats?.overdue ?? "–"} accent="destructive" danger />
+        <StatCard index={3} testid="stat-avg" icon={Timer} label="Tempo médio resposta" value={stats ? formatHours(stats.avg_response_hours) : "–"} accent="success" />
       </div>
 
       {(() => {
@@ -241,7 +241,7 @@ export default function Dashboard() {
           alerts: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                <h2 className="font-heading text-h3 text-foreground">
                   Precisa de atenção {notifs.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-red-text)]">{notifs.count}</span> : null}
                 </h2>
                 <Link to="/" data-testid="link-ver-pedidos" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
@@ -276,14 +276,14 @@ export default function Dashboard() {
           needs_review: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">
+                <h2 className="font-heading text-h3 text-foreground">
                   Precisa de decisão {needsReview.count > 0 ? <span className="ml-1 rounded-full bg-[var(--pastel-amber-bg)] px-2 py-0.5 align-middle font-mono text-xs font-bold text-[color:var(--pastel-amber-text)]">{needsReview.count}</span> : null}
                 </h2>
                 <Link to="/" className="group inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
                   Ver pedidos <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                 </Link>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-text-body">
                 Orçamentos de fornecedor com leitura incompleta, alterados desde a última versão, ou prontos a enviar mas por confirmar.
               </p>
               <div className="mt-4 space-y-2">
@@ -318,7 +318,7 @@ export default function Dashboard() {
           pipeline: (
             <div className="rounded-2xl border border-border bg-card p-4 card-elevated sm:p-6">
               <div className="flex items-baseline justify-between">
-                <h2 className="font-heading text-lg font-extrabold tracking-tight text-foreground">Pipeline por estado</h2>
+                <h2 className="font-heading text-h3 text-foreground">Pipeline por estado</h2>
                 {pipelineTotal > 0 ? <span className="font-mono text-xs font-bold tabular-nums text-muted-foreground">{pipelineTotal} no total</span> : null}
               </div>
               {pipeline.length === 0 ? (
