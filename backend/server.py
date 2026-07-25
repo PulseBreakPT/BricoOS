@@ -4503,8 +4503,15 @@ async def _process_correio_semanal(subject, pdf_bytes_list, email_id):
             db, dedup_key=f"doc-read-fail-csn-extract-{email_id}", category="document_read_failure",
             title="Falha na leitura de um documento",
             body=f"Extração estruturada do Correio Semanal ({subject or 'sem assunto'}) falhou.", url="/emails")
+        # Marcado aqui (não só no retry manual) para que uma falha já na
+        # primeira passagem — durante o próprio "poll_supplier_replies" —
+        # também fique visível como "erro" em vez de o email ficar a
+        # parecer normal e nunca mais ninguém saber que isto aconteceu.
+        await knowledge.mark_processing_error(db, email_id, f"Extração estruturada falhou: {e}")
         return None
     if not structured or not structured.get("csn_number"):
+        await knowledge.mark_processing_error(
+            db, email_id, "Não foi possível reconhecer o número da edição neste PDF.")
         return None
 
     prev_list = await db.correio_semanal_digests.find(
@@ -4598,8 +4605,14 @@ async def _process_correio_semanal_email(email_id):
             await knowledge.mark_processing_error(db, email_id, str(e))
             raise ValueError(f"Falha ao processar: {e}")
         if not result:
-            msg = "Não foi possível reconhecer o número da edição neste PDF."
-            await knowledge.mark_processing_error(db, email_id, msg)
+            # _process_correio_semanal já marcou o erro específico (extração
+            # falhou / nº de edição não reconhecido) — só resta ler de volta
+            # a mensagem para a propagar, sem voltar a marcar (evitaria
+            # contar o mesmo erro duas vezes em correio_semanal_process_error_count).
+            email_after = await db.received_emails.find_one(
+                {"id": email_id}, {"_id": 0, "correio_semanal_process_error": 1})
+            msg = (email_after or {}).get("correio_semanal_process_error") \
+                or "Não foi possível processar este Correio Semanal."
             raise ValueError(msg)
         return await knowledge.upsert_article_from_correio_semanal(
             db, email_id=email_id, correio_semanal_result=result)
@@ -4625,9 +4638,12 @@ async def _correio_semanal_status_list():
     by_email = {a["email_id"]: a for a in articles if a.get("email_id")}
     items = []
     for d in docs:
-        att_names = [a.get("filename") for a in d.get("attachments") or []]
-        if not _looks_like_correio_semanal(CORREIO_SEMANAL_SENDER, d.get("subject"), att_names):
-            continue
+        # O filtro por remetente já aconteceu na query acima — reaplicar
+        # _looks_like_correio_semanal aqui (que também exige o assunto ou o
+        # nome de um anexo bater com o padrão) escondia da lista qualquer
+        # email deste remetente cujo assunto tivesse chegado vazio/atípico:
+        # não ficava "erro" nem "não processado", simplesmente desaparecia,
+        # como se nunca tivesse sido recebido.
         article = by_email.get(d["id"])
         status = knowledge.processing_status(d, article)
         items.append({
@@ -5395,6 +5411,21 @@ async def poll_supplier_replies():
                 fallback_edition = (correio_semanal_result or {}).get("digest", {}).get("csn_number")
                 anexos_result = await _process_anexos_edicao(
                     zip_atts[0]["data"], zip_atts[0]["filename"], email_id, fallback_edition)
+        elif (m["from_email"] or "").strip().lower() == CORREIO_SEMANAL_SENDER:
+            # Veio do remetente dedicado ao Correio Semanal — que, por
+            # design, só envia este boletim, sempre em PDF (ver comentário
+            # em CORREIO_SEMANAL_SENDER) — mas não foi reconhecido: nem o
+            # assunto nem o nome de nenhum anexo bateram com o padrão
+            # esperado, ou não trouxe qualquer anexo. Nunca deixar isto
+            # passar como um email normal sem qualquer sinal — fica
+            # marcado como erro de processamento, visível no mesmo painel
+            # de "Reprocessar" usado para falhas a meio da extração.
+            await knowledge.mark_processing_error(
+                db, email_id,
+                "Não foi possível reconhecer este email como Correio Semanal "
+                "(assunto vazio ou anexo sem nome reconhecível)."
+                if m.get("attachments") else
+                "Chegou sem qualquer anexo — o Correio Semanal vem sempre em PDF.")
         edition_summary_result = None
         if correio_semanal_result or anexos_result:
             # Resumo único da edição — junta o que veio do boletim com o
