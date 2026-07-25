@@ -144,7 +144,7 @@ export default function DesktopWidgets({ onOpenRoute }) {
                 return (
                   <li key={task.id} className="flex items-center gap-2">
                     <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${overdue ? "bg-red-500" : "bg-emerald-500"}`}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${overdue ? "bg-destructive" : "bg-success"}`}
                     />
                     <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-neutral-800">
                       {task.title}
@@ -174,13 +174,13 @@ export default function DesktopWidgets({ onOpenRoute }) {
               {notes.map((note) => (
                 <li key={note.id} className="flex items-center gap-2">
                   <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${note.is_overdue ? "bg-red-500" : "bg-neutral-400"}`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${note.is_overdue ? "bg-destructive" : "bg-neutral-400"}`}
                   />
                   <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-neutral-800">
                     {note.customer_name || note.title || "Pedido"}
                   </span>
                   {note.is_overdue ? (
-                    <span className="shrink-0 font-mono text-[8px] font-black uppercase text-red-500">
+                    <span className="shrink-0 font-mono text-[8px] font-black uppercase text-destructive">
                       parado
                     </span>
                   ) : null}

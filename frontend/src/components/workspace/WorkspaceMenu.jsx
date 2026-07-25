@@ -97,7 +97,7 @@ export default function WorkspaceMenu({ variant = "sidebar" }) {
                     e.stopPropagation();
                     handleDelete(w);
                   }}
-                  className="shrink-0 rounded p-1 text-slate-300 hover:text-red-600"
+                  className="shrink-0 rounded p-1 text-slate-300 hover:text-destructive"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

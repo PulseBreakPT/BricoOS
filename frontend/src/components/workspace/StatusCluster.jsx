@@ -144,7 +144,7 @@ function ClockAgenda({ now }) {
               {todayTasks.map((t) => (
                 <li key={t.id} className="flex items-center gap-2">
                   <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${isOverdue(t.due_date, t.done) ? "bg-red-500" : "bg-emerald-500"}`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${isOverdue(t.due_date, t.done) ? "bg-destructive" : "bg-success"}`}
                   />
                   <span className="min-w-0 flex-1 truncate text-[11px] 3xl:text-[13px] font-bold text-foreground">
                     {t.title}
