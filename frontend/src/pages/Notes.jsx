@@ -555,10 +555,10 @@ export default function Notes() {
         </span>
         <div className="min-w-0 flex-col">
           <p className="kicker">{greeting()}, Tiago</p>
-          <h1 data-testid="segment-title" className={`mt-0.5 font-heading text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl ${seg.accent}`}>
+          <h1 data-testid="segment-title" className={`mt-0.5 font-heading text-h1 ${seg.accent}`}>
             {seg.title}
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm text-text-body">
             {!today
               ? seg.subtitle
               : counts.waiting_me
@@ -592,7 +592,7 @@ export default function Notes() {
             className="flex w-full items-center gap-2 p-3 text-left sm:p-3.5"
           >
             <MailCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-            <span className="min-w-0 flex-1 truncate font-heading text-sm font-extrabold text-[color:var(--pastel-emerald-text)]">Prontos para enviar ao cliente</span>
+            <span className="min-w-0 flex-1 truncate font-heading text-h3 text-[color:var(--pastel-emerald-text)]">Prontos para enviar ao cliente</span>
             <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">{counts.to_confirm}</span>
             <ChevronDown className={`h-4 w-4 shrink-0 text-[color:var(--pastel-emerald-text)] transition-transform ${toConfirmOpen ? "rotate-180" : ""}`} />
           </button>
@@ -629,8 +629,8 @@ export default function Notes() {
             type="button" data-testid="attention-toggle" onClick={() => setAttentionOpen((v) => !v)}
             className="flex w-full items-center gap-2 p-3 text-left sm:p-3.5"
           >
-            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-            <span className="min-w-0 flex-1 truncate font-heading text-sm font-extrabold text-foreground">Precisa de atenção</span>
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="min-w-0 flex-1 truncate font-heading text-h3 text-foreground">Precisa de atenção</span>
             <span className="shrink-0 rounded-full bg-[var(--pastel-red-bg)] px-2 py-0.5 text-xs font-bold text-[color:var(--pastel-red-text)]">{today.attention_count}</span>
             <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${attentionOpen ? "rotate-180" : ""}`} />
           </button>
@@ -847,7 +847,7 @@ export default function Notes() {
           </EmptyMedia>
           <EmptyHeader className="max-w-xs gap-1">
             <EmptyTitle className="font-heading font-extrabold text-foreground">Sem pedidos nesta área</EmptyTitle>
-            <EmptyDescription className="text-muted-foreground">{seg.empty}</EmptyDescription>
+            <EmptyDescription className="text-text-body">{seg.empty}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <button onClick={openNew} className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background shadow-lg shadow-slate-400/40 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95">
@@ -923,9 +923,9 @@ function FocusCard({ note, index, total, onPrev, onNext, onOpen, onExit, actions
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: c.bg, color: c.text }}>{c.label}</span>
           {note.is_overdue ? <span className="rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]">Parado há {note.waiting_days}d</span> : null}
         </div>
-        <h2 className="mt-3 font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">{note.customer_name || "Sem nome"}</h2>
+        <h2 className="mt-3 font-heading text-h2 text-foreground">{note.customer_name || "Sem nome"}</h2>
         {note.phone ? <a href={`tel:${note.phone}`} title="Ligar ao cliente" className="font-mono text-sm text-muted-foreground hover:text-foreground hover:underline">{formatPhoneDisplay(note.phone)}</a> : null}
-        <p className="mt-3 text-base text-foreground">{note.description}</p>
+        <p className="mt-3 text-base text-text-body">{note.description}</p>
         {note.measurements ? <p className="mt-1 font-mono text-sm text-muted-foreground">Medidas: {note.measurements}</p> : null}
 
         <div className="mt-5 rounded-2xl bg-muted p-4">

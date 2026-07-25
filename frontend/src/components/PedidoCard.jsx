@@ -26,18 +26,18 @@ function PedidoPeekContent({ note, st }) {
         <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ backgroundColor: st.bg, color: st.text }}>
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.dot }} />{st.label}
         </span>
-        {note.is_overdue ? <span className="text-[11px] font-bold text-red-600">Parado há {note.waiting_days}d</span> : null}
+        {note.is_overdue ? <span className="text-[11px] font-bold text-destructive">Parado há {note.waiting_days}d</span> : null}
       </div>
-      {note.description ? <p className="line-clamp-3 text-xs text-muted-foreground">{note.description}</p> : null}
+      {note.description ? <p className="line-clamp-3 text-xs text-text-body">{note.description}</p> : null}
       {last ? (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Última alteração</p>
+          <p className="text-label uppercase text-muted-foreground">Última alteração</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{last.message} <span className="text-muted-foreground">· {timeAgo(last.created_at)}</span></p>
         </div>
       ) : null}
       {note.next_action ? (
         <div className="rounded-lg bg-muted p-2">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Próxima ação</p>
+          <p className="text-label uppercase text-muted-foreground">Próxima ação</p>
           <p className="mt-0.5 text-xs font-semibold text-foreground">{note.next_action}</p>
         </div>
       ) : null}
@@ -86,7 +86,7 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
         <div className="flex items-start justify-between gap-2">
           <QuickPeekTrigger as="div" className="min-w-0 flex-1" renderPeek={() => <PedidoPeekContent note={note} st={st} />}>
             <div className="flex items-center gap-2">
-              <h3 className="truncate font-heading text-base font-extrabold tracking-tight text-foreground">{note.customer_name || "Sem nome"}</h3>
+              <h3 className="truncate font-heading text-h3 text-foreground">{note.customer_name || "Sem nome"}</h3>
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: pr.bg, color: pr.text }}>
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pr.dot }} />{pr.label}
               </span>
@@ -137,7 +137,7 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
           </div>
         </div>
 
-        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{note.description}</p>
+        <p className="mt-2 line-clamp-2 text-sm text-text-body">{note.description}</p>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={note.category} />
@@ -159,16 +159,16 @@ export default function PedidoCard({ note, onOpen, actions, selected = false, on
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-emerald-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-emerald-text)]"><MailCheck className="h-3 w-3" /> Pronto p/ enviar</span>
           ) : null}
           {note.client_no_answer_count > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-red-600"><PhoneMissed className="h-3 w-3" /> Cliente s/ resposta {note.client_no_answer_count}×</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]"><PhoneMissed className="h-3 w-3" /> Cliente s/ resposta {note.client_no_answer_count}×</span>
           ) : null}
           {note.supplier_no_answer_count > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-red-600"><PhoneMissed className="h-3 w-3" /> Fornecedor s/ resposta {note.supplier_no_answer_count}×</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pastel-red-bg)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--pastel-red-text)]"><PhoneMissed className="h-3 w-3" /> Fornecedor s/ resposta {note.supplier_no_answer_count}×</span>
           ) : null}
         </div>
 
         {(note.recent_activities || []).length > 0 ? (
           <div className="mt-3 border-t border-border pt-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Últimas alterações</p>
+            <p className="text-label uppercase text-muted-foreground">Últimas alterações</p>
             <ul className="mt-1.5 space-y-1">
               {note.recent_activities.slice(0, 3).map((a, i) => (
                 <li key={i} className="flex items-baseline gap-1.5 text-[11px] text-muted-foreground">
