@@ -23,21 +23,36 @@ export const COUNTRY_CODES = [
 
 export const DEFAULT_COUNTRY_CODE = "+351";
 
+// País "não listado" — quando o indicativo do cliente não está em
+// COUNTRY_CODES, o campo troca para texto livre em vez de forçar um dos
+// indicativos conhecidos. Não é um indicativo real, por isso nunca pode
+// colidir com um valor de COUNTRY_CODES (todos começam por "+").
+export const OTHER_COUNTRY = "outro";
+
 // Ordenados uma única vez por comprimento de indicativo (do mais longo para
 // o mais curto) — um indicativo mais curto que seja prefixo de outro mais
 // longo (nenhum caso aqui, mas por segurança) nunca "rouba" a correspondência.
 const COUNTRY_CODES_BY_LENGTH = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
 export const MAX_DIGITS = 15; // limite prático do E.164, generoso para qualquer indicativo suportado
+export const OTHER_MAX_LENGTH = 32; // texto livre em modo "Outro" — mais folga que MAX_DIGITS por poder ter espaços/hífens
 
 export function splitPhone(value) {
   // Um valor não-string (ex.: um número, se algum chamador passar por engano)
   // fazia .trim() rebentar — normaliza sempre para string primeiro.
   const v = String(value ?? "").trim();
-  if (!v.startsWith("+")) return { country: DEFAULT_COUNTRY_CODE, digits: v };
-  const match = COUNTRY_CODES_BY_LENGTH.find((c) => v.startsWith(c.code));
-  return match
-    ? { country: match.code, digits: v.slice(match.code.length).trim() }
-    : { country: DEFAULT_COUNTRY_CODE, digits: v };
+  if (v.startsWith("+")) {
+    const match = COUNTRY_CODES_BY_LENGTH.find((c) => v.startsWith(c.code));
+    if (match) return { country: match.code, digits: v.slice(match.code.length).trim() };
+    // "+" seguido de um indicativo que não reconhecemos — país não
+    // listado, guarda o valor tal como está para o modo de texto livre.
+    return { country: OTHER_COUNTRY, digits: v };
+  }
+  // Sem "+": só dígitos mantém o comportamento antigo (assume Portugal —
+  // é como a app sempre guardou números novos deste país). Qualquer outro
+  // caráter (espaços, parênteses, hífen...) só pode ter vindo de alguém a
+  // escrever livremente em modo "Outro" antes de existir indicativo.
+  if (/^\d*$/.test(v)) return { country: DEFAULT_COUNTRY_CODE, digits: v };
+  return { country: OTHER_COUNTRY, digits: v };
 }
 
 // Agrupamento visual por país — como cada um deles costuma escrever o seu
@@ -95,6 +110,9 @@ function formatBR(digits) {
 
 export function formatNational(country, digits) {
   if (!digits) return "";
+  // Modo "Outro" (país não listado): sem grelha própria — mostra
+  // exatamente o que a pessoa escreveu, sem tentar agrupar.
+  if (country === OTHER_COUNTRY) return digits;
   if (country === "+49") return formatDE(digits);
   if (country === "+55") return formatBR(digits);
   const groups = GROUPS_BY_COUNTRY[country];
@@ -114,6 +132,10 @@ const EXPECTED_LENGTH = {
 // "empty" (nada escrito ainda) | "short" | "long" | "ok"
 export function phoneLengthStatus(country, digits) {
   if (!digits) return "empty";
+  // Modo "Outro": não há comprimento esperado a validar — qualquer coisa
+  // escrita conta como "ok" (a única validação real continua a ser a do
+  // backend, país-agnóstica).
+  if (country === OTHER_COUNTRY) return "ok";
   const range = EXPECTED_LENGTH[country];
   if (!range) return "ok";
   if (digits.length < range[0]) return "short";
@@ -177,6 +199,9 @@ export function formatPhoneDisplay(value) {
   const v = String(value ?? "").trim();
   if (!v) return "";
   const { country, digits } = splitPhone(v);
+  // Modo "Outro": não há indicativo a mostrar antes do número — "digits"
+  // já é o valor completo tal como foi escrito.
+  if (country === OTHER_COUNTRY) return digits;
   const national = formatNational(country, digits);
   return national ? `${country} ${national}` : country;
 }
