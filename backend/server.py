@@ -2513,11 +2513,14 @@ _TASK_STATUS_TRANSITIONS = {
 async def _set_task_status(task_id, status, actor=None):
     """Ponto único de transição de estado — usado por /toggle (atalho
     done↔todo) e por PATCH /tasks/{id}/status (qualquer transição válida).
-    Mantém `done` sempre sincronizado com `status` (done = status=="done"),
-    para não obrigar a migrar os sítios do código que ainda filtram por
-    `done` (agenda do ambiente de trabalho, etc.). Só ao entrar em "done"
-    é que a próxima ocorrência de uma tarefa repetida é criada — entrar em
-    "in_progress" ou "archived" nunca dispara isso."""
+    Mantém `done` sempre sincronizado com `status` (done = status in
+    ("done", "archived")), para não obrigar a migrar os sítios do código
+    que ainda filtram por `done` (agenda do ambiente de trabalho, etc.) —
+    "archived" só é alcançável a partir de "done" (ver
+    _TASK_STATUS_TRANSITIONS), por isso continua a ser uma tarefa
+    concluída, nunca pendente. Só ao entrar em "done" é que a próxima
+    ocorrência de uma tarefa repetida é criada — entrar em "in_progress"
+    ou "archived" nunca dispara isso."""
     task = await db.tasks.find_one({"id": task_id}, {"_id": 0})
     if not task:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
@@ -2531,7 +2534,7 @@ async def _set_task_status(task_id, status, actor=None):
         raise HTTPException(
             status_code=400,
             detail=f'Não é possível mudar de "{TASK_STATUS_LABELS[current]}" para "{TASK_STATUS_LABELS[status]}"')
-    update = {"status": status, "status_changed_at": now_iso(), "done": status == "done"}
+    update = {"status": status, "status_changed_at": now_iso(), "done": status in ("done", "archived")}
     await db.tasks.update_one({"id": task_id}, {"$set": update})
     await log_task_activity(
         task_id, "status_change", f"Estado alterado para {TASK_STATUS_LABELS[status]}", actor=actor)
